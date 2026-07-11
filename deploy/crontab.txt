@@ -1,0 +1,2 @@
+0 9,21 * * * cd /home/ubuntu/namoobi && ./venv/bin/python poll.py >> /home/ubuntu/namoobi/poll.log 2>&1
+*/5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
