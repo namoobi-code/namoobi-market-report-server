@@ -101,24 +101,65 @@
   </div>
   <div class="lead" id="lead_note" style="margin-top:12px"></div>
 
-  <h2 id="s318">3.1.8 AI 빅테크 자본지출 (CAPEX)</h2>
-  <div class="box" style="margin-bottom:12px"><table id="capex_t"></table></div>
-  <div class="grid g3">
+  <h2 id="s318">3.1.8 AI 빅테크 자본지출 (CAPEX)<em id="capex_asof"></em></h2>
+  <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="capex_t"></table></div>
+  <div class="grid g2">
     <div class="card"><div class="k">CAPEX 추이 (십억 달러)</div><canvas id="c_capex"></canvas></div>
     <div class="card"><div class="k">매출 추이 (십억 달러)</div><canvas id="c_rev"></canvas></div>
     <div class="card"><div class="k">잉여현금흐름 FCF (십억 달러)</div><canvas id="c_fcf"></canvas></div>
+    <div class="card"><div class="k">CAPEX / 매출 — AI 투자 강도 (%)</div><canvas id="c_ratio"></canvas></div>
   </div>
   <div class="lead" id="capex_c" style="margin-top:12px"></div>
 
-  <h2 id="s319">3.1.9 메모리 + HBM 지표<em>반도체 주가 체크용</em></h2>
-  <div class="grid g4" id="hbm_tiles"></div>
-  <div class="grid g2" style="margin-top:12px">
-    <div class="card"><div class="k">HBM 업체별 점유율 (%) · 최신 실측</div><canvas id="c_hbm_share"></canvas></div>
-    <div class="card"><div class="k">메모리 스팟 현재가 (USD)</div><canvas id="c_hbm_spot"></canvas></div>
+  <h2 id="s319">3.1.9 메모리 + HBM 지표<em id="mem_asof"></em></h2>
+
+  <h3>① HBM 시장규모 · 수요 증가율</h3>
+  <div class="card"><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
+
+  <h3>② HBM ASP 추이 <span class="note">— 매일 08:30 자동 누적</span></h3>
+  <div class="grid g2">
+    <div class="box"><table id="asp_t"></table></div>
+    <div class="card"><canvas id="c_asp"></canvas></div>
   </div>
-  <h3>메모리 3사 EPS · PER 전망</h3>
-  <div class="box" style="margin-bottom:12px"><table id="hbm_eps"></table></div>
-  <div class="card"><div class="k">예상 PER 추이 (배)</div><canvas id="c_per"></canvas></div>
+
+  <h3>③ HBM 업체별 점유율 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="share_t"></table></div>
+    <div class="card"><canvas id="c_share"></canvas></div>
+  </div>
+
+  <h3>④ DRAM 현물(스팟) 지수 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="ds_t"></table></div>
+    <div class="card"><canvas id="c_ds"></canvas></div>
+  </div>
+
+  <h3>⑤ DRAM 고정거래(계약) 가격 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="dc_t"></table></div>
+    <div class="card"><canvas id="c_dc"></canvas></div>
+  </div>
+
+  <h3>⑥ NAND 현물(스팟) 가격 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="ns_t"></table></div>
+    <div class="card"><canvas id="c_ns"></canvas></div>
+  </div>
+
+  <h3>⑦ 모듈 · GDDR · NAND 계약 · 웨이퍼 추이</h3>
+  <div class="grid g2">
+    <div class="card"><div class="k">DRAM 모듈 현물</div><canvas id="c_ms"></canvas></div>
+    <div class="card"><div class="k">GDDR 현물</div><canvas id="c_gs"></canvas></div>
+    <div class="card"><div class="k">NAND 고정거래(계약)</div><canvas id="c_nc"></canvas></div>
+    <div class="card"><div class="k">NAND 웨이퍼 현물</div><canvas id="c_nw"></canvas></div>
+  </div>
+
+  <h3>⑧ HBM : DDR5 GB당 단가 격차</h3>
+  <div class="card"><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
+
+  <h3>⑨ 메모리 3사 EPS · PER <span class="note">— PER = 현재가 ÷ EPS 직접 계산</span></h3>
+  <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="val_t"></table></div>
+  <div class="card"><div class="k">PER 비교 (배)</div><canvas id="c_per"></canvas></div>
 
   <h2 id="s3110">3.1.10 관세청 수출 잠정치<em>10일 단위</em></h2>
   <div class="grid g2">

@@ -192,92 +192,114 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     $('lead_note').innerHTML=esc(M.korea_leading_comment||'기준 100 위는 경기 확장 국면, 아래는 수축 국면을 시사한다. 4개월 연속 상승 중.');
   }
 
-  /* ── 3.1.8 CAPEX ── */
-  const cx=M.bigtech_capex;
-  if(cx?.capex_series){
-    // 표는 차트와 동일한 capex_series 기준 (rows 배열엔 Meta가 누락돼 있어 불일치 방지)
-    const yrs=cx.capex_series.years;
-    const comp=Object.keys(cx.capex_series).filter(k=>k!=='years');
-    const cap=cx.capex_series, rev=cx.rev_series||{}, fcf=cx.fcf_series||{};
+  /* ── 3.1.8 CAPEX (db/capex.json) ── */
+  const cxd=b.capex?.data;
+  if(cxd){
+    $('capex_asof').textContent=`${cxd.asof} · 2023~2025 실측 교차검증`;
+    const YS=cxd.years, NM=cxd.companies;
     const fx=v=>(v===''||v==null)?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:0});
     $('capex_t').innerHTML=
-      `<tr><th rowspan="2">기업</th><th colspan="${yrs.length}" style="text-align:center">CAPEX</th>
-        <th colspan="${yrs.length}" style="text-align:center;border-left:2px solid #dfe3e7">매출</th></tr>
-       <tr>${yrs.map(y=>`<th style="text-align:right">${y}${y>=2026?'E':''}</th>`).join('')}
-        ${yrs.map((y,i)=>`<th style="text-align:right${i===0?';border-left:2px solid #dfe3e7':''}">${y}${y>=2026?'E':''}</th>`).join('')}</tr>`+
-      comp.map((n,ci)=>`<tr><td><b style="color:${PAL[ci]}">${esc(n)}</b></td>
-        ${(cap[n]||[]).map(v=>`<td class="num">${fx(v)}</td>`).join('')}
-        ${(rev[n]||[]).map((v,i)=>`<td class="num note"${i===0?' style="border-left:2px solid #dfe3e7"':''}>${fx(v)}</td>`).join('')}
+      `<tr><th rowspan="2">기업</th><th colspan="${YS.length}" style="text-align:center">CAPEX</th>
+        <th colspan="${YS.length}" style="text-align:center;border-left:2px solid #dfe3e7">매출</th></tr>
+       <tr>${YS.map(y=>`<th style="text-align:right">${y}${y>=2026?'E':''}</th>`).join('')}
+        ${YS.map((y,i)=>`<th style="text-align:right${i===0?';border-left:2px solid #dfe3e7':''}">${y}${y>=2026?'E':''}</th>`).join('')}</tr>`+
+      NM.map((n,ci)=>`<tr><td><b style="color:${PAL[ci]}">${esc(n)}</b></td>
+        ${cxd.capex[n].map(v=>`<td class="num">${fx(v)}</td>`).join('')}
+        ${cxd.revenue[n].map((v,i)=>`<td class="num note"${i===0?' style="border-left:2px solid #dfe3e7"':''}>${fx(v)}</td>`).join('')}
       </tr>`).join('')+
-      `<tr><td colspan="${1+yrs.length*2}" class="note">단위: 십억 달러 · 2026 이후는 가이던스/컨센서스(E) · ${esc(cx.asof||'')}</td></tr>`;
-    const S2=(o)=>{ if(!o) return null;
-      const ys=o.years, names=Object.keys(o).filter(k=>k!=='years');
-      return {ys, ds:names.map((n,i)=>({n,c:PAL[i],w:2,pt:2,d:o[n].map(v=>v===''?null:v)}))}; };
-    const a=S2(cx.capex_series), r2=S2(cx.rev_series), f=S2(cx.fcf_series);
-    if(a) mk($('c_capex'),a.ys,a.ds,{legend:true});
-    if(r2) mk($('c_rev'),r2.ys,r2.ds,{legend:true});
-    if(f) mk($('c_fcf'),f.ys,f.ds,{legend:true});
-    $('capex_c').innerHTML=esc(cx.comment||'');
+      `<tr><td colspan="${1+YS.length*2}" class="note">단위: 십억 달러 · 2026 이후는 가이던스/컨센서스</td></tr>`;
+    const S4=o=>NM.map((n,i)=>({n,c:PAL[i],w:2,pt:2,d:o[n].map(v=>v===''?null:v)}));
+    mk($('c_capex'),YS,S4(cxd.capex),{legend:true});
+    mk($('c_rev'),  YS,S4(cxd.revenue),{legend:true});
+    mk($('c_fcf'),  YS,S4(cxd.fcf),{legend:true});
+    mk($('c_ratio'),YS,S4(cxd.capex_to_rev),{legend:true});
+    $('capex_c').innerHTML=esc(cxd.comment||'');
   }
 
-  /* ── 3.1.9 메모리 + HBM ── */
-  const hb=M.hbm;
-  if(hb){
-    // 실측 스칼라 파서 — value / value_range("20-28") / value_pct / "32%E" 전부 대응
-    const num=(o,...ks)=>{
-      if(!o||typeof o!=='object') return null;
-      for(const k of ks){
-        const v=o[k];
-        if(v===''||v==null) continue;
-        if(typeof v==='number') return v;
-        const t=String(v), m=t.match(/\d+(?:\.\d+)?/g);
-        if(!m) continue;
-        if(m.length>=2 && /\d\s*[-~]\s*\d/.test(t)) return (parseFloat(m[0])+parseFloat(m[1]))/2;
-        return parseFloat(m[0]);
-      }
-      return null;
-    };
-    const txt=(o,...ks)=>{ if(!o) return null;
-      for(const k of ks){ const v=o[k]; if(v!==''&&v!=null) return v; } return null; };
-
-    // 값이 실제로 있는 타일만 (spot_index=DXI 는 유료 구독 전용 → 수집 불가, 항목 자체 제거)
-    const tiles=[['DDR5 16Gb 스팟','ddr5_16gb','USD'],['DDR4 8Gb 스팟','ddr4_8gb','USD'],
-      ['NAND MLC 64Gb','nand_mlc_64gb','USD'],['HBM3E 가격','hbm3e_price',''],['HBM4 가격','hbm4_price',''],
-      ['HBM 시장규모','hbm_market',''],['HBM 출하량','hbm_shipment',''],['DRAM 스팟-계약 갭','gap_ratio','%']];
-    $('hbm_tiles').innerHTML=tiles.map(([lab,key,u])=>{
-      const o=hb[key];
-      const val=txt(o,'value','value_range','value_pct');
-      if(val==null) return '';
-      return `<div class="card"><div class="k">${lab}</div>
-        <div class="v" style="font-size:17px">${esc(val)}${u?' '+u:''}</div>
-        <div class="s">${esc((o.spec||o.note||o.definition||'').slice(0,64))}</div></div>`;
-    }).filter(Boolean).join('');
-
-    // 업체별 점유율 — 최신 실측 (종전엔 하드코딩 2024년 값이 렌더되던 자리)
-    const sh=hb.share||{};
-    const pr=[['Samsung','samsung'],['SK hynix','sk_hynix'],['Micron','micron'],['기타','others']]
-      .map(([lab,k])=>[lab,num(sh,k)]).filter(([,v])=>v!=null);
-    if(pr.length>=2)
-      mk($('c_hbm_share'),pr.map(x=>x[0]),[{n:'점유율',d:pr.map(x=>x[1]),c:C.b}],{bar:true,y0:true});
-
-    // 메모리 스팟 현재가 (보고서 차트와 동일 — LIVE 실측)
-    const sp2=[['DDR5 16Gb','ddr5_16gb'],['DDR4 8Gb','ddr4_8gb'],['NAND MLC','nand_mlc_64gb']]
-      .map(([lab,k])=>[lab,num(hb[k],'value','value_range')]).filter(([,v])=>v!=null);
-    if(sp2.length)
-      mk($('c_hbm_spot'),sp2.map(x=>x[0]),[{n:'USD',d:sp2.map(x=>x[1]),c:C.o}],{bar:true,y0:true});
+  /* ── 3.1.9 메모리 + HBM (db/memory.json + series_mem_*) ── */
+  const md=b.memory?.data;
+  const SR=k=>(b['series_mem_'+k]?.data)||[];
+  // 누적 시계열 → Chart.js 데이터셋
+  function memTrend(el,key,opt={}){
+    const ser=[...SR(key)].sort((a,b2)=>a[0]<b2[0]?-1:1);
+    if(!ser.length) return;
+    const items=[...new Set(ser.flatMap(r=>Object.keys(r[1])))];
+    mk($(el), ser.map(r=>r[0].slice(5)),
+      items.map((it,i)=>({n:it,d:ser.map(r=>r[1][it]??null),c:PAL[i%PAL.length],w:2,pt:3})),
+      Object.assign({legend:true,y0:true,xt:8},opt));
   }
-  const he=b.hbm_eps?.data;
-  if(he){
-    const yrs=['y2025','y2026','y2027','y2028'];
-    const names=Object.keys(he).filter(k=>he[k]?.y2026_eps!=null);
-    $('hbm_eps').innerHTML=`<tr><th>기업</th>${yrs.map(y=>`<th style="text-align:right">${y.slice(1)} EPS</th>`).join('')}
-      ${yrs.map(y=>`<th style="text-align:right">${y.slice(1)} PER</th>`).join('')}</tr>`+
-      names.map(n=>`<tr><td><b>${esc(n)}</b></td>
-      ${yrs.map(y=>`<td class="num">${he[n][y+'_eps']?.toLocaleString()??'—'}</td>`).join('')}
-      ${yrs.map(y=>`<td class="num dn">${he[n][y+'_per']??'—'}</td>`).join('')}</tr>`).join('')+
-      `<tr><td colspan="9" class="note">한국기업 KRW · Micron USD</td></tr>`;
-    mk($('c_per'),yrs.map(y=>y.slice(1)+'년'),
-      names.map((n,i)=>({n,d:yrs.map(y=>he[n][y+'_per']),c:PAL[i]})),{legend:true,bar:true,y0:true});
+  // 표: 현재값 + 변동률
+  function priceTbl(id,tkey){
+    const t=md?.tables?.[tkey]; if(!t) return;
+    $(id).innerHTML=`<tr><th>품목</th><th style="text-align:right">평균가</th><th style="text-align:right">변동</th></tr>`+
+      t.rows.map(r=>{const c=r.chg_pct;
+        return `<tr><td><b>${esc(r.item)}</b></td><td class="num">${r.avg.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
+        <td class="num ${c>0?'up':(c<0?'dn':'note')}" ${Math.abs(c||0)>=5?'style="font-weight:800"':''}>${c==null?'—':(c>0?'+':'')+c.toFixed(2)+'%'}</td></tr>`;}).join('')+
+      `<tr><td colspan="3" class="note">갱신 ${esc(t.last_update)} · TrendForce</td></tr>`;
+  }
+  if(md){
+    $('mem_asof').textContent=`${md.asof} · 매일 08:30 서버 자동 수집`;
+    const H=md.hbm||{};
+
+    // ① HBM 시장규모
+    if(H.market){
+      const yr=H.market.revenue_bn.map(r=>r[0]);
+      const dy=Object.fromEntries(H.market.demand_yoy||[]);
+      mk($('c_hbm_mkt'),yr,[{n:'시장규모($B)',d:H.market.revenue_bn.map(r=>r[1]),c:C.g},
+        {n:'수요 증가율(%)',d:yr.map(y=>dy[y]??null),c:C.p,dash:[5,3],w:2.2}],{bar:true,legend:true,y0:true});
+      $('hbm_mkt_src').textContent=H.market.revenue_src;
+    }
+    // ② HBM ASP
+    if(H.asp){
+      $('asp_t').innerHTML=`<tr><th>제품</th><th style="text-align:right">가격(USD)</th><th style="text-align:right">변동</th><th>동인</th></tr>`+
+        H.asp.map(a=>`<tr><td><b>${esc(a.product)}</b></td><td class="num">${esc(a.price)}</td>
+        <td class="num ${a.trend==='up'?'up':'note'}">${esc(a.change||'—')}</td>
+        <td class="note">${esc((a.driver||'').slice(0,40))}</td></tr>`).join('');
+    }
+    memTrend('c_asp','hbm_asp');
+    // ③ 점유율
+    if(H.share){
+      const sr=Object.fromEntries((H.supplier_revenue||[]).map(r=>[r.vendor,r]));
+      $('share_t').innerHTML=`<tr><th>업체</th><th style="text-align:right">HBM 점유율</th><th style="text-align:right">매출 기준</th><th>비고</th></tr>`+
+        H.share.map(r=>{const v=sr[r.vendor]||{};
+        return `<tr><td><b>${esc(r.vendor)}</b></td><td class="num">${r.share_pct}%</td>
+        <td class="num note">${v.share_pct?`${v.share_pct}% ($${v.revenue_bn}B)`:'—'}</td>
+        <td class="note">${esc(r.note||'')}</td></tr>`;}).join('');
+    }
+    memTrend('c_share','hbm_share');
+    // ④⑤⑥ 가격 표 + 추세
+    priceTbl('ds_t','dram_spot');    memTrend('c_ds','dram_spot');
+    priceTbl('dc_t','dram_contract');memTrend('c_dc','dram_contract');
+    priceTbl('ns_t','nand_spot');    memTrend('c_ns','nand_spot');
+    // ⑦ 부가 4종
+    memTrend('c_ms','module_spot'); memTrend('c_gs','gddr_spot');
+    memTrend('c_nc','nand_contract'); memTrend('c_nw','nand_wafer');
+    // ⑧ HBM:DDR5 격차
+    if(H.per_gb){
+      const p=H.per_gb;
+      mk($('c_gap'),['DDR5 현물','HBM3','HBM3E','HBM4E'],
+        [{n:'USD/GB',d:[p.ddr5_spot_usd_per_gb,p.hbm3_usd_per_gb,p.hbm3e_usd_per_gb,p.hbm4_usd_per_gb],c:C.r}],
+        {bar:true,y0:true});
+      $('gap_src').textContent=`DDR5 현물이 HBM3E의 ${p.premium_x}배 — 통상 HBM이 5~6배 프리미엄인데 역전됨. ${p.note}`;
+    }
+    // ⑨ 밸류에이션
+    if(md.valuation){
+      const V=md.valuation;
+      const f=(v,K)=>v==null?'—':(K?Math.round(v).toLocaleString():v.toLocaleString(undefined,{maximumFractionDigits:2}));
+      $('val_t').innerHTML=`<tr><th>기업</th><th style="text-align:right">현재가</th>
+        <th style="text-align:right">TTM EPS</th><th style="text-align:right">PER</th>
+        <th style="text-align:right">2026E EPS</th><th style="text-align:right">PER</th>
+        <th style="text-align:right">2027E EPS</th><th style="text-align:right">PER</th></tr>`+
+        V.map(r=>{const K=r.currency==='KRW';
+        return `<tr><td><b>${esc(r.name)}</b></td><td class="num">${f(r.price,K)}</td>
+        <td class="num note">${f(r.eps_ttm,K)}</td><td class="num">${r.per_ttm}x</td>
+        <td class="num note">${f(r.eps_2026E,K)}</td><td class="num dn"><b>${r.per_2026E}x</b></td>
+        <td class="num note">${f(r.eps_2027E,K)}</td><td class="num" style="color:var(--ok)"><b>${r.per_2027E}x</b></td></tr>`;}).join('')+
+        `<tr><td colspan="8" class="note">PER = 현재가 ÷ EPS 직접 계산 (벤더 PER 은 기준주가 상이로 미사용) · ${esc(md.asof_valuation||'')}</td></tr>`;
+      mk($('c_per'),V.map(r=>r.name),
+        [{n:'TTM',d:V.map(r=>r.per_ttm),c:C.gy},{n:'2026E',d:V.map(r=>r.per_2026E),c:C.b},
+         {n:'2027E',d:V.map(r=>r.per_2027E),c:C.g}],{bar:true,legend:true,y0:true});
+    }
   }
 
   /* ── 3.1.10 관세청 수출 ── */

@@ -1,2 +1,3 @@
 0 9,21 * * * cd /home/ubuntu/namoobi && ./venv/bin/python poll.py >> /home/ubuntu/namoobi/poll.log 2>&1
 */5 * * * * ~/duckdns/duck.sh >/dev/null 2>&1
+30 8 * * * cd /home/ubuntu/namoobi && ./venv/bin/python scripts/fetch_memory.py work data/db >> /home/ubuntu/namoobi/memory.log 2>&1
