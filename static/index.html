@@ -35,9 +35,10 @@
   td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
   .up{color:var(--up)}.dn{color:var(--dn)}
   .note{font-size:11px;color:var(--tx2)}
-  canvas{max-height:200px}
+  /* Chart.js 무한 성장 방지 — 캔버스 높이를 못박는다(max-height 만으론 부족) */
+  canvas{height:200px!important;max-height:200px!important;width:100%!important}
   .cbox{position:relative}
-  .cbox canvas{max-height:none!important;height:100%!important}
+  .cbox canvas{height:100%!important;max-height:none!important}
   a{color:var(--dn);text-decoration:none}a:hover{text-decoration:underline}
   .links{display:flex;flex-wrap:wrap;gap:7px}
   .links a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--tx)}
@@ -112,8 +113,8 @@
   <h2 id="s319">3.1.9 메모리 + HBM 지표<em>반도체 주가 체크용</em></h2>
   <div class="grid g4" id="hbm_tiles"></div>
   <div class="grid g2" style="margin-top:12px">
-    <div class="card"><div class="k">HBM 시장 규모 · 출하량</div><canvas id="c_hbm_mkt"></canvas></div>
-    <div class="card"><div class="k">HBM 업체별 점유율 (%)</div><canvas id="c_hbm_share"></canvas></div>
+    <div class="card"><div class="k">HBM 업체별 점유율 (%) · 최신 실측</div><canvas id="c_hbm_share"></canvas></div>
+    <div class="card"><div class="k">메모리 스팟 현재가 (USD)</div><canvas id="c_hbm_spot"></canvas></div>
   </div>
   <h3>메모리 3사 EPS · PER 전망</h3>
   <div class="box" style="margin-bottom:12px"><table id="hbm_eps"></table></div>

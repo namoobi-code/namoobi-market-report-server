@@ -223,28 +223,48 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   /* ── 3.1.9 메모리 + HBM ── */
   const hb=M.hbm;
   if(hb){
+    // 실측 스칼라 파서 — value / value_range("20-28") / value_pct / "32%E" 전부 대응
+    const num=(o,...ks)=>{
+      if(!o||typeof o!=='object') return null;
+      for(const k of ks){
+        const v=o[k];
+        if(v===''||v==null) continue;
+        if(typeof v==='number') return v;
+        const t=String(v), m=t.match(/\d+(?:\.\d+)?/g);
+        if(!m) continue;
+        if(m.length>=2 && /\d\s*[-~]\s*\d/.test(t)) return (parseFloat(m[0])+parseFloat(m[1]))/2;
+        return parseFloat(m[0]);
+      }
+      return null;
+    };
+    const txt=(o,...ks)=>{ if(!o) return null;
+      for(const k of ks){ const v=o[k]; if(v!==''&&v!=null) return v; } return null; };
+
+    // 값이 실제로 있는 타일만 (spot_index=DXI 는 유료 구독 전용 → 수집 불가, 항목 자체 제거)
     const tiles=[['DDR5 16Gb 스팟','ddr5_16gb','USD'],['DDR4 8Gb 스팟','ddr4_8gb','USD'],
       ['NAND MLC 64Gb','nand_mlc_64gb','USD'],['HBM3E 가격','hbm3e_price',''],['HBM4 가격','hbm4_price',''],
-      ['HBM 시장규모','hbm_market',''],['HBM 출하량','hbm_shipment',''],['DRAM 갭 비율','gap_ratio','']];
+      ['HBM 시장규모','hbm_market',''],['HBM 출하량','hbm_shipment',''],['DRAM 스팟-계약 갭','gap_ratio','%']];
     $('hbm_tiles').innerHTML=tiles.map(([lab,key,u])=>{
-      const o=hb[key]; if(!o) return '';
-      const val=o.value!==''&&o.value!=null?o.value:'—';
+      const o=hb[key];
+      const val=txt(o,'value','value_range','value_pct');
+      if(val==null) return '';
       return `<div class="card"><div class="k">${lab}</div>
-        <div class="v" style="font-size:17px">${esc(val)}${u&&val!=='—'?' '+u:''}</div>
-        <div class="s">${esc((o.spec||o.note||'').slice(0,64))}</div></div>`;
-    }).join('');
-    const sh=hb.share;
-    if(sh && typeof sh==='object'){
-      const ent=Object.entries(sh).filter(([k,v])=>typeof v==='number'||(!isNaN(parseFloat(v))&&k!=='note'&&k!=='source'&&k!=='asof'));
-      if(ent.length) mk($('c_hbm_share'),ent.map(e=>e[0]),
-        [{n:'점유율',d:ent.map(e=>parseFloat(e[1])),c:C.b}],{bar:true,y0:true});
-    }
-    const mkt=hb.hbm_market, shp=hb.hbm_shipment;
-    const rows=[];
-    [['시장규모(십억$)',mkt],['출하량',shp]].forEach(([n,o])=>{
-      if(o && typeof o==='object' && !isNaN(parseFloat(o.value))) rows.push([n,parseFloat(o.value)]);
-    });
-    if(rows.length) mk($('c_hbm_mkt'),rows.map(r=>r[0]),[{n:'값',d:rows.map(r=>r[1]),c:C.o}],{bar:true,y0:true});
+        <div class="v" style="font-size:17px">${esc(val)}${u?' '+u:''}</div>
+        <div class="s">${esc((o.spec||o.note||o.definition||'').slice(0,64))}</div></div>`;
+    }).filter(Boolean).join('');
+
+    // 업체별 점유율 — 최신 실측 (종전엔 하드코딩 2024년 값이 렌더되던 자리)
+    const sh=hb.share||{};
+    const pr=[['Samsung','samsung'],['SK hynix','sk_hynix'],['Micron','micron'],['기타','others']]
+      .map(([lab,k])=>[lab,num(sh,k)]).filter(([,v])=>v!=null);
+    if(pr.length>=2)
+      mk($('c_hbm_share'),pr.map(x=>x[0]),[{n:'점유율',d:pr.map(x=>x[1]),c:C.b}],{bar:true,y0:true});
+
+    // 메모리 스팟 현재가 (보고서 차트와 동일 — LIVE 실측)
+    const sp2=[['DDR5 16Gb','ddr5_16gb'],['DDR4 8Gb','ddr4_8gb'],['NAND MLC','nand_mlc_64gb']]
+      .map(([lab,k])=>[lab,num(hb[k],'value','value_range')]).filter(([,v])=>v!=null);
+    if(sp2.length)
+      mk($('c_hbm_spot'),sp2.map(x=>x[0]),[{n:'USD',d:sp2.map(x=>x[1]),c:C.o}],{bar:true,y0:true});
   }
   const he=b.hbm_eps?.data;
   if(he){
