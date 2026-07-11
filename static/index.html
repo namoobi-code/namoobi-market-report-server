@@ -146,20 +146,40 @@
     <div class="card"><canvas id="c_ns"></canvas></div>
   </div>
 
-  <h3>⑦ 모듈 · GDDR · NAND 계약 · 웨이퍼 추이</h3>
+  <h3>⑦ NAND 고정거래(계약) 가격 추이</h3>
   <div class="grid g2">
-    <div class="card"><div class="k">DRAM 모듈 현물</div><canvas id="c_ms"></canvas></div>
-    <div class="card"><div class="k">GDDR 현물</div><canvas id="c_gs"></canvas></div>
-    <div class="card"><div class="k">NAND 고정거래(계약)</div><canvas id="c_nc"></canvas></div>
-    <div class="card"><div class="k">NAND 웨이퍼 현물</div><canvas id="c_nw"></canvas></div>
+    <div class="box"><table id="nc_t"></table></div>
+    <div class="card"><canvas id="c_nc"></canvas></div>
   </div>
 
-  <h3>⑧ HBM : DDR5 GB당 단가 격차</h3>
+  <h3>⑧ 스팟 − 계약 갭 <span class="note">— 계약가 인상 압력 선행지표</span></h3>
+  <div class="grid g2">
+    <div class="box"><table id="gap_t"></table></div>
+    <div class="card"><canvas id="c_spgap"></canvas></div>
+  </div>
+  <div class="src" id="spgap_src" style="margin-top:6px"></div>
+
+  <h3>⑨ HBM : DDR5 GB당 단가 격차</h3>
   <div class="card"><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
 
-  <h3>⑨ 메모리 3사 EPS · PER <span class="note">— PER = 현재가 ÷ EPS 직접 계산</span></h3>
+  <h3>⑩ 메모리 3사 EPS · PER <span class="note">— PER = 현재가 ÷ EPS 직접 계산</span></h3>
   <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="val_t"></table></div>
   <div class="card"><div class="k">PER 비교 (배)</div><canvas id="c_per"></canvas></div>
+
+  <h3>⑪ 선행지표 <span class="note">— 메모리 가격보다 먼저 움직이는 신호 · 전 항목 매일 갱신</span></h3>
+  <div class="grid g2">
+    <div class="box"><table id="lead_t"></table></div>
+    <div class="card"><div class="k">1년 성과 — 수요처(NVDA) vs 공급자(MU)</div><canvas id="c_lead1y"></canvas></div>
+  </div>
+  <div class="box" id="rs_box" style="margin-top:12px;display:none">
+    <div class="k" id="rs_k"></div>
+    <div class="lead" id="rs_note" style="margin-top:6px"></div>
+  </div>
+  <div class="card" style="margin-top:12px"><div class="k">메모리/GPU 상대강도 추이 (MU ÷ NVDA)</div><canvas id="c_rs"></canvas></div>
+
+  <h3>⑫ 지표 사전 <span class="note">— 의미 · 해석 방법 · 실제 변동 주기</span></h3>
+  <div class="box" style="overflow-x:auto"><table id="meta_t"></table></div>
+  <div class="src" style="margin-top:6px">※ '변동 주기'는 수집 주기가 아니라 값이 실제로 바뀌는 주기다. 계약가처럼 월 1회만 바뀌는 값은 추세선이 계단 모양으로 그려지는 것이 정상이다.</div>
 
   <h2 id="s3110">3.1.10 관세청 수출 잠정치<em>10일 단위</em></h2>
   <div class="grid g2">

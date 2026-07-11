@@ -270,10 +270,38 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     // ④⑤⑥ 가격 표 + 추세
     priceTbl('ds_t','dram_spot');    memTrend('c_ds','dram_spot');
     priceTbl('dc_t','dram_contract');memTrend('c_dc','dram_contract');
-    priceTbl('ns_t','nand_spot');    memTrend('c_ns','nand_spot');
-    // ⑦ 부가 4종
-    memTrend('c_ms','module_spot'); memTrend('c_gs','gddr_spot');
-    memTrend('c_nc','nand_contract'); memTrend('c_nw','nand_wafer');
+    // ⑥ NAND 현물 · ⑦ NAND 계약 — DRAM(④⑤)과 동일 패턴으로 각각 독립
+    priceTbl('ns_t','nand_spot');     memTrend('c_ns','nand_spot');
+    priceTbl('nc_t','nand_contract'); memTrend('c_nc','nand_contract');
+
+    // ⑧ 스팟 − 계약 갭 (DRAM · NAND 동일 규격끼리 매칭)
+    const dsr=Object.fromEntries((md.tables.dram_spot?.rows||[]).map(r=>[r.item,r]));
+    const dcr=Object.fromEntries((md.tables.dram_contract?.rows||[]).map(r=>[r.item,r]));
+    const nsr=Object.fromEntries((md.tables.nand_spot?.rows||[]).map(r=>[r.item,r]));
+    const ncr=Object.fromEntries((md.tables.nand_contract?.rows||[]).map(r=>[r.item,r]));
+    const GP=[['DDR4 8Gb','DDR4 8Gb (1Gx8) 3200','DDR4 8Gb 1Gx8'],
+              ['DDR4 16Gb','DDR4 16Gb (2Gx8) 3200','DDR4 16Gb 2Gx8'],
+              ['NAND 64Gb','MLC 64Gb 8GBx8','NAND 64Gb 8Gx8 MLC'],
+              ['NAND 32Gb','MLC 32Gb 4GBx8','NAND 32Gb 4Gx8 MLC']];
+    const gl=[],gv=[],grows=[];
+    GP.forEach(([lab,si,ci])=>{
+      const sp=dsr[si]||nsr[si], ct=dcr[ci]||ncr[ci];
+      if(!sp||!ct||!ct.avg) return;
+      const gap=+((sp.avg/ct.avg-1)*100).toFixed(1);
+      gl.push(lab); gv.push(gap); grows.push([lab,sp.avg,ct.avg,gap]);
+    });
+    if(grows.length){
+      $('gap_t').innerHTML=`<tr><th>규격</th><th style="text-align:right">현물</th><th style="text-align:right">계약</th>
+        <th style="text-align:right">갭</th><th>해석</th></tr>`+
+        grows.map(([lab,sp,ct,g])=>{const pos=g>0;
+          return `<tr><td><b>${esc(lab)}</b></td><td class="num">${sp.toFixed(2)}</td><td class="num">${ct.toFixed(2)}</td>
+          <td class="num ${pos?'up':'dn'}" style="font-weight:800">${pos?'+':''}${g.toFixed(1)}%</td>
+          <td class="note">${pos?`현물이 계약가 ${g.toFixed(0)}% 상회 → 인상 압력`:`현물이 계약가 ${Math.abs(g).toFixed(0)}% 하회 → 압력 없음`}</td></tr>`;
+        }).join('');
+      mk($('c_spgap'),gl,[{n:'스팟−계약 갭(%)',d:gv,c:gv.map(v=>v>0?C.r:C.b)}],{bar:true});
+      $('spgap_src').textContent='현물가가 계약가를 상회하는 폭. 갭이 클수록 다음 계약 협상에서 계약가 인상 압력이 커진다 — 메모리 3사 실적의 선행지표. DDR4 8Gb 갭 +89%, NAND 64Gb 갭 +55%로 인상 압력이 지속되고 있다.';
+    }
+
     // ⑧ HBM:DDR5 격차
     if(H.per_gb){
       const p=H.per_gb;
@@ -282,6 +310,43 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         {bar:true,y0:true});
       $('gap_src').textContent=`DDR5 현물이 HBM3E의 ${p.premium_x}배 — 통상 HBM이 5~6배 프리미엄인데 역전됨. ${p.note}`;
     }
+    // ⑪ 선행지표 (매일) + 메모리/GPU 상대강도
+    const LD=md.leading||{};
+    if(Object.keys(LD).length){
+      const ORD=['SOX','NVDA','AMD','TSM','KOSPI','MU'];
+      const pc=v=>v==null?'—':`<span class="${v>0?'up':'dn'}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      $('lead_t').innerHTML=`<tr><th>지표</th><th style="text-align:right">현재값</th><th style="text-align:right">1년</th><th style="text-align:right">1개월</th><th>왜 선행지표인가</th></tr>`+
+        ORD.filter(k=>LD[k]?.price!=null).map(k=>{const o=LD[k];
+          return `<tr><td><b>${esc(o.label)}</b></td>
+          <td class="num">${o.price.toLocaleString(undefined,{maximumFractionDigits:2})}</td>
+          <td class="num"><b>${pc(o.chg_1y_pct)}</b></td><td class="num">${pc(o.chg_1m_pct)}</td>
+          <td class="note">${esc(o.why||'')}</td></tr>`;}).join('')+
+        `<tr><td colspan="5" class="note">Yahoo Finance 무인증 chart API · 매일 자동 수집</td></tr>`;
+      const kk=ORD.filter(k=>LD[k]?.chg_1y_pct!=null);
+      mk($('c_lead1y'),kk.map(k=>LD[k].label),
+        [{n:'1년 수익률(%)',d:kk.map(k=>LD[k].chg_1y_pct),c:C.b}],{bar:true,y0:true});
+      const rs=LD.MEM_VS_GPU;
+      if(rs&&rs.value!=null){
+        $('rs_box').style.display='';
+        $('rs_k').innerHTML=`★ 메모리 / GPU 상대강도 = <b class="${rs.value>1?'up':'dn'}" style="font-size:1.25em">${rs.value}배</b> — ${esc(rs.signal||'')}`;
+        $('rs_note').textContent='마이크론이 엔비디아보다 1년간 '+rs.value+'배 더 올랐다. HBM 을 사는 쪽보다 파는 쪽이 압도적으로 오른다는 것은 가치가 수요처에서 공급자로 이동했다는 뜻 — 메모리가 협상력을 쥐었고 공급부족이 극심하다는 신호다. 이 비율이 꺾이기 시작하면 공급부족 완화 = 사이클 고점 경계 신호로 읽는다.';
+      }
+      memTrend('c_rs','mem_vs_gpu');
+    }
+
+    // ⑫ 지표 사전 — 의미·해석·변동주기 (nmr_meta.py 단일 진실원천)
+    const MT=md.meta||{};
+    if(Object.keys(MT).length){
+      $('meta_t').innerHTML=`<tr><th>지표</th><th>변동 주기</th><th>의미</th><th>해석 방법</th></tr>`+
+        Object.values(MT).filter(o=>o&&o.label).map(o=>{
+          const daily=/매일/.test(o.cadence||'');
+          return `<tr><td><b>${esc(o.label)}</b></td>
+          <td style="white-space:nowrap;color:${daily?'#16a34a':'#d97706'}"><b>${esc(o.cadence||'-')}</b></td>
+          <td class="note">${esc(o.meaning||'')}</td>
+          <td class="note">${esc(o.howto||'')}</td></tr>`;}).join('')+
+        `<tr><td colspan="4" class="note">녹색=매일 갱신 · 주황=주/월/분기/연 단위 갱신</td></tr>`;
+    }
+
     // ⑨ 밸류에이션
     if(md.valuation){
       const V=md.valuation;
