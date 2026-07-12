@@ -98,7 +98,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   ]);
   const M = rd?.markets || {};
 
-  $('meta').innerHTML=`최신 리포트 <b>${esc(rs[0]?.datetime||'—')}</b><br>지표 ${h.db_files}종 · 보고서 ${h.reports}건`;
+  $('meta').innerHTML=`최신 리포트 <b>${esc(rs[0]?.datetime||'—')}</b>`;
   // (2026-07-12) 앱셸 — 헤더·좌측(아카이브·APK·DB인벤토리)·nav 는 고정, 본문(.mainc)만 스크롤.
   //   좌측 항목(보고서·DB)은 항상 보이므로 nav 에서 뺀다 — nav 는 본문 섹션 점프 전용.
   $('nav').innerHTML=[['slive','실시간 시세'],
