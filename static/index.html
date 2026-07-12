@@ -9,16 +9,24 @@
   :root{--bg:#f6f7f9;--card:#fff;--line:#e4e7eb;--tx:#16191d;--tx2:#6b7480;
         --up:#d64545;--dn:#2f6fd0;--ok:#1e9e6a;--warn:#e08c1a;--dark:#16191d}
   *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:-apple-system,'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--tx);line-height:1.5;padding:22px 14px 70px;font-size:14px}
-  .wrap{max-width:1260px;margin:0 auto}
-  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:2px solid var(--dark)}
+  body{font-family:-apple-system,'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--tx);line-height:1.5;font-size:14px}
+  /* ── (2026-07-12) 앱셸: 헤더·좌측·네비는 고정, 본문(mainc)만 스크롤 ── */
+  .wrap{max-width:1260px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;
+        overflow:hidden;padding:18px 14px 10px}
+  .shell{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;margin-top:8px}
+  .side{min-height:0;display:flex;flex-direction:column;overflow:hidden}
+  .rightc{min-height:0;display:flex;flex-direction:column}
+  .mainc{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 8px 60px 0}
+  .mainc::-webkit-scrollbar,.invlist::-webkit-scrollbar,.side::-webkit-scrollbar{width:9px}
+  .mainc::-webkit-scrollbar-thumb,.invlist::-webkit-scrollbar-thumb,.side::-webkit-scrollbar-thumb{background:#cfd4da;border-radius:9px}
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:2px solid var(--dark);flex:0 0 auto}
   h1{font-size:21px;letter-spacing:-.3px}
   h1 span{color:var(--tx2);font-weight:400;font-size:13px;margin-left:7px}
   .meta{font-size:12px;color:var(--tx2);text-align:right}
-  nav{display:flex;flex-wrap:wrap;gap:5px;margin:6px 0 4px;position:sticky;top:0;z-index:100;background:var(--bg);padding:10px 0 9px;border-bottom:1px solid var(--line)}
+  nav{display:flex;flex-wrap:wrap;gap:5px;flex:0 0 auto;background:var(--bg);padding:0 0 9px;border-bottom:1px solid var(--line);margin-bottom:10px}
   nav a{font-size:11.5px;padding:4px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--tx2);text-decoration:none}
   nav a:hover{border-color:var(--dark);color:var(--tx)}
-  h2{font-size:15px;margin:34px 0 12px;padding-left:9px;border-left:3px solid var(--dark);scroll-margin-top:74px}
+  h2{font-size:15px;margin:34px 0 12px;padding-left:9px;border-left:3px solid var(--dark);scroll-margin-top:6px}
   h2 em{font-style:normal;color:var(--tx2);font-weight:400;font-size:12px;margin-left:6px}
   h3{font-size:12.5px;color:var(--tx2);margin:16px 0 8px;font-weight:600}
   .grid{display:grid;gap:12px}
@@ -47,24 +55,35 @@
   .dl{font-size:11.5px;background:var(--dark);color:#fff!important;padding:5px 12px;border-radius:5px}
   .box{background:var(--card);border:1px solid var(--line);border-radius:8px}
   /* (2026-07-12) 좌우 분할 — 좌: 보고서 아카이브 + DB 인벤토리(컴팩트), 우: 본문 */
-  .layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;align-items:start;margin-top:8px}
-  .side h2:first-child{margin-top:14px}
+
+  .side h2:first-child{margin-top:0}
+  .mainc>h2:first-child{margin-top:0}
+  .side .box{flex:0 0 auto}
   .side .rpt{padding:8px 10px;font-size:12px;flex-wrap:wrap;gap:4px}
-  .invlist{background:var(--card);border:1px solid var(--line);border-radius:8px;max-height:1200px;overflow-y:auto}
+  .invlist{background:var(--card);border:1px solid var(--line);border-radius:8px;flex:1 1 auto;min-height:110px;overflow-y:auto}
   .invlist .it{padding:7px 10px;border-top:1px solid var(--line)}
   .invlist .it:first-child{border-top:none}
   .invlist .l1{font-size:11.5px;display:flex;justify-content:space-between;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .invlist .l1 b{overflow:hidden;text-overflow:ellipsis}
   .invlist .l1 .m{color:var(--tx2);font-weight:400;flex-shrink:0}
   .invlist .l2{font-size:10.5px;color:var(--tx2);margin-top:2px;line-height:1.35}
-  @media(max-width:980px){.layout{grid-template-columns:1fr}}
+  /* 모바일·좁은 창: 앱셸 해제 → 평범한 문서 스크롤 (안드로이드 앱 웹뷰 포함) */
+  @media(max-width:980px){
+    .wrap{height:auto;overflow:visible;display:block;padding:18px 14px 60px}
+    .shell{display:block}
+    .side,.rightc,.mainc{display:block;overflow:visible;min-height:0}
+    .mainc{padding:0}
+    .invlist{max-height:420px}
+    nav{position:sticky;top:0;z-index:100;padding:10px 0 9px}
+  }
+  @media(max-height:620px) and (min-width:981px){ .side{overflow-y:auto} }
   .pill{display:inline-block;font-size:10.5px;padding:2px 8px;border-radius:4px;font-weight:600}
   .p-ok{background:#e4f5ee;color:var(--ok)}.p-warn{background:#fdf1e0;color:var(--warn)}.p-bad{background:#fbe9e9;color:var(--up)}
   .stages{display:flex;gap:5px;margin-bottom:12px;flex-wrap:wrap}
   .stage{flex:1;min-width:75px;text-align:center;padding:9px 4px;border-radius:6px;background:#eef0f3;font-size:12px;color:var(--tx2);border:1px solid var(--line)}
   .stage.on{background:var(--dark);color:#fff;font-weight:650;border-color:var(--dark)}
   .lead{font-size:12.5px;background:#fff;border:1px solid var(--line);border-left:3px solid var(--dark);border-radius:6px;padding:12px 14px;margin-bottom:12px;line-height:1.6}
-  footer{margin-top:46px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2);text-align:center}
+  footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2);text-align:center}
   .src{font-size:10.5px;color:var(--tx2);margin-top:6px}
 </style>
 </head>
@@ -73,9 +92,8 @@
     <div><h1>글로벌 시황 대시보드<span>namoobi market report</span></h1></div>
     <div class="meta" id="meta">불러오는 중…</div>
   </header>
-  <nav id="nav"></nav>
 
-  <div class="layout">
+  <div class="shell">
   <aside class="side">
   <h2 id="srpt">보고서 아카이브</h2>
   <div class="box" id="reports"></div>
@@ -93,6 +111,8 @@
 
 
   </aside>
+  <div class="rightc">
+  <nav id="nav"></nav>
   <main class="mainc">
   <h2 id="slive">실시간 시세<em>외부 링크</em></h2>
   <div class="links">
@@ -278,9 +298,10 @@
     <div class="card"><div class="k">공포탐욕지수 (0=극도의 공포 · 100=극도의 탐욕)</div><canvas id="c_fg"></canvas></div>
   </div>
 
+  <footer>보고서 목차 순서 · 리포트 실행 시점 스냅샷 · 실시간은 외부 링크 참조</footer>
   </main>
   </div>
-  <footer>보고서 목차 순서 · 리포트 실행 시점 스냅샷 · 실시간은 외부 링크 참조</footer>
+  </div>
 </div>
 <script src="/app.js"></script>
 </body></html>
