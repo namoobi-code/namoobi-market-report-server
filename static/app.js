@@ -460,11 +460,11 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
 
   /* ── KRX ── */
   const kx=b.krx_brief?.data;
-  if(kx) $('krx').innerHTML='<div class="note" style="margin-bottom:6px">업데이트: 매 실행 KRX 게시판 최신 회차 자동 조사 — 신규 회차 게시 시 갱신(주말·휴장일은 직전 거래일 회차)</div>'+
+  if(kx) $('krx').innerHTML='<div class="note" style="grid-column:1/-1;margin-bottom:2px">업데이트: 매 실행 KRX 게시판 최신 회차 자동 조사 — 신규 회차 게시 시 갱신(주말·휴장일은 직전 거래일 회차)</div>'+
     Object.entries(kx).filter(([k])=>k==='krx'||k==='short').map(([k,v])=>{
       const pfx=k==='krx'?'krx_brief':'short_brief', dir=`${k==='krx'?'krx':'short'}_${v.att_seq}`;
       let imgs='';
-      for(let i=1;i<=(v.pages||0);i++) imgs+=`<a href="/krxbrief/${dir}/${pfx}_p${i}.png" target="_blank"><img src="/krxbrief/${dir}/${pfx}_p${i}.png" style="width:100%;max-width:760px;border:1px solid var(--line,#ddd);border-radius:6px;margin-top:8px" loading="lazy" alt="${esc(v.title)} p${i}"></a>`;
+      for(let i=1;i<=(v.pages||0);i++) imgs+=`<a href="/krxbrief/${dir}/${pfx}_p${i}.png" target="_blank"><img src="/krxbrief/${dir}/${pfx}_p${i}.png" style="width:100%;border:1px solid var(--line,#ddd);border-radius:6px;margin-top:8px" loading="lazy" alt="${esc(v.title)} p${i}"></a>`;
       return `<div class="card"><div class="k">${k==='krx'?'KRX 증시 Brief':'공매도 데일리 브리프'}</div>
     <div class="v" style="font-size:14px">${esc(v.title)}</div>
     <div class="s">등록 ${esc(v.date)} · ${esc(v.pages)}p · <a href="https://open.krx.co.kr/contents/MKD/01/0101/01010000/MKD01010000.jsp" target="_blank" rel="noopener">원문(KRX)</a></div>${imgs}</div>`;}).join('');
