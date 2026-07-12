@@ -1,4 +1,4 @@
-import json, os, re, sqlite3
+import json, time, urllib.request, os, re, sqlite3
 from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, HTTPException
@@ -158,5 +158,35 @@ def apk_download(fname: str):
         raise HTTPException(404, "not found")
     return FileResponse(p, filename=fname,
         media_type="application/vnd.android.package-archive")
+
+# ── (2026-07-12) 6.2 코인 4종 1년 차트 (가격·거래량) ──
+#   Binance 공개 klines 를 서버가 대신 받아 1시간 캐시한다. 인증·과금 없음.
+#   클라이언트가 직접 부르면 CORS·사내망 차단에 걸리므로 서버 프록시로 우회한다.
+COINS = {"BTC": "BTCUSDT", "ETH": "ETHUSDT", "XRP": "XRPUSDT", "SOL": "SOLUSDT"}
+_coin_cache: dict = {}
+
+@app.get("/api/coin/{sym}")
+def coin_series(sym: str):
+    sym = sym.upper()
+    if sym not in COINS:
+        raise HTTPException(404, "unknown symbol")
+    now = time.time()
+    hit = _coin_cache.get(sym)
+    if hit and now - hit[0] < 3600:          # 1시간 캐시
+        return hit[1]
+    url = ("https://api.binance.com/api/v3/klines"
+           f"?symbol={COINS[sym]}&interval=1d&limit=365")
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "namoobi-dashboard"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            raw = json.loads(r.read().decode())
+        out = {"symbol": sym, "pair": COINS[sym],
+               "data": [{"t": k[0], "c": float(k[4]), "v": float(k[7])} for k in raw]}
+        _coin_cache[sym] = (now, out)
+        return out
+    except Exception as e:
+        if hit:                               # 실패 시 만료 캐시라도 준다
+            return hit[1]
+        return {"symbol": sym, "data": [], "error": str(e)}
 
 app.mount("/", StaticFiles(directory=BASE / "static", html=True), name="static")
