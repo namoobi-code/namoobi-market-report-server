@@ -573,8 +573,8 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     <div class="l2">${esc(r.desc)}</div></div>`).join('');
   $('inv_n').textContent=`${inv.length}종 전량`;
 
-  /* ── 보고서 ── */
-  $('reports').innerHTML=rs.map(r=>`<div class="rpt">
+  /* ── 보고서 (최신 5건만 — 서버는 7일치 보관, 목록은 5건으로 컷) ── */
+  $('reports').innerHTML=rs.slice(0,5).map(r=>`<div class="rpt">
     <div><b>${esc(r.datetime)}</b> <span class="note">· ${r.size_mb}MB</span></div>
     <a class="dl" href="/reports/${encodeURIComponent(r.file)}">다운로드</a></div>`).join('');
 })();
@@ -585,7 +585,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   const el=document.getElementById('apkbox');
   if(!el) return;
   if(!Array.isArray(rs)||!rs.length){el.innerHTML='<div class="rpt">릴리스 없음</div>';return;}
-  el.innerHTML=rs.map(r=>`<div class="rpt">
+  el.innerHTML=rs.slice(0,1).map(r=>`<div class="rpt">
     <div><b>${r.tag}</b> · ${r.published}${r.notes?`<br><span style="opacity:.75;font-size:11px">${r.notes}</span>`:''}<br><span style="opacity:.55;font-size:11px">${r.file} · ${r.size_mb}MB</span></div>
     <a class="dl" href="/apk/${encodeURIComponent(r.file)}">다운로드</a></div>`).join('');
 }).catch(()=>{});
