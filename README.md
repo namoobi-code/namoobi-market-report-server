@@ -13,7 +13,8 @@
 | | 위치 | 내용 |
 |---|---|---|
 | **PC — 서버 코드 작업본** | `D:\claudeCowork\namoobi-market-report-server` | 이 저장소. 여기서 고치고 → 서버 배포 → GitHub push |
-| **PC — 데이터 원본** | `D:\claudeCowork\_market_report_data\db\` | **DB 45종 원본** (git 추적 안 함 — `.gitignore: data/`) |
+| **PC — DB 정본** | `D:\claudeCowork\namoobi-market-report-server\db\` | **DB 52종 원본 — 이 저장소가 git 으로 버전관리·백업한다** |
+| **PC — 수집 중간산출물** | `D:\claudeCowork\_market_report_data\` | `nmr_*.json` · `report_data_*.json` · `poll.db` · `deriv_signals.db` · `krx_brief/` (DB 아님) |
 | **GitHub (백업)** | `namoobi-code/namoobi-market-report-server` (private) | 서버 코드 백업 |
 | **서버 (배포본)** | `ubuntu@141.147.160.13:~/namoobi/` | `app.py`·`static/`·`scripts/` + `data/db/` (PC에서 밀어넣은 사본) |
 
@@ -32,10 +33,16 @@ git add -A && git commit -m "..." && git push origin main
 
 키 = `D:\claudeCowork\SECURITY\nmr_deploy_key` · 토큰 = `D:\claudeCowork\SECURITY\githubtoken.txt`
 
-⚠️ **DB(`data/`)는 이 저장소에 없다.** 원본은 PC의 `_market_report_data\db\` 이고,
-서버로는 플러그인의 `scripts/sync_server.py` 가 밀어 넣는다. **서버 DB를 직접 고치지 말 것** —
-다음 동기화 때 PC 값으로 덮인다. (예외: 서버가 자체 생성하는 `poll.db` · `series_mem_*` 는
-sync_server 가 PC 로 되가져와 병합한다.)
+### DB 위치 (2026-07-12 이전)
+
+`db/` = **DB 정본 52종**. 종전엔 `_market_report_data\db\` 에 있어 **어느 저장소에도 속하지 않았고
+PC 로컬에만 존재**했다. 서버 코드 저장소로 옮겨 **git 버전관리 + GitHub 백업**이 함께 걸리게 했다.
+경로 해석은 `nmr_db.py` 의 `DBROOT_NAME` 한 곳이 정본이다(구 경로는 읽기 폴백만 유지).
+
+- 리포트 실행(`merge.py`)이 매일 `db/*.json` 을 갱신 → **여기서 `git commit` 하면 그날 DB가 백업**된다.
+- 서버(`~/namoobi/data/db/`)는 `sync_server.py` 가 밀어 넣는 **사본**이다. 서버 DB를 직접 고치지 말 것 —
+  다음 동기화 때 PC 값으로 덮인다.
+- 예외: 서버가 cron 으로 자체 누적하는 `poll.db` · `series_mem_*` 는 sync_server 가 PC 로 되가져와 병합한다.
 
 ---
 

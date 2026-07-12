@@ -1,0 +1,48 @@
+{
+ "marker": "2026-07",
+ "as_of": "2026-07-12",
+ "data": [
+  {
+   "country": "United States",
+   "rate": "3.50%-3.75%",
+   "asof": "2026-06-17",
+   "source": "Federal Reserve, FOMC Statement (federalreserve.gov, monetary20260617a.htm)",
+   "note": "동결 (4회 연속 동결, 파월 후임 Kevin Warsh 의장 체제)"
+  },
+  {
+   "country": "South Korea",
+   "rate": "2.50%",
+   "asof": "2026-05-28",
+   "source": "Bank of Korea, Monetary Policy Board decision (bok.or.kr)",
+   "note": "동결 (8회 연속 동결); 참고: 2026-07-16 회의에서 25bp 인상 전망(BNP파리바 등) 보도 있으나 아직 미확정"
+  },
+  {
+   "country": "Japan",
+   "rate": "1.00%",
+   "asof": "2026-06-16",
+   "source": "Bank of Japan, Statement on Monetary Policy (boj.or.jp, k260616a.pdf); Reuters/CNBC",
+   "note": "인상 (0.75%→1.00%, 1995년 이후 최고 수준, 정책위 7-1 찬성)"
+  },
+  {
+   "country": "China",
+   "rate": "3.00% (1Y LPR)",
+   "asof": "2026-06-20",
+   "source": "People's Bank of China, Loan Prime Rate announcement (english.www.gov.cn; Investing.com)",
+   "note": "동결 (13개월 연속 동결, 5년물 LPR은 3.50%)"
+  },
+  {
+   "country": "Eurozone",
+   "rate": "2.25%",
+   "asof": "2026-06-11",
+   "source": "European Central Bank, Monetary policy decisions (ecb.europa.eu, ecb.mp260611)",
+   "note": "인상 (예금금리 25bp 인상, 3년 만의 첫 인상, 2026-06-17 발효)"
+  },
+  {
+   "country": "United Kingdom",
+   "rate": "3.75%",
+   "asof": "2026-06-17",
+   "source": "Bank of England, Monetary Policy Summary and Minutes (bankofengland.co.uk, june-2026)",
+   "note": "동결 (7-2 표결로 동결, 2명은 4.00% 인상 주장; 직전 2025-12-18 인하로 3.75% 도달)"
+  }
+ ]
+}

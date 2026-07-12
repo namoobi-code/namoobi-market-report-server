@@ -1,0 +1,234 @@
+{
+ "marker": "2026-05-15",
+ "as_of": "2026-05-15",
+ "data": {
+  "quarter": "2026 Q1 (as of 2026-03-31)",
+  "filing_date": "2026-05-15",
+  "summary": "버크셔 해서웨이가 2026년 5월 15일 SEC에 제출한 2026년 1분기(3월 31일 기준) 13F-HR 공시에 따르면, 보통주 포트폴리오 평가액은 약 2631억달러로 전분기(2741.6억달러) 대비 약 4.0% 감소했다. 워런 버핏에서 그렉 아벨로 CEO가 교체된 이후 첫 13F로, 델타항공을 새로 편입하고 알파벳(구글) 비중을 3배 이상 늘리는 한편 비자·마스터카드·유나이티드헬스 등을 전량 매도하는 등 대대적인 포트폴리오 재편이 이루어졌다. 같은 시기 발표된 1분기 실적에서 버크셔의 현금 및 단기국채 보유액은 3974억달러로 사상 최고치를 기록했다. 다음 13F-HR(2026년 2분기, 6월 30일 기준)은 2026년 8월 14일까지 제출 예정으로 아직 공시되지 않았다.",
+  "cash": "현금 및 단기국채 보유액 3974억달러(2026년 1분기 말 기준, 사상 최고치, 전분기 3817억달러 대비 증가). 회사 규모 대비 현금 비중도 역대 최고 수준(약 31.7%)로 보도됨.",
+  "new_buys": [
+   {
+    "name": "Delta Air Lines Inc",
+    "ticker": "DAL",
+    "detail": "신규 3980만9456주 매입(평가액 약 26.5억달러). 2020년 팬데믹 당시 4대 항공사 지분을 전량 청산한 이후 처음으로 항공주에 재진입."
+   },
+   {
+    "name": "Alphabet Inc (Class C)",
+    "ticker": "GOOG",
+    "detail": "신규 358만5215주 매입(평가액 약 10.3억달러). 기존 보유 중인 Class A(GOOGL)와 별도의 신규 종류주 편입."
+   },
+   {
+    "name": "Macy's Inc",
+    "ticker": "M",
+    "detail": "신규 303만8355주 매입(평가액 약 5500만달러)."
+   }
+  ],
+  "added": [
+   {
+    "name": "Alphabet Inc (Class A)",
+    "ticker": "GOOGL",
+    "detail": "1784만6142주에서 5424만9798주로 약 204% 증가(평가액 약 156.0억달러), 이번 분기 최대 매수 종목."
+   },
+   {
+    "name": "New York Times Co",
+    "ticker": "NYT",
+    "detail": "506만5744주에서 1514만6535주로 약 199% 증가(평가액 약 12.7억달러)."
+   },
+   {
+    "name": "Lennar Corp (Class A)",
+    "ticker": "LEN",
+    "detail": "705만950주에서 1009만9642주로 약 43.2% 증가(평가액 약 8.8억달러)."
+   },
+   {
+    "name": "Lennar Corp (Class B)",
+    "ticker": "LEN-B",
+    "detail": "18만980주에서 23만7703주로 약 31.3% 증가(평가액 약 2000만달러)."
+   }
+  ],
+  "reduced": [
+   {
+    "name": "Chevron Corp",
+    "ticker": "CVX",
+    "detail": "1.302억주에서 8438만5856주로 약 35.2% 감소(평가액 약 174.6억달러), 이번 분기 최대 매도 종목."
+   },
+   {
+    "name": "Constellation Brands Inc",
+    "ticker": "STZ",
+    "detail": "1300만주에서 63만2890주로 약 95.1% 급감(평가액 약 9500만달러)."
+   },
+   {
+    "name": "Nucor Corp",
+    "ticker": "NUE",
+    "detail": "640만7749주에서 390만7075주로 약 39.0% 감소(평가액 약 6.6억달러)."
+   },
+   {
+    "name": "DaVita Inc",
+    "ticker": "DVA",
+    "detail": "3176만5065주에서 3010만585주로 약 5.2% 감소(평가액 약 46.3억달러)."
+   },
+   {
+    "name": "Bank of America Corp",
+    "ticker": "BAC",
+    "detail": "5.173억주에서 5.136억주로 약 0.7% 소폭 감소(평가액 약 250.4억달러)."
+   }
+  ],
+  "exited": [
+   {
+    "name": "Visa Inc",
+    "ticker": "V",
+    "detail": "830만주 전량 매도(전분기 평가액 약 29.1억달러)."
+   },
+   {
+    "name": "Mastercard Inc",
+    "ticker": "MA",
+    "detail": "399만주 전량 매도(전분기 평가액 약 22.8억달러)."
+   },
+   {
+    "name": "UnitedHealth Group Inc",
+    "ticker": "UNH",
+    "detail": "504만주 전량 매도(전분기 평가액 약 16.6억달러)."
+   },
+   {
+    "name": "Amazon.com Inc",
+    "ticker": "AMZN",
+    "detail": "228만주 전량 매도(전분기 평가액 약 5.3억달러)."
+   },
+   {
+    "name": "Aon PLC",
+    "ticker": "AON",
+    "detail": "360만주 전량 매도(전분기 평가액 약 12.7억달러)."
+   },
+   {
+    "name": "Domino's Pizza Inc",
+    "ticker": "DPZ",
+    "detail": "전량 매도."
+   }
+  ],
+  "top_holdings": [
+   {
+    "name": "Apple Inc",
+    "ticker": "AAPL",
+    "weight_or_value": "21.99% ($57.84B)",
+    "note": "227,917,808주 보유, 보유주식수 변동 없음"
+   },
+   {
+    "name": "American Express Co",
+    "ticker": "AXP",
+    "weight_or_value": "17.43% ($45.86B)",
+    "note": "151,610,700주 보유, 보유주식수 변동 없음"
+   },
+   {
+    "name": "Coca-Cola Co",
+    "ticker": "KO",
+    "weight_or_value": "11.56% ($30.42B)",
+    "note": "400,000,000주 보유, 보유주식수 변동 없음"
+   },
+   {
+    "name": "Bank of America Corp",
+    "ticker": "BAC",
+    "weight_or_value": "9.52% ($25.04B)",
+    "note": "513,624,165주, 소폭 감소(-0.7%)"
+   },
+   {
+    "name": "Chevron Corp",
+    "ticker": "CVX",
+    "weight_or_value": "6.64% ($17.46B)",
+    "note": "84,375,856주, 대폭 감소(-35.2%)"
+   },
+   {
+    "name": "Occidental Petroleum Corp",
+    "ticker": "OXY",
+    "weight_or_value": "6.55% ($17.22B)",
+    "note": "264,941,431주 보유, 변동 없음"
+   },
+   {
+    "name": "Alphabet Inc (Class A)",
+    "ticker": "GOOGL",
+    "weight_or_value": "5.93% ($15.60B)",
+    "note": "54,249,798주, 대폭 증가(+204.0%)"
+   },
+   {
+    "name": "Chubb Ltd",
+    "ticker": "CB",
+    "weight_or_value": "4.24% ($11.16B)",
+    "note": "34,249,183주 보유, 변동 없음"
+   },
+   {
+    "name": "Moody's Corp",
+    "ticker": "MCO",
+    "weight_or_value": "4.09% ($10.76B)",
+    "note": "24,669,778주 보유, 변동 없음"
+   },
+   {
+    "name": "Kraft Heinz Co",
+    "ticker": "KHC",
+    "weight_or_value": "2.78% ($7.32B)",
+    "note": "325,634,818주 보유, 변동 없음"
+   },
+   {
+    "name": "DaVita Inc",
+    "ticker": "DVA",
+    "weight_or_value": "1.76% ($4.63B)",
+    "note": "30,100,585주, 소폭 감소(-5.2%)"
+   },
+   {
+    "name": "Sirius XM Holdings Inc",
+    "ticker": "SIRI",
+    "weight_or_value": "1.10% ($2.88B)",
+    "note": "124,807,117주 보유, 변동 없음"
+   },
+   {
+    "name": "Verisign Inc",
+    "ticker": "VRSN",
+    "weight_or_value": "0.85% ($2.23B)",
+    "note": "8,989,880주 보유, 변동 없음"
+   },
+   {
+    "name": "Delta Air Lines Inc",
+    "ticker": "DAL",
+    "weight_or_value": "1.01% ($2.65B)",
+    "note": "39,809,456주, 신규 편입"
+   },
+   {
+    "name": "New York Times Co",
+    "ticker": "NYT",
+    "weight_or_value": "0.48% ($1.27B)",
+    "note": "15,146,535주, 대폭 증가(+199.0%)"
+   },
+   {
+    "name": "Capital One Financial Corp",
+    "ticker": "COF",
+    "weight_or_value": "0.50% ($1.30B)",
+    "note": "7,150,000주 보유, 변동 없음"
+   },
+   {
+    "name": "Ally Financial Inc",
+    "ticker": "ALLY",
+    "weight_or_value": "0.43% ($1.14B)",
+    "note": "29,000,000주 보유, 변동 없음"
+   },
+   {
+    "name": "Alphabet Inc (Class C)",
+    "ticker": "GOOG",
+    "weight_or_value": "0.39% ($1.03B)",
+    "note": "3,585,215주, 신규 편입"
+   },
+   {
+    "name": "Nucor Corp",
+    "ticker": "NUE",
+    "weight_or_value": "0.25% ($0.66B)",
+    "note": "3,907,075주, 대폭 감소(-39.0%)"
+   },
+   {
+    "name": "Lennar Corp (Class A)",
+    "ticker": "LEN",
+    "weight_or_value": "0.33% ($0.88B)",
+    "note": "10,099,642주, 증가(+43.2%)"
+   }
+  ],
+  "sources": [
+   "https://www.sec.gov/Archives/edgar/data/1067983/000119312526226661/0001193125-26-226661-index.htm",
+   "https://www.stocktitan.net/sec-filings/BRK/13f-hr-berkshire-hathaway-inc-sec-filing-085d6a6da075.html"
+  ]
+ }
+}
