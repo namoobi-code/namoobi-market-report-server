@@ -722,7 +722,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
   $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d316','3.1.6 FactSet'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],
     ['d33','3.3 미국'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
-    ['d4','4 원자재'],['d5','5 환율'],['d6','6 크립토'],['d7','7 증권사'],['d8','8 글로벌IB'],
+    ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d6','6 크립토'],['d7','7 증권사'],['d8','8 글로벌IB'],
     ['dB','부록B AI'],['dC','부록C 밸류체인'],['dD','부록D 관계도']]
     .map(([i,t])=>`<a href="#${i}" data-go2="${i}">${t}</a>`).join('');
 
@@ -869,13 +869,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   [['sp500','S&P 500'],['nasdaq100','나스닥 100']].forEach(([k,l])=>{
     const r=RB[k]; if(!r)return;
     rbh+=`<div class="grp">${l}</div>`;
-    const ch=[...(r.additions||[]).map(x=>({...x,act:'편입'})),...(r.deletions||[]).map(x=>({...x,act:'편출'}))];
+    let ch=[...(r.additions||[]).map(x=>({...x,act:'편입'})),...(r.deletions||[]).map(x=>({...x,act:'편출'}))];
+    (r.events||[]).forEach(ev=>{ if(ev&&typeof ev==='object'){
+      (ev.add||ev.in||[]).forEach(x=>ch.push({...x,act:'편입',when:ev.title||ev.date||''}));
+      (ev.remove||ev.out||[]).forEach(x=>ch.push({...x,act:'편출',when:ev.title||ev.date||''})); }});
     if(ch.length) rbh+=`<div class="box" style="overflow-x:auto"><table>
-      <tr><th>구분</th><th>티커</th><th>회사명</th><th>사업 내용</th><th>사유</th></tr>
+      <tr><th>구분</th><th>티커</th><th>회사명</th><th>사업 내용</th><th>사유</th><th>회차</th></tr>
       ${ch.map(x=>`<tr><td><b class="${x.act==='편입'?'up':'dn'}">${x.act}</b></td>
         <td><b>${E(x.ticker||x.symbol||'—')}</b></td><td>${E(x.name||'—')}</td>
-        <td class="note">${E(x.business||x.desc||'')}</td><td class="note">${E(x.reason||'')}</td></tr>`).join('')}</table></div>`;
-    if(Array.isArray(r.schedule)) rbh+=`<div class="lead" style="margin-top:10px">${r.schedule.map(x=>`• ${E(x)}`).join('<br>')}</div>`;});
+        <td class="note">${E(x.biz||x.business||x.desc||'')}</td><td class="note">${E(x.reason||'')}</td><td class="note">${E(x.when||'')}</td></tr>`).join('')}</table></div>`;
+    if(Array.isArray(r.schedule)&&r.schedule.length) rbh+=`<div class="lead" style="margin-top:10px">${r.schedule.map(x=>
+      typeof x==='string'?`• ${E(x)}`:`• <b>${E(x.q||x.cycle||'-')}</b> — 발표 ${E(x.announce||'-')} · 적용 ${E(x.effective||'-')}${x.note?` <span class="note">(${E(x.note)})</span>`:''}`).join('<br>')}</div>`;});
   $$('d_rebal').innerHTML=rbh||'<div class="note">데이터 없음</div>';
 
   /* ── 4. 원자재 ── */
