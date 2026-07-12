@@ -631,9 +631,75 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     ['<b>5</b> 성과 추적','추천 시점·가격을 DB에 기록해 <b>사후 수익률을 검증</b>','스크리닝 성적표'],
   ]);
 
+  tbl('tbl_auto',['단계','내용','되돌릴 수 있나'],[
+    ['<b>1</b> 백테스트','④가 고른 종목을 과거 데이터로 검증 — 수수료·세금·슬리피지 반영','<span class="up">위험 없음</span>'],
+    ['<b>2</b> 페이퍼 트레이딩','KIS <b>모의투자 계좌</b>로 실시간 주문 흐름 검증 (수개월)','<span class="up">위험 없음</span>'],
+    ['<b>3</b> 안전장치 구현','킬 스위치·손실 한도·주문 한도·멱등키·감사 로그','<span class="up">위험 없음</span>'],
+    ['<b>4</b> 소액 실계좌','잃어도 되는 금액만. 로그를 매일 눈으로 확인','<span class="dn">실제 손실 가능</span>'],
+    ['<b>5</b> 단계적 증액','수개월간 페이퍼 결과와 실계좌 결과가 일치할 때만','<span class="dn">실제 손실 가능</span>'],
+  ]);
+
+  tbl('tbl_fire',['항목','왜 중요한가'],[
+    ['<b>건강보험료</b>','퇴사 = 직장가입자 → <b>지역가입자</b>. 소득이 없어도 <b>재산·자동차</b>로 부과된다. 자산이 클수록 보험료도 크다'],
+    ['<b>세금</b>','금융소득 2천만원 초과 시 종합과세. 해외주식 양도세 22%. 인출 방식에 따라 실수령액이 달라진다'],
+    ['<b>국민연금 공백</b>','수령 개시(65세)까지의 <b>브리지 기간</b>을 자산으로 버텨야 한다. 조기 은퇴일수록 이 구간이 길다'],
+    ['<b>인플레이션</b>','연 2~3%면 20년 뒤 생활비는 <b>1.5~1.8배</b>. 목표액을 명목으로 잡으면 부족해진다'],
+    ['<b>수익률 순서 위험</b>','은퇴 <b>직후</b> 폭락하면 같은 평균 수익률이어도 자산이 먼저 고갈된다. 초기 몇 년이 결정적'],
+    ['<b>지출의 현실</b>','시간이 남으면 지출이 는다. 의료비는 나이 들수록 는다. 과거 지출 실측으로 잡을 것'],
+  ]);
+
+  /* ── 경제적 자유 계산기 (순수 클라이언트 산수 · 서버 불필요) ── */
+  const F={asset:20000,spend:4000,save:3000,ret:6,infl:2.5,swr:4};
+  const FD=[['asset','현재 순자산','만원'],['spend','연간 지출','만원'],['save','연간 저축','만원'],
+            ['ret','기대 수익률','%'],['infl','물가상승률','%'],['swr','인출률 (4%룰)','%']];
+  const fin=document.getElementById('fire_in');
+  if(fin){
+    fin.innerHTML=FD.map(([k,l,u])=>
+      `<div class="fr"><label for="f_${k}">${l}</label>
+       <input id="f_${k}" type="number" step="any" value="${F[k]}"><span class="u">${u}</span></div>`).join('');
+    let chart=null;
+    const won=v=>v>=10000?`${(v/10000).toFixed(2)}억`:`${Math.round(v).toLocaleString()}만`;
+    const calc=()=>{
+      FD.forEach(([k])=>{const v=parseFloat(document.getElementById('f_'+k).value); if(!isNaN(v))F[k]=v;});
+      const real=(1+F.ret/100)/(1+F.infl/100)-1;          // 실질 수익률
+      const target=F.spend*(100/F.swr);                    // 목표 자산 (오늘 물가 기준)
+      let a=F.asset, yrs=null; const path=[a];
+      for(let y=1;y<=60;y++){ a=a*(1+real)+F.save; path.push(a); if(yrs===null&&a>=target){yrs=y;} }
+      const rate=F.save/(F.save+F.spend)*100;              // 저축률
+      const pct=Math.min(100,F.asset/target*100);
+      const out=document.getElementById('fire_out');
+      out.innerHTML=
+        `<div class="fo"><span class="fl">퇴사까지</span><span class="fv big">${yrs===null?'60년+':yrs+'년'}</span></div>
+         <div class="fo"><span class="fl">목표 순자산 <span class="note">(연지출 × ${(100/F.swr).toFixed(0)})</span></span><span class="fv">${won(target)}원</span></div>
+         <div class="fo"><span class="fl">현재 진척률</span><span class="fv" style="color:${pct>=100?'var(--ok)':'var(--tx)'}">${pct.toFixed(1)}%</span></div>
+         <div class="fo"><span class="fl">저축률</span><span class="fv">${rate.toFixed(1)}%</span></div>
+         <div class="fo"><span class="fl">실질 수익률 <span class="note">(물가 차감)</span></span><span class="fv">${(real*100).toFixed(2)}%</span></div>
+         <div class="fo"><span class="fl">은퇴 후 연 인출액</span><span class="fv">${won(target*F.swr/100)}원</span></div>
+         <div class="note" style="margin-top:10px;line-height:1.5">모든 금액은 <b>오늘 물가 기준</b>(실질). 물가상승률을 수익률에서 차감해 계산하므로 목표액을 미래가치로 부풀릴 필요가 없다.</div>`;
+      const cv=document.getElementById('c_fire');
+      if(cv&&window.Chart){
+        const n=Math.min(path.length, (yrs||40)+6);
+        const data=path.slice(0,n).map(v=>Math.round(v/100));   // 만원 → 백만원
+        if(chart)chart.destroy();
+        chart=new Chart(cv,{type:'line',data:{labels:[...Array(n).keys()],
+          datasets:[{label:'순자산',data,borderColor:'#1e9e6a',backgroundColor:'rgba(30,158,106,.08)',
+                     fill:true,borderWidth:2,pointRadius:0,tension:.15},
+                    {label:'목표',data:Array(n).fill(Math.round(target/100)),borderColor:'#d64545',
+                     borderDash:[6,4],borderWidth:1.5,pointRadius:0,fill:false}]},
+          options:{responsive:true,maintainAspectRatio:false,animation:false,
+            plugins:{legend:{display:true,labels:{boxWidth:10,font:{size:10}}}},
+            scales:{x:{title:{display:true,text:'연차',font:{size:10}},ticks:{font:{size:10}}},
+                    y:{ticks:{font:{size:10}}}}}});
+      }
+    };
+    fin.querySelectorAll('input').forEach(i=>i.addEventListener('input',calc));
+    calc();
+  }
+
   // 탭 전환
-  const panes=['p_daily','p_db','p_ai','p_ta'];
+  const panes=['p_daily','p_db','p_ai','p_ta','p_auto','p_fire'];
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+    if(b.disabled||b.classList.contains('off')) return;   // 비활성 탭은 무시
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
     panes.forEach(id=>{const el=document.getElementById(id);
       if(el) el.classList.toggle('on', id===b.dataset.pane);});

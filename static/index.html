@@ -91,6 +91,8 @@
        background:#fff;border:1px solid var(--line);color:var(--tx2);white-space:nowrap;font-family:inherit}
   .tab:hover{border-color:var(--dark);color:var(--tx)}
   .tab.on{background:var(--dark);color:#fff;border-color:var(--dark)}
+  .tab.off,.tab:disabled{opacity:.42;cursor:not-allowed;background:#f1f2f4}
+  .tab.off:hover,.tab:disabled:hover{border-color:var(--line);color:var(--tx2)}
   .tab small{display:block;font-size:9.5px;font-weight:400;opacity:.65;margin-top:1px}
   .pane{display:none;flex:1;min-height:0;flex-direction:column}
   .pane.on{display:flex}
@@ -102,6 +104,18 @@
   .soon .badge{display:inline-block;font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:4px;
                background:#fdf1e0;color:var(--warn);margin-bottom:9px}
   @media(max-width:980px){ .tabs{justify-content:flex-start;order:3;width:100%} }
+  .fr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}
+  .fr:first-child{border-top:none}
+  .fr label{font-size:12px;color:var(--tx2);flex:1}
+  .fr input{width:130px;padding:6px 9px;border:1px solid var(--line);border-radius:5px;font-size:13px;
+            text-align:right;font-variant-numeric:tabular-nums;font-family:inherit;background:#fff;color:var(--tx)}
+  .fr input:focus{outline:none;border-color:var(--dark)}
+  .fr .u{font-size:11px;color:var(--tx2);width:34px}
+  .fo{display:flex;justify-content:space-between;padding:9px 0;border-top:1px solid var(--line)}
+  .fo:first-child{border-top:none}
+  .fo .fl{font-size:12px;color:var(--tx2)}
+  .fo .fv{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums}
+  .fo .fv.big{font-size:22px;color:var(--ok)}
 </style>
 </head>
 <body><div class="wrap">
@@ -112,6 +126,8 @@
       <button class="tab on" data-pane="p_db">DB data<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
       <button class="tab"    data-pane="p_ta">TradingAgents<small>종목 스크리닝</small></button>
+      <button class="tab"    data-pane="p_auto">자동매매<small>KIS · 선정종목 집행</small></button>
+      <button class="tab off" data-pane="p_fire" disabled title="준비 중">경제적 자유<small>퇴사 시뮬레이터</small></button>
     </div>
     <div class="meta" id="meta">불러오는 중…</div>
   </header>
@@ -175,6 +191,55 @@
       추천 시점·가격을 DB에 기록해 <b>사후 수익률을 추적</b>해야 신뢰할 수 있다.
     </div>
     <div class="src">⚠️ 투자 자문이 아니며, 스크리닝 결과는 참고용이다. 매매 판단과 책임은 사용자에게 있다.</div>
+  </div></div>
+
+  <!-- ⑤ 자동매매 (향후 개발) -->
+  <div class="pane" id="p_auto"><div class="soon">
+    <div class="hero"><span class="badge">향후 개발 · 설계 단계</span>
+      <h3>자동매매 — 선정 종목 집행 (KIS Open API)</h3>
+      <p>TradingAgents(④)가 고른 종목을 <a href="https://github.com/namoobi-code/namoobi-kis-autotrade" target="_blank" rel="noopener">namoobi-kis-autotrade</a>
+         가 한국투자증권 Open API 로 집행한다. <b>여기서부터는 실제 자금이 움직인다</b> — 스크리닝(④)까지는 틀려도 손해가 없지만,
+         이 단계는 버그 하나가 곧 손실이다. 안전장치를 먼저 만들고 로직은 그 다음이다.</p></div>
+    <h3>진행 순서 — 되돌릴 수 없는 단계는 마지막에</h3>
+    <div class="box"><table id="tbl_auto"></table></div>
+    <div class="lead" style="margin-top:14px">
+      <b>필수 안전장치 (이것 없이는 실계좌 금지)</b> — ① <b>킬 스위치</b>: 파일/플래그 하나로 전 주문 즉시 중단
+      ② <b>일일 손실 한도</b>: 도달 시 당일 매매 정지 ③ <b>1회·1종목 주문 한도</b>: 오류가 나도 피해가 한정되게
+      ④ <b>중복 주문 방지</b>: 재시작·네트워크 재시도 시 같은 주문이 두 번 나가지 않게 (멱등키)
+      ⑤ <b>전 주문 감사 로그</b>: 무엇을 왜 샀는지 사후 추적 가능하게 ⑥ <b>장 시작 직후·마감 직전 회피</b>: 변동성 급등 구간
+    </div>
+    <div class="src">⚠️ API 키·계좌번호는 저장소에 커밋하지 않는다 (<code>SECURITY/</code> 분리 · <code>.gitignore</code>).
+       ⚠️ 이 대시보드는 주문을 내지 않는다 — 집행은 별도 프로세스에서만.</div>
+  </div></div>
+
+  <!-- ⑥ 경제적 자유 -->
+  <div class="pane" id="p_fire"><div class="soon">
+    <div class="hero"><span class="badge">계산기 가동 · 트래킹은 향후</span>
+      <h3>경제적 자유 — 퇴사 시뮬레이터</h3>
+      <p>"얼마를 모으면 퇴사할 수 있나"를 산수로 확인한다. 통념인 <b>4% 룰</b>(연 지출의 25배를 모으면
+         원금을 헐지 않고 살 수 있다)을 기본값으로 두되, 이건 미국 주식·채권 과거 데이터 기반이라
+         <b>한국 거주자에게 그대로 적용되지 않는다</b>. 숫자를 바꿔가며 감을 잡는 용도다.</p></div>
+
+    <div class="grid g2">
+      <div class="card"><div class="k" style="margin-bottom:10px">입력</div>
+        <div id="fire_in"></div></div>
+      <div class="card"><div class="k" style="margin-bottom:10px">결과</div>
+        <div id="fire_out"><div class="note">값을 입력하면 계산됩니다</div></div></div>
+    </div>
+
+    <div class="card" style="margin-top:12px"><div class="k">순자산 성장 경로 (백만원)</div><canvas id="c_fire"></canvas></div>
+
+    <h3>계산에서 빠져 있는 것 — 실제로는 이게 더 크다</h3>
+    <div class="box"><table id="tbl_fire"></table></div>
+
+    <div class="lead" style="margin-top:14px">
+      <b>가장 흔한 함정</b> — ① <b>수익률을 낙관</b>한다: 연 7%는 장기 평균이지 매년 받는 값이 아니다.
+      은퇴 직후 몇 년간 폭락하면(<b>수익률 순서 위험</b>) 같은 평균 수익률이어도 자산이 먼저 고갈된다.
+      ② <b>지출을 과소평가</b>한다: 퇴사하면 시간이 남아 지출이 오히려 는다.
+      ③ <b>건강보험료</b>를 잊는다: 직장가입자에서 지역가입자로 바뀌면 재산·소득 기준으로 다시 매겨진다.
+    </div>
+    <div class="src">⚠️ 이 화면은 입력값에 대한 산수일 뿐 투자·재무 자문이 아니다. 수익률은 보장되지 않으며,
+       실제 결정 전에는 세무·재무 전문가와 상의할 것.</div>
   </div></div>
 
   <!-- ② DB data (현행 화면) -->
