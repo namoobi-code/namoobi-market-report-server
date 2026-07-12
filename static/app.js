@@ -459,10 +459,14 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
 
   /* ── KRX ── */
   const kx=b.krx_brief?.data;
-  if(kx) $('krx').innerHTML=Object.entries(kx).map(([k,v])=>`<div class="card">
-    <div class="k">${k==='krx'?'KRX 증시 Brief':'공매도 데일리 브리프'}</div>
+  if(kx) $('krx').innerHTML='<div class="note" style="margin-bottom:6px">업데이트: 매 실행 KRX 게시판 최신 회차 자동 조사 — 신규 회차 게시 시 갱신(주말·휴장일은 직전 거래일 회차)</div>'+
+    Object.entries(kx).filter(([k])=>k==='krx'||k==='short').map(([k,v])=>{
+      const pfx=k==='krx'?'krx_brief':'short_brief', dir=`${k==='krx'?'krx':'short'}_${v.att_seq}`;
+      let imgs='';
+      for(let i=1;i<=(v.pages||0);i++) imgs+=`<a href="/krxbrief/${dir}/${pfx}_p${i}.png" target="_blank"><img src="/krxbrief/${dir}/${pfx}_p${i}.png" style="width:100%;max-width:760px;border:1px solid var(--line,#ddd);border-radius:6px;margin-top:8px" loading="lazy" alt="${esc(v.title)} p${i}"></a>`;
+      return `<div class="card"><div class="k">${k==='krx'?'KRX 증시 Brief':'공매도 데일리 브리프'}</div>
     <div class="v" style="font-size:14px">${esc(v.title)}</div>
-    <div class="s">등록 ${esc(v.date)} · ${esc(v.pages)}p</div></div>`).join('');
+    <div class="s">등록 ${esc(v.date)} · ${esc(v.pages)}p · <a href="https://open.krx.co.kr/contents/MKD/01/0101/01010000/MKD01010000.jsp" target="_blank" rel="noopener">원문(KRX)</a></div>${imgs}</div>`;}).join('');
 
   /* ── 3.1.1 HY 스프레드 — DB 시계열(series_hy_oas)에서 계산, docx와 동일한 표+차트 ── */
   {const hs=S(b,'series_hy_oas'), hy=M.hy_spread||{};
@@ -787,6 +791,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   T('d_as',IH,idx(M.asia_markets)); T('d_eu',IH,idx(M.europe_markets));
 
   /* ── 3.2 한국 상세 ── */
+  { const _kc=document.getElementById('d_kinv');
+    if(_kc && !document.getElementById('kr_candles')){
+      const _div=document.createElement('div'); _div.id='kr_candles'; _div.style.cssText='grid-column:1/-1';
+      _div.innerHTML=['kospi','kosdaq'].map(k=>`<a href="/charts/${k}_tech.png" target="_blank"><img src="/charts/${k}_tech.png" style="width:100%;max-width:860px;border:1px solid var(--line,#ddd);border-radius:6px;margin:6px 0" loading="lazy" alt="${k} 일봉 캔들·수급" onerror="this.parentElement.style.display='none'"></a>`).join('');
+      _kc.parentElement.insertBefore(_div,_kc); } }
   const KI=M.korea_investors||{};
   $$('d_kinv').innerHTML=['kospi','kosdaq'].filter(k=>KI[k]).map(k=>{
     const v=KI[k];
@@ -919,7 +928,6 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* ── 6. 크립토 ── */
   const mo=(CR.market_overview||{}).market_summary||{}, fg=(CR.fear_greed||{}).current||{};
   $$('d_cry').innerHTML=[
-    ['공포·탐욕 지수',fg.value??'—',fg.classification||''],
     ['24h 거래대금',mo.total_volume_24h?('$'+(mo.total_volume_24h/1e9).toFixed(1)+'B'):'—',`${mo.total_coins||0}개 코인`],
     ['24h 평균 등락',mo.avg_change_24h!=null?`${mo.avg_change_24h>0?'+':''}${mo.avg_change_24h}%`:'—',
       `상승 ${mo.coins_up||0} · 하락 ${mo.coins_down||0}`],
@@ -982,7 +990,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   T('d_ai',['분류','내용'],((R.ai_trends||{}).items||[]).map(i=>
     typeof i==='string'?['—',E(i)]
     :[`<span class="pill p-ok">${E(i.tag||'—')}</span>`,
-      `<b>${E(i.title||'')}</b><br><span class="note">${E(i.summary||'')}</span>`]));
+      `<b>${E(i.title||'')}</b><br><span class="note">${E(i.summary||'')}</span>`+
+      (i.url?`<br><a href="${esc(i.url)}" target="_blank" rel="noopener" class="note">출처: ${E(i.source||i.url)}${i.date?' · '+E(i.date):''}</a>`:(i.source?`<br><span class="note">출처: ${E(i.source)}${i.date?' · '+E(i.date):''}</span>`:''))]));
 
   /* ── 부록C 밸류체인 개별종목 ── */
   const AC=M.appendix_c||{};

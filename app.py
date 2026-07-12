@@ -116,6 +116,15 @@ def download(fname: str):
     return FileResponse(p, filename=fname,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
 
+@app.get("/krxbrief/{sub}/{fname}")
+def krxbrief_img(sub: str, fname: str):
+    if not (re.fullmatch(r"[\w\-]+", sub) and re.fullmatch(r"[\w\-]+\.png", fname)):
+        raise HTTPException(400, "bad path")
+    p = BASE / "data" / "krx_brief" / sub / fname
+    if not p.exists():
+        raise HTTPException(404, "not found")
+    return FileResponse(p, media_type="image/png")
+
 @app.get("/api/poll/{metric}")
 def poll(metric: str, limit: int = 200):
     """서버가 1일 2회 수집한 김치프리미엄·공포탐욕 시계열"""
