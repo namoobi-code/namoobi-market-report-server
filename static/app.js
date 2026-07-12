@@ -589,3 +589,53 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     <div><b>${r.tag}</b> · ${r.published}${r.notes?`<br><span style="opacity:.75;font-size:11px">${r.notes}</span>`:''}<br><span style="opacity:.55;font-size:11px">${r.file} · ${r.size_mb}MB</span></div>
     <a class="dl" href="/apk/${encodeURIComponent(r.file)}">다운로드</a></div>`).join('');
 }).catch(()=>{});
+
+/* ══════════════════════════════════════════════════════════════════
+   (2026-07-12) 상단 탭 — 우측 영역(nav+본문) 통째 전환
+     ① daily 조사 data  : 매 실행 새로 조사 (docx 1~8·13장)   — 향후 개발
+     ② DB data          : 누적·버전관리 (현행 화면)            — 가동 중
+     ③ AI 추론 data     : 모델 판단 (docx 9~12장)              — 향후 개발
+     ④ TradingAgents    : 전종목 스크리닝                       — 설계 단계
+   1/3/4 는 골격만 두고, 들어갈 내용을 표로 명시해 둔다.
+   ══════════════════════════════════════════════════════════════════ */
+(function(){
+  const esc2=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const tbl=(id,head,rows)=>{const el=document.getElementById(id); if(!el)return;
+    el.innerHTML=`<tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>`+
+      rows.map(r=>`<tr>${r.map((c,i)=>`<td${i===0?' style="white-space:nowrap"':''}>${c}</td>`).join('')}</tr>`).join('');};
+
+  tbl('tbl_daily',['docx 장','내용','성격'],[
+    ['<b>1</b>','글로벌 Top News 10','매일 교체'],
+    ['<b>2</b>','글로벌 주요 이벤트 캘린더','매일 교체'],
+    ['<b>3</b>','글로벌 증시 단·중·장기 추세','시세 — 매일 변동'],
+    ['<b>4</b>','원자재 종합 (에너지·금속·희토류·농산물)','시세 — 매일 변동'],
+    ['<b>5</b>','주요 환율 단·중·장기 추세','시세 — 매일 변동'],
+    ['<b>6</b>','암호화폐 시장','시세 — 매일 변동'],
+    ['<b>7</b>','한국 주요 증권사 리서치 (10사)','리서치 요약'],
+    ['<b>8</b>','글로벌 IB 리서치 (UBS·GS·JPM·MS·BlackRock)','리서치 요약'],
+    ['<b>13</b>','주의 사항 및 출처','메타'],
+  ]);
+
+  tbl('tbl_ai',['docx 장','내용','비고'],[
+    ['<b>9</b>','종합 분석 — 매크로·테마·리스크','수집 지표를 근거로 한 해석'],
+    ['<b>10</b>','자산별 단·중·장기 견해','주식·채권·원자재·환율·크립토'],
+    ['<b>11</b>','추천 포트폴리오 (공격형·중립형·안정형)','비중 제안 — 참고용'],
+    ['<b>12</b>','액션 아이템 — 단기·중기·장기 체크리스트','실행 항목'],
+  ]);
+
+  tbl('tbl_ta',['단계','내용','산출'],[
+    ['<b>1</b> 유니버스','코스피·코스닥 전종목 + 미국 상장 전종목','종목 마스터 DB'],
+    ['<b>2</b> 정량 필터','밸류(PER·PBR)·성장(매출·EPS 증가율)·수급·모멘텀·재무건전성으로 <b>수십 개까지 압축</b>','1차 후보'],
+    ['<b>3</b> 에이전트 토론','후보에만 적용 — 펀더멘털·기술·심리·뉴스 분석가가 의견 → 강세/약세 리서처 반박 토론','종목별 논거'],
+    ['<b>4</b> 리스크 심사','포트폴리오 관점(집중도·상관관계·변동성)에서 최종 채택 여부 결정','추천 리스트'],
+    ['<b>5</b> 성과 추적','추천 시점·가격을 DB에 기록해 <b>사후 수익률을 검증</b>','스크리닝 성적표'],
+  ]);
+
+  // 탭 전환
+  const panes=['p_daily','p_db','p_ai','p_ta'];
+  document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
+    panes.forEach(id=>{const el=document.getElementById(id);
+      if(el) el.classList.toggle('on', id===b.dataset.pane);});
+  }));
+})();

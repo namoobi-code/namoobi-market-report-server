@@ -2,21 +2,23 @@
  "marker": "2026-07",
  "as_of": "2026-07-12",
  "data": {
+  "asof": "2026-06-17 SEP(6월 FOMC) 중간값, 괄호 비교값은 2026-03-18 SEP(3월 FOMC)",
+  "unit": "%",
   "rows": [
    {
-    "year": "2026말",
+    "year": "2026년말",
     "jun": 3.8,
     "mar": 3.4,
     "change": "+0.4"
    },
    {
-    "year": "2027말",
+    "year": "2027년말",
     "jun": 3.6,
     "mar": 3.1,
     "change": "+0.5"
    },
    {
-    "year": "2028말",
+    "year": "2028년말",
     "jun": 3.4,
     "mar": 3.1,
     "change": "+0.3"
@@ -28,7 +30,7 @@
     "change": "+0.0"
    }
   ],
-  "asof": "2026-06-17",
-  "source": "Federal Reserve, Summary of Economic Projections, June 17, 2026 (federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf) — table includes both June median dots and the March 17-18, 2026 SEP median dots for comparison. Values are midpoint of appropriate target range for federal funds rate, year-end."
+  "note": "6월 SEP은 위원 8명 동결·1명 인하·9명 인상(1회 이상) 전망으로 분산, 관세·에너지가격발 인플레이션 우려로 3월 대비 매파적 전환. 3월 SEP은 2026년 1회·2027년 1회 추가 인하 시사.",
+  "source": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm (연준 공식 SEP, 2026-06-17 발표, 표 내 'March projection' 행 인용)"
  }
 }

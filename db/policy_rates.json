@@ -7,42 +7,42 @@
    "rate": "3.50%-3.75%",
    "asof": "2026-06-17",
    "source": "Federal Reserve, FOMC Statement (https://www.federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm)",
-   "note": "동결 (4회 연속 동결, Kevin Warsh 신임 의장 첫 회의). 다음 FOMC는 2026-07-29(7/28~29 회의)이며 시장은 동결 전망 우세(2026-07-08 의사록 공개, CNBC)."
+   "note": "동결 (4회 연속 동결). 다음 FOMC는 2026-07-28~29 예정이며 아직 미개최 — 시장은 동결 전망 우세. DB 대조: 기존값과 일치, 재확인 완료."
   },
   {
    "country": "South Korea",
    "rate": "2.50%",
    "asof": "2026-05-28",
    "source": "Bank of Korea, Monetary Policy Board decision (https://www.bok.or.kr/portal/singl/baseRate/list.do?dataSeCd=01&menuNo=200643)",
-   "note": "동결 유지 중(2026-05-28 결정이 최신 실측치). 2026-07-16 금통위 예정이나 아직 미개최 — BNP파리바 등은 25bp 인상(2.75%) 전망(글로벌이코노믹, 2026-07-10 보도)이지만 이는 전망치이며 실측 아님."
+   "note": "동결 유지 중(2026-05-28 결정이 최신 실측치). 2026-07-16 금통위 예정이나 오늘(2026-07-12) 기준 아직 미개최 — 인상 전망 보도(글로벌이코노믹 등)는 예측치이므로 반영하지 않음. DB 대조: 기존값과 일치, 재확인 완료."
   },
   {
    "country": "Japan",
    "rate": "1.00%",
    "asof": "2026-06-16",
    "source": "Bank of Japan, Statement on Monetary Policy (https://www.boj.or.jp/en/mopo/mpmdeci/mpr_2026/k260616a.pdf); CNBC",
-   "note": "인상 결정 (0.75%→1.00%, 1995년 이후 최고, 정책위 7-1 찬성). 다음 회의는 2026-07-30~31 예정, 시장은 동결 전망 우세."
+   "note": "인상 결정 (0.75%→1.00%, 1995년 이후 최고치, 정책위원회 7-1 찬성). 다음 회의는 2026-07-30~31 예정, 아직 미개최. DB 대조: 기존값과 일치, 재확인 완료."
   },
   {
    "country": "China",
    "rate": "3.00% (1Y LPR)",
    "asof": "2026-06-20",
-   "source": "People's Bank of China, Loan Prime Rate announcement (https://english.www.gov.cn/archive/statistics/202605/20/content_WS6a0d5ceec6d00ca5f9a0b1f1.html); Investing.com",
-   "note": "동결 (13개월 연속 동결, 5년물 LPR은 3.50%). 다음 발표는 2026-07-20 예정(매월 20일, 실측 아님)."
+   "source": "People's Bank of China / 全国银行间同业拆借中心 LPR 공고 (https://www.pbc.gov.cn); 证券时报 보도(stcn.com)",
+   "note": "동결 (1년물 3.00%, 5년물 이상 3.50%로 모두 유지). 다음 발표는 2026-07-21 예정(매월 20일 전후, 아직 미공표). DB 대조: 기존값과 일치, 재확인 완료."
   },
   {
    "country": "Eurozone",
    "rate": "2.25%",
    "asof": "2026-06-11",
    "source": "European Central Bank, Monetary policy decisions (https://www.ecb.europa.eu/press/pr/date/2026/html/ecb.mp260611~4d41bd5e83.en.html)",
-   "note": "인상 (예금금리 25bp 인상, 2023년 이후 첫 인상, 2026-06-17 발효). 다음 회의는 2026-07-23 예정(비-전망치 회의)."
+   "note": "예금금리(Deposit Facility Rate) 25bp 인상, 2026-06-17 발효 — 2023년 긴축 종료 이후 첫 인상. 다음 회의는 2026-07-23 예정, 아직 미개최. DB 대조: 기존값과 일치, 재확인 완료."
   },
   {
    "country": "United Kingdom",
    "rate": "3.75%",
    "asof": "2026-06-17",
    "source": "Bank of England, Monetary Policy Summary and Minutes, June 2026 (https://www.bankofengland.co.uk/monetary-policy-summary-and-minutes/2026/june-2026)",
-   "note": "동결 (7-2 표결, 2명은 4.00% 인상 주장). 직전 인하는 2025-12-18로 3.75% 도달. 다음 회의는 2026-07-30 예정."
+   "note": "동결 (7-2 표결, 2명은 4.00%로 인상 주장). 다음 회의는 2026-07-30 예정, 아직 미개최. DB 대조: 기존값과 일치, 재확인 완료."
   }
  ]
 }
