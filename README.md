@@ -14,7 +14,7 @@
 |---|---|---|
 | **PC — 서버 코드 작업본** | `D:\claudeCowork\namoobi-market-report-server` | 이 저장소. 여기서 고치고 → 서버 배포 → GitHub push |
 | **PC — DB 정본** | `D:\claudeCowork\namoobi-market-report-server\db\` | **DB 52종 원본 — 이 저장소가 git 으로 버전관리·백업한다** |
-| **PC — 수집 중간산출물** | `D:\claudeCowork\_market_report_data\` | `nmr_*.json` · `report_data_*.json` · `poll.db` · `deriv_signals.db` · `krx_brief/` (DB 아님) |
+| **PC — 수집 중간산출물** | `D:\claudeCowork\namoobi-market-report-server\data\` | `nmr_*.json` · `report_data_*.json` · `poll.db` · `deriv_signals.db` · `krx_brief/` (DB 아님) |
 | **GitHub (백업)** | `namoobi-code/namoobi-market-report-server` (private) | 서버 코드 백업 |
 | **서버 (배포본)** | `ubuntu@141.147.160.13:~/namoobi/` | `app.py`·`static/`·`scripts/` + `data/db/` (PC에서 밀어넣은 사본) |
 
@@ -67,10 +67,10 @@ deploy/nginx.conf   리버스 프록시 + 무캐시 + gzip
 [서버] FastAPI → 공개 대시보드
 [서버] poll.py cron → 김프·공포탐욕 시계열 누적 (SQLite)
    ↓ sync_server.py 가 되가져옴 (백업)
-[내 PC] _market_report_data/poll.db
+[내 PC] namoobi-market-report-server/data/poll.db
 ```
 
-**서버는 데이터의 원본이 아니다.** 원본은 전부 PC(`D:\claudeCowork\_market_report_data`)에 있고,
+**서버는 데이터의 원본이 아니다.** 원본은 전부 PC(`D:\claudeCowork\namoobi-market-report-server\data`)에 있고,
 서버가 자체 생성하는 `poll.db` 만 매 동기화 때 PC로 되가져와 백업한다.
 → **서버가 통째로 날아가도 잃는 데이터가 없다.**
 
