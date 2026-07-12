@@ -99,10 +99,12 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   const M = rd?.markets || {};
 
   $('meta').innerHTML=`최신 리포트 <b>${esc(rs[0]?.datetime||'—')}</b><br>지표 ${h.db_files}종 · 보고서 ${h.reports}건`;
-  $('nav').innerHTML=[['s311','3.1.1 금리'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
+  // (2026-07-12) 페이지 순서와 동일: 실시간→보고서→DB→3.1.1… · nav 는 상단 고정(sticky)
+  $('nav').innerHTML=[['srpt','보고서'],['sinv','DB'],['slive','실시간 시세'],
+    ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
-    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s32','3.2 KRX'],['s333','3.3.3 HY'],
-    ['sberk','버크셔'],['spoll','서버수집'],['sinv','DB'],['srpt','보고서']]
+    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s32','3.2 KRX'],
+    ['sberk','버크셔'],['spoll','서버수집']]
     .map(([i,t])=>`<a href="#${i}">${t}</a>`).join('');
 
   /* ── 3.1.1 금리·통화정책 ── */
@@ -241,14 +243,21 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     $('mem_asof').textContent=`${md.asof} · 매일 08:30 서버 자동 수집`;
     const H=md.hbm||{};
 
-    // ① HBM 시장규모
-    if(H.market){
-      const yr=H.market.revenue_bn.map(r=>r[0]);
-      const dy=Object.fromEntries(H.market.demand_yoy||[]);
-      mk($('c_hbm_mkt'),yr,[{n:'시장규모($B)',d:H.market.revenue_bn.map(r=>r[1]),c:C.g},
-        {n:'수요 증가율(%)',d:yr.map(y=>dy[y]??null),c:C.p,dash:[5,3],w:2.2}],{bar:true,legend:true,y0:true});
-      $('hbm_mkt_src').textContent=H.market.revenue_src;
-    }
+    // ① HBM 시장규모 — (req9 2026-07-12) 연간 시계열 DB(series_mem_hbm_market, Yole 추정) 우선
+    { const ms=[...SR('hbm_market')].sort((a,b2)=>a[0]<b2[0]?-1:1);
+      if(ms.length){
+        const yr=ms.map(r=>r[0]); const vals=ms.map(r=>Object.values(r[1])[0]);
+        const yoy=vals.map((v,i)=>(i>0&&vals[i-1])?+((v/vals[i-1]-1)*100).toFixed(0):null);
+        mk($('c_hbm_mkt'),yr,[{n:'시장규모($B)',d:vals,c:C.g},
+          {n:'수요 증가율(%)',d:yoy,c:C.p,dash:[5,3],w:2.2}],{bar:true,legend:true,y0:true});
+        $('hbm_mkt_src').textContent='[추정] Yole Group·TrendForce 연간 전망 — 연 1~2회 갱신(조사기관 발표 시)';
+      } else if(H.market){
+        const yr=H.market.revenue_bn.map(r=>r[0]);
+        const dy=Object.fromEntries(H.market.demand_yoy||[]);
+        mk($('c_hbm_mkt'),yr,[{n:'시장규모($B)',d:H.market.revenue_bn.map(r=>r[1]),c:C.g},
+          {n:'수요 증가율(%)',d:yr.map(y=>dy[y]??null),c:C.p,dash:[5,3],w:2.2}],{bar:true,legend:true,y0:true});
+        $('hbm_mkt_src').textContent=H.market.revenue_src;
+      } }
     // ② HBM ASP
     if(H.asp){
       $('asp_t').innerHTML=`<tr><th>제품</th><th style="text-align:right">가격(USD)</th><th style="text-align:right">변동</th><th>동인</th></tr>`+
@@ -302,14 +311,22 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       $('spgap_src').textContent='현물가가 계약가를 상회하는 폭. 갭이 클수록 다음 계약 협상에서 계약가 인상 압력이 커진다 — 메모리 3사 실적의 선행지표. DDR4 8Gb 갭 +89%, NAND 64Gb 갭 +55%로 인상 압력이 지속되고 있다.';
     }
 
-    // ⑧ HBM:DDR5 격차
-    if(H.per_gb){
-      const p=H.per_gb;
-      mk($('c_gap'),['DDR5 현물','HBM3','HBM3E','HBM4E'],
-        [{n:'USD/GB',d:[p.ddr5_spot_usd_per_gb,p.hbm3_usd_per_gb,p.hbm3e_usd_per_gb,p.hbm4_usd_per_gb],c:C.r}],
-        {bar:true,y0:true});
-      $('gap_src').textContent=`DDR5 현물이 HBM3E의 ${p.premium_x}배 — 통상 HBM이 5~6배 프리미엄인데 역전됨. ${p.note}`;
-    }
+    // ⑨ HBM:DDR5 격차 — (req12 2026-07-12) 매일 환산 시계열(series_mem_hbm_ddr5_gap) 우선
+    { const gs=[...SR('hbm_ddr5_gap')].sort((a,b2)=>a[0]<b2[0]?-1:1);
+      if(gs.length){
+        const last=gs[gs.length-1][1]||{};
+        mk($('c_gap'),gs.map(r=>r[0].slice(5)),
+          [{n:'배율(HBM÷DDR5)',d:gs.map(r=>r[1]['배율']??null),c:C.p,w:2.4},
+           {n:'HBM $/GB',d:gs.map(r=>r[1]['HBM $/GB']??null),c:C.o,dash:[4,3]},
+           {n:'DDR5 $/GB',d:gs.map(r=>r[1]['DDR5 $/GB']??null),c:C.b,dash:[4,3]}],{legend:true,y0:true});
+        $('gap_src').textContent=`[환산 추정] HBM3E 스택 ASP÷용량 vs DDR5 계약가 $/GB — 최신 ${last['배율']}배 (HBM $${last['HBM $/GB']}/GB vs DDR5 $${last['DDR5 $/GB']}/GB). 통상 5~6배 · 배율 급락=범용 DRAM 급등(삼성 상대 유리) 신호 · 매일 계산·누적.`;
+      } else if(H.per_gb){
+        const p=H.per_gb;
+        mk($('c_gap'),['DDR5 현물','HBM3','HBM3E','HBM4E'],
+          [{n:'USD/GB',d:[p.ddr5_spot_usd_per_gb,p.hbm3_usd_per_gb,p.hbm3e_usd_per_gb,p.hbm4_usd_per_gb],c:C.r}],
+          {bar:true,y0:true});
+        $('gap_src').textContent=`DDR5 현물이 HBM3E의 ${p.premium_x}배 — 통상 HBM이 5~6배 프리미엄인데 역전됨. ${p.note}`;
+      } }
     // ⑪ 선행지표 (매일) + 메모리/GPU 상대강도
     const LD=md.leading||{};
     if(Object.keys(LD).length){
@@ -360,7 +377,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         <td class="num note">${f(r.eps_ttm,K)}</td><td class="num">${r.per_ttm}x</td>
         <td class="num note">${f(r.eps_2026E,K)}</td><td class="num dn"><b>${r.per_2026E}x</b></td>
         <td class="num note">${f(r.eps_2027E,K)}</td><td class="num" style="color:var(--ok)"><b>${r.per_2027E}x</b></td></tr>`;}).join('')+
-        `<tr><td colspan="8" class="note">PER = 현재가 ÷ EPS 직접 계산 (벤더 PER 은 기준주가 상이로 미사용) · ${esc(md.asof_valuation||'')}</td></tr>`;
+        `<tr><td colspan="8" class="note">단일 소스 db/hbm_eps.json — PER = 최신 종가 ÷ EPS 매일 재계산 (docx 3.1.9 표와 동일값) · ${esc((b.hbm_eps&&b.hbm_eps.price_note)||md.asof_valuation||'')}</td></tr>`;
       mk($('c_per'),V.map(r=>r.name),
         [{n:'TTM',d:V.map(r=>r.per_ttm),c:C.gy},{n:'2026E',d:V.map(r=>r.per_2026E),c:C.b},
          {n:'2027E',d:V.map(r=>r.per_2027E),c:C.g}],{bar:true,legend:true,y0:true});
@@ -397,9 +414,17 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       (sc.signals||[]).map(g=>`<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.value)}</td>
       <td><span class="pill ${cls(g.status)}">${esc(g.status)}</span></td>
       <td class="note">${esc((g.threshold||'').slice(0,58))}</td></tr>`).join('');
+    // (req7 2026-07-12) 정량 미공개 신호는 판정상태 타임라인으로 — c_pq=QoQ 수치, c_inv=3신호 판정 누적
     const sr=sc.series||{};
-    const g=(el,key,col)=>{const o=sr[key]; if(o) mk($(el),o.labels,[{n:key,d:o.values,c:col}],{bar:true,y0:true});};
-    g('c_inv','inventory',C.g); g('c_pq','price_qoq',C.r); g('c_cx','capex_yoy',C.b);
+    { const o=sr.price_qoq;
+      if(o&&$('c_pq')) mk($('c_pq'),(o.labels||[]).map(l=>String(l).split(' ')[0].split('(')[0]),
+        [{n:'QoQ %',d:o.values,c:C.r}],{bar:true,y0:true}); }
+    { const st=(b.series_semi_status&&b.series_semi_status.data)||[];
+      if(st.length&&$('c_inv')){
+        const KEYS=[['inventory','재고주수',C.g,0.05],['price_qoq','DRAM 계약가 QoQ',C.o,0],['capex_yoy','CAPEX YoY',C.b,-0.05]];
+        mk($('c_inv'),st.map(r=>r[0].slice(5)),
+          KEYS.map(([k,n,c,off])=>({n,d:st.map(r=>{const v=(r[1]||{})[k];return v==null?null:v+off;}),c,w:2,pt:3})),
+          {legend:true,y0:true}); } }
     $('semi_panels').innerHTML=(sc.panels||[]).map(p=>`<div class="box"><table>
       <tr><th colspan="2">${esc(p.title)}</th></tr>
       ${(p.rows||[]).map(r=>`<tr><td class="note" style="width:44%">${esc(r[0])}</td><td>${esc(r[1])}</td></tr>`).join('')}
@@ -433,11 +458,23 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     <div class="v" style="font-size:14px">${esc(v.title)}</div>
     <div class="s">등록 ${esc(v.date)} · ${esc(v.pages)}p</div></div>`).join('');
 
-  /* ── HY 스프레드 ── */
-  const hy=M.hy_spread;
-  if(hy) $('hy').innerHTML=Object.entries(hy).filter(([k,v])=>typeof v!=='object').map(([k,v])=>
-    `<div class="card"><div class="k">${esc(k)}</div><div class="v" style="font-size:17px">${esc(v)}</div></div>`).join('')
-    || `<div class="card"><div class="s">${esc(JSON.stringify(hy).slice(0,200))}</div></div>`;
+  /* ── 3.1.1 HY 스프레드 — DB 시계열(series_hy_oas)에서 계산, docx와 동일한 표+차트 ── */
+  {const hs=S(b,'series_hy_oas'), hy=M.hy_spread||{};
+  if(hs.length>2||hy.current!=null){
+    let cur, vals;
+    if(hs.length>2){
+      const pts=hs.map(x=>[new Date(x[0]),x[1]]), last=pts[pts.length-1][0];
+      const at=days=>{const t=new Date(last-days*864e5),c=pts.filter(p=>p[0]<=t);return (c.length?c[c.length-1]:pts[0])[1];};
+      cur=pts[pts.length-1][1];
+      vals=[['현재',cur],['1일',pts[pts.length-2][1]],['1주',at(7)],['1개월',at(30)],['3개월',at(91)],['6개월',at(182)],['1년',at(365)]];
+    }else{
+      cur=hy.current;
+      vals=[['현재',cur],['1일',hy.d1],['1주',hy.w1],['1개월',hy.m1],['3개월',hy.m3],['6개월',hy.m6],['1년',hy.y1]];
+    }
+    // (req1 2026-07-12) OAS 레벨 표 폐지 — 현재값+차트만 (docx 3.1.1 과 동일)
+    if($('hy_cur')) $('hy_cur').innerHTML=`현재 OAS: <b>${cur==null?'-':Number(cur).toFixed(2)+'%'}</b> · 기준 ${esc(hs.length?hs[hs.length-1][0]:(hy.asof||''))}${hy.comment?('<br><span class="note">'+esc(hy.comment)+'</span>'):''}`;
+    if(hs.length){const yr=hs.slice(-262); mk($('c_hy'),L(yr),[{n:'HY OAS',d:V(yr),c:C.o,w:2,fill:true,bg:'rgba(224,140,26,.08)'}]);}
+  }}
 
   /* ── 버크셔 ── */
   const bk=b.berkshire?.data;
@@ -462,18 +499,72 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   if(fg.length) mk($('c_fg'),fg.map(x=>x[0].slice(5,16).replace('T',' ')),
     [{n:'F&G',d:fg.map(x=>x[1]),c:C.r,fill:true,bg:'rgba(214,69,69,.08)'}],{y0:true});
 
-  /* ── DB 인벤토리 ── */
-  const DUP={'series_emp_nfp_mom':'nfp 폴백 — NFP 차트 교차검증선','series_emp_retail_mom':'retail 폴백 — 소매 차트 교차검증선'};
+  /* ── DB 인벤토리 (항목 설명 + 기준일) ── */
+  const DESC={
+    berkshire:'버크셔 해서웨이 13F 보유지분 변동 — 신규매수/확대/축소/청산·현금 (분기)',
+    capex:'AI 빅테크 연간 CAPEX·매출·FCF 표 (3.1.8, 실적=FMP·전망=가이던스/컨센서스)',
+    customs:'관세청 수출 잠정치 10일 단위 — 전체·반도체 등 품목별 (3.1.10)',
+    dot_plot:'FOMC 점도표 SEP 중간값 — 2026~2028말·장기중립 (3.1.1)',
+    employment:'미국 고용·경기 스냅샷 — NFP·실업률·ISM·GDP·소매판매 (3.1.3 표)',
+    fomc_meetings:'향후 FOMC 일정·상태·비고 (3.1.1)',
+    hbm_eps:'HBM 3사(SK하이닉스·삼성전자·마이크론) EPS/PER 추정 (3.1.9)',
+    inflation:'미국 물가 스냅샷 — CPI·근원CPI·PCE·PPI·기대인플레 (3.1.2 표)',
+    krx_brief:'KRX 증시 Brief·공매도 데일리 브리프 회차 메타 (3.2.4/3.2.5)',
+    leading:'한국 경기선행지수 순환변동치 최근월 요약 (3.1.5)',
+    memory:'메모리(DRAM·NAND·HBM) 가격·시장 스냅샷 (3.1.9)',
+    oecd_cli:'OECD 경기선행지수(CLI) 주요국 월별 (3.1.4)',
+    policy_rates:'주요 6개국 정책금리 현재값·비고 (3.1.1 카드)',
+    semi_cycle:'반도체 사이클→코스피 점검판 3대 신호 (3.1.11)',
+    series_curve_10_2:'미국 장단기 금리차 10Y−2Y 일별 시계열 (3.1.1 차트)',
+    series_emp_gdp:'미국 실질 GDP 성장률(연율) 분기 시계열 (3.1.3 차트)',
+    series_emp_ism_mfg:'ISM 제조업 PMI 월별 시계열 (3.1.3 차트)',
+    series_emp_ism_svc:'ISM 서비스업 PMI 월별 시계열 (3.1.3 차트)',
+    series_emp_jobless:'신규 실업수당 청구건수 주간 시계열 (3.1.3 차트)',
+    series_emp_nfp:'비농업고용(NFP) 시계열 (3.1.3 차트)',
+    series_emp_nfp_mom:'NFP 월 신규고용(전월차) — nfp 폴백·차트 교차검증선',
+    series_emp_retail:'소매판매 시계열 (3.1.3 차트)',
+    series_emp_retail_mom:'소매판매 전월비 — retail 폴백·차트 교차검증선',
+    series_emp_unemp:'실업률 월별 시계열 (3.1.3 차트)',
+    series_fed_funds_5y:'미국 연방기금 실효금리 5년 일별 시계열 (3.1.1)',
+    series_hy_oas:'하이일드 스프레드(ICE BofA US HY OAS) 일별 누적 — 3.1.1 HY 표·차트 소스',
+    series_infl_CPI:'CPI 전년비 월별 시계열 (3.1.2 차트)',
+    series_infl_Core_CPI:'근원 CPI 전년비 월별 시계열 (3.1.2 차트)',
+    series_infl_Core_PCE:'근원 PCE 전년비 월별 시계열 (3.1.2 차트)',
+    series_infl_PCE:'PCE 전년비 월별 시계열 (3.1.2 차트)',
+    series_infl_PPI:'PPI 전년비 월별 시계열 (3.1.2 차트)',
+    series_infl_exp:'기대인플레이션(10Y BEI) 일별 시계열 (3.1.2 차트)',
+    series_inflidx_CPI:'CPI 지수(레벨) 월별 — 전년비 계산·검증용 원계열',
+    series_inflidx_Core_CPI:'근원 CPI 지수(레벨) 월별 — 원계열',
+    series_inflidx_Core_PCE:'근원 PCE 지수(레벨) 월별 — 원계열',
+    series_inflidx_PCE:'PCE 지수(레벨) 월별 — 원계열',
+    series_inflidx_PPI:'PPI 지수(레벨) 월별 — 원계열',
+    series_leading:'한국 경기선행지수 순환변동치 월별 시계열 (3.1.5 차트)',
+    series_mem_dram_contract:'DRAM 고정거래가(계약가) 시계열 (3.1.9 대시보드)',
+    series_mem_dram_spot:'DRAM 현물가 시계열 (3.1.9 대시보드)',
+    series_mem_hbm_asp:'HBM ASP(평균판매가) 추정 시계열 (3.1.9)',
+    series_mem_hbm_share:'HBM 시장 점유율(3사) 시계열 (3.1.9)',
+    series_mem_leading_px:'메모리 선행가격 지표 시계열 (3.1.9)',
+    series_mem_mem_vs_gpu:'메모리 vs GPU 상대 지표 시계열 (3.1.9)',
+    series_mem_nand_contract:'NAND 고정거래가(계약가) 시계열 (3.1.9)',
+    series_mem_nand_spot:'NAND 현물가 시계열 (3.1.9)',
+    series_us10y_daily:'미국 10년물 국채금리 일별 시계열 (3.1.1 차트)',
+    series_us2y_daily:'미국 2년물 국채금리 일별 시계열 (3.1.1 차트)'};
   const inv=Object.keys(b).filter(k=>k!=='_poll').sort().map(k=>{
     const d=b[k],dat=d?.data; let n='—',kind='—';
     if(Array.isArray(dat)&&dat.length&&Array.isArray(dat[0])){kind='시계열';n=dat.length+'점';}
     else if(Array.isArray(dat)){kind='표';n=dat.length+'행';}
     else if(dat&&typeof dat==='object'){kind='복합';n=Object.keys(dat).length+'키';}
-    return {k,kind,n,asof:d?.as_of||'',dup:DUP[k]||''};
+    // (2026-07-12) 기준일 자동 폴백 — as_of 공란이면 marker(날짜꼴) → 시계열 최신일 → '—'
+    let ao=d?.as_of;
+    if(!ao){ const mk2=String(d?.marker||'').slice(0,10);
+      if(/^\d{4}-\d{2}-\d{2}$/.test(mk2)) ao=mk2;
+      else if(Array.isArray(dat)&&dat.length&&Array.isArray(dat[0])){ const l=String(dat[dat.length-1][0]).slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(l)) ao=l; } }
+    return {k,kind,n,asof:ao||'—',desc:DESC[k]||''};
   });
-  $('inv').innerHTML=`<tr><th>항목</th><th>형태</th><th style="text-align:right">규모</th><th>기준일</th><th>비고</th></tr>`+
-    inv.map(r=>`<tr><td><b>${esc(r.k)}</b></td><td class="note">${r.kind}</td><td class="num note">${r.n}</td>
-    <td class="note">${esc(r.asof)}</td><td class="note">${esc(r.dup)}</td></tr>`).join('');
+  // (2026-07-12) 좌측 사이드바 컴팩트 — 항목당 2줄(1줄: 이름+형태·규모·기준일 / 2줄: 설명)
+  $('inv').innerHTML=inv.map(r=>`<div class="it">
+    <div class="l1"><b>${esc(r.k)}</b><span class="m">${r.kind} ${r.n} · ${esc(r.asof)}</span></div>
+    <div class="l2">${esc(r.desc)}</div></div>`).join('');
   $('inv_n').textContent=`${inv.length}종 전량`;
 
   /* ── 보고서 ── */
@@ -481,3 +572,14 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     <div><b>${esc(r.datetime)}</b> <span class="note">· ${r.size_mb}MB</span></div>
     <a class="dl" href="/reports/${encodeURIComponent(r.file)}">다운로드</a></div>`).join('');
 })();
+
+
+/* ── 안드로이드 APK 릴리스 (GitHub Releases 캐시 · sync_apk.py) ── */
+fetch('/api/apk').then(r=>r.json()).then(rs=>{
+  const el=document.getElementById('apkbox');
+  if(!el) return;
+  if(!Array.isArray(rs)||!rs.length){el.innerHTML='<div class="rpt">릴리스 없음</div>';return;}
+  el.innerHTML=rs.map(r=>`<div class="rpt">
+    <div><b>${r.tag}</b> · ${r.published}${r.notes?`<br><span style="opacity:.75;font-size:11px">${r.notes}</span>`:''}<br><span style="opacity:.55;font-size:11px">${r.file} · ${r.size_mb}MB</span></div>
+    <a class="dl" href="/apk/${encodeURIComponent(r.file)}">다운로드</a></div>`).join('');
+}).catch(()=>{});

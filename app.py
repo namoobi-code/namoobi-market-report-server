@@ -139,4 +139,24 @@ def health():
             "reports": len(list(RPT.glob("*.docx"))),
             "now": datetime.now().isoformat(timespec="seconds")}
 
+APK = BASE / "data" / "apk"
+
+@app.get("/api/apk")
+def apk_releases():
+    """GitHub 릴리스 캐시 (scripts/sync_apk.py가 갱신)"""
+    p = APK / "releases.json"
+    if not p.exists():
+        return []
+    return json.loads(p.read_text(encoding="utf-8"))
+
+@app.get("/apk/{fname}")
+def apk_download(fname: str):
+    if not re.fullmatch(r"[\w\-\.]+\.apk", fname):
+        raise HTTPException(400, "bad filename")
+    p = APK / fname
+    if not p.exists():
+        raise HTTPException(404, "not found")
+    return FileResponse(p, filename=fname,
+        media_type="application/vnd.android.package-archive")
+
 app.mount("/", StaticFiles(directory=BASE / "static", html=True), name="static")
