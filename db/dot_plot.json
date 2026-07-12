@@ -4,40 +4,31 @@
  "data": {
   "rows": [
    {
-    "year": "2026년말",
-    "jun": "3.8%",
-    "mar": "3.4%",
-    "note": "6월 SEP(2026-06-17)에서 3월 대비 대폭 상향(3.4%→3.8%). 신임 의장 Kevin Warsh 취임 후 첫 SEP(본인 전망치는 미제출). 18명 참가자 중 다수가 2026년 중 최소 1회 추가 인상을 전망, 1명만 인하 전망",
-    "change": ""
+    "year": "2026말",
+    "jun": 3.8,
+    "mar": 3.4,
+    "change": "+0.4"
    },
    {
-    "year": "2027년말",
-    "jun": "3.6%",
-    "mar": "3.1%",
-    "note": "6월 SEP에서 상향 조정(3.1%→3.6%). 근원PCE 인플레이션 전망 상향(2.2%→2.5%)을 반영",
-    "change": ""
+    "year": "2027말",
+    "jun": 3.6,
+    "mar": 3.1,
+    "change": "+0.5"
    },
    {
-    "year": "2028년말",
-    "jun": "3.4%",
-    "mar": "3.1%",
-    "note": "6월 SEP에서 상향 조정(3.1%→3.4%)",
-    "change": ""
+    "year": "2028말",
+    "jun": 3.4,
+    "mar": 3.1,
+    "change": "+0.3"
    },
    {
     "year": "장기중립",
-    "jun": "3.1%",
-    "mar": "3.1%",
-    "note": "변동 없음(3월·6월 동일)",
-    "change": ""
+    "jun": 3.1,
+    "mar": 3.1,
+    "change": "+0.0"
    }
   ],
-  "asof": "2026-06-17 (2026년 6월 SEP, 최신) / 2026-03-18 (2026년 3월 SEP, 비교용)",
-  "source": [
-   "https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf",
-   "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm",
-   "https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260318.pdf",
-   "https://fredblog.stlouisfed.org/2026/06/fomc-summary-of-economic-projections-june-2026/"
-  ]
+  "asof": "2026-06-17",
+  "source": "Federal Reserve, Summary of Economic Projections, June 17, 2026 (federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf) — table includes both June median dots and the March 17-18, 2026 SEP median dots for comparison. Values are midpoint of appropriate target range for federal funds rate, year-end."
  }
 }
