@@ -261,6 +261,54 @@
     </main>
   </div>
 
+  <!-- ③ AI 추론 data -->
+  <div class="pane" id="p_ai">
+    <nav id="nav_a"></nav>
+    <main class="mainc">
+      <div class="lead" style="margin-top:2px;border-left-color:var(--warn)">
+        <b>⚠️ 아래는 수집된 사실이 아니라 모델이 판단·추론해 쓴 내용이다.</b>
+        참고 의견일 뿐 투자 자문이 아니며, 근거가 된 실제 지표는 <b>DB data</b> 탭에서 직접 확인할 수 있다.
+        <span class="note" id="a_asof"></span>
+      </div>
+
+      <h2 id="a9">9. 종합 분석<em>매크로 · 테마 · 리스크</em></h2>
+      <h3>요약</h3><div class="lead" id="a_sum"></div>
+      <h3>매크로 뷰</h3><div class="lead" id="a_macro"></div>
+      <h3>핵심 테마</h3><div class="box" style="overflow-x:auto"><table id="a_theme"></table></div>
+      <h3>핵심 리스크</h3><div class="box"><table id="a_risk"></table></div>
+
+      <h2 id="a10">10. 자산별 단·중·장기 견해</h2>
+      <div class="box" style="overflow-x:auto"><table id="a_asset"></table></div>
+
+      <h2 id="a11">11. 추천 포트폴리오<em>공격형 · 중립형 · 안정형</em></h2>
+      <div id="a_pf"></div>
+
+      <h2 id="a12">12. 액션 아이템<em>단기 · 중기 · 장기 체크리스트</em></h2>
+      <div class="box"><table id="a_act"></table></div>
+
+      <footer>docx 9~12장 — AI 추론 산출물. 수익률·낙폭은 시나리오 가정치이며 보장되지 않는다.</footer>
+    </main>
+  </div>
+
+  <!-- ④ TradingAgents (향후 개발) -->
+  <div class="pane" id="p_ta"><div class="soon">
+    <div class="hero"><span class="badge">향후 개발 · 설계 단계</span>
+      <h3>TradingAgents — 종목 스크리닝</h3>
+      <p><a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener">TauricResearch/TradingAgents</a>
+         의 <b>멀티 에이전트 토론</b> 구조를 참고해, 한국·미국 주식 전종목에서 매수 검토 후보를 추려낸다.
+         분석가(펀더멘털·기술·심리·뉴스)가 각자 의견을 내고, 강세/약세 리서처가 반박 토론을 거쳐,
+         리스크 매니저가 최종 채택 여부를 정하는 구조다.</p></div>
+    <h3>단계 설계</h3>
+    <div class="box"><table id="tbl_ta"></table></div>
+    <div class="lead" style="margin-top:14px">
+      <b>먼저 풀어야 할 것</b> — ① 전종목(코스피·코스닥 ~2,700 + 미국 ~5,000) 재무·가격 데이터를 어디서 무료로 받을지
+      (KRX OPEN API + Yahoo chart 조합이 유력) ② LLM 호출 비용 — 전종목에 에이전트 토론을 돌릴 수 없으니
+      <b>정량 필터로 후보를 수십 개로 줄인 뒤</b> 그 후보에만 토론을 붙인다 ③ 성과 검증 —
+      추천 시점·가격을 DB에 기록해 <b>사후 수익률을 추적</b>해야 신뢰할 수 있다.
+    </div>
+    <div class="src">⚠️ 투자 자문이 아니며, 스크리닝 결과는 참고용이다. 매매 판단과 책임은 사용자에게 있다.</div>
+  </div></div>
+
   <!-- ⑤ 자동매매 (향후 개발) -->
   <div class="pane" id="p_auto"><div class="soon">
     <div class="hero"><span class="badge">향후 개발 · 설계 단계</span>
