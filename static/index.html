@@ -116,6 +116,14 @@
   .fo .fl{font-size:12px;color:var(--tx2)}
   .fo .fv{font-size:15px;font-weight:650;font-variant-numeric:tabular-nums}
   .fo .fv.big{font-size:22px;color:var(--ok)}
+  .nw{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin-bottom:9px}
+  .nw .h{font-size:13.5px;font-weight:650;line-height:1.45}
+  .nw .h .r{display:inline-block;width:20px;color:var(--tx2);font-weight:600}
+  .nw .s{font-size:12px;color:var(--tx2);margin-top:5px;line-height:1.55}
+  .nw .f{font-size:11px;color:var(--tx2);margin-top:7px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .pf{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:14px;margin-bottom:12px}
+  .pf .t{font-size:13.5px;font-weight:650;margin-bottom:8px}
+  .bar{display:flex;height:11px;border-radius:6px;overflow:hidden;margin:9px 0 8px;background:#eef0f3}
 </style>
 </head>
 <body><div class="wrap">
@@ -153,26 +161,79 @@
   <div class="rightc">
 
   <!-- ① daily 조사 data (향후 개발) -->
-  <div class="pane" id="p_daily"><div class="soon">
-    <div class="hero"><span class="badge">향후 개발</span>
-      <h3>daily 조사 data</h3>
-      <p>리포트 실행 때마다 <b>새로 조사되어 매번 값이 바뀌는</b> 내용. DB로 누적하지 않고 그날의 스냅샷으로만 쓰인다.
-         현재는 docx 로만 제공되며, 이 화면으로 옮기는 것은 검토 중이다.</p></div>
-    <h3>여기에 들어올 것 — docx 1~8장 · 13장</h3>
-    <div class="box"><table id="tbl_daily"></table></div>
-    <div class="src">데이터 출처: 이미 서버에 올라와 있는 <code>report_data.json</code>(<code>/api/report</code>) — 별도 수집 없이 렌더만 붙이면 된다.</div>
-  </div></div>
+  <div class="pane" id="p_daily">
+    <nav id="nav_d"></nav>
+    <main class="mainc">
+      <div class="lead" id="d_asof" style="margin-top:2px">불러오는 중…</div>
+
+      <h2 id="d1">1. 글로벌 Top News 10</h2>
+      <div id="d_news"></div>
+
+      <h2 id="d2">2. 주요 이벤트 캘린더<em>단기 · 중장기 · 빅테크</em></h2>
+      <h3>단기 (2주 내)</h3><div class="box" style="overflow-x:auto"><table id="d_ev"></table></div>
+      <h3>중장기</h3><div class="box" style="overflow-x:auto"><table id="d_evl"></table></div>
+      <h3>빅테크 이벤트</h3><div class="box" style="overflow-x:auto"><table id="d_evb"></table></div>
+
+      <h2 id="d3">3. 글로벌 증시 단·중·장기 추세</h2>
+      <h3>미국</h3><div class="box" style="overflow-x:auto"><table id="d_us"></table></div>
+      <h3>아시아</h3><div class="box" style="overflow-x:auto"><table id="d_as"></table></div>
+      <h3>유럽</h3><div class="box" style="overflow-x:auto"><table id="d_eu"></table></div>
+      <h3>한국</h3><div class="box" style="overflow-x:auto"><table id="d_kr"></table></div>
+
+      <h2 id="d4">4. 원자재 종합<em>에너지 · 금속 · 비철 · 농산물</em></h2>
+      <div class="box" style="overflow-x:auto"><table id="d_com"></table></div>
+      <div class="lead" id="d_com_c" style="margin-top:12px"></div>
+
+      <h2 id="d5">5. 주요 환율 단·중·장기 추세</h2>
+      <div class="box" style="overflow-x:auto"><table id="d_fx"></table></div>
+
+      <h2 id="d6">6. 암호화폐 시장</h2>
+      <div class="grid g4" id="d_cry"></div>
+      <div class="lead" id="d_cry_c" style="margin-top:12px"></div>
+
+      <h2 id="d7">7. 한국 주요 증권사 리서치<em>10사</em></h2>
+      <div class="grid g2" id="d_sec"></div>
+      <div class="lead" id="d_sec_c" style="margin-top:12px"></div>
+
+      <h2 id="d8">8. 글로벌 IB 리서치<em>UBS · GS · JPM · MS · BlackRock</em></h2>
+      <div class="grid g2" id="d_gsec"></div>
+      <div class="lead" id="d_gsec_c" style="margin-top:12px"></div>
+
+      <h2 id="d13">13. AI 트렌드 · 출처</h2>
+      <div class="box" style="overflow-x:auto"><table id="d_ai"></table></div>
+
+      <footer>docx 1~8장 · 13장 — 리포트 실행 시점 스냅샷. 매 실행 새로 조사되며 DB로 누적하지 않는다.</footer>
+    </main>
+  </div>
 
   <!-- ③ AI 추론 data (향후 개발) -->
-  <div class="pane" id="p_ai"><div class="soon">
-    <div class="hero"><span class="badge">향후 개발</span>
-      <h3>AI 추론 data</h3>
-      <p>수집한 사실이 아니라 <b>모델이 판단·추론해 생성한</b> 내용. 사실 데이터와 섞이지 않도록 화면을 분리한다.
-         투자 판단의 근거가 아니라 참고 의견이며, 근거가 된 지표는 DB data 탭에서 확인할 수 있다.</p></div>
-    <h3>여기에 들어올 것 — docx 9~12장</h3>
-    <div class="box"><table id="tbl_ai"></table></div>
-    <div class="src">데이터 출처: <code>report_data.json</code> 의 <code>analysis</code> 블록(<code>/api/report</code>).</div>
-  </div></div>
+  <div class="pane" id="p_ai">
+    <nav id="nav_a"></nav>
+    <main class="mainc">
+      <div class="lead" style="margin-top:2px;border-left-color:var(--warn)">
+        <b>⚠️ 아래는 수집된 사실이 아니라 모델이 판단·추론해 쓴 내용이다.</b>
+        참고 의견일 뿐 투자 자문이 아니며, 근거가 된 실제 지표는 <b>DB data</b> 탭에서 직접 확인할 수 있다.
+        <span class="note" id="a_asof"></span>
+      </div>
+
+      <h2 id="a9">9. 종합 분석<em>매크로 · 테마 · 리스크</em></h2>
+      <h3>요약</h3><div class="lead" id="a_sum"></div>
+      <h3>매크로 뷰</h3><div class="lead" id="a_macro"></div>
+      <h3>핵심 테마</h3><div class="box" style="overflow-x:auto"><table id="a_theme"></table></div>
+      <h3>핵심 리스크</h3><div class="box"><table id="a_risk"></table></div>
+
+      <h2 id="a10">10. 자산별 단·중·장기 견해</h2>
+      <div class="box" style="overflow-x:auto"><table id="a_asset"></table></div>
+
+      <h2 id="a11">11. 추천 포트폴리오<em>공격형 · 중립형 · 안정형</em></h2>
+      <div id="a_pf"></div>
+
+      <h2 id="a12">12. 액션 아이템<em>단기 · 중기 · 장기 체크리스트</em></h2>
+      <div class="box"><table id="a_act"></table></div>
+
+      <footer>docx 9~12장 — AI 추론 산출물. 수익률·낙폭은 시나리오 가정치이며 보장되지 않는다.</footer>
+    </main>
+  </div>
 
   <!-- ④ TradingAgents (향후 개발) -->
   <div class="pane" id="p_ta"><div class="soon">

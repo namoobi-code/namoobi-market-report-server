@@ -604,24 +604,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     el.innerHTML=`<tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>`+
       rows.map(r=>`<tr>${r.map((c,i)=>`<td${i===0?' style="white-space:nowrap"':''}>${c}</td>`).join('')}</tr>`).join('');};
 
-  tbl('tbl_daily',['docx 장','내용','성격'],[
-    ['<b>1</b>','글로벌 Top News 10','매일 교체'],
-    ['<b>2</b>','글로벌 주요 이벤트 캘린더','매일 교체'],
-    ['<b>3</b>','글로벌 증시 단·중·장기 추세','시세 — 매일 변동'],
-    ['<b>4</b>','원자재 종합 (에너지·금속·희토류·농산물)','시세 — 매일 변동'],
-    ['<b>5</b>','주요 환율 단·중·장기 추세','시세 — 매일 변동'],
-    ['<b>6</b>','암호화폐 시장','시세 — 매일 변동'],
-    ['<b>7</b>','한국 주요 증권사 리서치 (10사)','리서치 요약'],
-    ['<b>8</b>','글로벌 IB 리서치 (UBS·GS·JPM·MS·BlackRock)','리서치 요약'],
-    ['<b>13</b>','주의 사항 및 출처','메타'],
-  ]);
 
-  tbl('tbl_ai',['docx 장','내용','비고'],[
-    ['<b>9</b>','종합 분석 — 매크로·테마·리스크','수집 지표를 근거로 한 해석'],
-    ['<b>10</b>','자산별 단·중·장기 견해','주식·채권·원자재·환율·크립토'],
-    ['<b>11</b>','추천 포트폴리오 (공격형·중립형·안정형)','비중 제안 — 참고용'],
-    ['<b>12</b>','액션 아이템 — 단기·중기·장기 체크리스트','실행 항목'],
-  ]);
 
   tbl('tbl_ta',['단계','내용','산출'],[
     ['<b>1</b> 유니버스','코스피·코스닥 전종목 + 미국 상장 전종목','종목 마스터 DB'],
@@ -705,3 +688,162 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       if(el) el.classList.toggle('on', id===b.dataset.pane);});
   }));
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   ① daily 조사 data (docx 1~8·13장) · ③ AI 추론 data (docx 9~12장)
+   두 화면 모두 /api/report 하나만 읽어 렌더한다 — LLM 호출 0회, 서버 부하 없음.
+   내용 자체는 리포트 실행 때 이미 만들어져 있고, 여기선 보여주기만 한다.
+   ══════════════════════════════════════════════════════════════════ */
+fetch('/api/report').then(r=>r.json()).then(R=>{
+  if(!R||!R.report_date) return;
+  const E=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const $$=i=>document.getElementById(i);
+  const T=(id,head,rows)=>{const el=$$(id); if(!el||!rows||!rows.length){if(el)el.innerHTML='<tr><td class="note">데이터 없음</td></tr>';return;}
+    el.innerHTML=`<tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>`+rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');};
+  const P=v=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(2)}%</span>`;
+  const N=v=>v==null?'—':(+v).toLocaleString(undefined,{maximumFractionDigits:2});
+  const LK=(t,u)=>u?`<a href="${E(u)}" target="_blank" rel="noopener">${E(t)}</a>`:E(t);
+
+  /* ═══ ① daily 조사 ═══ */
+  $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
+    <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
+  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d3','3 증시'],['d4','4 원자재'],
+    ['d5','5 환율'],['d6','6 크립토'],['d7','7 증권사'],['d8','8 글로벌IB'],['d13','13 AI트렌드']]
+    .map(([i,t])=>`<a href="#${i}" data-go2="${i}">${t}</a>`).join('');
+
+  // 1. Top News
+  const nw=(R.news||{}).top_news||[];
+  $$('d_news').innerHTML=nw.map(n=>{
+    const bad=/부정|▼/.test(n.impact||''), good=/긍정|▲/.test(n.impact||'');
+    return `<div class="nw">
+      <div class="h"><span class="r">${n.rank}</span>${E(n.headline)}</div>
+      <div class="s">${E(n.summary)}</div>
+      <div class="f">
+        <span class="${bad?'dn':(good?'up':'note')}" style="font-weight:600">${E(n.impact||'')}</span>
+        <span class="note">·</span><span>${LK(n.source||'출처', n.source_url)}</span>
+        <span class="note">· ${E(n.published_date||'')}</span></div></div>`;}).join('');
+
+  // 2. 캘린더
+  const ev=e=>[E(e.date),E(e.region||'—'),`<b>${E(e.event)}</b>`,
+               `<span style="color:var(--warn)">${E(e.importance||'')}</span>`,
+               `<span class="note">${E(e.expected_impact||'')}</span>`,LK(e.source||'—',e.source_url)];
+  T('d_ev', ['날짜','지역','이벤트','중요도','예상 영향','출처'], ((R.news||{}).events_calendar||[]).map(ev));
+  T('d_evl',['날짜','지역','이벤트','중요도','예상 영향','출처'], ((R.news||{}).events_calendar_longterm||[]).map(ev));
+  T('d_evb',['날짜','이벤트','중요도','예상 영향'],
+    ((R.news||{}).bigtech_events||[]).map(e=>[E(e.date),`<b>${E(e.event)}</b>`,
+      `<span style="color:var(--warn)">${E(e.importance||'')}</span>`,`<span class="note">${E(e.expected_impact||'')}</span>`]));
+
+  // 3. 증시 — us/asia/europe/korea
+  const M=R.markets||{};
+  const NM={sp500:'S&P 500',nasdaq:'나스닥',dow:'다우',vix:'VIX',dxy:'달러인덱스',us10y:'미 10년물',
+    nikkei:'닛케이225',shanghai:'상하이종합',hsi:'항셍',taiwan:'대만 가권',sensex:'센섹스',vietnam:'베트남(VNM)',
+    dax:'DAX',ftse:'FTSE100',cac:'CAC40',stoxx:'STOXX600',ibex:'IBEX35',mib:'FTSE MIB',
+    kospi:'코스피',kosdaq:'코스닥',kospi200:'코스피200'};
+  const idxRows=o=>Object.entries(o||{}).filter(([,v])=>v&&typeof v==='object'&&'current' in v)
+    .map(([k,v])=>[`<b>${NM[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,P(v['1w_pct']),P(v['1mo_pct']),
+                   P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),`<span class="note">${E(v.trend||'')}</span>`]);
+  const IH=['지수','현재','1주','1개월','3개월','6개월','1년','추세'];
+  T('d_us',IH,idxRows(M.us_markets)); T('d_as',IH,idxRows(M.asia_markets));
+  T('d_eu',IH,idxRows(M.europe_markets)); T('d_kr',IH,idxRows(M.korea));
+
+  // 4. 원자재
+  const C=R.commodities||{};
+  const CN={wti:'WTI 유가',brent:'브렌트유',natgas:'천연가스',gold:'금',silver:'은',copper:'구리',
+    platinum:'플래티넘',palladium:'팔라듐',aluminum:'알루미늄',nickel:'니켈',zinc:'아연',lead:'납',tin:'주석',
+    corn:'옥수수',wheat:'밀',soybean:'대두',sugar:'설탕',coffee:'커피',cocoa:'코코아',cotton:'면화',
+    kodex_energy:'KODEX 에너지',kodex_aipower:'KODEX AI전력'};
+  const GRP={energy:'에너지',metals:'금속',nonferrous:'비철',agriculture:'농산물'};
+  let crows=[];
+  Object.entries(GRP).forEach(([g,gl])=>Object.entries(C[g]||{}).forEach(([k,v])=>{
+    if(!v||typeof v!=='object'||!('current' in v))return;
+    crows.push([`<span class="note">${gl}</span>`,`<b>${CN[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,
+      P(v['1w_pct']),P(v['1mo_pct']),P(v['3mo_pct']),P(v['1y_pct']),`<span class="note">${E(v.trend||'')}</span>`]);}));
+  T('d_com',['분류','품목','현재','1주','1개월','3개월','1년','추세'],crows);
+  $$('d_com_c').innerHTML=[C.energy_comment,C.metals_comment,C.agri_comment].filter(Boolean)
+    .map(t=>`<div style="margin-bottom:6px">${E(t)}</div>`).join('')||'<span class="note">코멘트 없음</span>';
+
+  // 5. 환율
+  const FN={usd_krw:'원/달러',eur_krw:'원/유로',jpy_krw:'원/엔(100)',cny_krw:'원/위안',hkd_krw:'원/홍콩달러'};
+  T('d_fx',IH.map((h,i)=>i===0?'통화쌍':h),
+    Object.entries(M.fx_markets||{}).filter(([,v])=>v&&typeof v==='object'&&'current' in v)
+      .map(([k,v])=>[`<b>${FN[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,P(v['1w_pct']),P(v['1mo_pct']),
+        P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),`<span class="note">${E(v.trend||'')}</span>`]));
+
+  // 6. 크립토
+  const CR=R.crypto||{};
+  const fg=CR.fear_greed||{}, kp=CR.kimchi_premium||{}, dom=CR.dominance||{};
+  const cval=o=>o?.current??o?.value??null;
+  const cards=[['공포탐욕지수',cval(fg)??'—',fg.interpretation||''],
+    ['김치프리미엄',(cval(kp)!=null?cval(kp)+'%':'—'),kp.interpretation||kp.trend_analysis||''],
+    ['BTC 도미넌스',(cval(dom)!=null?cval(dom)+'%':'—'),''],
+    ['시장 요약','',CR.market_overview?.market_summary||'']];
+  $$('d_cry').innerHTML=cards.filter(c=>c[1]!==''||c[2]).map(([k,v,s2])=>
+    `<div class="card"><div class="k">${E(k)}</div>${v!==''?`<div class="v">${E(v)}</div>`:''}
+     <div class="s">${E(String(s2).slice(0,110))}</div></div>`).join('');
+  $$('d_cry_c').innerHTML=E(fg.trend_analysis||CR.market_overview?.market_summary||'')||'<span class="note">—</span>';
+
+  // 7·8. 증권사 / 글로벌 IB
+  const houses=(obj,names)=>Object.entries(obj||{}).filter(([k,v])=>v&&typeof v==='object'&&v.key_message)
+    .map(([k,v])=>`<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
+      <div class="s" style="margin-top:7px">${E(v.key_message)}</div>
+      <div class="src">강점: ${E(v.strength||'')}</div></div>`).join('');
+  $$('d_sec').innerHTML=houses(R.securities,{samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
+    shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
+    yuanta:'유안타증권',hyundai:'현대차증권'});
+  const ct=(R.securities||{}).common_themes;
+  $$('d_sec_c').innerHTML=Array.isArray(ct)?ct.map(t=>`• ${E(typeof t==='string'?t:JSON.stringify(t))}`).join('<br>'):E(ct||'');
+  $$('d_gsec').innerHTML=houses(R.global_securities,{ubs:'UBS',goldman:'Goldman Sachs',jpmorgan:'J.P. Morgan',
+    morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'});
+  const gc=(R.global_securities||{}).wall_street_consensus;
+  $$('d_gsec_c').innerHTML=typeof gc==='string'?E(gc):(gc?E(JSON.stringify(gc)):'');
+
+  // 13. AI 트렌드
+  T('d_ai',['항목','내용'],((R.ai_trends||{}).items||[]).map(i=>
+    typeof i==='string'?['—',E(i)]:[`<b>${E(i.title||i.name||'—')}</b>`,`<span class="note">${E(i.summary||i.desc||JSON.stringify(i))}</span>`]));
+
+  /* ═══ ③ AI 추론 ═══ */
+  const A=R.analysis||{};
+  $$('a_asof').textContent=` — 기준 ${R.report_date}`;
+  $$('nav_a').innerHTML=[['a9','9 종합분석'],['a10','10 자산별 견해'],['a11','11 포트폴리오'],['a12','12 액션']]
+    .map(([i,t])=>`<a href="#${i}" data-go2="${i}">${t}</a>`).join('');
+  $$('a_sum').innerHTML=E(A.summary||'—');
+  $$('a_macro').innerHTML=E(A.macro_view||'—');
+  T('a_theme',['테마','방향','코멘트'],(A.key_themes||[]).map(t=>{
+    const up=/▲|상승|긍정/.test(t.direction||'');
+    return [`<b>${E(t.theme)}</b>`,`<span class="${up?'up':'dn'}" style="font-weight:700">${E(t.direction||'')}</span>`,
+            `<span class="note">${E(t.comment||'')}</span>`];}));
+  T('a_risk',['#','리스크'],(A.key_risks||[]).map((r,i)=>[`<b>${i+1}</b>`,E(typeof r==='string'?r:JSON.stringify(r))]));
+
+  const AN={us_equity:'미국 주식',kr_equity:'한국 주식',china_equity:'중국 주식',japan_equity:'일본 주식',
+    em_equity:'신흥국 주식',europe_equity:'유럽 주식',kr_treasury:'한국 국채',us_treasury:'미국 국채',
+    gold:'금',oil:'원유',btc:'비트코인'};
+  T('a_asset',['자산','단·중·장기 견해'],Object.entries(A.asset_view||{})
+    .map(([k,v])=>[`<b>${AN[k]||k}</b>`,E(v)]));
+
+  const PC=['#2f6fd0','#1e9e6a','#e08c1a','#d64545','#8b5cf6','#0ea5e9','#94a3b8','#f472b6'];
+  $$('a_pf').innerHTML=Object.entries(A.portfolios||{}).map(([k,p])=>{
+    const al=p.allocation||[];
+    const bar=al.map((a,i)=>`<div style="width:${a.weight_pct}%;background:${PC[i%PC.length]}" title="${E(a.asset)} ${a.weight_pct}%"></div>`).join('');
+    return `<div class="pf">
+      <div class="t">${E(p.label||k)}</div>
+      <div class="bar">${bar}</div>
+      <table style="border:none;margin-top:4px">
+        <tr><th>자산</th><th style="text-align:right">비중</th><th>수단</th></tr>
+        ${al.map((a,i)=>`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${PC[i%PC.length]};margin-right:6px"></span>${E(a.asset)}</td>
+          <td class="num">${a.weight_pct}%</td><td class="note">${E(a.vehicle||'')}</td></tr>`).join('')}
+      </table>
+      <div class="src" style="margin-top:9px">
+        기대수익 <b>${E(p.expected_return||'—')}</b> · 최대낙폭 <b>${E(p.max_drawdown||'—')}</b> · 리밸런싱 ${E(p.rebalance||'—')}<br>
+        ${E(p.basis||'')}</div></div>`;}).join('');
+
+  T('a_act',['구분','액션'],(A.action_items||[]).map(a=>{
+    const s2=String(a), m2=s2.match(/^\[(.+?)\]\s*(.*)$/);
+    return m2?[`<b>${E(m2[1])}</b>`,E(m2[2])]:['—',E(s2)];}));
+
+  // 앵커 클릭 → 해당 패널의 .mainc 안에서 스크롤
+  document.querySelectorAll('nav a[data-go2]').forEach(a=>a.addEventListener('click',e=>{
+    const el=document.getElementById(a.dataset.go2);
+    if(el){ e.preventDefault(); el.scrollIntoView({behavior:'smooth',block:'start'}); }
+  }));
+}).catch(e=>{ const d=document.getElementById('d_asof'); if(d)d.textContent='report_data 로드 실패: '+e.message; });
+
