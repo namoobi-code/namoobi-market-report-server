@@ -706,6 +706,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const N=v=>(v==null||v==='')?'—':(+v).toLocaleString(undefined,{maximumFractionDigits:2});
   const LK=(t,u)=>u?`<a href="${E(u)}" target="_blank" rel="noopener">${E(t)}</a>`:E(t);
   const M=R.markets||{}, C=R.commodities||{}, CR=R.crypto||{};
+  // 추세 스파크라인 — docx 표의 '추세(1Y)' 열과 동일한 PNG (sync_server 가 /charts 로 업로드).
+  // 아직 업로드 전이면 404 → onerror 로 조용히 숨긴다(레이아웃 안 깨짐).
+  const SP=n=>n?`<img class="spk" src="/charts/spark_${n}.png" loading="lazy" alt=""
+      onerror="this.style.display='none'">`:'';
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
@@ -731,17 +735,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const EH=['날짜','지역','이벤트','중요도','예상 영향','출처'];
   T('d_ev', EH, ((R.news||{}).events_calendar||[]).map(EV));
   T('d_evl',EH, ((R.news||{}).events_calendar_longterm||[]).map(EV));
-  T('d_evb',['날짜','이벤트','중요도','예상 영향'],((R.news||{}).bigtech_events||[]).map(e=>
+  T('d_evb',['날짜','이벤트','중요도','예상 영향','출처'],((R.news||{}).bigtech_events||[]).map(e=>
     [E(e.date),`<b>${E(e.event)}</b>`,`<span style="color:var(--warn)">${E(e.importance||'')}</span>`,
-     `<span class="note">${E(e.expected_impact||'')}</span>`]));
+     `<span class="note">${E(e.expected_impact||'')}</span>`,LK(e.source||'—',e.source_url)]));
 
   /* ── 3.1 주요지표 (DB 아닌 3종) ── */
   const FS=M.factset||{};
+  const bullets=a=>Array.isArray(a)&&a.length?`<ul style="margin:6px 0 0 16px;padding:0">${a.map(x=>`<li style="margin:3px 0">${E(x)}</li>`).join('')}</ul>`:'';
   $$('d_fs').innerHTML = (FS.blog||FS.report) ? `
     ${FS.blog?`<div class="nw"><div class="h">${LK(FS.blog.title||'블로그',FS.blog.url)}</div>
-      <div class="s">${E(FS.blog.summary||'')}</div><div class="f note">${E(FS.blog.date||'')}</div></div>`:''}
+      <div class="s">${E(FS.blog.summary||'')}${bullets(FS.blog.points)}</div>
+      <div class="f note">${E(FS.blog.date||'')}</div></div>`:''}
     ${FS.report?`<div class="nw"><div class="h">${LK(FS.report.title||'Earnings Insight report',FS.report.url)}</div>
-      <div class="s">${(FS.report.full_summary||[]).map(x=>`<b>${E(x.section||'')}</b> — ${E((x.points||[]).join(' · '))}`).join('<br>')}</div>
+      <div class="s">${(FS.report.full_summary||[]).map(x=>
+        `<div style="margin-top:8px"><b>${E(x.section||'')}</b>${bullets(x.points)}</div>`).join('')}</div>
       <div class="f note">${E(FS.report.date||'')} · 다음 발행 ${E(FS.report.next_date||'—')}</div></div>`:''}
     <div class="src">${LK('insight.factset.com/topic/earnings',FS.topic_url)} · 기준 ${E(FS.as_of||'—')}</div>`
     : '<div class="note">데이터 없음</div>';
@@ -760,18 +767,22 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         `<b class="${c}">${E(sg||'—')}</b>`];}));
 
   const SEN=((M.macro||{}).sentiment||{}).rows||[];
-  T('d_sent',['지표','현재','1일','추세·해석'],SEN.map(r=>
+  const spkName=p=>String(p||'').replace(/^charts\/spark_/,'').replace(/\.png$/,'');
+  T('d_sent',['지표','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','의미 · 활용'],SEN.map(r=>
     [`<b>${E(r.name||'')}</b>`,`<span class="num">${N(r.current??r.value)}</span>`,
-     P(r.prev_pct),`<span class="note">${E(r.comment||r.trend||'')}</span>`]));
+     P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),P(r['6mo_pct']),P(r['1y_pct']),
+     SP(spkName(r.spark)),
+     `<span class="note">${E(r.meaning||'')}${r.use?` — ${E(r.use)}`:''}</span>`]));
 
   /* ── 지수표 공통 ── */
   const NM={sp500:'S&P 500',nasdaq:'나스닥',dow:'다우',vix:'VIX',dxy:'달러인덱스',us10y:'미 10년물',
     nikkei:'닛케이225',shanghai:'상하이종합',hsi:'홍콩 항셍',taiwan:'대만 가권',sensex:'인도 센섹스',vietnam:'베트남(VNM)',
     stoxx50:'유로 스톡스 50',dax:'독일 DAX',ftse:'영국 FTSE100',kospi:'코스피',kosdaq:'코스닥'};
-  const IH=['지수','현재','1주','1개월','3개월','6개월','1년','추세'];
+  const IH=['지수','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
   const idx=o=>Object.entries(o||{}).filter(([,v])=>v&&typeof v==='object'&&'current' in v)
-    .map(([k,v])=>[`<b>${NM[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,P(v['1w_pct']),P(v['1mo_pct']),
-      P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),`<span class="note">${E(v.trend||'')}</span>`]);
+    .map(([k,v])=>[`<b>${NM[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,
+      P(v['1d_pct']??v.prev_pct),P(v['1w_pct']),P(v['1mo_pct']),
+      P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),SP(k),`<span class="note">${E(v.trend||'')}</span>`]);
   T('d_kr',IH,idx(M.korea)); T('d_us',IH,idx(M.us_markets));
   T('d_as',IH,idx(M.asia_markets)); T('d_eu',IH,idx(M.europe_markets));
 
@@ -798,27 +809,30 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       <table style="border:none;margin-top:6px">${KS[k].map(x=>
         `<tr><td><b>${E(x.name)}</b></td><td class="note" style="text-align:right">${E(x.detail)}</td></tr>`).join('')}</table></div>`;}).join('');
 
-  const TH=['테마','대표 ETF','현재','1일','1주','1개월','3개월','1년'];
+  const TH=['테마','대표 ETF','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)'];
   const TE=M.korea_theme_etfs||{};
   T('d_theme',TH,(M.korea_theme_rows||[]).map(r=>
     [`<b>${E(r.theme||'')}</b>`,`<span class="note">${E(TE[r.theme]||r.etf||'')}</span>`,
-     `<span class="num">${N(r.current)}</span>`,P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),P(r['1y_pct'])]));
+     `<span class="num">${N(r.current)}</span>`,P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),
+      P(r['6mo_pct']),P(r['1y_pct']),SP('etf_'+(r.code||r.symbol||''))]));
   $$('d_theme_c').innerHTML=E(M.korea_themes_comment||'');
 
-  const SH=['종목','현재','1일','1주','1개월','3개월','1년'];
+  const SH=['종목','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
   const srow=r=>[`<b>${E(r.name||'')}</b> <span class="note">${E(r.code||r.symbol||'')}</span>`,
-    `<span class="num">${N(r.current)}</span>`,P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),P(r['1y_pct'])];
+    `<span class="num">${N(r.current)}</span>`,P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),
+    P(r['6mo_pct']),P(r['1y_pct']),SP('etf_'+(r.code||r.symbol||'')),`<span class="note">${E(r.trend||'')}</span>`];
   T('d_semis',SH,(M.semi_ai_stocks||[]).map(srow));
   $$('d_semis_c').innerHTML=E(M.semi_ai_stocks_comment||'');
   T('d_semie',SH,(M.semi_ai_etfs||[]).map(srow));
   $$('d_semie_c').innerHTML=E(M.semi_ai_etfs_comment||'');
 
   /* ── ETF 그룹 렌더 (미국·아시아·유럽·북미·호주중동 공통) ── */
-  const EGH=['종목','현재','1일','1주','1개월','3개월','6개월','1년','추세'];
-  const erow=x=>[`<b>${E(x.name||x.symbol)}</b> <span class="note">[${E(x.symbol||x.ticker||'-')}]</span>`+
+  const EGH=['종목','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
+  const erow=(x,pfx='etf_')=>[`<b>${E(x.name||x.symbol)}</b> <span class="note">[${E(x.symbol||x.ticker||'-')}]</span>`+
       (x.desc?`<br><span class="note">${E(x.desc)}</span>`:''),
     `<span class="num">${N(x.current)}</span>`,P(x['1d_pct']),P(x['1w_pct']),P(x['1mo_pct']),
-    P(x['3mo_pct']),P(x['6mo_pct']),P(x['1y_pct']),`<span class="note">${E(x.trend||'')}</span>`];
+    P(x['3mo_pct']),P(x['6mo_pct']),P(x['1y_pct']),
+    SP(pfx+(x.symbol||x.ticker||x.code||'')),`<span class="note">${E(x.trend||'')}</span>`];
   const etfGroups=(el,obj,labels)=>{
     const box=$$(el); if(!box||!obj){if(box)box.innerHTML='<div class="note">데이터 없음</div>';return;}
     let html='';
@@ -826,7 +840,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(!Array.isArray(v)||!v.length) return;
       html+=`<div class="grp">${E(labels[k]||k)}</div><div class="box" style="overflow-x:auto"><table>
         <tr>${EGH.map(h=>`<th>${h}</th>`).join('')}</tr>
-        ${v.map(x=>`<tr>${erow(x).map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;});
+        ${v.map(x=>`<tr>${erow(x, el==='d_asetf'?'aetf_':'etf_').map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</table></div>`;});
     if(obj.comment) html+=`<div class="lead" style="margin-top:12px">${E(obj.comment)}</div>`;
     if(obj.asof)    html+=`<div class="src">기준 ${E(obj.asof)}</div>`;
     box.innerHTML=html||'<div class="note">데이터 없음</div>';};
@@ -853,17 +867,27 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   $$('d_rebal').innerHTML=rbh||'<div class="note">데이터 없음</div>';
 
   /* ── 4. 원자재 ── */
-  const CN={wti:'WTI 유가',brent:'브렌트유',natgas:'천연가스',kodex_energy:'KODEX 에너지',kodex_aipower:'KODEX AI전력',
-    gold:'금',silver:'은',copper:'구리',platinum:'백금',rare_earth:'희토류 (REMX)',
-    corn:'옥수수',soybean:'대두',wheat:'밀',sugar:'설탕',coffee:'커피',orange:'오렌지주스',
-    crb:'CRB 지수',bdi:'발틱운임지수(BDI)',dba:'농업 ETF (DBA)',de:'디어앤코 (DE)',ntr:'뉴트리엔 (NTR)'};
-  const CH=['품목','현재','1주','1개월','3개월','6개월','1년','추세'];
-  const crow=o=>Object.entries(o||{}).filter(([,v])=>v&&typeof v==='object'&&'current' in v)
-    .map(([k,v])=>[`<b>${CN[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,P(v['1w_pct']),P(v['1mo_pct']),
-      P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),`<span class="note">${E(v.trend||'')}</span>`]);
-  T('d_c_en',CH,crow(C.energy));      $$('d_c_en_c').innerHTML=E(C.energy_comment||'');
-  T('d_c_me',CH,crow(C.metals));      $$('d_c_me_c').innerHTML=E(C.metals_comment||'');
-  T('d_c_ag',CH,crow(C.agriculture)); $$('d_c_ag_c').innerHTML=E(C.agri_comment||'');
+  // 명칭은 docx 와 동일한 정식 상품명·ETF명 (약칭 금지)
+  const CN={wti:'WTI 원유',brent:'브렌트유',natgas:'천연가스',
+    kodex_energy:'KODEX 미국S&P500에너지(합성)',kodex_aipower:'KODEX 미국AI전력핵심인프라',
+    gold:'금',silver:'은',copper:'구리',platinum:'백금',
+    corn:'옥수수',soybean:'대두',wheat:'소맥(밀)',sugar:'설탕',coffee:'커피',orange:'오렌지주스',
+    crb:'CRB 상품지수 (프록시 ^TRCCRB)',bdi:'BDI 운임 (프록시 BDRY ETF)',
+    dba:'Invesco DB Agriculture Fund (DBA)',de:'Deere & Company (DE)',ntr:'Nutrien Ltd. (NTR)'};
+  const CD={wti:'NYMEX WTI 선물 최근월물 — 국제 유가 선도 지표',
+    brent:'ICE 브렌트 선물 최근월물 — 유럽·아시아 기준 유종',
+    natgas:'NYMEX 천연가스 선물 최근월물',
+    kodex_energy:'전통 에너지(화석연료) · S&P500 에너지 섹터 합성 추종 (218420)',
+    kodex_aipower:'넥스트 에너지(전력망·인프라) · 미국 AI 전력 핵심 인프라 (487230)'};
+  const CH=['품목','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
+  const crow=(o,skip=[])=>Object.entries(o||{})
+    .filter(([k,v])=>v&&typeof v==='object'&&'current' in v&&!skip.includes(k))
+    .map(([k,v])=>[`<b>${CN[k]||k}</b>${CD[k]?`<br><span class="note">${E(CD[k])}</span>`:''}`,
+      `<span class="num">${N(v.current)}</span>`,P(v['1d_pct']??v.prev_pct),P(v['1w_pct']),P(v['1mo_pct']),
+      P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),SP(k),`<span class="note">${E(v.trend||'')}</span>`]);
+  T('d_c_en',CH,crow(C.energy));                    $$('d_c_en_c').innerHTML=E(C.energy_comment||'');
+  T('d_c_me',CH,crow(C.metals,['rare_earth']));     $$('d_c_me_c').innerHTML=E(C.metals_comment||'');
+  T('d_c_ag',CH,crow(C.agriculture));               $$('d_c_ag_c').innerHTML=E(C.agri_comment||'');
 
   const NF=C.nonferrous||{};
   $$('d_c_nf').innerHTML=(NF.groups||[]).map(g=>`
@@ -872,20 +896,24 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       <div class="s">${E(g.desc||'')}</div>
       ${g.core?`<div class="lead" style="margin:9px 0 0"><b>핵심 지표 — ${E(g.core)}</b><br>
         <span class="note">${E(g.core_desc||'')}</span></div>`:''}
-      ${Array.isArray(g.items)&&g.items.length?`<div class="box" style="margin-top:9px;overflow-x:auto"><table>
-        <tr><th>종목</th><th>현재</th><th>1주</th><th>1개월</th><th>1년</th><th>비고</th></tr>
-        ${g.items.map(x=>`<tr><td><b>${E(x.name||x.symbol)}</b> <span class="note">${E(x.symbol||'')}</span></td>
-          <td class="num">${N(x.current)}</td><td>${P(x['1w_pct'])}</td><td>${P(x['1mo_pct'])}</td>
-          <td>${P(x['1y_pct'])}</td><td class="note">${E(x.desc||'')}</td></tr>`).join('')}</table></div>`:''}
+      ${(()=>{const it=g.rows||g.items||[]; return it.length?`<div class="box" style="margin-top:9px;overflow-x:auto"><table>
+        <tr>${['종목','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'].map(h=>`<th>${h}</th>`).join('')}</tr>
+        ${it.map(x=>`<tr><td><b>${E(x.name||x.symbol||'')}</b> <span class="note">${E(x.symbol||x.code||'')}</span>
+            ${x.desc?`<br><span class="note">${E(x.desc)}</span>`:''}</td>
+          <td class="num">${N(x.current)}</td><td>${P(x['1d_pct']??x.prev_pct)}</td><td>${P(x['1w_pct'])}</td>
+          <td>${P(x['1mo_pct'])}</td><td>${P(x['3mo_pct'])}</td><td>${P(x['6mo_pct'])}</td><td>${P(x['1y_pct'])}</td>
+          <td>${SP(x.symbol?('c_'+x.symbol):'')}</td>
+          <td class="note">${E(x.trend||'')}</td></tr>`).join('')}</table></div>`:'';})()}
     </div>`).join('') + (NF.comment?`<div class="lead">${E(NF.comment)}</div>`:'');
 
   /* ── 5. 환율 ── */
   const FN={usd_krw:'원/달러',eur_krw:'원/유로',jpy_krw:'원/엔(100)',cny_krw:'원/위안',hkd_krw:'원/홍콩달러',
     usd_eur:'달러/유로',usd_jpy:'달러/엔',usd_cny:'달러/위안'};
   const fxr=o=>Object.entries(o||{}).filter(([,v])=>v&&typeof v==='object'&&'current' in v)
-    .map(([k,v])=>[`<b>${FN[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,P(v['1w_pct']),P(v['1mo_pct']),
-      P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),`<span class="note">${E(v.trend||'')}</span>`]);
-  const FH=['통화쌍','현재','1주','1개월','3개월','6개월','1년','추세'];
+    .map(([k,v])=>[`<b>${FN[k]||k}</b>`,`<span class="num">${N(v.current)}</span>`,
+      P(v['1d_pct']??v.prev_pct),P(v['1w_pct']),P(v['1mo_pct']),
+      P(v['3mo_pct']),P(v['6mo_pct']),P(v['1y_pct']),SP(k),`<span class="note">${E(v.trend||'')}</span>`]);
+  const FH=['통화쌍','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
   T('d_fx',FH,fxr(M.fx_markets)); T('d_fxu',FH,fxr(M.fx_usd));
 
   /* ── 6. 크립토 ── */
@@ -961,11 +989,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   $$('d_appc').innerHTML=(AC.groups||[]).map(g=>{
     const rows=(AC.rows||{})[g]||[]; if(!rows.length)return '';
     return `<div class="grp">${E(g)}</div><div class="box" style="overflow-x:auto"><table>
-      <tr>${['종목','현재','1일','1주','1개월','3개월','1년','역할'].map(h=>`<th>${h}</th>`).join('')}</tr>
+      <tr>${['종목','현재','1일','1주','1개월','3개월','1년','추세(1Y)','역할'].map(h=>`<th>${h}</th>`).join('')}</tr>
       ${rows.map(x=>`<tr>
         <td><b>${E(x.name||'')}</b> <span class="note">${E(x.symbol||x.code||'')}</span></td>
         <td class="num">${N(x.current)}</td><td>${P(x['1d_pct'])}</td><td>${P(x['1w_pct'])}</td>
         <td>${P(x['1mo_pct'])}</td><td>${P(x['3mo_pct'])}</td><td>${P(x['1y_pct'])}</td>
+        <td>${SP('c_'+(x.symbol||x.code||''))}</td>
         <td class="note">${E(x.desc||'')}</td></tr>`).join('')}</table></div>`;}).join('')
     + (AC.asof?`<div class="src">기준 ${E(AC.asof)}</div>`:'');
 

@@ -189,4 +189,10 @@ def coin_series(sym: str):
             return hit[1]
         return {"symbol": sym, "data": [], "error": str(e)}
 
+# ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
+#   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
+CHARTS = BASE / "data" / "charts"
+CHARTS.mkdir(parents=True, exist_ok=True)
+app.mount("/charts", StaticFiles(directory=CHARTS), name="charts")
+
 app.mount("/", StaticFiles(directory=BASE / "static", html=True), name="static")
