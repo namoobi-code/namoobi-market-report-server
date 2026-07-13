@@ -118,6 +118,47 @@ def fetch_hbm():
     print(f"[memory] ✅ HBM 지표      {n}행 (점유율·ASP·공급사매출·스펙)")
     return out
 
+def naver_annual(code6):
+    """네이버 기업실적분석 — 연도별 EPS·PER·BPS·ROE·매출·영업이익 (실적 + 컨센서스).
+
+    ★ 연도 키(202612)와 isConsensus 플래그를 명시적으로 준다 → 매핑이 확실하다.
+      SK하이닉스: 2023·2024·2025 = 실적(N) · 2026 = 컨센서스(Y)
+      2027~2028 은 네이버가 제공하지 않는다 → 기존 소스(MCP/애널리스트) 유지.
+
+    반환: {"2025": {"eps":..., "per":..., "revenue":..., "op":..., "opm":..., "roe":...,
+                    "is_consensus": False}, "2026": {..., "is_consensus": True}}
+    단위: 매출·영업이익 = 억원
+    """
+    try:
+        d = json.loads(get(f"https://m.stock.naver.com/api/stock/{code6}/finance/annual"))
+    except Exception as e:
+        print(f"[memory] ⚠️ 네이버 연도별 실적 실패({code6}): {e}")
+        return {}
+    fi = d.get("financeInfo") or {}
+    cols = {c["key"]: (c.get("title", ""), c.get("isConsensus") == "Y")
+            for c in (fi.get("trTitleList") or []) if c.get("key")}
+    FLD = {"매출액": "revenue", "영업이익": "op", "당기순이익": "net",
+           "영업이익률": "opm", "ROE": "roe", "EPS": "eps", "PER": "per",
+           "BPS": "bps", "PBR": "pbr", "주당배당금": "dps"}
+    def _v(x):
+        v = (x or {}).get("value")
+        if v in (None, "", "-"): return None
+        try: return float(str(v).replace(",", ""))
+        except Exception: return None
+    out = {}
+    for r in (fi.get("rowList") or []):
+        f = FLD.get(r.get("title"))
+        if not f: continue
+        for k, cell in (r.get("columns") or {}).items():
+            if k not in cols: continue
+            yr = k[:4]
+            out.setdefault(yr, {"is_consensus": cols[k][1]})
+            v = _v(cell)
+            if v is not None:
+                out[yr][f] = -v if (cell or {}).get("cx") == "minus" and v > 0 else v
+    return out
+
+
 def naver_consensus(code6):
     """네이버 당일 컨센서스 — 추정EPS/추정PER·실적EPS/PER·목표주가.
 
@@ -175,7 +216,11 @@ def fetch_valuation():
         #     삼성전자   DB 2026 EPS  16,693(PER 15.3배)  vs  네이버 당일  46,664(PER 5.45배)
         #   PER 16.7배와 5.8배는 투자판단이 완전히 다르다. 낡은 추정치를 그대로 두면 안 된다.
         if tk.endswith(".KS"):
-            nv = naver_consensus(tk.split(".")[0])
+            code6 = tk.split(".")[0]
+            ann = naver_annual(code6)
+            if ann:
+                r["annual_naver"] = ann           # ★ 연도별 EPS·PER (실적 + 컨센서스, 연도키 명시)
+            nv = naver_consensus(code6)
             if nv:
                 r["consensus_live"] = nv          # 네이버 당일 컨센서스 (정본)
                 if nv.get("fwd_eps"):
@@ -189,8 +234,9 @@ def fetch_valuation():
         rows.append(r)
     ok = sum(1 for r in rows if r["price"])
     nc = sum(1 for r in rows if r.get("consensus_live"))
-    print(f"[memory] ✅ 밸류에이션    {ok}/{len(rows)}사 주가 · 네이버 당일 컨센서스 {nc}사 "
-          f"(Micron 은 MCP/DB 보완)")
+    na = sum(1 for r in rows if r.get("annual_naver"))
+    print(f"[memory] ✅ 밸류에이션    {ok}/{len(rows)}사 주가 · 당일 컨센서스 {nc}사 · "
+          f"연도별 실적/컨센서스 {na}사 (Micron 은 MCP/DB 보완)")
     return rows
 
 
