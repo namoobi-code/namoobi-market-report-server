@@ -90,6 +90,63 @@ def us_symbols():
     return list(dict.fromkeys(syms))
 
 # ================ STAGE 1 ================
+# ── (2026-07-13) 가격 기준일 ──
+#  KRX OPEN API 는 T+1 공표라 당일 데이터가 없다(7/13 22시에도 최신은 7/10).
+#  그래서 trade_date(KRX 기본정보 기준일)와 실제 가격일이 다르다:
+#     trade_date = 20260710 (KRX)   ·   price_date = 2026-07-13 (Yahoo 종가)
+#  번들은 두 날짜가 섞여 있으므로 둘 다 명시한다 — 하나만 보여주면 옛 데이터로 오인한다.
+def kr_price_date():
+    try:
+        c=jget("https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?range=5d&interval=1d")["chart"]["result"][0]
+        ts=[t for t,x in zip(c["timestamp"], c["indicators"]["quote"][0]["close"]) if x]
+        return datetime.fromtimestamp(ts[-1],KST).strftime("%Y-%m-%d") if ts else None
+    except Exception:
+        return None
+
+# ══════════════════════════════════════════════════════════════════
+#  (2026-07-13) 당일 시세 오버레이 — 네이버 전종목 bulk
+#
+#  KRX OPEN API(data-dbg)는 T+1 공표라 당일 데이터가 없다.
+#  7/13 밤 10시에 조회해도 최신이 7/10(금)이다. 그래서 종가·시총·거래대금이
+#  1영업일(주말 끼면 3일) 낡은 값으로 필터링·랭킹되고 있었다 —
+#  오늘 -15% 빠지고 거래대금이 15조로 터진 종목의 '오늘'을 못 본다는 뜻이다.
+#
+#  KRX 정보데이터시스템(data.krx.co.kr) MDC 는 세션 쿠키를 요구해(LOGOUT 400) 부적합.
+#  네이버 전종목 bulk 는 장 마감 직후 당일 값을 주고, KRX 공식값과 일치한다
+#  (SK하이닉스 2026-07-13 종가 1,845,000 · -15.37% 정확히 일치 검증).
+#
+#  역할 분담:
+#    · 네이버 → 종가·시총·거래대금·등락률 (당일, 매일 바뀌는 값)
+#    · KRX   → 주권/보통주 여부·상장일·과거 시세 (준정적. T+1 지연 무해)
+# ══════════════════════════════════════════════════════════════════
+NV_URL="https://m.stock.naver.com/api/stocks/marketValue/%s?page=%d&pageSize=100"
+
+def naver_bulk():
+    """{종목코드: {close, mcap, trdval, chg_pct}} — 코스피+코스닥 전종목 당일 시세."""
+    out={}
+    for mkt in ("KOSPI","KOSDAQ"):
+        page=1
+        while page<=40:
+            try:
+                d=jget(NV_URL%(mkt,page),headers={"User-Agent":"Mozilla/5.0"})
+            except Exception as e:
+                print(f"[naver] {mkt} p{page} 실패: {type(e).__name__}"); break
+            rows=d.get("stocks") or []
+            if not rows: break
+            for r in rows:
+                c=r.get("itemCode")
+                if not c: continue
+                try:
+                    out[c]={"close":float(r.get("closePriceRaw") or 0),
+                            "mcap":float(r.get("marketValueRaw") or 0),
+                            "trdval":float(r.get("accumulatedTradingValueRaw") or 0),
+                            "chg_pct":float(str(r.get("fluctuationsRatio") or 0).replace(",",""))}
+                except Exception: pass
+            if len(rows)<100: break
+            page+=1
+    print(f"[naver] 당일 시세 {len(out)}종목 (코스피+코스닥)")
+    return out
+
 def stage1():
     today=date.today()
     d0s,stk=krx_day_back(today,"stk"); _,ksq=krx_day_back(today,"ksq")
@@ -101,6 +158,7 @@ def stage1():
         dd,_=krx_day_back(t-timedelta(days=k),"stk")
         prev.append(dd)
         krx_day_back(t-timedelta(days=k),"ksq")
+    NV=naver_bulk()          # 당일 시세 (KRX 는 T+1 이라 낡았다)
     base={}
     for mkt in ("stk","ksq"):
         cache=f"{CACHE}/krxbase_{mkt}_{d0s}.json"
@@ -122,9 +180,13 @@ def stage1():
             try:
                 if date(int(ldd[:4]),int(ldd[4:6]),int(ldd[6:8]))>cutoff: continue
             except Exception: pass
-            close=num(r["TDD_CLSPRC"]); mcap=num(r["MKTCAP"])
+            # ★ 당일 시세로 덮어쓴다 — KRX 값은 최대 3일(주말 포함) 낡았다
+            nv=NV.get(code)
+            close=(nv["close"] if nv and nv.get("close") else num(r["TDD_CLSPRC"]))
+            mcap =(nv["mcap"]  if nv and nv.get("mcap")  else num(r["MKTCAP"]))
             if not close or close<1000 or not mcap or mcap<3000e8: continue
-            vals=[num(r["ACC_TRDVAL"])]+[num(x[code]["ACC_TRDVAL"]) for x in loads if code in x]
+            _t0=(nv["trdval"] if nv and nv.get("trdval") else num(r["ACC_TRDVAL"]))
+            vals=[_t0]+[num(x[code]["ACC_TRDVAL"]) for x in loads if code in x]
             vals=[v for v in vals if v is not None]
             if not vals or sum(vals)/len(vals)<30e8: continue
             kr_pass.append({"code":code,"name":r["ISU_NM"],"mkt":r["MKT_NM"],"close":close,
@@ -154,7 +216,8 @@ def stage1():
         us_pass.append({"sym":q["symbol"],"name":(q.get("longName") or q.get("shortName") or "")[:44],
                         "px":px,"mcap":mcap})
     kr_pass.sort(key=lambda r:-r["mcap"]); us_pass.sort(key=lambda r:-r["mcap"])
-    save_db("ta_stage1",{"trade_date":d0s,"kr":{"universe":kr_total,"pass":len(kr_pass),"rows":kr_pass},
+    save_db("ta_stage1",{"trade_date":d0s,"price_date":kr_price_date(),
+                         "price_src":"네이버 전종목 bulk(당일)" if NV else "KRX(T+1)","nv_n":len(NV),"kr":{"universe":kr_total,"pass":len(kr_pass),"rows":kr_pass},
                          "us":{"universe":us_total,"pass":len(us_pass),"rows":us_pass}})
     print(f"stage1 ok: KR {kr_total}->{len(kr_pass)} US {us_total}->{len(us_pass)}")
 
@@ -318,7 +381,7 @@ def stage2():
                            "qly":[lambda r:r["roe"],lambda r:r["fcfy"],lambda r:(-r["de"] if r["de"] is not None and not r["isfin"] else None)]})
     us_final=sorted([r for r in us_s if r["score"] is not None],key=lambda r:-r["score"])[:30]
     for r in us_final: r.pop("fcf",None)
-    save_db("ta_stage2",{"trade_date":s1["trade_date"],
+    save_db("ta_stage2",{"trade_date":s1["trade_date"],"price_date":s1.get("price_date") or kr_price_date(),
                          "kr":{"scored":len(rows),"drops":kr_drop,"top":kr_final},
                          "us":{"scored":len(us),"drops":us_drop,"top":us_final}})
     print(f"stage2 ok: KR top{len(kr_final)} US top{len(us_final)}")
@@ -405,6 +468,10 @@ def flags(t,st=None):
                          (f" (ATR {atr}% 의 {abs(p)/atr:.1f}배)" if atr else ""))
             elif d1>=0.08:
                 f.append(f"⚠️ 오늘 +{p}% 급등 — 추격매수 위험")
+        g=t.get("gap_open")   # KRX 공식 시가 기준 (네이버) — 정확하다
+        if g is not None:
+            if g<=-0.03: f.append(f"시가 갭다운 {round(g*100,1)}% — 장 시작부터 악재 반영")
+            elif g>=0.03: f.append(f"시가 갭업 {round(g*100,1)}% — 추격매수 주의")
         if (t.get("ret_1m") or 0)<-0.10: f.append("1개월 −10%↓ 하락")
         if (t.get("hi52_dist") or 0)<-0.30: f.append("52주 고점比 −30%↓")
         if (t.get("vol_20d_vs_60d") or 1)>2: f.append("거래량 급증(20d/60d>2)")
@@ -412,6 +479,67 @@ def flags(t,st=None):
         b,br=st.get("bullish",0),st.get("bearish",0)
         if b+br>=8 and b/(b+br+1e-9)>=0.9: f.append("소셜 강세 쏠림(≥90%) — 역발상 리스크")
     return f
+# ══════════════════════════════════════════════════════════════════
+#  (2026-07-13) 번들 보강 — 네이버 /integration (종목당 1콜, 번들 20종만)
+#
+#  KRX OPEN API 가 T+1 이라 못 쓰던 것들이 여기 당일값으로 다 있다.
+#  특히 시가·고가·저가는 KRX 공식값이라 Yahoo 의 부정확한 시가를 대체한다
+#  (SK하이닉스 2026-07-13: Yahoo 2,113,000 vs 네이버/KRX 2,207,000 — Yahoo 가 틀렸다).
+#  덕분에 포기했던 '시가 갭' 지표를 정확한 값으로 되살릴 수 있다.
+# ══════════════════════════════════════════════════════════════════
+def naver_detail(code):
+    try:
+        d=jget(f"https://m.stock.naver.com/api/stock/{code}/integration",
+               headers={"User-Agent":"Mozilla/5.0"})
+    except Exception:
+        return {}
+    T={x.get("key"):x.get("value") for x in (d.get("totalInfos") or [])}
+    def n(k):
+        v=T.get(k)
+        if not v: return None
+        try: return float(str(v).replace(",","").replace("%","").replace("원","").replace("배",""))
+        except Exception: return None
+    dt=(d.get("dealTrendInfos") or [{}])[0]           # 최근 거래일 수급
+    cs=d.get("consensusInfo") or {}
+    def cn(v):
+        try: return float(str(v).replace(",",""))
+        except Exception: return None
+    out={"시가":n("시가"),"고가":n("고가"),"저가":n("저가"),"전일":n("전일"),
+         "외인소진율%":n("외인소진율"),
+         "PER":n("PER"),"추정PER":n("추정PER"),"추정EPS":n("추정EPS"),
+         "52주최고":n("52주 최고"),"52주최저":n("52주 최저")}
+    if dt:
+        out["수급_당일"]={"기준일":dt.get("bizdate"),
+                       "외국인순매수":dt.get("foreignerPureBuyQuant"),
+                       "기관순매수":dt.get("organPureBuyQuant"),
+                       "개인순매수":dt.get("individualPureBuyQuant"),
+                       "외인보유율":dt.get("foreignerHoldRatio")}
+    if cs.get("priceTargetMean"):
+        tgt=cn(cs.get("priceTargetMean"))
+        out["컨센서스"]={"목표주가":tgt,"투자의견":cs.get("recommMean"),"작성일":cs.get("createDate")}
+    return {k:v for k,v in out.items() if v is not None}
+
+def _kr_enrich(t, code):
+    """Yahoo 기술지표 + 네이버 당일 상세(시가·수급·컨센서스). 실패해도 비차단."""
+    if not isinstance(t, dict) or "err" in t:
+        return t
+    nd=naver_detail(code)
+    if not nd: return t
+    t=dict(t)
+    op, pc = nd.get("시가"), nd.get("전일")
+    if op and pc:
+        t["open"]=op
+        t["gap_open"]=round(op/pc-1,4)          # ★ KRX 공식 시가라 정확하다
+    for k in ("고가","저가","외인소진율%","추정PER","추정EPS","52주최고","52주최저"):
+        if nd.get(k) is not None: t[k]=nd[k]
+    if nd.get("수급_당일"): t["수급_당일"]=nd["수급_당일"]
+    if nd.get("컨센서스"):
+        t["컨센서스"]=nd["컨센서스"]
+        c=t["기준가"] if "기준가" in t else t.get("close")
+        tg=nd["컨센서스"].get("목표주가")
+        if c and tg: t["컨센서스"]["상승여력%"]=round((tg/c-1)*100,1)
+    return t
+
 def stage3():
     s2=load_db("ta_stage2")
     KR=s2["kr"]["top"][:10]; US=s2["us"]["top"][:10]
@@ -420,7 +548,7 @@ def stage3():
         t=tech(ysym)
         return {"종목":r["name"],"코드":r["code"],"시장":r["mkt"],"시총_조원":round(r["mcap"]/1e12,1),
                 "팩터카드":{k:r.get(k) for k in ("fper","pbr","divy","roe","de","revg","opg","frate","z_val","z_grw","z_mom","z_qly","score")},
-                "기술지표":t,"뉴스_최근":kr_news(r["code"]),
+                "기술지표":_kr_enrich(t, r["code"]),"뉴스_최근":kr_news(r["code"]),
                 "심리":{"외국인소진율%":r.get("frate"),"소셜":"<국내 소셜 미연결 — 결측>"},
                 "사전플래그":flags(t)}
     def do_us(r):
@@ -477,7 +605,14 @@ def main():
         # stage3 미포함 부분 실행 성공 — 이전 상태 복원
         save_db("ta_flag",prev_flag if prev_flag else {"status":"unknown"})
     run["end"]=now_kst()
-    status["runs"]=(status.get("runs") or [])[-13:]+[run]
-    save_db("ta_status",status)
+    # (2026-07-13) 실행 로그에는 '완주 회차(stage1~3 전부)' 만 남긴다.
+    #   디버깅으로 `ta_screen.py stage3` 만 돌린 부분 실행이 로그를 오염시켜
+    #   대시보드 0.Architecture 의 '최근 실행 로그' 가 실제 파이프라인 상태를 못 보여줬다.
+    _full = all(k in run["stages"] for k in ("stage1","stage2","stage3"))
+    if _full:
+        status["runs"]=(status.get("runs") or [])[-13:]+[run]
+        save_db("ta_status",status)
+    else:
+        print(f"[status] 부분 실행({','.join(run['stages'])}) — 실행 로그에 기록하지 않음")
 if __name__=="__main__":
     main()

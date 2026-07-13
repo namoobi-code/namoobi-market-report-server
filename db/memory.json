@@ -3,7 +3,7 @@
  "as_of": "2026-07-13",
  "data": {
   "asof": "2026-07-13",
-  "fetched_at": "2026-07-13T22:34:12+09:00",
+  "fetched_at": "2026-07-13T22:40:32+09:00",
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
@@ -283,7 +283,9 @@
     "ddr5_per_gb": 14.0,
     "ratio": 3.6,
     "basis": "HBM3E 36GB 스택 ASP $1,800 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $112.00 ÷ 8GB (환산 추정)",
-    "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"
+    "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표",
+    "ddr5_spot_per_gb": 24.17,
+    "ratio_spot": 2.1
    }
   },
   "leading": {
@@ -291,33 +293,33 @@
     "ticker": "^SOX",
     "label": "필라델피아 반도체지수",
     "why": "반도체 업황 종합 체온계",
-    "price": 12586.332,
-    "chg_1y_pct": 122.9,
-    "chg_1m_pct": 3.1
+    "price": 12457.855,
+    "chg_1y_pct": 120.6,
+    "chg_1m_pct": 2.1
    },
    "NVDA": {
     "ticker": "NVDA",
     "label": "엔비디아",
     "why": "HBM 최대 수요처",
-    "price": 209.895,
-    "chg_1y_pct": 27.9,
-    "chg_1m_pct": 4.7
+    "price": 208.76,
+    "chg_1y_pct": 27.2,
+    "chg_1m_pct": 4.2
    },
    "AMD": {
     "ticker": "AMD",
     "label": "AMD",
     "why": "HBM 2번째 수요처",
-    "price": 536.13,
-    "chg_1y_pct": 266.6,
-    "chg_1m_pct": 18.5
+    "price": 529.87,
+    "chg_1y_pct": 262.3,
+    "chg_1m_pct": 17.1
    },
    "TSM": {
     "ticker": "TSM",
     "label": "TSMC",
     "why": "CoWoS 패키징 = HBM 출하의 물리적 상한",
-    "price": 437.32,
-    "chg_1y_pct": 91.2,
-    "chg_1m_pct": 7.0
+    "price": 429.171,
+    "chg_1y_pct": 87.7,
+    "chg_1m_pct": 5.0
    },
    "KOSPI": {
     "ticker": "^KS11",
@@ -331,14 +333,14 @@
     "ticker": "MU",
     "label": "마이크론",
     "why": "메모리 공급자 대표",
-    "price": 920.97,
-    "chg_1y_pct": 676.5,
-    "chg_1m_pct": 3.3
+    "price": 905.898,
+    "chg_1y_pct": 663.8,
+    "chg_1m_pct": 1.6
    },
    "MEM_VS_GPU": {
     "label": "메모리/GPU 상대강도 (MU ÷ NVDA, 1년)",
     "why": "1 초과 = 가치가 수요처(GPU)에서 공급자(메모리)로 이동 = 공급부족 심화",
-    "value": 6.07,
+    "value": 6.0,
     "signal": "공급자 우위"
    }
   },
@@ -373,13 +375,13 @@
     "name": "Micron",
     "ticker": "MU",
     "currency": "USD",
-    "price": 920.125,
+    "price": 905.58,
     "eps_ttm": null,
     "eps_2026E": 73.32,
     "eps_2027E": 98.0,
     "per_ttm": null,
-    "per_2026E": 12.55,
-    "per_2027E": 9.39,
+    "per_2026E": 12.35,
+    "per_2027E": 9.24,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다"
    }
   ],

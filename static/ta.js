@@ -266,7 +266,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
       rows.map(r=>kr?[esc(r.name),r.mkt,Number(r.close).toLocaleString(),(r.mcap/1e12).toFixed(2),(r.trdval/1e8).toFixed(0)]
                    :[r.sym,esc(r.name),fx(r.px,2),(r.mcap/1e9).toFixed(1)]))}</div>`;
     document.getElementById('ta_s1').innerHTML=
-      `<div class="ta-note">기준 거래일 ${esc(s1.trade_date)} · 갱신 ${esc(s1.as_of)} — 한국 ${s1.kr.universe}종목 → <b>${s1.kr.pass}</b> 통과 · 미국 ${s1.us.universe}종목 → <b>${s1.us.pass}</b> 통과</div>`
+      `<div class="ta-note"><b>KRX 기본정보 기준일</b> ${esc(s1.trade_date)} <span class="note">(KRX OPEN API 는 T+1 공표 — 당일 데이터가 없다)</span> · <b>가격 기준일</b> ${esc(s1.price_date||"—")} · 갱신 ${esc(s1.as_of)} — 한국 ${s1.kr.universe}종목 → <b>${s1.kr.pass}</b> 통과 · 미국 ${s1.us.universe}종목 → <b>${s1.us.pass}</b> 통과</div>`
       +`<div class="ta-h" style="margin-top:8px">한국 통과 ${s1.kr.pass}종목 (시총순)</div>`+mk(s1.kr.rows,true)
       +`<div class="ta-h">미국 통과 ${s1.us.pass}종목 (시총순)</div>`+mk(s1.us.rows,false);
   } else document.getElementById('ta_s1').innerHTML='<div class="ta-note">데이터 없음 — 다음 06:00 실행 대기</div>';
@@ -280,7 +280,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     const drops=(s2.kr.drops||[]).map(d=>esc(d[0])+'('+esc(d[1])+')').join(', ');
     const dropsU=(s2.us.drops||[]).slice(0,14).map(d=>esc(d[0])+'('+esc(d[1])+')').join(', ');
     document.getElementById('ta_s2').innerHTML=
-      `<div class="ta-note">기준 거래일 ${esc(s2.trade_date)} · 갱신 ${esc(s2.as_of)}</div>`
+      `<div class="ta-note"><b>KRX 기본정보 기준일</b> ${esc(s2.trade_date)} <span class="note">(KRX OPEN API 는 T+1 공표 — 당일 데이터가 없다)</span> · <b>가격 기준일</b> ${esc(s2.price_date||"—")} · 갱신 ${esc(s2.as_of)}</div>`
       +`<div class="ta-h" style="margin-top:8px">한국 TOP 30</div><div class="ta-scroll">${krT}</div>`
       +`<div class="ta-h">미국 TOP 30</div><div class="ta-scroll">${usT}</div>`
       +`<div class="ta-note"><b>재무 하드컷 탈락</b> — KR: ${drops||'없음'}<br>US(일부): ${dropsU||'없음'}</div>`;
@@ -308,7 +308,13 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     const cnt=k=>V.filter(v=>v['판정']===k).length;
     const ord={'채택':0,'관망':1,'탈락':2};
     const vs=[...V].sort((a,b)=>(ord[a['판정']]??3)-(ord[b['판정']]??3)||(b['확신도']||0)-(a['확신도']||0));
-    let h=`<div class="ta-note">기준 거래일 <b>${esc(sv.trade_date)}</b> · 판정 생성 ${esc(sv.as_of)} · 실행 이력 ${calls&&calls.calls?calls.calls.length:1}회</div>`;
+    // 기준가의 실제 날짜 = px_snapshot 의 price_date (KRX trade_date 와 다르다)
+    const _pds=[...new Set(Object.values(sv.px_snapshot||{}).map(x=>x&&x.price_date).filter(Boolean))].sort();
+    const _pd=_pds.length?_pds[_pds.length-1]:null;
+    let h=`<div class="ta-note"><b>가격 기준일 ${esc(_pd||'—')}</b> (판정에 쓰인 종가일)`
+      + (_pds.length>1?` <span class="note">· 한국 ${esc(_pds[_pds.length-1])} / 미국 ${esc(_pds[0])} (시차)</span>`:'')
+      + ` · 판정 생성 ${esc(sv.as_of)} · 실행 이력 ${calls&&calls.calls?calls.calls.length:1}회`
+      + `<br><span class="note">KRX 기본정보 기준일 ${esc(sv.trade_date)} — KRX OPEN API 는 T+1 공표라 당일 데이터가 없다(7/13 밤에도 최신은 7/10). 가격·기술지표는 Yahoo 당일 종가이므로 두 날짜가 다르다.</span></div>`;
     h+=`<div style="margin:6px 0 14px"><span class="ta-chip g">채택 ${cnt('채택')}</span><span class="ta-chip y">관망 ${cnt('관망')}</span><span class="ta-chip r">탈락 ${cnt('탈락')}</span></div>`;
     if(ap.length){
       h+=`<div class="ta-appr"><b style="font-size:13px">✅ 최종 승인 ${ap.length}종목 (리스크 심사 통과)</b><div style="margin-top:8px">`+
