@@ -293,23 +293,9 @@
     </main>
   </div>
 
-  <!-- ④ TradingAgents (향후 개발) -->
-  <div class="pane" id="p_ta"><div class="soon">
-    <div class="hero"><span class="badge">향후 개발 · 설계 단계</span>
-      <h3>TradingAgents — 종목 스크리닝</h3>
-      <p><a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener">TauricResearch/TradingAgents</a>
-         의 <b>멀티 에이전트 토론</b> 구조를 참고해, 한국·미국 주식 전종목에서 매수 검토 후보를 추려낸다.
-         분석가(펀더멘털·기술·심리·뉴스)가 각자 의견을 내고, 강세/약세 리서처가 반박 토론을 거쳐,
-         리스크 매니저가 최종 채택 여부를 정하는 구조다.</p></div>
-    <h3>단계 설계</h3>
-    <div class="box"><table id="tbl_ta"></table></div>
-    <div class="lead" style="margin-top:14px">
-      <b>먼저 풀어야 할 것</b> — ① 전종목(코스피·코스닥 ~2,700 + 미국 ~5,000) 재무·가격 데이터를 어디서 무료로 받을지
-      (KRX OPEN API + Yahoo chart 조합이 유력) ② LLM 호출 비용 — 전종목에 에이전트 토론을 돌릴 수 없으니
-      <b>정량 필터로 후보를 수십 개로 줄인 뒤</b> 그 후보에만 토론을 붙인다 ③ 성과 검증 —
-      추천 시점·가격을 DB에 기록해 <b>사후 수익률을 추적</b>해야 신뢰할 수 있다.
-    </div>
-    <div class="src">⚠️ 투자 자문이 아니며, 스크리닝 결과는 참고용이다. 매매 판단과 책임은 사용자에게 있다.</div>
+  <!-- ④ TradingAgents (서버 자동화 가동) -->
+  <div class="pane" id="p_ta"><div class="soon" id="ta_root">
+    <div class="hero"><h3>TradingAgents — 종목 스크리닝</h3><p>불러오는 중…</p></div>
   </div></div>
 
   <!-- ⑤ 자동매매 (향후 개발) -->
@@ -554,4 +540,5 @@
   </div>
 </div>
 <script src="/app.js"></script>
+<script src="/ta.js"></script>
 </body></html>

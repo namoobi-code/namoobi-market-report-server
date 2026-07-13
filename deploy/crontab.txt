@@ -23,3 +23,7 @@
 45 6 * * * cd /home/ubuntu/namoobi && ./venv/bin/python scripts/fetch_memory.py work data/db >> /home/ubuntu/namoobi/memory.log 2>&1
 50 6 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_screen.py all >> /home/ubuntu/namoobi/ta_screen.log 2>&1
 55 6 * * * cd /home/ubuntu/namoobi && python3 scripts/sync_apk.py >> /home/ubuntu/namoobi/apk_sync.log 2>&1
+
+# ── [5단계] 성과 추적 — 판정 이력 대비 실현 수익률·α (무-LLM) ──
+58 15 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_perf.py >> /home/ubuntu/namoobi/ta_perf.log 2>&1
+58 6 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_perf.py >> /home/ubuntu/namoobi/ta_perf.log 2>&1
