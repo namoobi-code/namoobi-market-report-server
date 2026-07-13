@@ -225,9 +225,11 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
           ? `<div class="ta-h" style="margin-top:14px">반복 등장 종목 <span style="font-size:11px;font-weight:400;color:var(--tx2)">— 표본을 지배하고 있는지 확인</span></div>`
             + box(tbl(['종목','등장 횟수'], pf.중복진단.반복등장.map(d=>[esc(d.종목),`<b>${d.등장횟수}회</b>`])))
           : `<div class="ta-note">반복 등장 종목 없음 — 현재 ${pf.중복진단?pf.중복진단.고유종목수:'—'}종목 모두 1회씩 판정됐다.</div>`);
-    const rows=(pf.rows||[]).slice().sort((a,b)=>(b.현재수익률??-999)-(a.현재수익률??-999));
+    const rows=(pf.rows||[]).slice().sort((a,b)=>
+      String(b.price_date||b.trade_date||'').localeCompare(String(a.price_date||a.trade_date||''))
+      || (b.현재수익률??-999)-(a.현재수익률??-999));
     document.getElementById('ta_perf_rows').innerHTML=`<div class="ta-scroll">`+
-      tbl(['종목','반복','시장','판정','확신도','심사','기준가','현재가','현재 수익률',...H.map(h=>h+' α')],
+      tbl(['종목','반복','시장','판정','확신도','심사','<b>기준일</b>','기준가','현재가','현재 수익률',...H.map(h=>h+' α')],
         rows.map(r=>[
           esc(r.종목),
           (r.반복판정>1?`<b class="dn">${r.반복판정}회</b>`:'<span class="note">1</span>'),
@@ -235,13 +237,23 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
           (r.판정==='채택'?`<b class="up">채택</b>`:(r.판정==='탈락'?`<span class="note">탈락</span>`:'관망')),
           String(r.확신도??'—'),
           (r.심사==='승인'?`<b style="color:var(--ok)">승인</b>`:(r.심사==='반려'?`<span class="dn">반려</span>`:'<span class="note">—</span>')),
+          (r.price_date?`<b>${esc(r.price_date)}</b>`:'<span class="note">—</span>'),
           (r.기준가==null?'—':Number(r.기준가).toLocaleString()),
           (r.현재가==null?'—':Number(r.현재가).toLocaleString()),
           R(r.현재수익률),
           ...H.map(h=>r[h+'_알파']==null?'<span class="note">·</span>':P(r[h+'_알파']))
         ]))+`</div>`;
+    document.getElementById('ta_perf_rows').insertAdjacentHTML('beforebegin',
+      `<div class="ta-note" style="margin-bottom:8px">
+        <b>같은 종목이 여러 날 선정되면?</b> — <b>회차마다 별도 행</b>으로 남긴다. 7/13의 SK하이닉스(@1,845,000)와
+        7/20의 SK하이닉스(@2,000,000)는 <b>다른 가격·다른 정보에서 나온 다른 콜</b>이므로, 각각의 판정이 옳았는지를
+        따로 채점해야 한다. 하나로 합치면 '언제 낸 신호가 좋았는가'를 잃는다.<br>
+        <b>기준가 = 그 회차 판정 시점에 실제로 본 종가</b>이고, <b>기준일</b>이 그 날짜다.
+        집계할 때만 종목 단위로 묶어 평균을 낸다(위 ② 표).</div>`);
     document.getElementById('ta_perf_note').innerHTML=
-      `기준 거래일 ${esc(pf.runs&&pf.runs[0]?pf.runs[0].trade_date:'—')} · 갱신 ${esc(pf.as_of||'')} · 벤치마크 KR=^KS11 · US=SPY
+      `갱신 ${esc(pf.as_of||'')} · 벤치마크 KR=^KS11 · US=SPY
+       <br>※ <b>기준일</b> = 기준가가 실제로 형성된 날(종가일). 번들의 <code>trade_date</code>(KRX 기본정보 기준일)는
+       1영업일 지연돼 실제 가격일과 다르므로 성과 계산에 쓰지 않는다.
        <br>${esc(pf.note||'')}`;
   } else {
     document.getElementById('ta_perf_sum').innerHTML='<div class="ta-note">아직 판정 이력이 없다 — /namoobi-trading-agents 를 1회 이상 실행해야 추적이 시작된다.</div>';

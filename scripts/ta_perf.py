@@ -28,39 +28,70 @@ HORIZONS = [("1주", 7), ("1개월", 30), ("3개월", 91)]
 
 
 def fetch(sym):
-    """[(YYYY-MM-DD, close), ...] · 실패 시 []"""
+    """[(YYYY-MM-DD, close), ...] · 실패 시 [] · (series, 회사명) 은 fetch2 로."""
+    return fetch2(sym)[0]
+
+
+def fetch2(sym):
+    """(series, 회사명) — 회사명은 티커 검증용.
+
+    ⚠️ Yahoo 는 한국 종목에 잘못된 접미사를 줘도 에러 대신 '엉뚱한 데이터'를 반환한다.
+       006910.KS → 3,475원 (딴 종목) · 000660.KQ → 딴 종목
+       그런데 **잘못된 접미사는 회사명 자리에 '코드,코드,코드' 쓰레기 문자열**을 넣는다:
+         000660.KS → "SK hynix Inc."                      ← 정상
+         000660.KQ → "000660.KQ,0P0000AZ1B,4519170"        ← 쓰레기 = 틀린 티커
+       이걸 판별자로 쓴다. 가격 일치만으로는 우연히 통과할 수 있어 불충분하다.
+    """
     for attempt in range(3):
         try:
             u = CHART % urllib.request.quote(sym, safe="")
             r = json.loads(urllib.request.urlopen(
                 urllib.request.Request(u, headers=UA), timeout=20, context=CTX).read())
             res = r["chart"]["result"][0]
+            m = res.get("meta") or {}
+            nm = m.get("longName") or m.get("shortName") or ""
             ts = res["timestamp"]
             cl = res["indicators"]["quote"][0]["close"]
-            return [(datetime.fromtimestamp(t, KST).strftime("%Y-%m-%d"), c)
-                    for t, c in zip(ts, cl) if c is not None]
+            ser = [(datetime.fromtimestamp(t, KST).strftime("%Y-%m-%d"), c)
+                   for t, c in zip(ts, cl) if c is not None]
+            return ser, nm
         except Exception:
             if attempt == 2:
-                return []
+                return [], ""
             time.sleep(2)
-    return []
+    return [], ""
+
+
+def _valid_name(nm, sym):
+    """회사명이 진짜인가? (틀린 접미사면 '코드,코드,코드' 형태가 온다)"""
+    if not nm:
+        return False
+    return not re.match(r"^\d{6}\.K[SQ],", nm)
 
 
 def ticker(name, snap):
     code, mkt = snap.get("code"), snap.get("시장")
     if mkt == "US":
         return [code]
-    return [f"{code}.KS", f"{code}.KQ"]     # 코스피 → 실패 시 코스닥
+    if snap.get("ysym"):                  # 번들이 정확한 심볼을 남겼으면 그대로
+        return [snap["ysym"]]
+    return [f"{code}.KS", f"{code}.KQ"]   # 둘 다 시도 → 회사명으로 진짜를 고른다
 
 
 def series(name, snap, cache):
+    """티커 검증 2중: ① 회사명이 진짜인가 ② 기준가가 시리즈에 실재하는가."""
     if name in cache:
         return cache[name]
+    p0 = snap.get("close")
     for tk in ticker(name, snap):
-        s = fetch(tk)
-        if s:
-            cache[name] = s
-            return s
+        ser, nm = fetch2(tk)
+        if not ser or not _valid_name(nm, tk):
+            continue                       # 쓰레기 회사명 = 틀린 접미사 → 버린다
+        if p0 and not any(abs(c - p0) / max(abs(p0), 1e-9) < 0.005 for _, c in ser):
+            print(f"[perf] ⚠️ {name}({tk}, {nm}): 기준가 {p0} 가 시리즈에 없다 — 확인 필요")
+        cache[name] = ser
+        return ser
+    print(f"[perf] ⚠️ {name}: 유효한 티커를 찾지 못했다 — 성과 계산 제외")
     cache[name] = []
     return []
 
@@ -132,7 +163,8 @@ def main():
             nm = _norm(nm)
             ser = series(nm, snap, cache)
             p0 = snap.get("close")
-            pd0 = price_date(ser, p0)          # 번들 기준가의 실제 날짜
+            # 번들이 기록한 price_date 우선(정확). 없으면 기준가로 역추적.
+            pd0 = snap.get("price_date") or price_date(ser, p0)
             bser = bench.get(mkt, [])
             b0 = next((c for d, c in bser if d >= (pd0 or "9999")), None)
             cur = ser[-1][1] if ser else None
