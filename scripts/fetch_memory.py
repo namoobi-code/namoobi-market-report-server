@@ -119,43 +119,75 @@ def fetch_hbm():
     return out
 
 def naver_annual(code6):
-    """네이버 기업실적분석 — 연도별 EPS·PER·BPS·ROE·매출·영업이익 (실적 + 컨센서스).
+    """네이버 기업실적분석 — 연도별 EPS·PER·BPS·ROE·매출·영업이익 (실적 + 3년치 컨센서스).
 
-    ★ 연도 키(202612)와 isConsensus 플래그를 명시적으로 준다 → 매핑이 확실하다.
-      SK하이닉스: 2023·2024·2025 = 실적(N) · 2026 = 컨센서스(Y)
-      2027~2028 은 네이버가 제공하지 않는다 → 기존 소스(MCP/애널리스트) 유지.
+    ★ 소스: 네이버 PC 종목분석 iframe = FnGuide(navercomp.wisereport.co.kr)
+      모바일 API(/finance/annual)는 당해년도(2026) 하나만 준다.
+      PC 표에는 2027·2028(E)까지 있다 — 이쪽이 정본이다.
 
-    반환: {"2025": {"eps":..., "per":..., "revenue":..., "op":..., "opm":..., "roe":...,
-                    "is_consensus": False}, "2026": {..., "is_consensus": True}}
-    단위: 매출·영업이익 = 억원
+    2단계 호출: ① c1010001.aspx 에서 encparam·id 토큰 추출 (페이지마다 새로 생성)
+                ② ajax/cF1001.aspx 를 토큰과 함께 호출 → 연도별 표 HTML
+
+    실측(SK하이닉스 2026-07-13):
+      EPS  2021~2025 실적 → 2026(E) 318,735 · 2027(E) 444,359 · 2028(E) 433,625
+      (E) 표기로 실적/컨센서스가 명시되므로 매핑이 확실하다.
+
+    반환: {"2026": {"eps":318735, "per":6.84, "bps":..., "roe":..., "revenue":...,
+                    "is_consensus": True}, ...}   · 매출·영업이익 단위 = 억원
     """
+    PAGE = f"https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={code6}"
     try:
-        d = json.loads(get(f"https://m.stock.naver.com/api/stock/{code6}/finance/annual"))
+        h = get(PAGE)
+        enc = (re.search(r"encparam\s*[:=]\s*['\"]([^'\"]+)['\"]", h) or [None, None])[1]
+        idp = (re.search(r"[^a-zA-Z]id\s*:\s*['\"]([A-Za-z0-9+/=]{6,})['\"]", h) or [None, None])[1]
+        if not enc:
+            print(f"[memory] ⚠️ FnGuide 토큰 추출 실패({code6}) — 연도별 실적 생략")
+            return {}
+        u = ("https://navercomp.wisereport.co.kr/v2/company/ajax/cF1001.aspx"
+             f"?cmp_cd={code6}&fin_typ=0&freq_typ=Y&encparam={enc}&id={idp or ''}")
+        req = urllib.request.Request(u, headers={**UA, "Referer": PAGE,
+                                                "X-Requested-With": "XMLHttpRequest"})
+        with urllib.request.urlopen(req, timeout=30, context=CTX) as r:
+            html = r.read().decode("utf-8", "ignore")
     except Exception as e:
         print(f"[memory] ⚠️ 네이버 연도별 실적 실패({code6}): {e}")
         return {}
-    fi = d.get("financeInfo") or {}
-    cols = {c["key"]: (c.get("title", ""), c.get("isConsensus") == "Y")
-            for c in (fi.get("trTitleList") or []) if c.get("key")}
+
+    # 연도 헤더 — '(E)' 가 붙으면 컨센서스
+    yrs = re.findall(r"(20\d{2})/\d{2}(\(E\))?", html)
+    if not yrs:
+        return {}
+    cols = [(y, bool(e)) for y, e in yrs]
+
     FLD = {"매출액": "revenue", "영업이익": "op", "당기순이익": "net",
            "영업이익률": "opm", "ROE": "roe", "EPS": "eps", "PER": "per",
-           "BPS": "bps", "PBR": "pbr", "주당배당금": "dps"}
-    def _v(x):
-        v = (x or {}).get("value")
-        if v in (None, "", "-"): return None
-        try: return float(str(v).replace(",", ""))
-        except Exception: return None
+           "BPS": "bps", "PBR": "pbr"}
+
+    def cells(label):
+        m = re.search(r">\s*%s[^<]*<.*?</tr>" % re.escape(label), html, re.S)
+        if not m:
+            return []
+        return [re.sub(r"<[^>]+>", "", t).replace("&nbsp;", "").strip()
+                for t in re.findall(r"<td[^>]*>(.*?)</td>", m.group(), re.S)]
+
+    def _num(v):
+        if v in (None, "", "-", "N/A"):
+            return None
+        try:
+            return float(str(v).replace(",", ""))
+        except Exception:
+            return None
+
     out = {}
-    for r in (fi.get("rowList") or []):
-        f = FLD.get(r.get("title"))
-        if not f: continue
-        for k, cell in (r.get("columns") or {}).items():
-            if k not in cols: continue
-            yr = k[:4]
-            out.setdefault(yr, {"is_consensus": cols[k][1]})
-            v = _v(cell)
-            if v is not None:
-                out[yr][f] = -v if (cell or {}).get("cx") == "minus" and v > 0 else v
+    for label, key in FLD.items():
+        vals = cells(label)
+        for i, (yr, is_e) in enumerate(cols):
+            if i >= len(vals):
+                break
+            v = _num(vals[i])
+            if v is None:
+                continue
+            out.setdefault(yr, {"is_consensus": is_e})[key] = v
     return out
 
 
