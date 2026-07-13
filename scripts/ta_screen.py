@@ -96,29 +96,28 @@ def us_symbols():
 #     trade_date = 20260710 (KRX)   ·   price_date = 2026-07-13 (Yahoo 종가)
 #  번들은 두 날짜가 섞여 있으므로 둘 다 명시한다 — 하나만 보여주면 옛 데이터로 오인한다.
 def kr_price_date():
+    """한국 시장의 '가격 기준일' = 최근 거래일 종가일.
+
+    ⚠️ 종전엔 Yahoo ^KS11 로 구했는데 캐시된 옛 응답이 와서 07-13 에 07-10 을 반환했다.
+       네이버 지수 API 는 당일값을 확정적으로 준다 → 1차 네이버, 2차 Yahoo 폴백.
+    """
     try:
-        c=jget("https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?range=5d&interval=1d")["chart"]["result"][0]
-        ts=[t for t,x in zip(c["timestamp"], c["indicators"]["quote"][0]["close"]) if x]
-        return datetime.fromtimestamp(ts[-1],KST).strftime("%Y-%m-%d") if ts else None
+        d = jget("https://m.stock.naver.com/api/index/KOSPI/price?pageSize=1&page=1",
+                 headers={"User-Agent": "Mozilla/5.0"})
+        rows = d if isinstance(d, list) else (d.get("priceInfos") or [])
+        t = str((rows or [{}])[0].get("localTradedAt", ""))[:10]
+        if len(t) == 10:
+            return t
+    except Exception as e:
+        print("  [price_date] 네이버 실패 → Yahoo 폴백:", type(e).__name__)
+    try:
+        c = jget("https://query1.finance.yahoo.com/v8/finance/chart/%5EKS11?range=5d&interval=1d")["chart"]["result"][0]
+        ts = [t for t, x in zip(c["timestamp"], c["indicators"]["quote"][0]["close"]) if x]
+        return datetime.fromtimestamp(ts[-1], KST).strftime("%Y-%m-%d") if ts else None
     except Exception:
         return None
 
-# ══════════════════════════════════════════════════════════════════
-#  (2026-07-13) 당일 시세 오버레이 — 네이버 전종목 bulk
-#
-#  KRX OPEN API(data-dbg)는 T+1 공표라 당일 데이터가 없다.
-#  7/13 밤 10시에 조회해도 최신이 7/10(금)이다. 그래서 종가·시총·거래대금이
-#  1영업일(주말 끼면 3일) 낡은 값으로 필터링·랭킹되고 있었다 —
-#  오늘 -15% 빠지고 거래대금이 15조로 터진 종목의 '오늘'을 못 본다는 뜻이다.
-#
-#  KRX 정보데이터시스템(data.krx.co.kr) MDC 는 세션 쿠키를 요구해(LOGOUT 400) 부적합.
-#  네이버 전종목 bulk 는 장 마감 직후 당일 값을 주고, KRX 공식값과 일치한다
-#  (SK하이닉스 2026-07-13 종가 1,845,000 · -15.37% 정확히 일치 검증).
-#
-#  역할 분담:
-#    · 네이버 → 종가·시총·거래대금·등락률 (당일, 매일 바뀌는 값)
-#    · KRX   → 주권/보통주 여부·상장일·과거 시세 (준정적. T+1 지연 무해)
-# ══════════════════════════════════════════════════════════════════
+
 NV_URL="https://m.stock.naver.com/api/stocks/marketValue/%s?page=%d&pageSize=100"
 
 def naver_bulk():
@@ -216,7 +215,15 @@ def stage1():
         us_pass.append({"sym":q["symbol"],"name":(q.get("longName") or q.get("shortName") or "")[:44],
                         "px":px,"mcap":mcap})
     kr_pass.sort(key=lambda r:-r["mcap"]); us_pass.sort(key=lambda r:-r["mcap"])
-    save_db("ta_stage1",{"trade_date":d0s,"price_date":kr_price_date(),
+    # ── (2026-07-13) trade_date = '가격 기준일' 로 정정 ──
+    #  종전엔 KRX 기본정보 기준일(T+1 지연)을 trade_date 로 썼다. 그런데 시세(종가·시총·
+    #  거래대금)는 이미 전부 네이버 당일값으로 바뀌었다 → 라벨만 3일 전을 가리키는 거짓말이었다.
+    #  KRX 가 지금 주는 건 정적 정보뿐이다: 종목 유니버스 · 주권/보통주 구분 · 상장일.
+    #  이건 T+1 이어도 무해하므로 krx_base_date 로 따로 남기고, 스크리닝의 실질 기준일은
+    #  가격 기준일로 삼는다.
+    _pd = kr_price_date()
+    _td = _pd.replace("-", "") if _pd else d0s
+    save_db("ta_stage1",{"trade_date":_td,"price_date":_pd,"krx_base_date":d0s,
                          "price_src":"네이버 전종목 bulk(당일)" if NV else "KRX(T+1)","nv_n":len(NV),"kr":{"universe":kr_total,"pass":len(kr_pass),"rows":kr_pass},
                          "us":{"universe":us_total,"pass":len(us_pass),"rows":us_pass}})
     print(f"stage1 ok: KR {kr_total}->{len(kr_pass)} US {us_total}->{len(us_pass)}")
@@ -382,6 +389,7 @@ def stage2():
     us_final=sorted([r for r in us_s if r["score"] is not None],key=lambda r:-r["score"])[:30]
     for r in us_final: r.pop("fcf",None)
     save_db("ta_stage2",{"trade_date":s1["trade_date"],"price_date":s1.get("price_date") or kr_price_date(),
+                         "krx_base_date":s1.get("krx_base_date"),
                          "kr":{"scored":len(rows),"drops":kr_drop,"top":kr_final},
                          "us":{"scored":len(us),"drops":us_drop,"top":us_final}})
     print(f"stage2 ok: KR top{len(kr_final)} US top{len(us_final)}")
@@ -564,6 +572,7 @@ def stage3():
     _pds=[x for x in _pds if x]
     save_db("ta_stage3",{"trade_date":s2["trade_date"],
                          "price_date":(max(_pds) if _pds else None),
+                         "krx_base_date":s2.get("krx_base_date"),
                          "kr":kr_b,"us":us_b,
         "안내":"이 번들은 /namoobi-trading-agents 스킬 실행 시 Bull/Bear 토론 에이전트의 입력으로 사용된다. 서버는 LLM을 쓰지 않는다."})
     print(f"stage3 ok: bundles {len(kr_b)}+{len(us_b)}")
