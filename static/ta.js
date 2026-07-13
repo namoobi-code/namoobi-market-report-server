@@ -294,7 +294,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
           kr?fx(f.roe,0)+'%':pc(f.roe),fx(t.rsi14,0),pc(t.ret_1m),pc(t.ret_1y),pc(t.hi52_dist),sent,
           (b['사전플래그']||[]).map(x=>`<span class="ta-flag">${esc(x)}</span>`).join('')||'—'];}));
     document.getElementById('ta_s3').innerHTML=
-      `<div class="ta-note">기준 거래일 ${esc(s3.trade_date)} · 갱신 ${esc(s3.as_of)} — 뉴스 헤드라인 6건·StockTwits 원문은 <a href="/api/db/ta_stage3" target="_blank">JSON</a> 참조</div>`
+      `<div class="ta-note"><b>가격 기준일 ${esc(s3.price_date||'—')}</b> (실제 종가일) · 갱신 ${esc(s3.as_of)} <span class="note">· trade_date=${esc(s3.trade_date)} 는 KRX 기본정보 기준일로 1영업일 지연되므로 가격일과 다르다</span> — 뉴스 헤드라인 6건·StockTwits 원문은 <a href="/api/db/ta_stage3" target="_blank">JSON</a> 참조</div>`
       +`<div class="ta-h" style="margin-top:8px">한국 후보 10</div><div class="ta-scroll">${mk(s3.kr,true)}</div>`
       +`<div class="ta-h">미국 후보 10</div><div class="ta-scroll">${mk(s3.us,false)}</div>`;
   } else document.getElementById('ta_s3').innerHTML='<div class="ta-note">데이터 없음</div>';
