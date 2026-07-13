@@ -266,7 +266,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
       rows.map(r=>kr?[esc(r.name),r.mkt,Number(r.close).toLocaleString(),(r.mcap/1e12).toFixed(2),(r.trdval/1e8).toFixed(0)]
                    :[r.sym,esc(r.name),fx(r.px,2),(r.mcap/1e9).toFixed(1)]))}</div>`;
     document.getElementById('ta_s1').innerHTML=
-      `<div class="ta-note"><b>기준일 ${esc(s1.price_date||s1.trade_date||'—')}</b> (종가 기준) · 갱신 ${esc(s1.as_of)} <span class="note">· 시세(종가·시총·거래대금)는 네이버 당일값. 종목 기본정보(주권·보통주·상장일)만 KRX ${esc(s1.krx_base_date||'—')} 기준 — 정적 정보라 무해하다.</span> · 갱신 ${esc(s1.as_of)} — 한국 ${s1.kr.universe}종목 → <b>${s1.kr.pass}</b> 통과 · 미국 ${s1.us.universe}종목 → <b>${s1.us.pass}</b> 통과</div>`
+      `<div class="ta-note"><b>기준일 ${esc(s1.price_date||s1.trade_date||'—')}</b> (종가 기준) · 갱신 ${esc(s1.as_of)} <span class="note">· 시세(종가·시총·거래대금)는 네이버 당일값. 종목 기본정보(주권·보통주·상장일)만 KRX ${esc(s1.krx_base_date||'—')} 기준 — 정적 정보라 무해하다.</span> — 한국 ${s1.kr.universe}종목 → <b>${s1.kr.pass}</b> 통과 · 미국 ${s1.us.universe}종목 → <b>${s1.us.pass}</b> 통과</div>`
       +`<div class="ta-h" style="margin-top:8px">한국 통과 ${s1.kr.pass}종목 (시총순)</div>`+mk(s1.kr.rows,true)
       +`<div class="ta-h">미국 통과 ${s1.us.pass}종목 (시총순)</div>`+mk(s1.us.rows,false);
   } else document.getElementById('ta_s1').innerHTML='<div class="ta-note">데이터 없음 — 다음 06:00 실행 대기</div>';
@@ -280,7 +280,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     const drops=(s2.kr.drops||[]).map(d=>esc(d[0])+'('+esc(d[1])+')').join(', ');
     const dropsU=(s2.us.drops||[]).slice(0,14).map(d=>esc(d[0])+'('+esc(d[1])+')').join(', ');
     document.getElementById('ta_s2').innerHTML=
-      `<div class="ta-note"><b>기준일 ${esc(s2.price_date||s2.trade_date||'—')}</b> (종가 기준) · 갱신 ${esc(s2.as_of)} <span class="note">· 시세(종가·시총·거래대금)는 네이버 당일값. 종목 기본정보(주권·보통주·상장일)만 KRX ${esc(s2.krx_base_date||'—')} 기준 — 정적 정보라 무해하다.</span> · 갱신 ${esc(s2.as_of)}</div>`
+      `<div class="ta-note"><b>기준일 ${esc(s2.price_date||s2.trade_date||'—')}</b> (종가 기준) · 갱신 ${esc(s2.as_of)} <span class="note">· 시세(종가·시총·거래대금)는 네이버 당일값. 종목 기본정보(주권·보통주·상장일)만 KRX ${esc(s2.krx_base_date||'—')} 기준 — 정적 정보라 무해하다.</span></div>`
       +`<div class="ta-h" style="margin-top:8px">한국 TOP 30</div><div class="ta-scroll">${krT}</div>`
       +`<div class="ta-h">미국 TOP 30</div><div class="ta-scroll">${usT}</div>`
       +`<div class="ta-note"><b>재무 하드컷 탈락</b> — KR: ${drops||'없음'}<br>US(일부): ${dropsU||'없음'}</div>`;
