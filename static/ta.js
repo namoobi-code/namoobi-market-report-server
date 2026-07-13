@@ -204,22 +204,34 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     const P=v=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v}%</span>`;
     const R=v=>v==null?'<span class="note">경과 전</span>':`<b class="${v>0?'up':'dn'}">${v>0?'+':''}${v}%</b>`;
     const H=pf.horizons||['1주','1개월','3개월'];
-    document.getElementById('ta_perf_sum').innerHTML=box(
-      tbl(['구분','종목수',...H.flatMap(h=>[h+' 평균α',h+' 적중률'])],
-        pf.summary.map(x=>[
-          (x.구분.startsWith('★')?`<b>${esc(x.구분)}</b>`:(x.구분.startsWith('탈락')?`<span class="note">${esc(x.구분)}</span>`:esc(x.구분))),
-          String(x.종목수),
-          ...H.flatMap(h=>[
-            (x[h+'_평균알파']==null?'<span class="note">경과 전</span>':R(x[h+'_평균알파'])),
-            (x[h+'_적중률']==null?'—':`${x[h+'_적중률']}% <span class="note">(n=${x[h+'_n']})</span>`)])
-        ])))
-      +`<div class="ta-note">α = 종목수익률 − 벤치마크(KOSPI·SPY). <b>탈락 = 대조군</b> — 채택 α 가 탈락 α 를 유의하게 앞서야 필터가 작동한다는 증거다.
-        경과일이 안 된 구간은 계산하지 않는다(억지로 채우지 않음).</div>`;
+    const NM=x=>(x.구분.startsWith('★')?`<b>${esc(x.구분)}</b>`:(x.구분.startsWith('탈락')?`<span class="note">${esc(x.구분)}</span>`:esc(x.구분)));
+    const cell=(v,n)=>v==null?'<span class="note">경과 전</span>':`${R(v)} <span class="note">(n=${n})</span>`;
+    document.getElementById('ta_perf_sum').innerHTML=
+      `<b style="font-size:12px">① 콜 단위</b> <span class="note">— 판정 1건 = 표본 1개. 같은 종목이 반복 등장하면 그 종목이 표본을 지배한다.</span>`
+      +box(tbl(['구분','콜수','고유종목',...H.flatMap(h=>[h+' 평균α',h+' 적중률'])],
+        pf.summary.map(x=>[NM(x),String(x.콜수),String(x.고유종목수),
+          ...H.flatMap(h=>[cell(x[h+'_평균알파'],x[h+'_n']),
+            (x[h+'_적중률']==null?'—':`${x[h+'_적중률']}%`)])])))
+      +`<b style="font-size:12px;display:block;margin-top:14px">② 종목 단위 <span style="color:var(--ok)">★ 중복 가중 제거</span></b>
+        <span class="note">— 종목별로 먼저 평균 → 종목 간 평균. ①과 크게 벌어지면 소수 종목이 성적을 끌고 있다는 뜻이다.</span>`
+      +box(tbl(['구분','고유종목',...H.flatMap(h=>[h+' 평균α',h+' 적중률'])],
+        pf.summary.map(x=>[NM(x),String(x.고유종목수),
+          ...H.flatMap(h=>[cell(x[h+'_종목평균알파'],x[h+'_종목n']),
+            (x[h+'_종목적중률']==null?'—':`${x[h+'_종목적중률']}%`)])])))
+      +`<div class="ta-note">α = 종목수익률 − 벤치마크(KOSPI·SPY). <b>탈락 = 대조군</b> — 채택 α 가 탈락 α 를 유의하게 앞서야 필터가 작동한다는 증거다.<br>
+        ⚠️ 같은 종목의 연속 판정은 서로 독립이 아니다(어제 오른 종목은 오늘도 오를 확률이 높다). <b>n 을 독립 표본 수로 읽지 말 것</b> — 실질 독립 표본은 고유종목수에 가깝다.<br>
+        경과일이 안 된 구간은 계산하지 않는다(억지로 채우지 않음).</div>`
+      + ((pf.중복진단&&(pf.중복진단.반복등장||[]).length)
+          ? `<div class="ta-h" style="margin-top:14px">반복 등장 종목 <span style="font-size:11px;font-weight:400;color:var(--tx2)">— 표본을 지배하고 있는지 확인</span></div>`
+            + box(tbl(['종목','등장 횟수'], pf.중복진단.반복등장.map(d=>[esc(d.종목),`<b>${d.등장횟수}회</b>`])))
+          : `<div class="ta-note">반복 등장 종목 없음 — 현재 ${pf.중복진단?pf.중복진단.고유종목수:'—'}종목 모두 1회씩 판정됐다.</div>`);
     const rows=(pf.rows||[]).slice().sort((a,b)=>(b.현재수익률??-999)-(a.현재수익률??-999));
     document.getElementById('ta_perf_rows').innerHTML=`<div class="ta-scroll">`+
-      tbl(['종목','시장','판정','확신도','심사','기준가','현재가','현재 수익률',...H.map(h=>h+' α')],
+      tbl(['종목','반복','시장','판정','확신도','심사','기준가','현재가','현재 수익률',...H.map(h=>h+' α')],
         rows.map(r=>[
-          esc(r.종목),r.시장,
+          esc(r.종목),
+          (r.반복판정>1?`<b class="dn">${r.반복판정}회</b>`:'<span class="note">1</span>'),
+          r.시장,
           (r.판정==='채택'?`<b class="up">채택</b>`:(r.판정==='탈락'?`<span class="note">탈락</span>`:'관망')),
           String(r.확신도??'—'),
           (r.심사==='승인'?`<b style="color:var(--ok)">승인</b>`:(r.심사==='반려'?`<span class="dn">반려</span>`:'<span class="note">—</span>')),

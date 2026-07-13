@@ -152,18 +152,46 @@ def main():
                      "종목수": len([v for v in (call.get("verdicts") or []) if px.get(v.get("종목"))]),
                      "승인": sorted(appr)})
 
-    # ── 집계: 판정군별 · 심사결과별 평균 α (탈락군 포함 — 생존편향 방지) ──
+    # ══════════════════════════════════════════════════════════════════
+    #  집계 — 중복 가중 문제를 2단 평균으로 처리한다.
+    #
+    #  같은 종목이 매일 채택되면 콜(call) 단위 평균은 그 한 종목이 표본을 지배해
+    #  "채택군 성적"이 아니라 "그 종목 성적"이 되어버린다. 또 같은 종목의 연속
+    #  판정은 서로 독립이 아니므로(어제 오른 종목은 오늘도 오를 확률이 높다)
+    #  n=30 을 독립 표본 30개처럼 읽으면 안 된다 — 실질 독립 표본은 종목 수에 가깝다.
+    #
+    #  그래서 두 가지를 나란히 낸다:
+    #    · 콜 단위  = 판정 1건 = 표본 1개 (신호를 낼 때마다의 기대 성과)
+    #    · 종목 단위 = 종목별로 먼저 평균 → 종목 간 평균 (중복 가중 제거)
+    #  둘이 크게 벌어지면 "소수 종목이 반복 등장해 성적을 끌고 있다"는 진단이 된다.
+    # ══════════════════════════════════════════════════════════════════
     def agg(sel, label):
         g = [r for r in rows if sel(r)]
-        out = {"구분": label, "종목수": len(g)}
+        uniq = sorted({r["종목"] for r in g})
+        out = {"구분": label, "콜수": len(g), "고유종목수": len(uniq)}
         for lab, _ in HORIZONS:
             a = [r[f"{lab}_알파"] for r in g if r[f"{lab}_알파"] is not None]
-            s = [r[f"{lab}_수익률"] for r in g if r[f"{lab}_수익률"] is not None]
+            # ── 콜 단위 (평평한 평균) ──
             out[f"{lab}_평균알파"] = round(sum(a) / len(a), 2) if a else None
-            out[f"{lab}_평균수익"] = round(sum(s) / len(s), 2) if s else None
             out[f"{lab}_적중률"] = (round(100 * sum(1 for x in a if x > 0) / len(a), 1) if a else None)
             out[f"{lab}_n"] = len(a)
+            # ── 종목 단위 (종목별 평균 → 종목 간 평균) ──
+            per = {}
+            for r in g:
+                v = r[f"{lab}_알파"]
+                if v is not None:
+                    per.setdefault(r["종목"], []).append(v)
+            pm = [sum(v) / len(v) for v in per.values()]
+            out[f"{lab}_종목평균알파"] = round(sum(pm) / len(pm), 2) if pm else None
+            out[f"{lab}_종목적중률"] = (round(100 * sum(1 for x in pm if x > 0) / len(pm), 1) if pm else None)
+            out[f"{lab}_종목n"] = len(pm)
         return out
+
+    # 같은 종목이 몇 번 등장했는지 (반복 판정 카운트) — 행에 표시해 중복을 눈에 보이게 한다
+    from collections import Counter
+    cnt = Counter(r["종목"] for r in rows)
+    for r in rows:
+        r["반복판정"] = cnt[r["종목"]]
 
     summary = [
         agg(lambda r: r["심사"] == "승인", "★ 최종 승인"),
@@ -173,19 +201,29 @@ def main():
         agg(lambda r: True, "전체 후보"),
     ]
 
+    # 중복 진단 — 반복 등장 상위 종목 (표본을 지배하고 있는지 확인)
+    dup = [{"종목": k, "등장횟수": v} for k, v in cnt.most_common(10) if v > 1]
+
     out = {"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M:%S"),
            "benchmark": BENCH, "horizons": [h[0] for h in HORIZONS],
            "runs": runs, "rows": rows, "summary": summary,
+           "중복진단": {"총콜수": len(rows), "고유종목수": len(cnt), "반복등장": dup},
            "note": ("α = 종목수익률 − 벤치마크수익률(KOSPI/SPY). 경과일이 안 된 구간은 null. "
                     "탈락군을 대조군으로 함께 추적한다 — 채택군 α 가 탈락군 α 보다 유의하게 "
-                    "높아야 스크리닝이 작동한다는 증거가 된다(생존편향 방지).")}
+                    "높아야 스크리닝이 작동한다는 증거가 된다(생존편향 방지)."),
+           "note_dup": ("같은 종목이 여러 날 판정되면 콜 단위 평균은 그 종목이 표본을 지배한다. "
+                        "'종목 단위'는 종목별로 먼저 평균을 낸 뒤 종목 간 평균을 내 중복 가중을 제거한 값이다. "
+                        "콜 단위와 종목 단위가 크게 벌어지면 소수 종목이 성적을 끌고 있다는 뜻이다. "
+                        "또 같은 종목의 연속 판정은 서로 독립이 아니므로 n 을 독립 표본 수로 읽지 말 것 — "
+                        "실질 독립 표본은 고유종목수에 가깝다.")}
     # ta_stage*.json 과 동일하게 raw 로 저장한다 (/api/db 가 파일을 그대로 서빙 —
     # nmr_db 래퍼({marker,as_of,data})로 감싸면 대시보드가 한 겹 더 벗겨야 한다)
     tmp = os.path.join(DB, "ta_perf.json.tmp")
     json.dump(out, open(tmp, "w", encoding="utf-8"), ensure_ascii=False)
     os.replace(tmp, os.path.join(DB, "ta_perf.json"))
     done = sum(1 for r in rows if r["1주_알파"] is not None)
-    print(f"[perf] ok: {len(runs)}회차 · {len(rows)}종목 · 1주 경과 {done}종목 → db/ta_perf.json")
+    print(f"[perf] ok: {len(runs)}회차 · 콜 {len(rows)}건 / 고유 {len(cnt)}종목 · "
+          f"1주 경과 {done}건 · 반복등장 {len(dup)}종목 → db/ta_perf.json")
     return 0
 
 

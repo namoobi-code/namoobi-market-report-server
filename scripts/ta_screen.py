@@ -9,7 +9,7 @@ all   : 1->2->3 순차. 각 단계 실패 시 기존 JSON 유지(carry-forward).
 import json, os, re, sys, time, math, html, traceback
 import urllib.request, urllib.parse, http.cookiejar
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB   = os.path.join(BASE, "data", "db")
@@ -18,6 +18,7 @@ os.makedirs(DB, exist_ok=True); os.makedirs(CACHE, exist_ok=True)
 UA={"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
 KRX_KEY_FILE=os.path.join(BASE,"secrets","krx.key")
 
+KST=timezone(timedelta(hours=9))
 def now_kst(): return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 def get(url,headers=None,timeout=20,opener=None):
     if opener: return opener.open(url,timeout=timeout).read()
@@ -327,7 +328,10 @@ def tech(sym):
     try:
         c=jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}?range=1y&interval=1d")["chart"]["result"][0]
         q=c["indicators"]["quote"][0]
+        ts=c.get("timestamp") or []
         cl=[x for x in q["close"] if x]; hi=[x for x in q["high"] if x]; lo=[x for x in q["low"] if x]
+        op=[o for o,x in zip(q.get("open") or [],q["close"]) if x]
+        dts=[datetime.fromtimestamp(t,KST).strftime("%Y-%m-%d") for t,x in zip(ts,q["close"]) if x]
         vol=[v for v,x in zip(q["volume"],q["close"]) if x]
         n=len(cl)
         if n<60: return {"err":"짧은 이력"}
@@ -335,7 +339,17 @@ def tech(sym):
         rsi=100-100/(1+(sum(gains)/14)/max(sum(losses)/14,1e-9))
         def sma(k): return sum(cl[-k:])/k if n>=k else None
         atr=sum(h-l for h,l in zip(hi[-14:],lo[-14:]))/14/cl[-1]*100
-        return {"close":round(cl[-1],2),"ret_1m":round(cl[-1]/cl[-21]-1,3) if n>21 else None,
+        return {"close":round(cl[-1],2),
+                # (2026-07-13) 1일 등락·전일·시가 추가 — 종전엔 없어서 토론 에이전트가
+                #   '오늘 하루에 -15% 급락했다'는 사실 자체를 알 수 없었다(1개월 수익률만 봄).
+                #   급락/급등 당일에 판정하는 것은 전혀 다른 상황이므로 반드시 보여줘야 한다.
+                "price_date":(dts[-1] if dts else None),
+                "prev_close":round(cl[-2],2) if n>1 else None,
+                "ret_1d":round(cl[-1]/cl[-2]-1,4) if n>1 else None,
+                # ⚠️ 시가(open)·갭은 넣지 않는다 — Yahoo 의 KRX 시가가 KRX 공식(네이버)과
+                #    어긋난다(SK하이닉스 2026-07-13: Yahoo 2,113,000 vs 네이버 2,207,000).
+                #    검증 안 되는 수치를 번들에 넣으면 에이전트가 그걸 근거로 논거를 만든다.
+                "ret_1m":round(cl[-1]/cl[-21]-1,3) if n>21 else None,
                 "ret_3m":round(cl[-1]/cl[-63]-1,3) if n>63 else None,"ret_1y":round(cl[-1]/cl[0]-1,3),
                 "vs_50sma":round(cl[-1]/sma(50)-1,3),"vs_200sma":round(cl[-1]/sma(200)-1,3) if n>=200 else None,
                 "hi52_dist":round(cl[-1]/max(cl)-1,3),"rsi14":round(rsi),
@@ -381,6 +395,16 @@ def flags(t,st=None):
         if t.get("rsi14") is not None:
             if t["rsi14"]>=75: f.append("RSI 과열(≥75)")
             elif t["rsi14"]<=35: f.append("RSI 조정권(≤35) — 모멘텀 훼손 주의")
+        # ★ 급락/급등 당일 — 판정 시점의 상황을 규정하는 가장 중요한 정보
+        d1=t.get("ret_1d")
+        if d1 is not None:
+            atr=t.get("atr_pct") or 0
+            p=round(d1*100,1)
+            if d1<=-0.05:
+                f.append(f"⚠️ 오늘 {p}% 급락 — 급락 당일 판정" +
+                         (f" (ATR {atr}% 의 {abs(p)/atr:.1f}배)" if atr else ""))
+            elif d1>=0.08:
+                f.append(f"⚠️ 오늘 +{p}% 급등 — 추격매수 위험")
         if (t.get("ret_1m") or 0)<-0.10: f.append("1개월 −10%↓ 하락")
         if (t.get("hi52_dist") or 0)<-0.30: f.append("52주 고점比 −30%↓")
         if (t.get("vol_20d_vs_60d") or 1)>2: f.append("거래량 급증(20d/60d>2)")
@@ -406,7 +430,13 @@ def stage3():
                 "기술지표":t,"뉴스_최근":us_news(r["sym"]),"심리":{"StockTwits":st},
                 "사전플래그":flags(t,st if isinstance(st,dict) else None)}
     kr_b=pmap(do_kr,KR,workers=6); us_b=pmap(do_us,US,workers=6)
-    save_db("ta_stage3",{"trade_date":s2["trade_date"],"kr":kr_b,"us":us_b,
+    # trade_date 는 KRX 기본정보 기준일(1영업일 지연)이고, 가격은 Yahoo 당일 종가다.
+    # 둘이 다르므로 price_date 를 따로 남긴다 — 성과추적이 기준가 날짜를 오인하지 않게.
+    _pds=[b["기술지표"].get("price_date") for b in (kr_b+us_b) if isinstance(b.get("기술지표"),dict)]
+    _pds=[x for x in _pds if x]
+    save_db("ta_stage3",{"trade_date":s2["trade_date"],
+                         "price_date":(max(_pds) if _pds else None),
+                         "kr":kr_b,"us":us_b,
         "안내":"이 번들은 /namoobi-trading-agents 스킬 실행 시 Bull/Bear 토론 에이전트의 입력으로 사용된다. 서버는 LLM을 쓰지 않는다."})
     print(f"stage3 ok: bundles {len(kr_b)}+{len(us_b)}")
 
