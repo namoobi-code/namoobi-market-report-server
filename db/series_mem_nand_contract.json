@@ -17,6 +17,14 @@
     "NAND 64Gb 8Gx8 MLC": 19.165,
     "NAND 32Gb 4Gx8 MLC": 15.493
    }
+  ],
+  [
+   "2026-07-13",
+   {
+    "NAND 128Gb 16Gx8 MLC": 26.508,
+    "NAND 64Gb 8Gx8 MLC": 19.165,
+    "NAND 32Gb 4Gx8 MLC": 15.493
+   }
   ]
  ]
 }
