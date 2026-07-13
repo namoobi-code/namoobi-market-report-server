@@ -118,6 +118,35 @@ def fetch_hbm():
     print(f"[memory] ✅ HBM 지표      {n}행 (점유율·ASP·공급사매출·스펙)")
     return out
 
+def naver_consensus(code6):
+    """네이버 당일 컨센서스 — 추정EPS/추정PER·실적EPS/PER·목표주가.
+
+    KRX OPEN API 는 T+1 이라 못 주고, Yahoo quoteSummary 는 인증이 필요하다.
+    네이버 /integration 은 무인증·당일값이며 국내 증권사 컨센서스 집계를 그대로 준다.
+    """
+    try:
+        d = json.loads(get(f"https://m.stock.naver.com/api/stock/{code6}/integration"))
+    except Exception as e:
+        print(f"[memory] ⚠️ 네이버 컨센서스 실패({code6}): {e}")
+        return None
+    T = {x.get("key"): x.get("value") for x in (d.get("totalInfos") or [])}
+    def n(k):
+        v = T.get(k)
+        if not v: return None
+        try: return float(str(v).replace(",", "").replace("배", "").replace("원", "").replace("%", ""))
+        except Exception: return None
+    out = {"fwd_eps": n("추정EPS"), "fwd_per": n("추정PER"),
+           "eps_ttm": n("EPS"), "per_ttm": n("PER"), "asof": datetime.now(KST).strftime("%Y-%m-%d")}
+    cs = d.get("consensusInfo") or {}
+    if cs.get("priceTargetMean"):
+        try:
+            out["target"] = float(str(cs["priceTargetMean"]).replace(",", ""))
+            out["recomm"] = cs.get("recommMean")
+            out["target_asof"] = cs.get("createDate")
+        except Exception: pass
+    return {k: v for k, v in out.items() if v is not None}
+
+
 def fetch_valuation():
     """메모리 3사 주가·EPS·PER.
     price 는 Yahoo chart API(공개·무인증)로 실시간 취득.
@@ -134,13 +163,118 @@ def fetch_valuation():
             px = d["chart"]["result"][0]["meta"].get("regularMarketPrice")
         except Exception as e:
             print(f"[memory] ⚠️ {name} 주가 실패: {e}")
-        rows.append({"name": name, "ticker": tk, "currency": cur, "price": px,
-                     "eps_ttm": None, "eps_2026E": None, "eps_2027E": None,
-                     "per_ttm": None, "per_2026E": None, "per_2027E": None,
-                     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다"})
+        r = {"name": name, "ticker": tk, "currency": cur, "price": px,
+             "eps_ttm": None, "eps_2026E": None, "eps_2027E": None,
+             "per_ttm": None, "per_2026E": None, "per_2027E": None,
+             "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다"}
+
+        # ★ (2026-07-13) 한국 2사는 네이버가 '당일' 컨센서스를 준다 — 이걸 정본으로 쓴다.
+        #   종전엔 DB(hbm_eps) 의 연도별 추정치를 carry-forward 했는데, 메모리 슈퍼사이클로
+        #   컨센서스가 대폭 상향된 것이 반영되지 않아 보고서가 3배 틀린 PER 을 보여주고 있었다:
+        #     SK하이닉스 DB 2026 EPS 110,559(PER 16.7배)  vs  네이버 당일 318,735(PER 5.79배)
+        #     삼성전자   DB 2026 EPS  16,693(PER 15.3배)  vs  네이버 당일  46,664(PER 5.45배)
+        #   PER 16.7배와 5.8배는 투자판단이 완전히 다르다. 낡은 추정치를 그대로 두면 안 된다.
+        if tk.endswith(".KS"):
+            nv = naver_consensus(tk.split(".")[0])
+            if nv:
+                r["consensus_live"] = nv          # 네이버 당일 컨센서스 (정본)
+                if nv.get("fwd_eps"):
+                    r["eps_fwd"] = nv["fwd_eps"]
+                    if px:
+                        r["per_fwd"] = round(px / nv["fwd_eps"], 2)
+                if nv.get("eps_ttm"):
+                    r["eps_ttm"] = nv["eps_ttm"]
+                    if px:
+                        r["per_ttm"] = round(px / nv["eps_ttm"], 2)
+        rows.append(r)
     ok = sum(1 for r in rows if r["price"])
-    print(f"[memory] ✅ 밸류에이션    {ok}/{len(rows)}사 주가 취득 (EPS 는 MCP/DB 보완)")
+    nc = sum(1 for r in rows if r.get("consensus_live"))
+    print(f"[memory] ✅ 밸류에이션    {ok}/{len(rows)}사 주가 · 네이버 당일 컨센서스 {nc}사 "
+          f"(Micron 은 MCP/DB 보완)")
     return rows
+
+
+def compute_ddr5_gap(result):
+    """(req12 2026-07-12) HBM : DDR5 GB당 단가 격차 — 환산 추정.
+    HBM $/GB = Silicon Analysts ASP(HBM3E 8-Hi, USD/스택) ÷ 스택 용량(24GB)
+    DDR5 $/GB = TrendForce DDR5 16Gb(=2GB) 계약가 평균 ÷ 2
+    배율 = HBM $/GB ÷ DDR5 $/GB. 모두 공개 소스 — 주기적으로 계산 가능(매 실행)."""
+    try:
+        hbm = result.get("hbm") or {}
+        asp = None
+        for a in (hbm.get("asp") or []):
+            if "HBM3E" in str(a.get("product", "")) and a.get("price_mid"):
+                asp = float(a["price_mid"]); break
+        if asp is None:
+            for a in (hbm.get("asp") or []):
+                if a.get("price_mid"): asp = float(a["price_mid"]); break
+        cap_gb = 24.0
+        for sp in (hbm.get("specs") or []):
+            if "HBM3E" in str(sp.get("gen", "")):
+                import re as _re2
+                mm = _re2.findall(r"(\d+)\s*GB", str(sp.get("capacity", "")))
+                if mm: cap_gb = float(mm[0]); break
+        ddr5 = None; ddr5_gb = 2.0; ddr5_src = "DDR5 16Gb 계약가"
+        rows_dc = ((result.get("tables") or {}).get("dram_contract") or {}).get("rows", [])
+        for r in rows_dc:
+            if "DDR5 16Gb" in str(r.get("item", "")) and r.get("avg"):
+                ddr5 = float(r["avg"]); break
+        if ddr5 is None:
+            import re as _re3
+            for r in rows_dc:
+                it = str(r.get("item", ""))
+                if it.startswith("DDR5") and r.get("avg"):
+                    mm = _re3.search(r"(\d+)\s*GB", it)
+                    if mm:
+                        ddr5 = float(r["avg"]); ddr5_gb = float(mm.group(1)); ddr5_src = it + " 모듈가 환산"; break
+        if asp and ddr5 and cap_gb:
+            h_gb = asp / cap_gb; d_gb = ddr5 / ddr5_gb
+            ratio = round(h_gb / d_gb, 1)
+            result.setdefault("hbm", {})["ddr5_gap"] = {
+                "hbm_per_gb": round(h_gb, 2), "ddr5_per_gb": round(d_gb, 2), "ratio": ratio,
+                "basis": f"HBM3E {cap_gb:.0f}GB 스택 ASP ${asp:,.0f} ÷ {cap_gb:.0f}GB vs {ddr5_src} ${ddr5:.2f} ÷ {ddr5_gb:.0f}GB (환산 추정)",
+                "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"}
+            print(f"[memory] ✅ HBM:DDR5 격차  {ratio}배 (HBM ${h_gb:.1f}/GB vs DDR5 ${d_gb:.2f}/GB)")
+    except Exception as e:
+        print(f"[memory] ⚠️ HBM:DDR5 격차 계산 실패(비차단): {e}")
+
+
+def enrich_valuation(result, dbdir):
+    """(req13 2026-07-12) 메모리 3사 EPS·PER 단일소스 — db/hbm_eps.json 하나만 쓴다.
+    EPS = DB 컨센서스(HBMAgent 가 변동 시 갱신) / PER = 오늘 종가 ÷ EPS 재계산(매일).
+    대시보드 ⑩과 docx 표가 모두 이 파일을 읽어 값이 항상 일치한다."""
+    try:
+        p = os.path.join(dbdir, "hbm_eps.json")
+        sd = json.load(open(p, encoding="utf-8"))
+        store = sd.get("data") if isinstance(sd, dict) and "data" in sd else (sd or {})
+        alias = {"Micron": "마이크론", "마이크론": "마이크론"}
+        prices, notes = {}, []
+        for row in (result.get("valuation") or []):
+            nm = alias.get(row.get("name"), row.get("name"))
+            px = row.get("price")
+            if not px: continue
+            prices[nm] = {"price": px, "currency": row.get("currency"), "asof": result.get("asof")}
+            eo = store.get(nm) or store.get(row.get("name")) or {}
+            for yy in ("2025", "2026", "2027", "2028"):
+                ev = eo.get(f"y{yy}_eps")
+                try: ev = float(str(ev).replace(",", "")) if ev not in (None, "") else None
+                except Exception: ev = None
+                if ev:
+                    eo[f"y{yy}_per"] = round(px / ev, 2)
+            key = nm if nm in store else row.get("name")
+            store[key or nm] = eo
+            row["eps_2026E"] = eo.get("y2026_eps"); row["per_2026E"] = eo.get("y2026_per")
+            row["eps_2027E"] = eo.get("y2027_eps"); row["per_2027E"] = eo.get("y2027_per")
+            fmt = "{:,.0f}".format(px) if row.get("currency") == "KRW" else "${:,.2f}".format(px)
+            notes.append(f"{row.get('name')} {fmt}")
+        if prices:
+            sd = {"as_of": result.get("asof"), "source": "single-source: EPS=컨센서스, PER=종가÷EPS 매일 재계산",
+                  "price_note": "기준가(" + (result.get("asof") or "") + " 종가): " + " · ".join(notes),
+                  "prices": prices, "data": store}
+            json.dump(sd, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+            print(f"[memory] ✅ EPS·PER 단일소스 갱신 — {len(prices)}사 최신가 기준 PER 재계산")
+    except Exception as e:
+        print(f"[memory] ⚠️ EPS·PER 단일소스 갱신 실패(비차단): {e}")
 
 
 def accumulate(result, dbdir):
@@ -176,6 +310,11 @@ def accumulate(result, dbdir):
     if lpx: snaps["leading_px"] = lpx
     rs = (lead.get("MEM_VS_GPU") or {}).get("value")
     if rs is not None: snaps["mem_vs_gpu"] = {"메모리/GPU 상대강도": rs}
+
+    # (req12) HBM:DDR5 GB당 단가 격차 — 매일 환산 누적
+    gap = (hbm.get("ddr5_gap") or {})
+    if gap.get("ratio") is not None:
+        snaps["hbm_ddr5_gap"] = {"HBM $/GB": gap.get("hbm_per_gb"), "DDR5 $/GB": gap.get("ddr5_per_gb"), "배율": gap.get("ratio")}
 
     n = 0
     for key, snap in snaps.items():
@@ -296,6 +435,7 @@ def main():
     if lead: result["leading"] = lead
     val = fetch_valuation()
     if val: result["valuation"] = val
+    compute_ddr5_gap(result)   # (req12) HBM:DDR5 GB당 단가 격차 — 환산 추정(매 실행)
     if hbm: result["sources"].append(HBM_API)
     if val: result["sources"].append("Yahoo Finance quote API")
 
@@ -309,6 +449,10 @@ def main():
     except Exception as e:
         print(f"[memory] ⚠️ 메타데이터 첨부 실패(비차단): {e}")
 
+    dbdir_pre = sys.argv[2] if len(sys.argv) > 2 else os.environ.get("NMR_DB")
+    if dbdir_pre and os.path.isdir(dbdir_pre):
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        enrich_valuation(result, dbdir_pre)   # (req13) 저장 전에 EPS·PER 주입 — WORK/nmr_memory.json 도 일치
     p = os.path.join(WORK, "nmr_memory.json")
     json.dump(result, open(p, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     n = sum(len(t["rows"]) for t in result["tables"].values())
