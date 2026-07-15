@@ -153,6 +153,37 @@
   .funnel .stg{background:#eef2f7;border-radius:7px;padding:5px 11px;font-weight:600}
   .funnel .stg b{color:#1f6feb;font-variant-numeric:tabular-nums}
   .funnel .ar{color:var(--tx2);font-weight:700}
+
+  /* ── SCREENER interactive (2026-07-15) ── */
+  .scrtop{display:flex;align-items:center;gap:12px;margin:6px 0 9px;flex-wrap:wrap}
+  .mktseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+  .mktseg .mkt{border:none;background:#fff;padding:7px 15px;font-size:13px;font-weight:600;cursor:pointer;color:var(--tx2)}
+  .mktseg .mkt.on{background:var(--dark);color:#fff}
+  .scrcnt{font-size:13.5px;font-weight:600;color:var(--tx2)}
+  .scrcnt b{color:#1f6feb;font-size:19px;font-variant-numeric:tabular-nums;margin-right:2px}
+  .scrrst{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--tx2)}
+  .scrrst:hover{border-color:var(--dark);color:var(--tx)}
+  .fltbar{display:flex;gap:8px;flex-wrap:wrap}
+  .fchip{position:relative}
+  .fchip>button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--tx)}
+  .fchip>button:hover{border-color:var(--dark)}
+  .fchip>button.act{border-color:#1f6feb;background:#eef4ff}
+  .fchip>button .cv{color:#1f6feb;font-weight:700;margin-left:3px}
+  .fpop{position:absolute;top:calc(100% + 6px);left:0;z-index:60;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 8px 28px rgba(0,0,0,.16);padding:11px;min-width:215px;display:none}
+  .fpop.open{display:block}
+  .fpop .pl{font-size:11px;color:var(--tx2);margin:0 0 6px}
+  .fpop .preset{display:block;width:100%;text-align:left;border:none;background:#f4f5f7;border-radius:7px;padding:8px 10px;font-size:12.5px;margin-bottom:5px;cursor:pointer;color:var(--tx)}
+  .fpop .preset:hover{background:#e6edfa}
+  .fpop .preset.sel{background:#1f6feb;color:#fff;font-weight:600}
+  .fpop .man{display:flex;gap:6px;align-items:center;margin-top:7px;border-top:1px dashed var(--line);padding-top:8px}
+  .fpop .man input{width:82px;border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:right;font-family:inherit}
+  .fpop .man span{font-size:11px;color:var(--tx2)}
+  .fpop .tgl{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:3px 0}
+  #scr_tbl{font-size:12.5px}
+  #scr_tbl th{position:sticky;top:0;background:#eef2f7;cursor:pointer;white-space:nowrap;user-select:none}
+  #scr_tbl th:hover{background:#e0e7f2}
+  #scr_tbl th.dn::after{content:" \25be";color:#1f6feb}
+  #scr_tbl th.up::after{content:" \25b4";color:#1f6feb}
 </style>
 </head>
 <body><div class="wrap">
@@ -369,28 +400,20 @@
        실제 결정 전에는 세무·재무 전문가와 상의할 것.</div>
   </div></div>
 
-  <!-- SCREENER (2026-07-15 · 1차목표) -->
+  <!-- SCREENER (2026-07-15 · 인터랙티브 필터) -->
   <div class="pane" id="p_screener">
     <main class="mainc">
       <div class="lead" id="scr_asof" style="margin-top:2px">불러오는 중…</div>
-      <h2>종목 스크리너<em>1단계 — 유니버스 · 거래가능성 하드컷</em></h2>
-      <p class="note" style="margin:2px 0 10px">전종목(ETF 제외)에서 <b>실제 매매가 가능하고 지표가 왜곡되지 않는</b> 종목만 남기는 1차 관문.
-        서버가 하루 2회(장 마감 기준) 전종목 시세를 수집해 아래 하드컷을 적용한다. 통과 종목은 2단계(4축 z-score)로 넘어간다.</p>
-
-      <h3>유니버스 <em>전종목 · ETF 제외 · 서버 1일 2회 수집</em></h3>
-      <div class="uvcard" id="scr_uv"></div>
-      <div class="funnel" id="scr_funnel"></div>
-
-      <h3>1단계 필터 <em>KRX / Yahoo 하드컷 · 계속 확장 가능</em></h3>
-      <div class="box" style="overflow-x:auto"><table class="flt" id="scr_flt"></table></div>
-
-      <h3>통과 종목 · 한국 <em id="scr_kr_n"></em></h3>
-      <div class="box" style="overflow-x:auto;max-height:460px"><table id="scr_kr"></table></div>
-
-      <h3>통과 종목 · 미국 <em id="scr_us_n"></em></h3>
-      <div class="box" style="overflow-x:auto;max-height:460px"><table id="scr_us"></table></div>
-
-      <div class="src" id="scr_src"></div>
+      <h2 style="margin-bottom:2px">종목 스크리너<em>1단계 하드컷 — 필터를 직접 조정</em></h2>
+      <p class="note" style="margin:2px 0 8px">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
+      <div class="scrtop">
+        <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
+        <span class="scrcnt" id="scr_cnt">—</span>
+        <button class="scrrst" id="scr_rst">필터 초기화</button>
+      </div>
+      <div class="fltbar" id="scr_fltbar"></div>
+      <div class="box" style="overflow:auto;max-height:560px;margin-top:9px"><table id="scr_tbl"></table></div>
+      <div class="src" id="scr_src2"></div>
     </main>
   </div>
 

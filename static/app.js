@@ -1065,70 +1065,141 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 }).catch(e=>{const d=document.getElementById('d_asof'); if(d)d.textContent='report_data 로드 실패: '+e.message;});
 
 /* ══════════════════════════════════════════════════════════════════
-   SCREENER (2026-07-15 · 1차목표) — /api/db/ta_stage1 를 읽어
-   유니버스 카드 · 1단계 필터표 · 통과 종목(KR/US) 렌더. 지연 로드(버튼 클릭 시).
+   SCREENER (2026-07-15) — 인터랙티브 필터.
+   /api/db/screener_pool (전종목·필드) 를 지연로드 → 클라이언트가 6필터로 실시간 필터링.
+   각 필터 = 프리셋 선택 + 직접 min/max 입력. 기본값 = 표준 1단계 하드컷.
    ══════════════════════════════════════════════════════════════════ */
 (function(){
   const $=i=>document.getElementById(i);
   const E=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-  const won=v=>v==null?'—':(v>=1e12?(v/1e12).toFixed(2)+'조':(v>=1e8?Math.round(v/1e8).toLocaleString()+'억':Math.round(v).toLocaleString()));
-  const usd=v=>v==null?'—':(v>=1e9?'$'+(v/1e9).toFixed(1)+'B':(v>=1e6?'$'+(v/1e6).toFixed(0)+'M':'$'+Math.round(v).toLocaleString()));
-  // 1단계 필터 정의 (확장 가능 — 여기에 행 추가하면 표에 자동 반영)
-  const FILTERS=[
-    ["시가총액","≥ 3,000억원","≥ $2B","초소형주 제외 — 유동성·정보 신뢰도"],
-    ["거래대금","3거래일 평균 ≥ 30억","3개월 평균거래량×주가 ≥ $20M","실제 매매 가능성"],
-    ["저가주","종가 ≥ 1,000원","≥ $5","저가주 변동성·잡전 리스크"],
-    ["상장기간","상장 ≥ 1년","IPO ≥ 1년","이력 부족 종목의 지표 왜곡"],
-    ["증권 구분","보통주만(주권·우선주/스팩 제외)","ETF·워런트·유닛·우선주·테스트 제외","중복·비종목 제거"],
-    ["건전성 신호","—","200일선 −30%↓ 제외","추락 나이프 회피"],
-    ["데이터 소스","stk/ksq_bydd_trd + isu_base_info (3콜)","NASDAQ Trader 2파일 + v7 배치 ~16콜","전부 무키·무료"],
-  ];
-  let loaded=false;
-  window.renderScreener=function(){
-    if(loaded) return; loaded=true;
-    // 필터표
-    $('scr_flt').innerHTML='<tr><th>필터</th><th>한국 (KRX)</th><th>미국 (Yahoo)</th><th>이유</th></tr>'+
-      FILTERS.map(r=>`<tr><td><b>${E(r[0])}</b></td><td class="kr">${E(r[1])}</td><td class="us">${E(r[2])}</td><td class="why">${E(r[3])}</td></tr>`).join('');
-    fetch('/api/db/ta_stage1').then(r=>r.json()).then(d=>{
-      d=d||{};
-      const kr=d.kr||{}, us=d.us||{};
-      const krU=kr.universe??(Array.isArray(kr)?null:null), krP=kr.pass??(Array.isArray(kr)?kr.length:0);
-      const usU=us.universe, usP=us.pass??(Array.isArray(us)?us.length:0);
-      const krRows=kr.rows||(Array.isArray(kr)?kr:[]), usRows=us.rows||(Array.isArray(us)?us:[]);
-      const empty=!krRows.length && !usRows.length;
-      $('scr_asof').innerHTML = empty
-        ? '아직 스크리닝 결과가 없습니다 — 다음 서버 스크리닝(매일 새벽/저녁 장 마감 후) 실행 시 자동으로 채워집니다.'
-        : `기준일 <b>${E(d.price_date||d.trade_date||'—')}</b> · 시세출처 ${E(d.price_src||'—')} · 당일시세 ${d.nv_n||0}종`;
-      // 유니버스 카드
-      $('scr_uv').innerHTML=[
-        ['한국 전종목', krU, krP, '#1f6feb'],
-        ['미국 전종목', usU, usP, '#b1400a'],
-      ].map(c=>`<div class="uvbox"><div class="k">${c[0]} (ETF 제외)</div>
-        <div class="n"><b>${c[1]!=null?Number(c[1]).toLocaleString():'—'}</b></div>
-        <div class="k">→ 1단계 통과 <b style="color:${c[3]}">${c[2]!=null?Number(c[2]).toLocaleString():'—'}</b>종</div></div>`).join('');
-      // 퍼널
-      $('scr_funnel').innerHTML=
-        `<span class="stg">유니버스 <b>${((krU||0)+(usU||0)).toLocaleString()||'—'}</b></span>`+
-        `<span class="ar">→</span><span class="stg">1단계 통과 <b>${((krP||0)+(usP||0)).toLocaleString()}</b></span>`+
-        `<span class="ar">→</span><span class="stg" style="opacity:.5">2단계 z-score</span>`+
-        `<span class="ar">→</span><span class="stg" style="opacity:.5">3단계 번들</span>`;
-      // KR 표
-      $('scr_kr_n').textContent = krP!=null?`${Number(krP).toLocaleString()}종 · 시총순`:'';
-      $('scr_kr').innerHTML = krRows.length
-        ? '<tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>시가총액</th><th>거래대금(3일평균)</th></tr>'+
-          krRows.map((r,i)=>`<tr><td class="note">${i+1}</td><td><b>${E(r.name)}</b> <span class="note">${E(r.code)}</span></td>
-            <td>${E(r.mkt||'')}</td><td class="num">${r.close?Math.round(r.close).toLocaleString()+'원':'—'}</td>
-            <td class="num">${won(r.mcap)}</td><td class="num">${won(r.trdval)}</td></tr>`).join('')
-        : '<tr><td class="note">데이터 없음</td></tr>';
-      // US 표
-      $('scr_us_n').textContent = usP!=null?`${Number(usP).toLocaleString()}종 · 시총순`:'';
-      $('scr_us').innerHTML = usRows.length
-        ? '<tr><th>#</th><th>티커</th><th>종목명</th><th>주가</th><th>시가총액</th></tr>'+
-          usRows.map((r,i)=>`<tr><td class="note">${i+1}</td><td><b>${E(r.sym)}</b></td><td>${E(r.name)}</td>
-            <td class="num">$${r.px?(+r.px).toFixed(2):'—'}</td><td class="num">${usd(r.mcap)}</td></tr>`).join('')
-        : '<tr><td class="note">데이터 없음</td></tr>';
-      $('scr_src').innerHTML='출처: KRX OPEN API(유니버스·상장정보) + 네이버 전종목 시세(당일) · NASDAQ Trader + Yahoo v7(미국). '
-        +'서버 <code>ta_screen.py stage1</code> 산출 · 하루 2회 장 마감 후 갱신.';
-    }).catch(e=>{ $('scr_asof').textContent='스크리닝 데이터 로드 실패: '+e; });
+  const nowY=new Date().getFullYear();
+  const wonF=v=>v==null?'—':(v>=1e12?(v/1e12).toFixed(v>=1e13?0:2)+'조':(v>=1e8?Math.round(v/1e8).toLocaleString()+'억':Math.round(v).toLocaleString()));
+  const usdF=v=>v==null?'—':(v>=1e9?'$'+(v/1e9).toFixed(v>=1e10?0:1)+'B':(v>=1e6?'$'+(v/1e6).toFixed(0)+'M':'$'+Math.round(v).toLocaleString()));
+
+  const DEF={
+    kr:{
+      cap:{label:'시가총액',fmt:wonF,presets:[['전체',null,null],['10조 ↑',1e13,null],['1~10조',1e12,1e13],['3,000억~1조',3e11,1e12],['1,000억~3,000억',1e11,3e11],['1,000억 ↓',null,1e11]],def:[3e11,null]},
+      tv:{label:'거래대금',fmt:wonF,min:1,presets:[['전체',null],['100억 ↑',1e10],['30억 ↑',3e9],['10억 ↑',1e9],['1억 ↑',1e8]],def:[3e9,null]},
+      px:{label:'저가주',fmt:wonF,min:1,presets:[['전체',null],['1,000원 ↑',1000],['5,000원 ↑',5000],['1만원 ↑',10000]],def:[1000,null]},
+      age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
+      sec:{label:'증권 구분',fixed:'보통주만'},
+      health:{label:'건전성 신호',fixed:'—'}
+    },
+    us:{
+      cap:{label:'시가총액',fmt:usdF,presets:[['전체',null,null],['$200B ↑',2e11,null],['$10~200B',1e10,2e11],['$2~10B',2e9,1e10],['$300M~2B',3e8,2e9],['$300M ↓',null,3e8]],def:[2e9,null]},
+      tv:{label:'거래대금',fmt:usdF,min:1,presets:[['전체',null],['$50M ↑',5e7],['$20M ↑',2e7],['$5M ↑',5e6]],def:[2e7,null]},
+      px:{label:'저가주',fmt:usdF,min:1,presets:[['전체',null],['$5 ↑',5],['$10 ↑',10],['$50 ↑',50]],def:[5,null]},
+      age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
+      sec:{label:'증권 구분',fixed:'EQUITY만(ETF·워런트 제외)'},
+      health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'}
+    }
   };
+  const KEYS=['cap','tv','px','age','sec','health'];
+  let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
+
+  function resetF(){ F={}; const d=DEF[mkt];
+    for(const k of KEYS){ const f=d[k]; if(f.fixed!==undefined) continue;
+      if(f.tgl){F[k]={on:f.def};} else {F[k]={min:f.def[0],max:f.def[1]};} } }
+  const ageOf=r=>r.yr?nowY-r.yr:null;
+  function pass(r){ const d=DEF[mkt];
+    for(const k in F){ const f=d[k], st=F[k];
+      if(f.tgl){ if(st.on && r.d200!=null && r.d200<-0.30) return false; continue; }
+      let v=k==='cap'?r.cap:k==='tv'?r.tv:k==='px'?r.px:k==='age'?ageOf(r):null;
+      if(v==null) continue;
+      if(st.min!=null && v<st.min) return false;
+      if(st.max!=null && v>st.max) return false; }
+    return true; }
+
+  function chipLabel(k){ const f=DEF[mkt][k], st=F[k];
+    if(f.fixed!==undefined) return `${f.label}: <span class="cv">${E(f.fixed)}</span>`;
+    if(f.tgl) return `${f.label}: <span class="cv">${st.on?'ON':'OFF'}</span>`;
+    const lo=st.min, hi=st.max;
+    let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
+    return `${f.label}: <span class="cv">${E(v)}</span>`; }
+
+  function renderChips(){
+    const d=DEF[mkt];
+    $('scr_fltbar').innerHTML=KEYS.map(k=>{
+      const f=d[k];
+      if(f.fixed!==undefined) return `<div class="fchip"><button disabled style="opacity:.75;cursor:default">${chipLabel(k)}</button></div>`;
+      const st=F[k]; const active = f.tgl? st.on : (st.min!=null||st.max!=null);
+      let pop;
+      if(f.tgl){
+        pop=`<label class="tgl"><input type="checkbox" data-tgl="${k}" ${st.on?'checked':''}> ${E(f.tglLabel)}</label>`;
+      } else {
+        pop=`<div class="pl">프리셋</div>`+f.presets.map((p,pi)=>{
+          const lo=p[1], hi=p.length>2?p[2]:null;
+          const sel=(st.min===lo && (st.max===hi || (f.min&&hi==null)));
+          return `<button class="preset ${sel?'sel':''}" data-k="${k}" data-lo="${lo==null?'':lo}" data-hi="${hi==null?'':hi}">${E(p[0])}</button>`;
+        }).join('')+
+        `<div class="man"><span>직접</span><input type="number" placeholder="최소" data-man="${k}" data-mm="min" value="${st.min??''}">`+
+        (f.min?'':`<span>~</span><input type="number" placeholder="최대" data-man="${k}" data-mm="max" value="${st.max??''}">`)+`</div>`;
+      }
+      return `<div class="fchip"><button class="${active?'act':''}" data-chip="${k}">${chipLabel(k)}</button><div class="fpop" id="pop_${k}">${pop}</div></div>`;
+    }).join('');
+    // 이벤트
+    $('scr_fltbar').querySelectorAll('[data-chip]').forEach(b=>b.onclick=e=>{
+      e.stopPropagation(); const k=b.dataset.chip; const p=$('pop_'+k); const wasOpen=p.classList.contains('open');
+      document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); if(!wasOpen)p.classList.add('open'); });
+    $('scr_fltbar').querySelectorAll('.preset').forEach(b=>b.onclick=()=>{
+      const k=b.dataset.k; F[k]={min:b.dataset.lo===''?null:+b.dataset.lo, max:b.dataset.hi===''?null:+b.dataset.hi}; apply(); });
+    $('scr_fltbar').querySelectorAll('[data-man]').forEach(inp=>inp.oninput=()=>{
+      const k=inp.dataset.man; F[k][inp.dataset.mm]= inp.value===''?null:+inp.value;
+      const btn=document.querySelector(`[data-chip="${k}"]`);
+      if(btn){ btn.innerHTML=chipLabel(k); btn.classList.toggle('act', F[k].min!=null||F[k].max!=null); }
+      applyTable(); });
+    $('scr_fltbar').querySelectorAll('[data-tgl]').forEach(t=>t.onchange=()=>{ F[t.dataset.tgl].on=t.checked; apply(); });
+  }
+
+  const COLS={
+    kr:[['n','종목',0],['mk','시장',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['age','상장',1]],
+    us:[['n','종목명',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['d200','200일선',1],['age','상장',1]]
+  };
+  function cell(r,key){
+    if(key==='n') return mkt==='kr'?`<b>${E(r.n)}</b> <span class="note">${E(r.c)}</span>`:`<b>${E(r.c)}</b> <span class="note">${E(r.n)}</span>`;
+    if(key==='mk') return E(r.mk||'');
+    if(key==='px') return mkt==='kr'?(r.px?Math.round(r.px).toLocaleString()+'원':'—'):'$'+(r.px?(+r.px).toFixed(2):'—');
+    if(key==='chg'){const v=r.chg; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(2)}%</span>`;}
+    if(key==='cap') return mkt==='kr'?wonF(r.cap):usdF(r.cap);
+    if(key==='tv') return mkt==='kr'?wonF(r.tv):usdF(r.tv);
+    if(key==='d200'){const v=r.d200; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
+    if(key==='age'){const a=ageOf(r); return a==null?'—':a+'년';}
+    return '';
+  }
+  function sortVal(r,k){ return k==='age'?(ageOf(r)??-1):k==='n'?String(r.n||''):(r[k]??-Infinity); }
+  let popCloser=false;
+  function applyTable(){
+    const rows=POOL[mkt].filter(pass);
+    rows.sort((a,b)=>{const x=sortVal(a,sort.k),y=sortVal(b,sort.k);
+      if(typeof x==='string')return sort.d*x.localeCompare(y); return sort.d*(x-y);});
+    $('scr_cnt').innerHTML=`<b>${rows.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`;
+    const cols=COLS[mkt]; const cap=rows.slice(0,400);
+    $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-sort="${c[0]}" class="${sort.k===c[0]?(sort.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
+      cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''}">${cell(r,c[0])}</td>`).join('')+'</tr>').join('')+
+      (rows.length>400?`<tr><td colspan="${cols.length+1}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
+    $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
+      const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
+  }
+  function apply(){ applyTable(); renderChips(); }
+
+  window.renderScreener=function(){
+    if(!loaded){
+      loaded=true;
+      $('scr_asof').textContent='전종목 풀 불러오는 중…';
+      fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
+        d=d||{}; POOL={kr:d.kr||[],us:d.us||[]};
+        $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
+        $('scr_src2').innerHTML='출처: KRX OPEN API(유니버스·상장) + 네이버 전종목 시세 · Yahoo v7 배치(미국) · 하루 2회 갱신. '
+          +'ETF·스팩·비보통주 제외. 결측값은 해당 필터에서 관대 처리(통과).';
+        resetF(); apply();
+      }).catch(e=>{ $('scr_asof').textContent='풀 로드 실패: '+e; });
+    } else { apply(); }
+  };
+  // 마켓 토글 · 초기화 · 팝오버 바깥클릭 닫기
+  document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
+  // 즉시 바인딩 (app.js 는 body 끝에서 로드 — DOM 준비됨)
+  document.querySelectorAll('.mktseg .mkt').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.mktseg .mkt').forEach(x=>x.classList.toggle('on',x===b));
+    mkt=b.dataset.mkt; sort={k:'cap',d:-1}; resetF(); apply(); });
+  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ sort={k:'cap',d:-1}; resetF(); apply(); };}
 })();

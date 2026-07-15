@@ -27,3 +27,5 @@
 # ── [5단계] 성과 추적 — 판정 이력 대비 실현 수익률·α (무-LLM) ──
 58 15 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_perf.py >> /home/ubuntu/namoobi/ta_perf.log 2>&1
 58 6 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_perf.py >> /home/ubuntu/namoobi/ta_perf.log 2>&1
+52 15 * * * cd /home/ubuntu/namoobi && python3 scripts/screener_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
+52 6  * * * cd /home/ubuntu/namoobi && python3 scripts/screener_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
