@@ -132,6 +132,27 @@
   .appd img{width:100%;border:1px solid var(--line);border-radius:8px;margin-bottom:12px;background:#fff}
   .spk{height:26px;width:auto;max-width:96px;vertical-align:middle;opacity:.9}
   .grp{font-size:12px;font-weight:700;color:var(--tx);background:#eef0f3;padding:7px 11px;border-radius:6px;margin:14px 0 7px}
+
+  /* ── SCREENER (2026-07-15) ── */
+  .scrbtn{display:block;width:100%;text-align:left;background:linear-gradient(135deg,#1f6feb,#0b4fc4);color:#fff;border:none;border-radius:9px;padding:11px 13px;font-size:14px;font-weight:800;cursor:pointer;margin:0 0 12px;box-shadow:0 2px 8px rgba(31,111,235,.28)}
+  .scrbtn:hover{filter:brightness(1.08)}
+  .scrbtn small{display:block;font-size:10px;font-weight:500;opacity:.85;margin-top:2px;letter-spacing:0}
+  .scrbtn.on{outline:2px solid #0b4fc4;outline-offset:1px}
+  #p_screener .flt{width:100%;border-collapse:collapse;font-size:12.5px;margin:6px 0 4px}
+  #p_screener .flt th,#p_screener .flt td{border:1px solid var(--line);padding:7px 9px;text-align:left;vertical-align:top}
+  #p_screener .flt th{background:#eef2f7;font-weight:700;white-space:nowrap}
+  #p_screener .flt td.kr{color:#0b4fc4;font-weight:600;white-space:nowrap}
+  #p_screener .flt td.us{color:#b1400a;font-weight:600;white-space:nowrap}
+  #p_screener .flt td.why{color:var(--tx2);font-size:11.5px}
+  .uvcard{display:flex;gap:14px;flex-wrap:wrap;margin:8px 0}
+  .uvbox{flex:1 1 190px;background:var(--card);border:1px solid var(--line);border-radius:9px;padding:12px 14px}
+  .uvbox .n{font-size:25px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.15}
+  .uvbox .n b{color:#1f6feb}
+  .uvbox .k{font-size:12px;color:var(--tx2);margin-top:2px}
+  .funnel{display:flex;align-items:center;gap:7px;font-size:12px;margin:2px 0 12px;flex-wrap:wrap}
+  .funnel .stg{background:#eef2f7;border-radius:7px;padding:5px 11px;font-weight:600}
+  .funnel .stg b{color:#1f6feb;font-variant-numeric:tabular-nums}
+  .funnel .ar{color:var(--tx2);font-weight:700}
 </style>
 </head>
 <body><div class="wrap">
@@ -150,6 +171,7 @@
 
   <div class="shell">
   <aside class="side">
+  <button id="btn_screener" class="scrbtn">🔍 SCREENER<small>종목 스크리너 · 유니버스·필터·통과종목</small></button>
   <h2 id="srpt">보고서 아카이브<em>최신 5건</em></h2>
   <div class="box" id="reports"></div>
 
@@ -346,6 +368,31 @@
     <div class="src">⚠️ 이 화면은 입력값에 대한 산수일 뿐 투자·재무 자문이 아니다. 수익률은 보장되지 않으며,
        실제 결정 전에는 세무·재무 전문가와 상의할 것.</div>
   </div></div>
+
+  <!-- SCREENER (2026-07-15 · 1차목표) -->
+  <div class="pane" id="p_screener">
+    <main class="mainc">
+      <div class="lead" id="scr_asof" style="margin-top:2px">불러오는 중…</div>
+      <h2>종목 스크리너<em>1단계 — 유니버스 · 거래가능성 하드컷</em></h2>
+      <p class="note" style="margin:2px 0 10px">전종목(ETF 제외)에서 <b>실제 매매가 가능하고 지표가 왜곡되지 않는</b> 종목만 남기는 1차 관문.
+        서버가 하루 2회(장 마감 기준) 전종목 시세를 수집해 아래 하드컷을 적용한다. 통과 종목은 2단계(4축 z-score)로 넘어간다.</p>
+
+      <h3>유니버스 <em>전종목 · ETF 제외 · 서버 1일 2회 수집</em></h3>
+      <div class="uvcard" id="scr_uv"></div>
+      <div class="funnel" id="scr_funnel"></div>
+
+      <h3>1단계 필터 <em>KRX / Yahoo 하드컷 · 계속 확장 가능</em></h3>
+      <div class="box" style="overflow-x:auto"><table class="flt" id="scr_flt"></table></div>
+
+      <h3>통과 종목 · 한국 <em id="scr_kr_n"></em></h3>
+      <div class="box" style="overflow-x:auto;max-height:460px"><table id="scr_kr"></table></div>
+
+      <h3>통과 종목 · 미국 <em id="scr_us_n"></em></h3>
+      <div class="box" style="overflow-x:auto;max-height:460px"><table id="scr_us"></table></div>
+
+      <div class="src" id="scr_src"></div>
+    </main>
+  </div>
 
   <!-- ② DB data (현행 화면) -->
   <div class="pane on" id="p_db">

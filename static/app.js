@@ -687,13 +687,22 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
 
   // 탭 전환
-  const panes=['p_daily','p_db','p_ai','p_ta','p_auto','p_fire'];
+  const panes=['p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener'];
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
     if(b.disabled||b.classList.contains('off')) return;   // 비활성 탭은 무시
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
     panes.forEach(id=>{const el=document.getElementById(id);
       if(el) el.classList.toggle('on', id===b.dataset.pane);});
+    const sb=document.getElementById('btn_screener'); if(sb) sb.classList.remove('on');
   }));
+  // 사이드바 SCREENER 버튼 → p_screener 페인 (상단 탭과 독립)
+  const sbtn=document.getElementById('btn_screener');
+  if(sbtn) sbtn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+    panes.forEach(id=>{const el=document.getElementById(id); if(el) el.classList.toggle('on', id==='p_screener');});
+    sbtn.classList.add('on');
+    if(window.renderScreener) window.renderScreener();
+  });
 })();
 
 
@@ -1054,3 +1063,72 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const el=document.getElementById(a.dataset.go2);
     if(el){e.preventDefault(); el.scrollIntoView({behavior:'smooth',block:'start'});}}));
 }).catch(e=>{const d=document.getElementById('d_asof'); if(d)d.textContent='report_data 로드 실패: '+e.message;});
+
+/* ══════════════════════════════════════════════════════════════════
+   SCREENER (2026-07-15 · 1차목표) — /api/db/ta_stage1 를 읽어
+   유니버스 카드 · 1단계 필터표 · 통과 종목(KR/US) 렌더. 지연 로드(버튼 클릭 시).
+   ══════════════════════════════════════════════════════════════════ */
+(function(){
+  const $=i=>document.getElementById(i);
+  const E=t=>String(t??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const won=v=>v==null?'—':(v>=1e12?(v/1e12).toFixed(2)+'조':(v>=1e8?Math.round(v/1e8).toLocaleString()+'억':Math.round(v).toLocaleString()));
+  const usd=v=>v==null?'—':(v>=1e9?'$'+(v/1e9).toFixed(1)+'B':(v>=1e6?'$'+(v/1e6).toFixed(0)+'M':'$'+Math.round(v).toLocaleString()));
+  // 1단계 필터 정의 (확장 가능 — 여기에 행 추가하면 표에 자동 반영)
+  const FILTERS=[
+    ["시가총액","≥ 3,000억원","≥ $2B","초소형주 제외 — 유동성·정보 신뢰도"],
+    ["거래대금","3거래일 평균 ≥ 30억","3개월 평균거래량×주가 ≥ $20M","실제 매매 가능성"],
+    ["저가주","종가 ≥ 1,000원","≥ $5","저가주 변동성·잡전 리스크"],
+    ["상장기간","상장 ≥ 1년","IPO ≥ 1년","이력 부족 종목의 지표 왜곡"],
+    ["증권 구분","보통주만(주권·우선주/스팩 제외)","ETF·워런트·유닛·우선주·테스트 제외","중복·비종목 제거"],
+    ["건전성 신호","—","200일선 −30%↓ 제외","추락 나이프 회피"],
+    ["데이터 소스","stk/ksq_bydd_trd + isu_base_info (3콜)","NASDAQ Trader 2파일 + v7 배치 ~16콜","전부 무키·무료"],
+  ];
+  let loaded=false;
+  window.renderScreener=function(){
+    if(loaded) return; loaded=true;
+    // 필터표
+    $('scr_flt').innerHTML='<tr><th>필터</th><th>한국 (KRX)</th><th>미국 (Yahoo)</th><th>이유</th></tr>'+
+      FILTERS.map(r=>`<tr><td><b>${E(r[0])}</b></td><td class="kr">${E(r[1])}</td><td class="us">${E(r[2])}</td><td class="why">${E(r[3])}</td></tr>`).join('');
+    fetch('/api/db/ta_stage1').then(r=>r.json()).then(d=>{
+      d=d||{};
+      const kr=d.kr||{}, us=d.us||{};
+      const krU=kr.universe??(Array.isArray(kr)?null:null), krP=kr.pass??(Array.isArray(kr)?kr.length:0);
+      const usU=us.universe, usP=us.pass??(Array.isArray(us)?us.length:0);
+      const krRows=kr.rows||(Array.isArray(kr)?kr:[]), usRows=us.rows||(Array.isArray(us)?us:[]);
+      const empty=!krRows.length && !usRows.length;
+      $('scr_asof').innerHTML = empty
+        ? '아직 스크리닝 결과가 없습니다 — 다음 서버 스크리닝(매일 새벽/저녁 장 마감 후) 실행 시 자동으로 채워집니다.'
+        : `기준일 <b>${E(d.price_date||d.trade_date||'—')}</b> · 시세출처 ${E(d.price_src||'—')} · 당일시세 ${d.nv_n||0}종`;
+      // 유니버스 카드
+      $('scr_uv').innerHTML=[
+        ['한국 전종목', krU, krP, '#1f6feb'],
+        ['미국 전종목', usU, usP, '#b1400a'],
+      ].map(c=>`<div class="uvbox"><div class="k">${c[0]} (ETF 제외)</div>
+        <div class="n"><b>${c[1]!=null?Number(c[1]).toLocaleString():'—'}</b></div>
+        <div class="k">→ 1단계 통과 <b style="color:${c[3]}">${c[2]!=null?Number(c[2]).toLocaleString():'—'}</b>종</div></div>`).join('');
+      // 퍼널
+      $('scr_funnel').innerHTML=
+        `<span class="stg">유니버스 <b>${((krU||0)+(usU||0)).toLocaleString()||'—'}</b></span>`+
+        `<span class="ar">→</span><span class="stg">1단계 통과 <b>${((krP||0)+(usP||0)).toLocaleString()}</b></span>`+
+        `<span class="ar">→</span><span class="stg" style="opacity:.5">2단계 z-score</span>`+
+        `<span class="ar">→</span><span class="stg" style="opacity:.5">3단계 번들</span>`;
+      // KR 표
+      $('scr_kr_n').textContent = krP!=null?`${Number(krP).toLocaleString()}종 · 시총순`:'';
+      $('scr_kr').innerHTML = krRows.length
+        ? '<tr><th>#</th><th>종목</th><th>시장</th><th>종가</th><th>시가총액</th><th>거래대금(3일평균)</th></tr>'+
+          krRows.map((r,i)=>`<tr><td class="note">${i+1}</td><td><b>${E(r.name)}</b> <span class="note">${E(r.code)}</span></td>
+            <td>${E(r.mkt||'')}</td><td class="num">${r.close?Math.round(r.close).toLocaleString()+'원':'—'}</td>
+            <td class="num">${won(r.mcap)}</td><td class="num">${won(r.trdval)}</td></tr>`).join('')
+        : '<tr><td class="note">데이터 없음</td></tr>';
+      // US 표
+      $('scr_us_n').textContent = usP!=null?`${Number(usP).toLocaleString()}종 · 시총순`:'';
+      $('scr_us').innerHTML = usRows.length
+        ? '<tr><th>#</th><th>티커</th><th>종목명</th><th>주가</th><th>시가총액</th></tr>'+
+          usRows.map((r,i)=>`<tr><td class="note">${i+1}</td><td><b>${E(r.sym)}</b></td><td>${E(r.name)}</td>
+            <td class="num">$${r.px?(+r.px).toFixed(2):'—'}</td><td class="num">${usd(r.mcap)}</td></tr>`).join('')
+        : '<tr><td class="note">데이터 없음</td></tr>';
+      $('scr_src').innerHTML='출처: KRX OPEN API(유니버스·상장정보) + 네이버 전종목 시세(당일) · NASDAQ Trader + Yahoo v7(미국). '
+        +'서버 <code>ta_screen.py stage1</code> 산출 · 하루 2회 장 마감 후 갱신.';
+    }).catch(e=>{ $('scr_asof').textContent='스크리닝 데이터 로드 실패: '+e; });
+  };
+})();
