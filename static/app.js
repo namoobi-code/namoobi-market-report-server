@@ -1195,28 +1195,32 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       pbr:{label:'PBR',field:'pbr',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['1배 ↓',1],['2배 ↓',2],['3배 ↓',3]]},
       divy:{label:'배당수익률',field:'divy',dir:'min',u:1,fmt:v=>v.toFixed(1)+'%',presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]]},
       grw:{label:'EPS성장',field:'growth',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
-      mom:{label:'주가추세(12-1M)',field:'mom',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',0.5],['100% ↑',1],['200% ↑',2]]}
+      mom:{label:'주가추세(12-1M)',field:'mom',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',0.5],['100% ↑',1],['200% ↑',2]]},
+      hi:{label:'52주고점比',field:'near52',dir:'min',u:0.01,fmt:v=>'고점 '+(v*100).toFixed(0)+'%',presets:[['전체',null],['고점 -10% 이내',-0.10],['고점 -20% 이내',-0.20],['고점 -30% 이내',-0.30]]}
     },
     us:{
       per:{label:'P/E',field:'fpe',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['10배 ↓',10],['15배 ↓',15],['20배 ↓',20]]},
       pbr:{label:'P/B',field:'pb',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['1배 ↓',1],['2배 ↓',2],['3배 ↓',3]]},
       divy:{label:'배당수익률',field:'divy',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(1)+'%',presets:[['전체',null],['1% ↑',0.01],['2% ↑',0.02],['3% ↑',0.03]]},
       grw:{label:'EPS성장',field:'growth',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
-      mom:{label:'주가추세(52주)',field:'w52',dir:'min',u:1,fmt:v=>v.toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]]}
+      mom:{label:'주가추세(52주)',field:'w52',dir:'min',u:1,fmt:v=>v.toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]]},
+      hi:{label:'52주고점比',field:'hi52',dir:'min',u:0.01,fmt:v=>'고점 '+(v*100).toFixed(0)+'%',presets:[['전체',null],['고점 -10% 이내',-0.10],['고점 -20% 이내',-0.20],['고점 -30% 이내',-0.30]]},
+      v200:{label:'200일선比',field:'vs200',dir:'min',u:0.01,fmt:v=>(v>=0?'+':'')+(v*100).toFixed(0)+'%',presets:[['전체',null],['200일선 위',0],['+10% 이상',0.10],['+20% 이상',0.20]]}
     }
   };
-  const K2=['per','pbr','divy','grw','mom'];
+  const ALLK2=['per','pbr','divy','grw','mom','hi','v200'];
+  const k2list=()=>Object.keys(DEF2[mkt]);
   let F2={};
-  function resetF2(){ F2={}; for(const k of K2) F2[k]={v:null}; }
+  function resetF2(){ F2={}; for(const k of ALLK2) F2[k]={v:null}; }
   resetF2();
   function pass2(r){ const d=DEF2[mkt];
-    for(const k of K2){ const st=F2[k]; if(st.v==null)continue; const f=d[k]; const fv=r[f.field];
+    for(const k of k2list()){ const st=F2[k]; if(st.v==null)continue; const f=d[k]; const fv=r[f.field];
       if(fv==null)continue; if(f.dir==='max'&&fv>st.v)return false; if(f.dir==='min'&&fv<st.v)return false; }
     return true; }
   function chipLabel2(k){ const f=DEF2[mkt][k], v=F2[k].v;
     return v==null?`${f.label}: <span class="cv">전체</span>`:`${f.label}: <span class="cv">${f.fmt(v)} ${f.dir==='max'?'↓':'↑'}</span>`; }
   function renderChips2(){ const d=DEF2[mkt];
-    $('scr_fltbar2').innerHTML=`<span style="font-size:11.5px;color:var(--tx2);align-self:center;margin-right:2px">원자료 하드컷:</span>`+K2.map(k=>{
+    $('scr_fltbar2').innerHTML=`<span style="font-size:11.5px;color:var(--tx2);align-self:center;margin-right:2px">원자료 하드컷:</span>`+k2list().map(k=>{
       const f=d[k], v=F2[k].v, active=v!=null;
       const pop=`<div class="pl">프리셋 (${f.dir==='max'?'이하':'이상'})</div>`+
         f.presets.map(p=>{const pv=p[1]; const sel=(v===pv); return `<button class="preset ${sel?'sel':''}" data-k2="${k}" data-v="${pv==null?'':pv}">${E(p[0])}</button>`;}).join('')+
@@ -1245,8 +1249,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(1,Math.min(150,+tn.value||30)); rankTbl(); };
   }
   const COL2={
-    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['growth','성장',1],['mom','추세',1]],
-    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['growth','성장',1],['w52','52주',1]]
+    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['growth','성장',1],['mom','추세',1],['near52','고점比',1]],
+    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['growth','성장',1],['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1]]
   };
   function cell2(r,c){const k=c[0];
     if(k==='n') return mkt==='kr'?`<b>${E(r.name)}</b> <span class="note">${E(r.code)}</span>`:`<b>${E(r.sym)}</b> <span class="note">${E(r.name)}</span>`;
@@ -1255,6 +1259,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(k==='divy'){const v=r.divy; return v==null?'—':(mkt==='us'&&v<1?(v*100).toFixed(2):(+v).toFixed(2));}
     if(k==='growth'||k==='mom'){const v=r[k]; return v==null?'—':(v*100).toFixed(0)+'%';}
     if(k==='w52'){const v=r.w52; return v==null?'—':(+v).toFixed(0)+'%';}
+    if(k==='near52'||k==='hi52'){const v=r[k]; return v==null?'—':'고점 '+(v*100).toFixed(0)+'%';}
+    if(k==='vs200'){const v=r.vs200; return v==null?'—':(v>=0?'+':'')+(v*100).toFixed(0)+'%';}
     const v=r[k]; return v==null?'—':(+v).toFixed(1);
   }
   function rankTbl(){
