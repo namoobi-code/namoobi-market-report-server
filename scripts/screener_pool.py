@@ -58,6 +58,12 @@ def _enrich_kr(kr, d0s):
                 if cons: fin[tt+"_E"]=rd.get(tt,{}).get(cons[0])
             o["fin"]=fin
         except Exception: pass
+        try:
+            S=(datetime.date.today()-timedelta(days=400)).strftime("%Y%m%d"); E=datetime.date.today().strftime("%Y%m%d")
+            dch=T.jget(f"https://api.stock.naver.com/chart/domestic/item/{r['c']}/day?startDateTime={S}&endDateTime={E}",timeout=12)
+            cl=[x["closePrice"] for x in dch if x.get("closePrice")]
+            if len(cl)>=100: o["ma200"]=cl[-1]/(sum(cl[-200:])/min(200,len(cl)))-1
+        except Exception: pass
         return o
     enr=T.pmap(fetch, kr, workers=16)
     for i,r in enumerate(enr):
@@ -83,7 +89,7 @@ def _enrich_kr(kr, d0s):
         op3=[v for v in (fn.get("영업이익") or []) if v is not None]
         r.update(fper=fper,per=per,pbr=pbr,divy=divy,mom=mom,near52=near52,
                  roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
-                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")))
+                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")), vs200=r.get("ma200"))
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
         r.pop("tot",None); r.pop("fin",None); kr[i]=r
@@ -91,7 +97,7 @@ def _enrich_kr(kr, d0s):
                           lambda r:(-r["pbr"] if r.get("pbr") and r["pbr"]>0 else None),
                           lambda r:r.get("divy")],
                    "grw":[lambda r:r.get("g_new")],
-                   "mom":[lambda r:r.get("mom"), lambda r:r.get("near52")],
+                   "mom":[lambda r:r.get("mom"), lambda r:r.get("near52"), lambda r:r.get("vs200")],
                    "qly":[lambda r:r.get("roe"),
                           lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
 
