@@ -1083,7 +1083,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'저가주',fmt:wonF,min:1,presets:[['전체',null],['1,000원 ↑',1000],['5,000원 ↑',5000],['1만원 ↑',10000]],def:[1000,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'보통주만'},
-      health:{label:'건전성 신호',fixed:'—'}
+      health:{label:'건전성 신호',fixed:'—'},
+      opLoss:{label:'3년 영업적자',tgl:1,def:true,tglLabel:'3년 연속 영업적자 제외'},
+      de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
+      cr:{label:'유동비율(당좌)',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]}
     },
     us:{
       cap:{label:'시가총액',fmt:usdF,presets:[['전체',null,null],['$200B ↑',2e11,null],['$10~200B',1e10,2e11],['$2~10B',2e9,1e10],['$300M~2B',3e8,2e9],['$300M ↓',null,3e8]],def:[2e9,null]},
@@ -1091,10 +1094,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'저가주',fmt:usdF,min:1,presets:[['전체',null],['$5 ↑',5],['$10 ↑',10],['$50 ↑',50]],def:[5,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'EQUITY만(ETF·워런트 제외)'},
-      health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'}
+      health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'},
+      opLoss:{label:'3년 영업적자',fixed:'— (US 미제공)'},
+      de:{label:'D/E',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
+      cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]}
     }
   };
-  const KEYS=['cap','tv','px','age','sec','health'];
+  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr'];
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1106,8 +1112,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const ageOf=r=>r.yr?nowY-r.yr:null;
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
-      if(f.tgl){ if(st.on && r.d200!=null && r.d200<-0.30) return false; continue; }
-      let v=k==='cap'?r.cap:k==='tv'?r.tv:k==='px'?r.px:k==='age'?ageOf(r):null;
+      if(f.tgl){ if(!st.on) continue;
+        if(k==='health' && r.d200!=null && r.d200<-0.30) return false;
+        if(k==='opLoss' && r.op3neg) return false;
+        continue; }
+      if(f.fin && r.isfin) continue;   // 금융업 면제
+      let v=k==='cap'?r.cap:k==='tv'?r.tv:k==='px'?r.px:k==='age'?ageOf(r):k==='de'?r.de:k==='cr'?r.cr:null;
       if(v==null) continue;
       if(st.min!=null && v<st.min) return false;
       if(st.max!=null && v>st.max) return false; }
@@ -1197,7 +1207,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       per:{label:'PER',field:'fper',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['10배 ↓',10],['15배 ↓',15],['20배 ↓',20]]},
       pbr:{label:'PBR',field:'pbr',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['1배 ↓',1],['2배 ↓',2],['3배 ↓',3]]},
       divy:{label:'배당수익률',field:'divy',dir:'min',u:1,fmt:v=>v.toFixed(1)+'%',presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]]},
-      grw:{label:'EPS성장',field:'growth',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
+      grw:{label:'매출·영익성장',field:'g_new',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
       mom:{label:'주가추세(12-1M)',field:'mom',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',0.5],['100% ↑',1],['200% ↑',2]]},
       hi:{label:'52주고점比',field:'near52',dir:'min',u:0.01,fmt:v=>'고점 '+(v*100).toFixed(0)+'%',presets:[['전체',null],['고점 -10% 이내',-0.10],['고점 -20% 이내',-0.20],['고점 -30% 이내',-0.30]]}
     },
@@ -1205,7 +1215,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       per:{label:'P/E',field:'fpe',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['10배 ↓',10],['15배 ↓',15],['20배 ↓',20]]},
       pbr:{label:'P/B',field:'pb',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['1배 ↓',1],['2배 ↓',2],['3배 ↓',3]]},
       divy:{label:'배당수익률',field:'divy',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(1)+'%',presets:[['전체',null],['1% ↑',0.01],['2% ↑',0.02],['3% ↑',0.03]]},
-      grw:{label:'EPS성장',field:'growth',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
+      grw:{label:'매출·영익성장',field:'g_new',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
       mom:{label:'주가추세(52주)',field:'w52',dir:'min',u:1,fmt:v=>v.toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]]},
       hi:{label:'52주고점比',field:'hi52',dir:'min',u:0.01,fmt:v=>'고점 '+(v*100).toFixed(0)+'%',presets:[['전체',null],['고점 -10% 이내',-0.10],['고점 -20% 이내',-0.20],['고점 -30% 이내',-0.30]]},
       v200:{label:'200일선比',field:'vs200',dir:'min',u:0.01,fmt:v=>(v>=0?'+':'')+(v*100).toFixed(0)+'%',presets:[['전체',null],['200일선 위',0],['+10% 이상',0.10],['+20% 이상',0.20]]}
@@ -1254,15 +1264,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(0,Math.min(600,+tn.value||0)); rankTbl(); };
   }
   const COL2={
-    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['growth','성장',1],['mom','추세',1],['near52','고점比',1]],
-    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['growth','성장',1],['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1]]
+    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['g_new','성장',1],['mom','추세',1],['near52','고점比',1]],
+    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['g_new','성장',1],['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1]]
   };
   function cell2(r,c){const k=c[0];
     if(k==='n') return mkt==='kr'?`<b>${E(r.name)}</b> <span class="note">${E(r.code)}</span>`:`<b>${E(r.sym)}</b> <span class="note">${E(r.name)}</span>`;
     if(k==='rscore') return `<span class="z ${zClass(r.rscore)}">${zFmt(r.rscore)}</span>`;
     if(k.startsWith('z_')) return `<span class="z ${zClass(r[k])}">${zFmt(r[k])}</span>`;
     if(k==='divy'){const v=r.divy; return v==null?'—':(mkt==='us'&&v<1?(v*100).toFixed(2):(+v).toFixed(2));}
-    if(k==='growth'||k==='mom'){const v=r[k]; return v==null?'—':(v*100).toFixed(0)+'%';}
+    if(k==='g_new'||k==='mom'){const v=r[k]; return v==null?'—':(v*100).toFixed(0)+'%';}
     if(k==='w52'){const v=r.w52; return v==null?'—':(+v).toFixed(0)+'%';}
     if(k==='near52'||k==='hi52'){const v=r[k]; return v==null?'—':'고점 '+(v*100).toFixed(0)+'%';}
     if(k==='vs200'){const v=r.vs200; return v==null?'—':(v>=0?'+':'')+(v*100).toFixed(0)+'%';}
@@ -1299,7 +1309,40 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
 
   let stage=1;
-  function refresh(){ if(stage===1) apply(); else renderS2(); }
+  // ── 3단계 실측 팩터카드 + 분석요청 ──
+  let topN3=30;
+  function loadS3(cb){ if(POOL.kr.length||POOL.us.length){ S2=POOL; cb&&cb(); return; } loadS2(cb); }
+  function rankCards3(){
+    const nOn=AX.filter(a=>ON[a[0]]).length;
+    let rows=POOL[mkt].filter(pass).filter(pass2).map(r=>{let sw=0,sz=0,n=0;
+      for(const[k]of AX){ if(!ON[k])continue; const z=r['z_'+k]; if(z==null)continue; sw+=W[k];sz+=W[k]*z;n++; }
+      return Object.assign({},r,{rscore:(nOn>0&&n>=Math.min(3,nOn))?sz/sw:null});
+    }).filter(r=>r.rscore!=null);
+    rows.sort((a,b)=>b.rscore-a.rscore);
+    const top=rows.slice(0, Math.max(1,topN3||30));
+    window.__scr_top3=top.map(r=>r.c);
+    $('scr_cnt3').innerHTML=`1·2단계 통과 <b>${rows.length}</b>종 → TOP <b>${top.length}</b> 팩터카드`;
+    const isk=mkt==='kr';
+    const chip=(l,z)=> z==null?`<span>${l} —</span>`:`<span class="${zClass(z)}">${l} ${z>0?'+':''}${z.toFixed(2)}</span>`;
+    const P=(v,d)=>v==null?'—':(v>0?'+':'')+(v*100).toFixed(d==null?0:d)+'%';
+    $('scr_cards').innerHTML=top.map((r,i)=>{
+      const roe=r.roe==null?'—':(isk?r.roe.toFixed(1):(r.roe*100).toFixed(1))+'%';
+      const de=r.de==null?'—':r.de.toFixed(0)+'%';
+      const cr=r.cr==null?'—':r.cr.toFixed(1);
+      const per=isk?(r.fper==null?'—':(+r.fper).toFixed(1)):(r.fpe==null?'—':(+r.fpe).toFixed(1));
+      const pbr=isk?(r.pbr==null?'—':(+r.pbr).toFixed(1)):(r.pb==null?'—':(+r.pb).toFixed(1));
+      const div=r.divy==null?'—':(isk?(+r.divy).toFixed(1):(r.divy*100).toFixed(1))+'%';
+      const lastLbl=isk?'영익YoY':'FCF수익', lastVal=isk?P(r.opg,0):P(r.fcfy,1);
+      return `<div class="fcard"><div class="fh"><b>${E(isk?r.n:r.c)}</b> <span class="cd">${E(isk?r.c:r.n)}</span><span class="sc ${zClass(r.rscore)}">${r.rscore>0?'+':''}${r.rscore.toFixed(2)}</span></div>
+        <div class="fz">${chip('V',r.z_val)}${chip('G',r.z_grw)}${chip('M',r.z_mom)}${chip('Q',r.z_qly)}</div>
+        <div class="fm"><span>PER <b>${per}</b></span><span>PBR <b>${pbr}</b></span><span>배당 <b>${div}</b></span>
+          <span>ROE <b>${roe}</b></span><span>부채 <b>${de}</b></span><span>유동 <b>${cr}</b></span>
+          <span>매출YoY <b>${P(r.revg,0)}</b></span><span>${lastLbl} <b>${lastVal}</b></span><span>#${i+1}</span></div></div>`;
+    }).join('') || '<div class="note" style="grid-column:1/-1">통과 종목 없음 — 1·2단계 필터를 완화하세요</div>';
+  }
+  function renderS3(){ rankCards3(); }
+
+  function refresh(){ if(stage===1) apply(); else if(stage===2) renderS2(); else renderS3(); }
 
   window.renderScreener=function(){
     if(!loaded){
@@ -1308,7 +1351,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
         d=d||{}; POOL={kr:d.kr||[],us:d.us||[]};
         $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
-        $('scr_src2').innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신. 2단계 z-score 는 1단계 통과분에서 계산.';
+        {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
         resetF(); apply();
       }).catch(e=>{ $('scr_asof').textContent='풀 로드 실패: '+e; });
     } else { refresh(); }
@@ -1324,8 +1367,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     stage=+b.dataset.stg;
     $('scr_s1').style.display = stage===1?'':'none';
     $('scr_s2').style.display = stage===2?'':'none';
-    if(stage===2) loadS2(()=>{ renderS2(); });
+    $('scr_s3').style.display = stage===3?'':'none';
+    if(stage===2) loadS2(()=>renderS2());
+    else if(stage===3) loadS3(()=>renderS3());
     else apply();
   });
-  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else {resetW();renderS2();} };}
+  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else if(stage===2){resetW();renderS2();} else {resetW();renderS3();} };}
+  // 3단계 상위 N · 분석요청 버튼
+  {const tn=$('scr_topn3'); if(tn) tn.oninput=()=>{ topN3=Math.max(1,Math.min(100,+tn.value||30)); rankCards3(); };}
+  {const ab=$('scr_ask'); if(ab) ab.onclick=()=>{ const t=window.__scr_top3||[];
+    if(!t.length){alert('선택된 종목이 없습니다 — 1·2단계 필터를 확인하세요');return;}
+    try{navigator.clipboard.writeText(t.join(', '));}catch(e){}
+    alert('분석요청 TOP '+t.length+'종 (클립보드 복사됨):\n'+t.join(', ')+'\n\n/namoobi-trading-agents 실행 시 이 종목으로 토론·리스크심사합니다.'); };}
 })();

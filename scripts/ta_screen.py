@@ -344,6 +344,22 @@ def stage2():
                             "mom":[lambda r:r["mom"],lambda r:r["near52"]],
                             "qly":[lambda r:r["roe"],lambda r:(-r["de"] if r["de"] is not None and not r["isfin"] else None)]})
     kr_final=sorted([r for r in kr_s if r["score"] is not None],key=lambda r:-r["score"])[:30]
+    # (2026-07-15) 3단계 실측(Layer2) 데이터셋 — 상위 150 전체를 실측 재무째 저장(하드컷은 클라가 적용).
+    def _l2kr(r):
+        fn=r.get("fin") or {}
+        op3=[v for v in (fn.get("영업이익") or []) if v is not None]
+        de=last(fn.get("부채비율")); roe=last(fn.get("ROE")); cr=last(fn.get("당좌비율"))
+        revg,opg=yoy(fn.get("매출액")),yoy(fn.get("영업이익"))
+        la,le=last(fn.get("매출액")),fn.get("매출액_E")
+        rf=(le/la-1) if (la and le and la>0) else None
+        g=[min(x,3.0) for x in (revg,opg,rf) if x is not None]
+        return {**{k:r.get(k) for k in ("code","name","mkt","close","mcap","isfin")},
+                "z_val":r.get("z_val"),"z_mom":r.get("z_mom"),
+                "de":de,"roe":roe,"cr":cr,"revg":revg,"opg":opg,"rev_e":rf,
+                "g_new":(sum(g)/len(g) if g else None),
+                "op3neg":(len(op3)>=3 and all(v<0 for v in op3[-3:])),
+                "nofin":(not r.get("fin"))}
+    l2_kr=[_l2kr(r) for r in kr150]
     # ---- US ----
     quotes=json.load(open(f"{CACHE}/us_quotes.json"))
     qmap={q["symbol"]:q for q in quotes}
@@ -406,11 +422,20 @@ def stage2():
                            "mom":[lambda r:r["w52"],lambda r:r["hi52"],lambda r:r["vs200"]],
                            "qly":[lambda r:r["roe"],lambda r:r["fcfy"],lambda r:(-r["de"] if r["de"] is not None and not r["isfin"] else None)]})
     us_final=sorted([r for r in us_s if r["score"] is not None],key=lambda r:-r["score"])[:30]
+    def _l2us(r):
+        g=[min(x,3.0) for x in (r.get("revg"),r.get("epsg")) if x is not None]
+        fcfy=(r["fcf"]/r["mcap"]) if r.get("fcf") and r.get("mcap") else None
+        isfin="Financial" in (r.get("sector") or "")
+        return {**{k:r.get(k) for k in ("sym","name","px","mcap","sector")},
+                "z_val":r.get("z_val"),"z_mom":r.get("z_mom"),
+                "de":r.get("de"),"cr":r.get("cr"),"roe":r.get("roe"),"revg":r.get("revg"),"epsg":r.get("epsg"),
+                "g_new":(sum(g)/len(g) if g else None),"fcfy":fcfy,"isfin":isfin,"nofin":("err2" in r)}
+    l2_us=[_l2us(r) for r in us150]
     for r in us_final: r.pop("fcf",None)
     save_db("ta_stage2",{"trade_date":s1["trade_date"],"price_date":s1.get("price_date") or kr_price_date(),
                          "krx_base_date":s1.get("krx_base_date"),
-                         "kr":{"scored":len(rows),"drops":kr_drop,"top":kr_final,"l1":l1_kr},
-                         "us":{"scored":len(us),"drops":us_drop,"top":us_final,"l1":l1_us}})
+                         "kr":{"scored":len(rows),"drops":kr_drop,"top":kr_final,"l1":l1_kr,"l2":l2_kr},
+                         "us":{"scored":len(us),"drops":us_drop,"top":us_final,"l1":l1_us,"l2":l2_us}})
     print(f"stage2 ok: KR top{len(kr_final)} US top{len(us_final)}")
 
 # ================ STAGE 3 ================

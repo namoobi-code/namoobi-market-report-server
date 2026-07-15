@@ -16,8 +16,23 @@ def _score(rs, key, axdef):
         axs=[r["z_"+ax] for ax in axdef if r.get("z_"+ax) is not None]
         r["score"]=sum(axs)/len(axs) if len(axs)>=3 else None
 
+FIN_RE=None
+def _isfin(name):
+    global FIN_RE
+    if FIN_RE is None:
+        import re
+        FIN_RE=re.compile(r"은행|금융|증권|보험|생명|화재|카드|캐피탈|종금|저축|지주")
+    return bool(FIN_RE.search(name or ""))
+
+def _last(l):
+    for v in reversed(l or []):
+        if v is not None: return v
+def _yoy(l):
+    a=[v for v in (l or []) if v is not None]
+    return (a[-1]/a[-2]-1) if (len(a)>=2 and a[-2] and a[-2]>0) else None
+
 def _enrich_kr(kr, d0s):
-    """한국 전종목 종목별 재무(네이버 integration) + 모멘텀 앵커 → z-score."""
+    """한국 전종목 실측 재무: integration(V·실시간 PER/PBR) + finance/annual(실측 G/Q·하드컷)."""
     d0=datetime.strptime(d0s,"%Y%m%d").date()
     anchors={}
     for lbl,days in (("m1",30),("m12",365)):
@@ -25,19 +40,32 @@ def _enrich_kr(kr, d0s):
         for mkt in ("stk","ksq"):
             _,rows=T.krx_day_back(d0-timedelta(days=days),mkt)
             anchors[lbl][mkt]={r["ISU_CD"]:r for r in rows}
-    def nv_int(r):
+    def fetch(r):
+        o={**r}
         try:
             j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/integration",timeout=10)
-            return {**r,"tot":{x["code"]:x.get("value") for x in j.get("totalInfos",[])}}
-        except Exception: return {**r}
-    enr=T.pmap(nv_int, kr, workers=16)
+            o["tot"]={x["code"]:x.get("value") for x in j.get("totalInfos",[])}
+        except Exception: pass
+        try:
+            j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/finance/annual",timeout=10)
+            fi=j.get("financeInfo") or {}
+            actual=sorted([t["key"] for t in fi.get("trTitleList",[]) if t.get("isConsensus")=="N"])[-3:]
+            cons=sorted([t["key"] for t in fi.get("trTitleList",[]) if t.get("isConsensus")=="Y"])[:1]
+            rd={x["title"]:{k:T.num((v or {}).get("value")) for k,v in (x.get("columns") or {}).items()} for x in fi.get("rowList",[])}
+            fin={}
+            for tt in ("매출액","영업이익","ROE","부채비율","당좌비율"):
+                fin[tt]=[rd.get(tt,{}).get(k) for k in actual]
+                if cons: fin[tt+"_E"]=rd.get(tt,{}).get(cons[0])
+            o["fin"]=fin
+        except Exception: pass
+        return o
+    enr=T.pmap(fetch, kr, workers=16)
     for i,r in enumerate(enr):
-        t=r.get("tot") or {}
-        per,cper=T.num(t.get("per")),T.num(t.get("cnsPer")); eps,ceps=T.num(t.get("eps")),T.num(t.get("cnsEps"))
+        t=r.get("tot") or {}; fn=r.get("fin") or {}
+        per,cper=T.num(t.get("per")),T.num(t.get("cnsPer"))
         pbr,divy=T.num(t.get("pbr")),T.num(t.get("dividendYieldRatio"))
         hi52=T.num(t.get("highPriceOf52Weeks"))
-        fper=cper if cper and cper>0 else (per if per and per>0 else None)
-        growth=min(ceps/eps-1,2.0) if (eps and eps>0 and ceps and ceps>0) else None
+        fper=cper if (cper and cper>0) else (per if per and per>0 else None)
         mkt="stk" if r.get("mk")=="KOSPI" else "ksq"
         a1,a12=anchors["m1"][mkt].get(r["c"]),anchors["m12"][mkt].get(r["c"])
         mom=None
@@ -46,43 +74,74 @@ def _enrich_kr(kr, d0s):
             sh0,sh12=T.num(a1.get("LIST_SHRS")),T.num(a12.get("LIST_SHRS"))
             if c1 and c12 and not (sh0 and sh12 and abs(sh0/sh12-1)>0.10): mom=c1/c12-1
         near52=(r["px"]/hi52-1) if (hi52 and r.get("px")) else None
-        roe_px=min(pbr/per,0.6) if (pbr and per and 1<per<80 and 0.1<pbr<20) else None
-        r.update(fper=fper,per=per,pbr=pbr,divy=divy,growth=growth,mom=mom,near52=near52,roe_px=roe_px)
-        # 2단계 프론트 호환 별칭
+        # 실측 G/Q + 하드컷
+        revg,opg=_yoy(fn.get("매출액")),_yoy(fn.get("영업이익"))
+        la,le=_last(fn.get("매출액")),fn.get("매출액_E")
+        rf=(le/la-1) if (la and le and la>0) else None
+        gg=[min(x,3.0) for x in (revg,opg,rf) if x is not None]
+        roe=_last(fn.get("ROE")); de=_last(fn.get("부채비율")); cr=_last(fn.get("당좌비율"))
+        op3=[v for v in (fn.get("영업이익") or []) if v is not None]
+        r.update(fper=fper,per=per,pbr=pbr,divy=divy,mom=mom,near52=near52,
+                 roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
+                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")))
+        r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
-        r.pop("tot",None); kr[i]=r
+        r.pop("tot",None); r.pop("fin",None); kr[i]=r
     _score(kr,"c",{"val":[lambda r:(-r["fper"] if r.get("fper") else None),
                           lambda r:(-r["pbr"] if r.get("pbr") and r["pbr"]>0 else None),
                           lambda r:r.get("divy")],
-                   "grw":[lambda r:r.get("growth")],
+                   "grw":[lambda r:r.get("g_new")],
                    "mom":[lambda r:r.get("mom"), lambda r:r.get("near52")],
-                   "qly":[lambda r:r.get("roe_px")]})
+                   "qly":[lambda r:r.get("roe"),
+                          lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
 
 def _enrich_us(us):
-    """미국 전종목 — 캐시된 Yahoo quotes 에서 재무 추출 → z-score."""
+    """미국 전종목 실측 재무: 캐시 quotes(V·M) + quoteSummary(실측 G/Q·하드컷)."""
     uq=f"{T.CACHE}/us_quotes.json"; qmap={}
     if os.path.exists(uq):
         for q in json.load(open(uq)):
             if q.get("quoteType")=="EQUITY": qmap[q.get("symbol")]=q
-    for i,r in enumerate(us):
+    for r in us:
         q=qmap.get(r["c"]) or {}
         pe,fpe0=q.get("trailingPE"),q.get("forwardPE")
-        epsT,epsF=q.get("epsTrailingTwelveMonths"),q.get("epsForward")
-        growth=min(epsF/epsT-1,2.0) if (epsT and epsT>0 and epsF and epsF>0) else None
         pb=q.get("priceToBook")
-        fpe=fpe0 if (fpe0 and fpe0>0) else (pe if pe and pe>0 else None)
-        pbv=pb if (pb and pb>0) else None
-        roe_px=min(pbv/fpe,0.6) if (pbv and fpe and 1<fpe<80 and 0.1<pbv<20) else None
-        r.update(fpe=fpe,pb=pbv,divy=q.get("dividendYield"),growth=growth,
-                 w52=q.get("fiftyTwoWeekChangePercent"),hi52=q.get("fiftyTwoWeekHighChangePercent"),
-                 vs200=q.get("twoHundredDayAverageChangePercent"),roe_px=roe_px)
-        r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap"); us[i]=r
+        r["fpe"]=fpe0 if (fpe0 and fpe0>0) else (pe if pe and pe>0 else None)
+        r["pb"]=pb if (pb and pb>0) else None
+        r["divy"]=q.get("dividendYield")
+        r["w52"]=q.get("fiftyTwoWeekChangePercent"); r["hi52"]=q.get("fiftyTwoWeekHighChangePercent")
+        r["vs200"]=q.get("twoHundredDayAverageChangePercent")
+    op,crumb=T.yahoo_opener()
+    import urllib.parse as _up
+    def yqs(r):
+        for att in range(3):
+            try:
+                j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
+                         f"?modules=financialData,assetProfile&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                fd=(j["quoteSummary"]["result"] or [{}])[0]
+                fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{})
+                def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
+                return {**r,"sector":ap.get("sector"),"de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
+                        "roe":v(fdd.get("returnOnEquity")),"revg":v(fdd.get("revenueGrowth")),
+                        "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow"))}
+            except Exception:
+                time.sleep(0.5*(att+1))
+        return r
+    us2=T.pmap(yqs, us, workers=6)
+    for i,r in enumerate(us2):
+        gg=[min(x,3.0) for x in (r.get("revg"),r.get("epsg")) if x is not None]
+        r["g_new"]=(sum(gg)/len(gg) if gg else None); r["growth"]=r["g_new"]
+        r["fcfy"]=(r["fcf"]/r["cap"]) if (r.get("fcf") and r.get("cap")) else None
+        r["isfin"]="Financial" in (r.get("sector") or "")
+        r.pop("fcf",None)
+        r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap")
+        us[i]=r
     _score(us,"c",{"val":[lambda r:(-r["fpe"] if r.get("fpe") else None),
                           lambda r:(-r["pb"] if r.get("pb") else None),
                           lambda r:r.get("divy")],
-                   "grw":[lambda r:r.get("growth")],
+                   "grw":[lambda r:r.get("g_new")],
                    "mom":[lambda r:r.get("w52"), lambda r:r.get("hi52"), lambda r:r.get("vs200")],
-                   "qly":[lambda r:r.get("roe_px")]})
+                   "qly":[lambda r:r.get("roe"), lambda r:r.get("fcfy"),
+                          lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
 
 def build():
     today=date.today()
