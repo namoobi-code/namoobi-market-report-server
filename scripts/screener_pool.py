@@ -7,6 +7,83 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import date, datetime, timedelta
 import ta_screen as T
 
+def _score(rs, key, axdef):
+    """stage2 score_axes 와 동일 — 축별 z-score(zmap) + 종합(min 3축)."""
+    zz={ax:[T.zmap({r[key]:g(r) for r in rs}) for g in fs] for ax,fs in axdef.items()}
+    for r in rs:
+        k=r[key]
+        for ax in axdef: r["z_"+ax]=T.amean([z.get(k) for z in zz[ax]])
+        axs=[r["z_"+ax] for ax in axdef if r.get("z_"+ax) is not None]
+        r["score"]=sum(axs)/len(axs) if len(axs)>=3 else None
+
+def _enrich_kr(kr, d0s):
+    """한국 전종목 종목별 재무(네이버 integration) + 모멘텀 앵커 → z-score."""
+    d0=datetime.strptime(d0s,"%Y%m%d").date()
+    anchors={}
+    for lbl,days in (("m1",30),("m12",365)):
+        anchors[lbl]={}
+        for mkt in ("stk","ksq"):
+            _,rows=T.krx_day_back(d0-timedelta(days=days),mkt)
+            anchors[lbl][mkt]={r["ISU_CD"]:r for r in rows}
+    def nv_int(r):
+        try:
+            j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/integration",timeout=10)
+            return {**r,"tot":{x["code"]:x.get("value") for x in j.get("totalInfos",[])}}
+        except Exception: return {**r}
+    enr=T.pmap(nv_int, kr, workers=16)
+    for i,r in enumerate(enr):
+        t=r.get("tot") or {}
+        per,cper=T.num(t.get("per")),T.num(t.get("cnsPer")); eps,ceps=T.num(t.get("eps")),T.num(t.get("cnsEps"))
+        pbr,divy=T.num(t.get("pbr")),T.num(t.get("dividendYieldRatio"))
+        hi52=T.num(t.get("highPriceOf52Weeks"))
+        fper=cper if cper and cper>0 else (per if per and per>0 else None)
+        growth=min(ceps/eps-1,2.0) if (eps and eps>0 and ceps and ceps>0) else None
+        mkt="stk" if r.get("mk")=="KOSPI" else "ksq"
+        a1,a12=anchors["m1"][mkt].get(r["c"]),anchors["m12"][mkt].get(r["c"])
+        mom=None
+        if a1 and a12:
+            c1,c12=T.num(a1.get("TDD_CLSPRC")),T.num(a12.get("TDD_CLSPRC"))
+            sh0,sh12=T.num(a1.get("LIST_SHRS")),T.num(a12.get("LIST_SHRS"))
+            if c1 and c12 and not (sh0 and sh12 and abs(sh0/sh12-1)>0.10): mom=c1/c12-1
+        near52=(r["px"]/hi52-1) if (hi52 and r.get("px")) else None
+        roe_px=min(pbr/per,0.6) if (pbr and per and 1<per<80 and 0.1<pbr<20) else None
+        r.update(fper=fper,per=per,pbr=pbr,divy=divy,growth=growth,mom=mom,near52=near52,roe_px=roe_px)
+        # 2단계 프론트 호환 별칭
+        r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
+        r.pop("tot",None); kr[i]=r
+    _score(kr,"c",{"val":[lambda r:(-r["fper"] if r.get("fper") else None),
+                          lambda r:(-r["pbr"] if r.get("pbr") and r["pbr"]>0 else None),
+                          lambda r:r.get("divy")],
+                   "grw":[lambda r:r.get("growth")],
+                   "mom":[lambda r:r.get("mom"), lambda r:r.get("near52")],
+                   "qly":[lambda r:r.get("roe_px")]})
+
+def _enrich_us(us):
+    """미국 전종목 — 캐시된 Yahoo quotes 에서 재무 추출 → z-score."""
+    uq=f"{T.CACHE}/us_quotes.json"; qmap={}
+    if os.path.exists(uq):
+        for q in json.load(open(uq)):
+            if q.get("quoteType")=="EQUITY": qmap[q.get("symbol")]=q
+    for i,r in enumerate(us):
+        q=qmap.get(r["c"]) or {}
+        pe,fpe0=q.get("trailingPE"),q.get("forwardPE")
+        epsT,epsF=q.get("epsTrailingTwelveMonths"),q.get("epsForward")
+        growth=min(epsF/epsT-1,2.0) if (epsT and epsT>0 and epsF and epsF>0) else None
+        pb=q.get("priceToBook")
+        fpe=fpe0 if (fpe0 and fpe0>0) else (pe if pe and pe>0 else None)
+        pbv=pb if (pb and pb>0) else None
+        roe_px=min(pbv/fpe,0.6) if (pbv and fpe and 1<fpe<80 and 0.1<pbv<20) else None
+        r.update(fpe=fpe,pb=pbv,divy=q.get("dividendYield"),growth=growth,
+                 w52=q.get("fiftyTwoWeekChangePercent"),hi52=q.get("fiftyTwoWeekHighChangePercent"),
+                 vs200=q.get("twoHundredDayAverageChangePercent"),roe_px=roe_px)
+        r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap"); us[i]=r
+    _score(us,"c",{"val":[lambda r:(-r["fpe"] if r.get("fpe") else None),
+                          lambda r:(-r["pb"] if r.get("pb") else None),
+                          lambda r:r.get("divy")],
+                   "grw":[lambda r:r.get("growth")],
+                   "mom":[lambda r:r.get("w52"), lambda r:r.get("hi52"), lambda r:r.get("vs200")],
+                   "qly":[lambda r:r.get("roe_px")]})
+
 def build():
     today=date.today()
     d0s,_=T.krx_day_back(today,"stk"); T.krx_day_back(today,"ksq")
@@ -62,6 +139,11 @@ def build():
                        "px":px,"chg":q.get("regularMarketChangePercent"),"cap":cap,
                        "tv":round(v3*px) if v3 else None,"yr":yr,
                        "d200":q.get("twoHundredDayAverageChangePercent")})
+    # ── 전종목 z-score enrichment (2단계 랭킹용) ──
+    try: _enrich_kr(kr, d0s)
+    except Exception as e: print("[pool] KR enrich 실패:", repr(e)[:80])
+    try: _enrich_us(us)
+    except Exception as e: print("[pool] US enrich 실패:", repr(e)[:80])
     _pd=T.kr_price_date()
     out={"asof":T.now_kst(),"price_date":_pd,
          "kr":sorted(kr,key=lambda r:-(r["cap"] or 0)),

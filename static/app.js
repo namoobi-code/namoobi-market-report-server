@@ -581,7 +581,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('inv_n').textContent=`${inv.length}종 전량`;
 
   /* ── 보고서 (최신 5건만 — 서버는 7일치 보관, 목록은 5건으로 컷) ── */
-  $('reports').innerHTML=rs.slice(0,5).map(r=>`<div class="rpt">
+  $('reports').innerHTML=rs.slice(0,3).map(r=>`<div class="rpt">
     <div><b>${esc(r.datetime)}</b> <span class="note">· ${r.size_mb}MB</span></div>
     <a class="dl" href="/reports/${encodeURIComponent(r.file)}">다운로드</a></div>`).join('');
 })();
@@ -1270,9 +1270,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function rankTbl(){
     const nOn=AX.filter(a=>ON[a[0]]).length;
-    let rows=S2[mkt].filter(pass2).map(r=>{let sw=0,sz=0,n=0;
+    let rows=S2[mkt].filter(pass).filter(pass2).map(r=>{let sw=0,sz=0,n=0;
       for(const[k]of AX){ if(!ON[k])continue; const z=r['z_'+k]; if(z==null)continue; sw+=W[k]; sz+=W[k]*z; n++; }
-      return Object.assign({},r,{rscore:(nOn>0&&n>0)?sz/sw:null});
+      return Object.assign({},r,{rscore:(nOn>0&&n>=Math.min(3,nOn))?sz/sw:null});  // 축 3개↑면 최소3 유효, 그 이하면 켠 축 전부 필요
     });
     if(nOn===0 && (sort2.k==='rscore'||sort2.k.startsWith('z_'))) sort2.k='mcap';
     const sk=sort2.k, gv=r=> sk==='mcap'?(r.mcap??-Infinity):(r[sk]??-Infinity);
@@ -1282,7 +1282,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const shown = Math.min(lim, 600, rows.length);   // 표시 상한 600행(성능)
     $('scr_cnt').innerHTML = nOn>0
       ? `1단계 <b>${rows.length}</b>종 <span style="opacity:.6">· z랭킹 ${nRank}종 · 표시 ${shown}${shown<rows.length?' (상한600)':''}</span>`
-      : `<b>${rows.length}</b>종 <span style="opacity:.6">/ 1단계풀 ${S2[mkt].length} (축 0 — 하드컷 필터만)</span>`;
+      : `<b>${rows.length}</b>종 <span style="opacity:.6">/ 전종목 ${S2[mkt].length} (1단계 필터+하드컷)</span>`;
     const cols=COL2[mkt], top=rows.slice(0, shown);
     $('scr_tbl2').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-s2="${c[0]}" class="${sort2.k===c[0]?(sort2.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
       top.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''} ${c[3]||''}">${cell2(r,c)}</td>`).join('')+'</tr>').join('');
@@ -1291,8 +1291,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function loadS2(cb){
     if(s2loaded){cb&&cb();return;}
-    fetch('/api/db/ta_stage2').then(r=>r.json()).then(d=>{
-      d=d||{}; S2={kr:(d.kr||{}).l1||[],us:(d.us||{}).l1||[]}; s2loaded=true; cb&&cb();
+    // 2단계도 1단계와 같은 전종목 풀(z점수 포함)을 쓴다 — 1단계 필터를 거친 뒤 랭킹(퍼널).
+    if(POOL.kr.length||POOL.us.length){ S2=POOL; s2loaded=true; cb&&cb(); return; }
+    fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
+      d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; S2=POOL; s2loaded=true; cb&&cb();
     }).catch(()=>{ S2={kr:[],us:[]}; s2loaded=true; cb&&cb(); });
   }
 
