@@ -70,7 +70,9 @@ def _creds():
         return None
     return {"mode": mode, "host": VTS if mode == "mock" else REAL,
             "appkey": ak, "appsecret": sk, "sec": z,
-            # 실측 레이트리밋. 여유 20% 둠.
+            # 실측 레이트리밋: 모의 ~1건/초. 실전은 문서상 20건/초(gap 0.06).
+            # ⚠️ 신규 계좌는 신청일로부터 '3일간 초당 3건' 제한(공지 2026-03-20) 후 자동 상향.
+            #    3일창 동안엔 _get 의 적응형 백오프가 간격을 자동으로 늘린다. 이후엔 0.06 으로 풀속.
             "gap": 0.75 if mode == "mock" else 0.06}
 
 # ── 토큰 ────────────────────────────────────────────────────────────────────
@@ -150,8 +152,12 @@ def _get(c, tok, path, tr, params, tries=4):
             j = {}
         _last[0] = time.time()
         if "초당" in str(j.get("msg1", "")):
-            c["gap"] = min(c["gap"] * 1.6 + 0.1, 2.0)      # 리밋 걸리면 간격을 늘려 학습
+            # 리밋 → 간격을 늘려 학습. 상한 0.5s(=2건/초) — 신규 3일창(3건/초)에서도 과증 방지.
+            c["gap"] = min(c["gap"] * 1.5 + 0.05, 0.5)
             continue
+        # 성공 → 간격을 조금씩 회복(3일 제한 해제/일시 혼잡 이후 풀속 복귀). 최저는 모드 하한.
+        floor = 0.75 if c["mode"] == "mock" else 0.06
+        c["gap"] = max(floor, c["gap"] * 0.97)
         return j
     return {}
 
