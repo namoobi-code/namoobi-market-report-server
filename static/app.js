@@ -1097,9 +1097,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const KEYS=['cap','tv','px','age','sec','health'];
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
-  function resetF(){ F={}; const d=DEF[mkt];
+  const F_ST={};   // 마켓별 1단계 필터 상태 유지
+  function buildF(){ const o={}; const d=DEF[mkt];
     for(const k of KEYS){ const f=d[k]; if(f.fixed!==undefined) continue;
-      if(f.tgl){F[k]={on:f.def};} else {F[k]={min:f.def[0],max:f.def[1]};} } }
+      if(f.tgl){o[k]={on:f.def};} else {o[k]={min:f.def[0],max:f.def[1]};} } return o; }
+  function resetF(){ F_ST[mkt]=buildF(); F=F_ST[mkt]; }          // 초기화 → 현재 마켓만 기본값
+  function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF(); F=F_ST[mkt]; }  // 마켓 전환 → 저장분 로드(원복 안함)
   const ageOf=r=>r.yr?nowY-r.yr:null;
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
@@ -1211,7 +1214,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const ALLK2=['per','pbr','divy','grw','mom','hi','v200'];
   const k2list=()=>Object.keys(DEF2[mkt]);
   let F2={};
-  function resetF2(){ F2={}; for(const k of ALLK2) F2[k]={v:null}; }
+  const F2_ST={};   // 마켓별 2단계 하드컷 상태 유지
+  function resetF2(){ F2={}; for(const k of ALLK2) F2[k]={v:null}; F2_ST[mkt]=F2; }
+  function loadF2(){ if(!F2_ST[mkt]){resetF2();} else F2=F2_ST[mkt]; }
   resetF2();
   function pass2(r){ const d=DEF2[mkt];
     for(const k of k2list()){ const st=F2[k]; if(st.v==null)continue; const f=d[k]; const fv=r[f.field];
@@ -1310,7 +1315,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   // 마켓 토글
   document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
-    mkt=b.dataset.mkt; sort={k:'cap',d:-1}; sort2={k:'rscore',d:-1}; if(stage===1)resetF(); refresh(); });
+    mkt=b.dataset.mkt; loadF(); loadF2(); refresh(); });   // 원복 안함 — 마켓별 선택 유지
   // 스테이지 토글 (1단계/2단계)
   document.querySelectorAll('.stgseg .stg').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',x===b));
