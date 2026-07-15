@@ -1376,7 +1376,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else if(stage===2){resetW();renderS2();} else {resetW();renderS3();} };}
   // 3단계 상위 N · 분석요청 버튼
   {const tn=$('scr_topn3'); if(tn) tn.oninput=()=>{ topN3=Math.max(1,Math.min(100,+tn.value||30)); rankCards3(); };}
-  {const ab=$('scr_ask'); if(ab) ab.onclick=()=>{ const t=window.__scr_top3||[];
+  {const pw=$('scr_pw'), ab0=$('scr_ask');
+   if(pw&&ab0){ pw.oninput=()=>{ const ok=pw.value==='0070';
+     ab0.disabled=!ok; ab0.style.opacity=ok?'1':'.45'; ab0.style.cursor=ok?'pointer':'not-allowed';
+     ab0.textContent=(ok?'📋':'🔒')+' 분석요청 → TradingAgents'; }; } }
+  {const ab=$('scr_ask'); if(ab) ab.onclick=()=>{ if(ab.disabled)return; const t=window.__scr_top3||[];
     if(!t.length){alert('선택된 종목이 없습니다 — 1·2단계 필터를 확인하세요');return;}
     try{navigator.clipboard.writeText(t.join(', '));}catch(e){}
     alert('분석요청 TOP '+t.length+'종 (클립보드 복사됨):\n'+t.join(', ')+'\n\n/namoobi-trading-agents 실행 시 이 종목으로 토론·리스크심사합니다.'); };}
