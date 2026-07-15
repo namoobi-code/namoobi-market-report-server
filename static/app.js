@@ -1187,7 +1187,48 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             ['mom','M 모멘텀','주가 추세 (12−1M·52주고점)'],['qly','Q 수익성','ROE 근사 (PBR÷PER)']];
   let S2={kr:[],us:[]}, s2loaded=false, W={val:1,grw:1,mom:1,qly:1}, ON={val:1,grw:1,mom:1,qly:1},
       topN=30, sort2={k:'rscore',d:-1};
-  function resetW(){ W={val:1,grw:1,mom:1,qly:1}; ON={val:1,grw:1,mom:1,qly:1}; topN=30; sort2={k:'rscore',d:-1}; }
+  function resetW(){ W={val:1,grw:1,mom:1,qly:1}; ON={val:1,grw:1,mom:1,qly:1}; topN=30; sort2={k:'rscore',d:-1}; resetF2(); }
+  // z 원자료 하드컷 필터 (축 전부 해제 시 순수 필터로 사용 가능)
+  const DEF2={
+    kr:{
+      per:{label:'PER',field:'fper',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['10배 ↓',10],['15배 ↓',15],['20배 ↓',20]]},
+      pbr:{label:'PBR',field:'pbr',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['1배 ↓',1],['2배 ↓',2],['3배 ↓',3]]},
+      divy:{label:'배당수익률',field:'divy',dir:'min',u:1,fmt:v=>v.toFixed(1)+'%',presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]]},
+      grw:{label:'EPS성장',field:'growth',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
+      mom:{label:'주가추세(12-1M)',field:'mom',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',0.5],['100% ↑',1],['200% ↑',2]]}
+    },
+    us:{
+      per:{label:'P/E',field:'fpe',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['10배 ↓',10],['15배 ↓',15],['20배 ↓',20]]},
+      pbr:{label:'P/B',field:'pb',dir:'max',u:1,fmt:v=>v.toFixed(1)+'배',presets:[['전체',null],['1배 ↓',1],['2배 ↓',2],['3배 ↓',3]]},
+      divy:{label:'배당수익률',field:'divy',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(1)+'%',presets:[['전체',null],['1% ↑',0.01],['2% ↑',0.02],['3% ↑',0.03]]},
+      grw:{label:'EPS성장',field:'growth',dir:'min',u:0.01,fmt:v=>(v*100).toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['10% ↑',0.1],['20% ↑',0.2],['50% ↑',0.5]]},
+      mom:{label:'주가추세(52주)',field:'w52',dir:'min',u:1,fmt:v=>v.toFixed(0)+'%',presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]]}
+    }
+  };
+  const K2=['per','pbr','divy','grw','mom'];
+  let F2={};
+  function resetF2(){ F2={}; for(const k of K2) F2[k]={v:null}; }
+  resetF2();
+  function pass2(r){ const d=DEF2[mkt];
+    for(const k of K2){ const st=F2[k]; if(st.v==null)continue; const f=d[k]; const fv=r[f.field];
+      if(fv==null)continue; if(f.dir==='max'&&fv>st.v)return false; if(f.dir==='min'&&fv<st.v)return false; }
+    return true; }
+  function chipLabel2(k){ const f=DEF2[mkt][k], v=F2[k].v;
+    return v==null?`${f.label}: <span class="cv">전체</span>`:`${f.label}: <span class="cv">${f.fmt(v)} ${f.dir==='max'?'↓':'↑'}</span>`; }
+  function renderChips2(){ const d=DEF2[mkt];
+    $('scr_fltbar2').innerHTML=`<span style="font-size:11.5px;color:var(--tx2);align-self:center;margin-right:2px">원자료 하드컷:</span>`+K2.map(k=>{
+      const f=d[k], v=F2[k].v, active=v!=null;
+      const pop=`<div class="pl">프리셋 (${f.dir==='max'?'이하':'이상'})</div>`+
+        f.presets.map(p=>{const pv=p[1]; const sel=(v===pv); return `<button class="preset ${sel?'sel':''}" data-k2="${k}" data-v="${pv==null?'':pv}">${E(p[0])}</button>`;}).join('')+
+        `<div class="man"><span>직접</span><input type="number" placeholder="${f.dir==='max'?'최대':'최소'}" data-man2="${k}" value="${v==null?'':(+(v/f.u).toFixed(4))}"><span>${f.dir==='max'?'↓':'↑'}</span></div>`;
+      return `<div class="fchip"><button class="${active?'act':''}" data-chip2="${k}">${chipLabel2(k)}</button><div class="fpop" id="pop2_${k}">${pop}</div></div>`;
+    }).join('');
+    $('scr_fltbar2').querySelectorAll('[data-chip2]').forEach(bt=>bt.onclick=e=>{e.stopPropagation();const k=bt.dataset.chip2;const p=$('pop2_'+k);const w=p.classList.contains('open');document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open'));if(!w)p.classList.add('open');});
+    $('scr_fltbar2').querySelectorAll('[data-k2]').forEach(bt=>bt.onclick=()=>{F2[bt.dataset.k2].v=bt.dataset.v===''?null:+bt.dataset.v; rankTbl(); renderChips2();});
+    $('scr_fltbar2').querySelectorAll('[data-man2]').forEach(inp=>inp.oninput=()=>{const k=inp.dataset.man2;const f=DEF2[mkt][k];F2[k].v=inp.value===''?null:(+inp.value)*f.u;
+      const bt=$('scr_fltbar2').querySelector(`[data-chip2="${k}"]`); if(bt){bt.innerHTML=chipLabel2(k);bt.classList.toggle('act',F2[k].v!=null);} rankTbl();});
+  }
+  function renderS2(){ renderWPanel(); renderChips2(); rankTbl(); }
   const zClass=z=>z==null?'':(z>=1.5?'zc2':z>=0.5?'zc1':z<=-1.5?'zn2':z<=-0.5?'zn1':'');
   const zFmt=z=>z==null?'—':(z>0?'+':'')+z.toFixed(2);
   function renderWPanel(){
@@ -1196,33 +1237,40 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       return `<div class="wax ${ON[k]?'':'off'}"><div class="wh"><label><input type="checkbox" data-axon="${k}" ${ON[k]?'checked':''}> ${E(a[1])}</label><span class="wv">${(W[k]).toFixed(1)}x</span></div>
         <input type="range" min="0" max="3" step="0.1" value="${W[k]}" data-axw="${k}" ${ON[k]?'':'disabled'}>
         <div class="wd">${E(a[2])}</div></div>`;}).join('')+
-      `<div class="wtop">Top <input type="number" min="1" max="150" value="${topN}" id="scr_topn"> 위 <span style="color:var(--tx2)">· 축 ${nOn}/4 (최소 3)</span></div>`;
+      `<div class="wtop">Top <input type="number" min="1" max="150" value="${topN}" id="scr_topn"> 위 <span style="color:var(--tx2)">· 축 ${nOn}/4 (0=필터만)</span></div>`;
     $('scr_wpanel').querySelectorAll('[data-axw]').forEach(r=>r.oninput=()=>{
       const k=r.dataset.axw; W[k]=+r.value; r.closest('.wax').querySelector('.wv').textContent=W[k].toFixed(1)+'x'; rankTbl(); });
     $('scr_wpanel').querySelectorAll('[data-axon]').forEach(c=>c.onchange=()=>{
-      const k=c.dataset.axon; if(!c.checked && AX.filter(a=>ON[a[0]]).length<=3){ c.checked=true; return; } ON[k]=c.checked; renderWPanel(); rankTbl(); });
+      ON[c.dataset.axon]=c.checked; renderWPanel(); rankTbl(); });
     const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(1,Math.min(150,+tn.value||30)); rankTbl(); };
   }
   const COL2={
-    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1]],
-    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1]]
+    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['growth','성장',1],['mom','추세',1]],
+    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['growth','성장',1],['w52','52주',1]]
   };
   function cell2(r,c){const k=c[0];
     if(k==='n') return mkt==='kr'?`<b>${E(r.name)}</b> <span class="note">${E(r.code)}</span>`:`<b>${E(r.sym)}</b> <span class="note">${E(r.name)}</span>`;
     if(k==='rscore') return `<span class="z ${zClass(r.rscore)}">${zFmt(r.rscore)}</span>`;
     if(k.startsWith('z_')) return `<span class="z ${zClass(r[k])}">${zFmt(r[k])}</span>`;
     if(k==='divy'){const v=r.divy; return v==null?'—':(mkt==='us'&&v<1?(v*100).toFixed(2):(+v).toFixed(2));}
+    if(k==='growth'||k==='mom'){const v=r[k]; return v==null?'—':(v*100).toFixed(0)+'%';}
+    if(k==='w52'){const v=r.w52; return v==null?'—':(+v).toFixed(0)+'%';}
     const v=r[k]; return v==null?'—':(+v).toFixed(1);
   }
   function rankTbl(){
-    const rows=S2[mkt].map(r=>{let sw=0,sz=0,n=0;
+    const nOn=AX.filter(a=>ON[a[0]]).length;
+    let rows=S2[mkt].filter(pass2).map(r=>{let sw=0,sz=0,n=0;
       for(const[k]of AX){ if(!ON[k])continue; const z=r['z_'+k]; if(z==null)continue; sw+=W[k]; sz+=W[k]*z; n++; }
-      return Object.assign({},r,{rscore:n>=3?sz/sw:null});
-    }).filter(r=>r.rscore!=null);
-    const sk=sort2.k;
-    rows.sort((a,b)=>sort2.d*((a[sk]??-Infinity)-(b[sk]??-Infinity)));
-    $('scr_cnt').innerHTML=`상위 <b>${Math.min(topN,rows.length)}</b>위 <span style="opacity:.6">/ 채점 ${rows.length}종</span>`;
-    const cols=COL2[mkt], top=rows.slice(0,topN);
+      return Object.assign({},r,{rscore:(nOn>0&&n>0)?sz/sw:null});
+    });
+    if(nOn>0) rows=rows.filter(r=>r.rscore!=null);
+    if(nOn===0 && (sort2.k==='rscore'||sort2.k.startsWith('z_'))) sort2.k='mcap';
+    const sk=sort2.k, gv=r=> sk==='mcap'?(r.mcap??-Infinity):(r[sk]??-Infinity);
+    rows.sort((a,b)=>sort2.d*(gv(a)-gv(b)));
+    $('scr_cnt').innerHTML = nOn>0
+      ? `상위 <b>${Math.min(topN,rows.length)}</b>위 <span style="opacity:.6">/ 채점 ${rows.length}종</span>`
+      : `<b>${rows.length}</b>종 <span style="opacity:.6">/ 채점풀 ${S2[mkt].length} (축 0 — 하드컷 필터만)</span>`;
+    const cols=COL2[mkt], top=rows.slice(0, nOn>0?topN:400);
     $('scr_tbl2').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-s2="${c[0]}" class="${sort2.k===c[0]?(sort2.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
       top.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''} ${c[3]||''}">${cell2(r,c)}</td>`).join('')+'</tr>').join('');
     $('scr_tbl2').querySelectorAll('[data-s2]').forEach(th=>th.onclick=()=>{
@@ -1236,7 +1284,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
 
   let stage=1;
-  function refresh(){ if(stage===1) apply(); else { renderWPanel(); rankTbl(); } }
+  function refresh(){ if(stage===1) apply(); else renderS2(); }
 
   window.renderScreener=function(){
     if(!loaded){
@@ -1261,8 +1309,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     stage=+b.dataset.stg;
     $('scr_s1').style.display = stage===1?'':'none';
     $('scr_s2').style.display = stage===2?'':'none';
-    if(stage===2) loadS2(()=>{ renderWPanel(); rankTbl(); });
+    if(stage===2) loadS2(()=>{ renderS2(); });
     else apply();
   });
-  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else {resetW();renderWPanel();rankTbl();} };}
+  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else {resetW();renderS2();} };}
 })();
