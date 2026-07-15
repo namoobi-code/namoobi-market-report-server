@@ -221,7 +221,7 @@ def futures_oi():
             "oi_chg": _f(o.get("otst_stpl_qty_icdc")),
             "asof": datetime.date.today().isoformat()}
 
-def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600):
+def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_budget=90):
     """코스피200 옵션 근월물 체인을 T+0 로 훑어 PCR·IV스큐·GEX 를 낸다.
 
     체인 전체(390 행사가 × 2 = 780 호출)는 모의(1건/초)에서 13분이라 과하다.
@@ -262,7 +262,13 @@ def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600):
         scan = [k for k in ks if spot * 0.75 <= k <= spot * 1.25][: max_calls // 2]
 
     rows = []
+    _t0 = time.time()
     for k in scan:
+        # 신규 3일 유량제한(3건/초) 구간에선 전체 스캔이 수 분 걸린다 → 시간 예산 초과 시 조기 종료,
+        # 나머지 행사가는 KRX T+1 값으로 채운다(아래 꼬리보정). 배치가 무한정 늘어지는 걸 막는다.
+        if time.time() - _t0 > time_budget:
+            print(f"    [KIS] 시간예산 {time_budget}s 초과 — {scan.index(k)}/{len(scan)} 행사가에서 조기종료(나머지 KRX 보정)")
+            break
         for side, tbl in (("C", call), ("P", put)):
             j = _get(c, tok, "/uapi/domestic-futureoption/v1/quotations/inquire-price",
                      "FHMIF10000000", {"FID_COND_MRKT_DIV_CODE": "O", "FID_INPUT_ISCD": tbl[k]})
