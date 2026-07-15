@@ -1186,8 +1186,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const AX=[['val','V 밸류','싼 종목 (−PER·−PBR·+배당)'],['grw','G 성장','이익 모멘텀 (EPS 성장)'],
             ['mom','M 모멘텀','주가 추세 (12−1M·52주고점)'],['qly','Q 수익성','ROE 근사 (PBR÷PER)']];
   let S2={kr:[],us:[]}, s2loaded=false, W={val:1,grw:1,mom:1,qly:1}, ON={val:1,grw:1,mom:1,qly:1},
-      topN=30, sort2={k:'rscore',d:-1};
-  function resetW(){ W={val:1,grw:1,mom:1,qly:1}; ON={val:1,grw:1,mom:1,qly:1}; topN=30; sort2={k:'rscore',d:-1}; resetF2(); }
+      topN=0, sort2={k:'rscore',d:-1};
+  function resetW(){ W={val:1,grw:1,mom:1,qly:1}; ON={val:1,grw:1,mom:1,qly:1}; topN=0; sort2={k:'rscore',d:-1}; resetF2(); }
   // z 원자료 하드컷 필터 (축 전부 해제 시 순수 필터로 사용 가능)
   const DEF2={
     kr:{
@@ -1241,12 +1241,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       return `<div class="wax ${ON[k]?'':'off'}"><div class="wh"><label><input type="checkbox" data-axon="${k}" ${ON[k]?'checked':''}> ${E(a[1])}</label><span class="wv">${(W[k]).toFixed(1)}x</span></div>
         <input type="range" min="0" max="3" step="0.1" value="${W[k]}" data-axw="${k}" ${ON[k]?'':'disabled'}>
         <div class="wd">${E(a[2])}</div></div>`;}).join('')+
-      `<div class="wtop">Top <input type="number" min="1" max="150" value="${topN}" id="scr_topn"> 위 <span style="color:var(--tx2)">· 축 ${nOn}/4 (0=필터만)</span></div>`;
+      `<div class="wtop">상위 <input type="number" min="0" max="600" placeholder="전체" value="${topN||''}" id="scr_topn"> 위(0=전체) <span style="color:var(--tx2)">· 축 ${nOn}/4 (0=필터만)</span></div>`;
     $('scr_wpanel').querySelectorAll('[data-axw]').forEach(r=>r.oninput=()=>{
       const k=r.dataset.axw; W[k]=+r.value; r.closest('.wax').querySelector('.wv').textContent=W[k].toFixed(1)+'x'; rankTbl(); });
     $('scr_wpanel').querySelectorAll('[data-axon]').forEach(c=>c.onchange=()=>{
       ON[c.dataset.axon]=c.checked; renderWPanel(); rankTbl(); });
-    const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(1,Math.min(150,+tn.value||30)); rankTbl(); };
+    const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(0,Math.min(600,+tn.value||0)); rankTbl(); };
   }
   const COL2={
     kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['growth','성장',1],['mom','추세',1],['near52','고점比',1]],
@@ -1269,14 +1269,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       for(const[k]of AX){ if(!ON[k])continue; const z=r['z_'+k]; if(z==null)continue; sw+=W[k]; sz+=W[k]*z; n++; }
       return Object.assign({},r,{rscore:(nOn>0&&n>0)?sz/sw:null});
     });
-    if(nOn>0) rows=rows.filter(r=>r.rscore!=null);
     if(nOn===0 && (sort2.k==='rscore'||sort2.k.startsWith('z_'))) sort2.k='mcap';
     const sk=sort2.k, gv=r=> sk==='mcap'?(r.mcap??-Infinity):(r[sk]??-Infinity);
     rows.sort((a,b)=>sort2.d*(gv(a)-gv(b)));
+    const nRank=rows.filter(r=>r.rscore!=null).length;
+    const lim = topN>0 ? topN : rows.length;   // topN 0/빈값 = 전체
+    const shown = Math.min(lim, 600, rows.length);   // 표시 상한 600행(성능)
     $('scr_cnt').innerHTML = nOn>0
-      ? `상위 <b>${Math.min(topN,rows.length)}</b>위 <span style="opacity:.6">/ 채점 ${rows.length}종</span>`
-      : `<b>${rows.length}</b>종 <span style="opacity:.6">/ 채점풀 ${S2[mkt].length} (축 0 — 하드컷 필터만)</span>`;
-    const cols=COL2[mkt], top=rows.slice(0, nOn>0?topN:400);
+      ? `1단계 <b>${rows.length}</b>종 <span style="opacity:.6">· z랭킹 ${nRank}종 · 표시 ${shown}${shown<rows.length?' (상한600)':''}</span>`
+      : `<b>${rows.length}</b>종 <span style="opacity:.6">/ 1단계풀 ${S2[mkt].length} (축 0 — 하드컷 필터만)</span>`;
+    const cols=COL2[mkt], top=rows.slice(0, shown);
     $('scr_tbl2').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-s2="${c[0]}" class="${sort2.k===c[0]?(sort2.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
       top.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''} ${c[3]||''}">${cell2(r,c)}</td>`).join('')+'</tr>').join('');
     $('scr_tbl2').querySelectorAll('[data-s2]').forEach(th=>th.onclick=()=>{

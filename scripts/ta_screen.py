@@ -296,9 +296,14 @@ def stage2():
     kr150=sorted([r for r in rows if r["score"] is not None],key=lambda r:-r["score"])[:150]
     # (2026-07-15) Layer1 z-score 스냅샷 — 재랭킹용(가중치 조절). Layer2 재계산 전 값 보존.
     _l1f=("code","name","mkt","close","mcap","fper","per","pbr","divy","growth","mom","near52")
-    l1_kr=[{**{k:r.get(k) for k in _l1f},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
-            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")}
-           for r in rows if r.get("score") is not None]
+    _rbc={r["code"]:r for r in rows}
+    def _l1kr(p):
+        r=_rbc.get(p["code"])
+        if r: return {**{k:r.get(k) for k in _l1f},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
+                      "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")}
+        base={k:p.get(k) for k in ("code","name","mkt","close","mcap")}
+        return {**base,**{k:None for k in ("fper","per","pbr","divy","growth","mom","near52","z_val","z_grw","z_mom","z_qly","score")}}
+    l1_kr=[_l1kr(p) for p in s1["kr"]["rows"]]
     # KR Layer2: naver annual
     def nv_fin(r):
         try:
@@ -363,9 +368,14 @@ def stage2():
                          "qly":[lambda r:r["roe_px"]]})
     us150=sorted([r for r in us if r["score"] is not None],key=lambda r:-r["score"])[:150]
     _l1u=("sym","name","mcap","px","fpe","pb","divy","growth","w52","hi52","vs200","sector")
-    l1_us=[{**{k:r.get(k) for k in _l1u},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
-            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")}
-           for r in us if r.get("score") is not None]
+    _ubs={r["sym"]:r for r in us}
+    def _l1us(p):
+        r=_ubs.get(p["sym"])
+        if r: return {**{k:r.get(k) for k in _l1u},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
+                      "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")}
+        base={"sym":p.get("sym"),"name":p.get("name"),"px":p.get("px"),"mcap":p.get("mcap")}
+        return {**base,**{k:None for k in ("fpe","pb","divy","growth","w52","hi52","vs200","sector","z_val","z_grw","z_mom","z_qly","score")}}
+    l1_us=[_l1us(p) for p in s1["us"]["rows"]]
     op,crumb=yahoo_opener()
     def yqs(r):
         try:
