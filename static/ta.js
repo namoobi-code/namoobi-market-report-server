@@ -35,33 +35,42 @@ const tbl=(head,rows)=>`<table class="ta-tbl"><tr>${head.map(h=>`<th>${h}</th>`)
 const box=h=>`<div class="box" style="padding:10px">${h}</div>`;
 
 const ARCH=`
-<div class="ta-h">전체 구조 — 서버(무-LLM 자동) + 스킬(LLM 판단)의 분업</div>
-<div class="ta-pre">┌──────────────── 서버 자동 (매일 06:00 KST cron · LLM 없음 · 전부 무료 소스) ────────────────┐
-│ 1단계 유니버스   KRX OPEN API(코스피·코스닥 전종목) + NASDAQ Trader(미국 전종목)              │
-│      ↓           + Yahoo v7 배치시세 → 거래가능성 하드컷 → ta_stage1.json                     │
-│ 2단계 정량필터   네이버(PER·PBR·컨센서스·외국인) + 네이버 연간재무 + Yahoo quoteSummary       │
-│      ↓           4축 z-score 랭킹 + 재무건전성 컷 → 시장별 TOP30 → ta_stage2.json             │
-│ 3단계 번들준비   상위 10×2 종목별: 기술지표(RSI·MACD·이평) 직접계산 + 뉴스 + StockTwits       │
-│                  + 규칙 기반 사전플래그 → ta_stage3.json (토론 에이전트 입력)                  │
-└───────────────────────────────────────────────────────────────────────────────────────────────┘
-┌──────────────── 스킬 /namoobi-trading-agents 실행 시 (LLM 판단) ──────────────────────────────┐
-│ 3단계 토론       ta_stage3.json 번들 주입 → 4분석가 의견 → Bull 논거 → Bear 반박 → 판정       │
-│ 4단계 리스크심사 토론 채택 종목 → 섹터 집중도·상관·변동성(ATR) 심사 → 최종 채택/반려          │
-└───────────────────────────────────────────────────────────────────────────────────────────────┘
-  5단계 성과추적   판정 스냅샷 DB → 1주/1개월 후 실현 수익률 vs 벤치마크 (향후 구현)</div>
-<div class="ta-h">설계 원칙 (TauricResearch/TradingAgents 소스 분석에서 가져온 것)</div>
+<div class="ta-h">전체 구조 — 스크리너(서버 자동·무-LLM) + 스킬(LLM 판단)의 분업</div>
+<div class="ta-pre">┌──────── 서버 자동 (매일 06·15시 KST cron · LLM 없음 · 전부 무료 소스) ────────┐
+│ 데이터    전종목 실측 재무를 미리 수집 → screener_pool.json                        │
+│           KR: 네이버 벌크시세 + integration(PER·PBR·배당·외국인)                    │
+│               + finance/annual(ROE·부채비율·당좌·매출·영업이익) + 차트(200일선)     │
+│           US: NASDAQ Trader + Yahoo v7 배치 + quoteSummary(ROE·D/E·유동·매출·FCF)   │
+│      ↓                                                                              │
+│ 1단계     하드컷 — 거래가능성(시총·거래대금·저가주·상장·증권구분·건전성)            │
+│ 유니버스   + 실측(3년 영업적자·부채비율 ≤300%·유동비율 ≥0.8) → 통과 종목            │
+│      ↓                                                                              │
+│ 2단계     실측 z랭킹 — V(−PER·−PBR·+배당)·G(실측 매출·영익 YoY)                     │
+│ 정량필터   ·M(12−1M·52주고점·200일선)·Q(실측 ROE·저부채·FCF) 4축 가중 z-score        │
+│      ↓     (전종목 실측 — 프록시 폐기)                                              │
+│ 3단계     팩터카드 — 상위 종목 실측 재무 상세 + 4축 z + 사전플래그(기술·뉴스·심리)   │
+└────────────────────────────────────────────────────────────────────────────────────┘
+        ↓  스크리너 페이지에서 [분석요청](비번) 또는 자동 상위 N
+┌──────── 스킬 /namoobi-trading-agents 실행 시 (LLM 판단) ─────────────────────────────┐
+│ 3-C 토론  번들 주입 → 4분석가 의견 → Bull 논거 → Bear 반박 → 판정(채택/관망/탈락)     │
+│ 4단계     리스크심사 — 섹터 집중도·상관·변동성(ATR) → 최종 채택/반려                 │
+└────────────────────────────────────────────────────────────────────────────────────┘
+  5단계     성과추적 — 판정 스냅샷 → 1주/1개월 후 실현 수익률 vs 벤치마크(탈락군 대조)</div>
+<div class="ta-h">설계 원칙</div>
 ${box(tbl(['원칙','내용'],[
-['사전 수집 → 주입','LLM이 데이터를 도구로 찾게 하지 않고, 스크립트가 먼저 수집해 프롬프트에 주입 — 툴 압박에 의한 지어내기(환각) 원천 차단 (TradingAgents issue #557의 교훈)'],
-['배제는 하드컷, 선호는 랭킹','유동성·건전성만 탈락 조건으로, 밸류·성장·모멘텀은 시장 내 z-score 상대평가 — 하드컷 조합의 공집합/스타일 쏠림 방지'],
-['결측은 결측으로','수집 실패 시 명시적 플레이스홀더 문자열, 가짜 0·추정값 금지. 단계 실패 시 전일 JSON 유지(carry-forward)'],
-['LLM 최소화','서버는 수집·계산만. LLM(토론·심사)은 스킬 실행 시에만, 상위 후보에만 적용'],
-['성과 검증','판정을 DB에 남겨 사후 수익률로 파이프라인 자체를 평가 (5단계)']]))}
+['단계별 비용 배분','1·2단계는 전종목에 경량 실측 z랭킹, 무거운 토론(LLM)은 상위 후보에만 — 싸게 넓게 거르고 비싸게 좁게 판단'],
+['프록시 → 실측 (2026-07)','네이버 finance/annual·Yahoo quoteSummary 가 전종목 실측 재무를 싸게 주므로, 종전 프록시(EPS비율·PBR÷PER)를 폐기하고 처음부터 실측 G(매출·영익 YoY)·Q(실측 ROE·FCF)로 z랭킹'],
+['배제는 하드컷, 선호는 랭킹','유동성·건전성은 탈락 조건, 밸류·성장·모멘텀·수익성은 시장 내 z-score 상대평가'],
+['사전 수집 → 주입','LLM이 도구로 데이터를 찾게 하지 않고 스크립트가 먼저 수집해 프롬프트에 주입 — 툴 압박 환각 차단'],
+['결측은 결측으로','수집 실패 시 명시적 결측(가짜 0·추정 금지), 실측 재무 없는 종목은 해당 z축 결측 처리'],
+['성과 검증','판정을 DB에 남겨 사후 수익률로 파이프라인 자체를 평가 (5단계·탈락군 대조)']]))}
 <div class="ta-h">산출물 API</div>
 ${box(tbl(['파일','내용','조회'],[
-['ta_stage1.json','유니버스 + 하드컷 통과 리스트','<a href="/api/db/ta_stage1" target="_blank">/api/db/ta_stage1</a>'],
-['ta_stage2.json','4축 랭킹 + 재무검증 TOP30×2','<a href="/api/db/ta_stage2" target="_blank">/api/db/ta_stage2</a>'],
-['ta_stage3.json','토론 번들 10×2 + 사전플래그','<a href="/api/db/ta_stage3" target="_blank">/api/db/ta_stage3</a>'],
-['ta_status.json','일일 실행 로그(단계별 성공/소요)','<a href="/api/db/ta_status" target="_blank">/api/db/ta_status</a>']]))}
+['screener_pool.json','전종목 실측 재무 + 4축 z (스크리너 1·2·3단계 엔진)','<a href="/api/db/screener_pool" target="_blank">/api/db/screener_pool</a>'],
+['ta_stage1~3.json','자동 파이프라인(ta_screen)의 유니버스·랭킹·번들','<a href="/api/db/ta_stage1" target="_blank">stage1</a> · <a href="/api/db/ta_stage2" target="_blank">2</a> · <a href="/api/db/ta_stage3" target="_blank">3</a>'],
+['ta_verdict.json','스킬 실행 시 토론·심사 최종 판정','<a href="/api/db/ta_verdict" target="_blank">/api/db/ta_verdict</a>'],
+['ta_perf.json','판정군별 성과추적(탈락군 대조)','<a href="/api/db/ta_perf" target="_blank">/api/db/ta_perf</a>']]))}
+<div class="ta-note">스크리너 페이지(좌측 SCREENER 버튼)에서 1·2·3단계를 <b>직접 조작·필터</b>할 수 있고, 자동 파이프라인(ta_screen)은 같은 원리로 매일 상위 후보를 미리 뽑아 둔다.</div>
 <div class="src">⚠️ 투자 자문이 아니며 결과는 참고용. 매매 판단·책임은 사용자에게 있다.</div>`;
 
 const S1A=`
@@ -72,15 +81,15 @@ ${box('<b style="font-size:12px">기본적 분석</b>'+tbl(['지표','중요도'
 ['fwd EPS 성장','★★★','✅ 네이버 cnsEps/eps','✅ epsForward/epsTTM','컨센서스 기반 선행 성장'],
 ['PER(TTM·Fwd)','★★★','✅ 네이버','✅ Yahoo','적자기업=결측 처리(최하점 금지)'],
 ['PBR','★★☆','✅ 네이버','✅ priceToBook','금융·지주는 섹터 내 상대평가'],
-['ROE·이익률','★★★','△ 네이버 연간재무','△ quoteSummary','밸류 함정 방어 핵심 — 2단계 Layer2에서 실측'],
-['D/E·유동비율','★★☆','△ 연간재무','△ quoteSummary','배제용 — Layer2'],
-['FCF','★★☆','△','△ quoteSummary','이익의 질 — Layer2(미국)'],
+['ROE·이익률','★★★','✅ 네이버 연간재무','✅ quoteSummary','밸류 함정 방어 — 1·2단계에서 전종목 실측(프록시 폐기)'],
+['D/E·유동비율','★★☆','✅ 연간재무','✅ quoteSummary','배제용 — 1단계 실측 하드컷'],
+['FCF','★★☆','—','✅ quoteSummary','이익의 질 — Q축(미국)'],
 ['배당수익률','★★','✅','✅','랭킹 가점'],
 ['Beta·EBITDA 등','★','△','✅/△','스크리닝 판별력 낮음 — 미사용']]))}
 ${box('<b style="font-size:12px">기술적 분석</b>'+tbl(['지표','중요도','한국','미국','비고'],[
 ['12−1 모멘텀','★★★','✅ KRX 과거시점','✅ 52주수익률 근사','팩터 문헌에서 가장 강건'],
 ['52주 고점 대비','★★★','✅ 네이버','✅ Yahoo','모멘텀 확인'],
-['200일선 대비','★★☆','✅ 계산','✅ Yahoo','장기추세 필터'],
+['200일선 대비','★★☆','✅ 네이버 차트','✅ Yahoo','장기추세 — M축(한·미 대칭)'],
 ['거래량 활성화(10d/3m)','★★','✅','✅','수급 관심 프록시'],
 ['RSI','★★','✅ 계산','✅ 계산','1차에선 극단 과열 배제·3단계 번들에 포함'],
 ['ATR(변동성)','★★','✅ 계산','✅ 계산','4단계 포지션 사이징 재사용'],
@@ -97,32 +106,34 @@ ${box('<b style="font-size:12px">뉴스·이벤트</b>'+tbl(['지표','중요도
 ['실적 발표 일정','★★','향후: 번들에 D-day 추가 검토']]))}`;
 
 const S1B=`
-<div class="ta-h">B. 1단계에서 실제 사용하는 지표와 이유</div>
-${box(tbl(['필터','한국 (KRX)','미국 (Yahoo 배치)','이유'],[
+<div class="ta-h">B. 1단계 하드컷 — 거래가능성 + 실측 건전성 (전부 스크리너에서 조절 가능)</div>
+${box('<b style="font-size:12px">거래가능성 (경량)</b>'+tbl(['필터','한국 (KRX)','미국 (Yahoo 배치)','이유'],[
 ['시가총액','≥ 3,000억원','≥ $2B','초소형주 제외 — 유동성·정보 신뢰도'],
 ['거래대금','3거래일 평균 ≥ 30억원','3개월 평균거래량×주가 ≥ $20M','실제 매매 가능성'],
 ['저가주','종가 ≥ 1,000원','≥ $5','저가주 변동성·작전 리스크'],
 ['상장기간','상장 ≥ 1년','IPO ≥ 1년','이력 부족 종목의 지표 왜곡'],
-['증권 구분','보통주만(주권·우선주/스팩 제외)','ETF·워런트·유닛·우선주·테스트 제외','중복·비종목 제거'],
-['건전성 신호','—','Financial Status D(부실) 제외·200일선 −30%↓ 제외','추락 나이프 회피'],
-['데이터 소스','stk/ksq_bydd_trd + isu_base_info (3콜)','NASDAQ Trader 2파일 + v7 배치 ~16콜','전부 무키·무료']]))}
-<div class="ta-note">무실적(적자) 배제는 1단계가 아닌 2단계에서 — 1단계는 "거래 가능한가"만 본다.</div>`;
+['증권 구분','보통주만(우선주/스팩 제외)','ETF·워런트·유닛·우선주 제외','중복·비종목 제거'],
+['건전성 신호','—','200일선 −30%↓ 제외','추락 나이프 회피']]))}
+${box('<b style="font-size:12px">실측 건전성 (2026-07 · 종전 2단계 Layer2 → 1단계로 이동)</b>'+tbl(['필터','기준','금융업','이유'],[
+['3년 영업적자','3년 연속 영업적자 제외','—','구조적 부실 — 네이버 연간재무 영업이익 3년'],
+['부채비율(D/E)','≤ 300%','면제','레버리지 리스크 — 금융업은 구조적 고부채'],
+['유동비율(당좌)','≥ 0.8','면제','단기 지급능력']]))}
+<div class="ta-note">종전엔 실측 건전성 컷을 상위 150에만(2단계 Layer2) 적용했으나, 전종목 실측 재무 확보 후 <b>1단계 하드컷으로 이동</b>했다 — 하드컷의 제자리는 1단계다.</div>`;
 
 const S3A=`
-<div class="ta-h">A. 3단계 번들 구성 지표와 이유</div>
-${box(tbl(['블록','지표','이유'],[
-['팩터카드','2단계 4축 z-score + 원값(fPER·PBR·ROE·D/E·성장·FCF)','토론의 정량 뼈대 — 에이전트가 수치 인용 의무'],
-['기술지표','RSI14 · 50/200일선 대비 · 1M/3M/1Y 수익률 · 52주고점比 · ATR% · 거래량 20d/60d','국면 판단(추세/과열/조정) — Yahoo 차트 1년으로 서버가 직접 계산'],
-['뉴스','최근 헤드라인 6건 (KR=네이버 · US=Yahoo)','촉매·리스크 식별 — 해석은 LLM 몫'],
-['심리','US=StockTwits 강세/약세 집계(무키) · KR=외국인 소진율','개미 쏠림·수급 — ≥90/10은 역발상 리스크로 해석'],
-['사전플래그','RSI≥75 과열 / RSI≤35 조정권 / 1개월 −10%↓ / 52주고점比 −30%↓ / 거래량급증 / 소셜 쏠림≥90%','규칙으로 미리 계산해 LLM 판단 보조 — 서버 무-LLM 파트']]))}
+<div class="ta-h">A. 3단계 — 실측 팩터카드 + 분석요청</div>
+${box(tbl(['블록','내용','이유'],[
+['팩터카드','1·2단계 통과 상위 종목의 4축 z + 실측 원값(PER·PBR·배당·ROE·부채·유동·매출YoY·영익YoY/FCF)','토론의 정량 뼈대 — 에이전트가 수치 인용 의무'],
+['기술·사전플래그','RSI≥75 과열 / RSI≤35 조정 / 1M −10%↓ / 52주고점比 −30%↓ / 거래량급증 / 소셜 쏠림','규칙으로 미리 계산해 LLM 판단 보조 — 서버 무-LLM 파트'],
+['뉴스·심리','최근 헤드라인(KR 네이버·US Yahoo) · US StockTwits 강세/약세 · KR 외국인 소진율','촉매·리스크·개미 쏠림 — 해석은 LLM'],
+['분석요청','스크리너 3단계에서 상위 N을 [분석요청] 버튼(비번)으로 확정 → 토론 입력으로 전달','오조작 방지 소프트 게이트']]))}
 <div class="ta-h">C. 에이전트 토론 — /namoobi-trading-agents 스킬 실행 시</div>
 ${box(tbl(['순서','내용'],[
-['입력','아래 B의 번들(ta_stage3.json) — 스킬이 서버에서 내려받아 그대로 프롬프트에 주입 (툴콜 없음 → 환각 차단)'],
-['토론','종목별: 4분석가(기본·기술·심리·뉴스) 의견 → Bull 최선 논거 3 → Bear 조목 반박 → 판정(채택/관망/탈락 + 확신도 1~10)'],
+['입력','확정된 상위 종목 번들 — 스킬이 서버에서 내려받아 프롬프트에 주입(툴콜 없음 → 환각 차단)'],
+['토론','종목별: 4분석가(기본·기술·심리·뉴스) 의견 → Bull 최선 논거 → Bear 반박 → 판정(채택/관망/탈락 + 확신도 1~10)'],
 ['규칙','번들 수치만 인용(지어내기 금지) · 결측은 "자료 없음" · 전부 채택 금지(차별화 강제)'],
 ['출력','판정 JSON → 4단계 리스크 심사의 입력']]))}
-<div class="ta-note">서버는 LLM을 쓰지 않는다 — 이 페이지의 B 리스트는 "토론 대기 후보"이며, 판정은 스킬 실행 시에만 생성된다.</div>`;
+<div class="ta-note">서버는 LLM을 쓰지 않는다 — 팩터카드는 "토론 대기 후보"이며, 판정은 스킬 실행 시에만 생성된다.</div>`;
 
 const S4=`
 <div class="ta-h">4단계 — 리스크 심사 (/namoobi-trading-agents 스킬 실행 시)</div>
@@ -147,26 +158,25 @@ ${box(tbl(['항목','구현'],[
 <div class="ta-note" id="ta_perf_note"></div>`;
 
 const S2A=`
-<div class="ta-h">A. 2단계에서 실제 사용하는 지표와 이유</div>
-${box('<b style="font-size:12px">Layer 1 — 4축 z-score 랭킹 (동일가중 · 최소 3축 필요)</b>'+tbl(['축','구성 (KR / US)','이유'],[
-['V 밸류','−fPER(컨센서스 우선)·−PBR·+배당 / −fPE·−P/B·+배당','싸게 사기 — 적자는 결측 처리'],
-['G 성장','컨센서스 EPS÷실적 EPS−1 / epsForward÷epsTTM−1 (+200% 캡)','이익 모멘텀 — 저베이스 캡으로 턴어라운드 왜곡 완화'],
-['M 모멘텀','12−1개월 수익률·52주고점 근접 / 52주수익률·고점비·200일선比','최근 1개월 제외 = 단기 반전 노이즈 제거·액면변경(주식수 ±10%) 가드'],
-['Q 수익성','PBR÷PER 근사(정상범위만) / 동일','ROE 근사 — Layer2에서 실측으로 교체']]))}
-${box('<b style="font-size:12px">Layer 2 — 상위 150 재무 실측 (KR=네이버 연간재무 · US=Yahoo quoteSummary)</b>'+tbl(['규칙','내용','이유'],[
-['하드컷 ①','3년 연속 영업적자 제외','구조적 부실'],
-['하드컷 ②','부채비율·D/E > 300% 제외 (금융업 면제)','레버리지 리스크 — 금융업은 구조적 고부채'],
-['하드컷 ③','유동비율 < 0.8 제외 (미국)','단기 지급능력'],
-['축 교체 G','실측 매출·영업이익 YoY + 매출 컨센서스 성장','프록시(EPS 비율)의 저베이스 착시 교정'],
-['축 교체 Q','실측 ROE + 저부채 가점 (+미국 FCF수익률)','극단값 지배 차단'],
-['산출','시장별 TOP 30 + 종목별 팩터카드','3단계 토론 입장권']]))}`;
+<div class="ta-h">2단계 — 4축 z-score 실측 랭킹 <span style="font-size:11px;font-weight:400;color:var(--ok)">· 프록시 폐기, 전종목 실측 (2026-07)</span></div>
+${box(tbl(['축','구성 (KR / US)','이유'],[
+['V 밸류','−fPER(컨센서스 우선)·−PBR·+배당수익률','싸게 사기 — 적자기업은 결측 처리(최하점 금지)'],
+['G 성장','실측 매출·영업이익 YoY + 매출 컨센서스 / 실측 매출성장·EPS성장','<b>실측</b> — 종전 프록시(컨센EPS÷실적EPS)의 저베이스 착시 제거'],
+['M 모멘텀','12−1개월 수익률·52주고점 근접·<b>200일선比</b> / 52주수익률·고점비·200일선比','최근 1개월 제외(단기 반전 노이즈)·200일선(장기추세) — 한·미 대칭 3지표'],
+['Q 수익성','실측 ROE + 저부채 가점 / 실측 ROE + FCF수익률 + 저부채','<b>실측</b> — 종전 PBR÷PER 프록시의 극단값 지배 차단']]))}
+<div class="ta-note">동일가중이 기본, 스크리너에서 <b>축별 가중치 슬라이더</b>로 관점을 조절해 실시간 재랭킹한다(서버 재실행 없음, 최소 3축). z=시장 내 표준화 점수(0=평균, +1=상위).</div>
+<div class="ta-h" style="margin-top:16px">실측 재무 소스 (전종목 · 종전 상위 150 한정 → 전종목 확대)</div>
+${box(tbl(['시장','소스','커버리지·속도'],[
+['한국','네이버 finance/annual(ROE·부채비율·당좌비율·매출·영업이익) + 차트(200일 이동평균)','전종목 ~99% · ~15초'],
+['미국','Yahoo quoteSummary(ROE·D/E·유동비율·매출성장·FCF)','전종목 ~67%(레이트리밋 재시도) · ~4분']]))}
+<div class="ta-note">종전엔 프록시로 전종목 랭킹 → 상위 150만 실측(Layer2)했으나, 네이버·야후가 실측 재무를 싸게 주므로 <b>처음부터 전종목 실측</b>으로 통합했다. 재무 없는 종목은 해당 z축만 결측(하단 정렬).</div>`;
 
 // ---------- skeleton ----------
 root.innerHTML=`
-<div class="hero"><span class="badge">서버 자동화 가동 · 매일 06:00 KST</span>
+<div class="hero"><span class="badge">서버 자동화 · 하루 2회(06·15시 KST) + 스크리너 실시간</span>
 <h3>TradingAgents — 종목 스크리닝</h3>
 <p><a href="https://github.com/TauricResearch/TradingAgents" target="_blank" rel="noopener">TauricResearch/TradingAgents</a>의 멀티 에이전트 토론 구조를 번안.
-1~3단계(수집·정량필터·번들)는 <b>서버가 매일 새벽 6시에 LLM 없이 자동 실행</b>하고, 토론(3-C)·리스크 심사(4)는 <b>/namoobi-trading-agents</b> 스킬 실행 시 LLM이 수행한다.</p></div>
+1~3단계(전종목 실측 z랭킹)는 <b>서버가 하루 2회(06·15시) LLM 없이 자동 실행</b>하고 <b>좌측 SCREENER 페이지에서 직접 조작</b>할 수 있다. 토론(3-C)·리스크 심사(4)는 <b>/namoobi-trading-agents</b> 스킬 실행 시 LLM이 수행한다.</p></div>
 <div class="ta-btns">
 <button class="ta-btn on" data-ta="0">0. Architecture<small>전반 구조</small></button>
 <button class="ta-btn" data-ta="1">1 Step<small>유니버스</small></button>
@@ -199,8 +209,12 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
         return s?(s.ok?`✅ ${s.sec}s`:`❌ ${esc(s.err||'').slice(0,60)}`):'—'})])));
   } else document.getElementById('ta_status').innerHTML='<div class="ta-note">아직 실행 기록 없음</div>';
   // ── 5단계 성과추적 (ta_perf.py 산출) ──
+  // ⚠️ 이 블록은 stage1/2/3·SKILL RESULT 보다 먼저 실행된다 — 여기서 예외가 나면
+  //    아래 렌더가 전부 중단돼 모든 패널이 "불러오는 중…" 에 멈춘다(2026-07-14 장애).
+  //    그래서 (a) summary 가 배열인지 실제로 확인하고 (b) try/catch 로 격리한다.
   const pf=await J('ta_perf');
-  if(pf&&pf.summary){
+  try{
+  if(pf&&Array.isArray(pf.summary)&&pf.summary.length){
     const P=v=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v}%</span>`;
     const R=v=>v==null?'<span class="note">경과 전</span>':`<b class="${v>0?'up':'dn'}">${v>0?'+':''}${v}%</b>`;
     const H=pf.horizons||['1주','1개월','3개월'];
@@ -259,8 +273,15 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     document.getElementById('ta_perf_sum').innerHTML='<div class="ta-note">아직 판정 이력이 없다 — /namoobi-trading-agents 를 1회 이상 실행해야 추적이 시작된다.</div>';
     document.getElementById('ta_perf_rows').innerHTML='';
   }
+  }catch(e){
+    console.error('[ta] 5단계 성과추적 렌더 실패 — 다른 단계는 계속 그린다:',e);
+    document.getElementById('ta_perf_sum').innerHTML=
+      '<div class="ta-note">성과추적 표를 그리지 못했다 (ta_perf.json 형식 오류: '+esc(String(e&&e.message||e))+'). 원본: <a href="/api/db/ta_perf" target="_blank">/api/db/ta_perf</a></div>';
+    document.getElementById('ta_perf_rows').innerHTML='';
+  }
 
   const s1=await J('ta_stage1');
+  try{
   if(s1){
     const mk=(rows,kr)=>`<div class="ta-scroll">${tbl(kr?['종목','시장','종가','시총(조)','거래대금(억)']:['티커','종목명','주가','시총($B)'],
       rows.map(r=>kr?[esc(r.name),r.mkt,Number(r.close).toLocaleString(),(r.mcap/1e12).toFixed(2),(r.trdval/1e8).toFixed(0)]
@@ -270,7 +291,9 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
       +`<div class="ta-h" style="margin-top:8px">한국 통과 ${s1.kr.pass}종목 (시총순)</div>`+mk(s1.kr.rows,true)
       +`<div class="ta-h">미국 통과 ${s1.us.pass}종목 (시총순)</div>`+mk(s1.us.rows,false);
   } else document.getElementById('ta_s1').innerHTML='<div class="ta-note">데이터 없음 — 다음 06:00 실행 대기</div>';
+  }catch(e){console.error('[ta] 1단계 렌더 실패:',e);document.getElementById('ta_s1').innerHTML='<div class="ta-note">1단계 렌더 실패: '+esc(String(e&&e.message||e))+'</div>';}
   const s2=await J('ta_stage2');
+  try{
   if(s2){
     const zrow=r=>[fx(r.z_val),fx(r.z_grw),fx(r.z_mom),fx(r.z_qly),`<b>${fx(r.score,2)}</b>`];
     const krT=tbl(['#','종목','fPER','PBR','ROE%','부채%','매출성장','영업이익성장','V','G','M','Q','종합'],
@@ -285,7 +308,9 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
       +`<div class="ta-h">미국 TOP 30</div><div class="ta-scroll">${usT}</div>`
       +`<div class="ta-note"><b>재무 하드컷 탈락</b> — KR: ${drops||'없음'}<br>US(일부): ${dropsU||'없음'}</div>`;
   } else document.getElementById('ta_s2').innerHTML='<div class="ta-note">데이터 없음</div>';
+  }catch(e){console.error('[ta] 2단계 렌더 실패:',e);document.getElementById('ta_s2').innerHTML='<div class="ta-note">2단계 렌더 실패: '+esc(String(e&&e.message||e))+'</div>';}
   const s3=await J('ta_stage3');
+  try{
   if(s3){
     const mk=(bs,kr)=>tbl(['종목','종합','fPER/fPE','ROE','RSI','1개월','1년','52주고점比','심리','플래그'],
       bs.map(b=>{const f=b['팩터카드']||{},t=b['기술지표']||{},sn=b['심리']||{};
@@ -298,8 +323,10 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
       +`<div class="ta-h" style="margin-top:8px">한국 후보 10</div><div class="ta-scroll">${mk(s3.kr,true)}</div>`
       +`<div class="ta-h">미국 후보 10</div><div class="ta-scroll">${mk(s3.us,false)}</div>`;
   } else document.getElementById('ta_s3').innerHTML='<div class="ta-note">데이터 없음</div>';
+  }catch(e){console.error('[ta] 3단계 렌더 실패:',e);document.getElementById('ta_s3').innerHTML='<div class="ta-note">3단계 렌더 실패: '+esc(String(e&&e.message||e))+'</div>';}
 
   // ---- SKILL RESULT (ta_verdict) ----
+  try{
   const sv=await J('ta_verdict'); const calls=await J('ta_calls');
   const el=document.getElementById('ta_sr');
   if(!sv||!sv.verdicts){ el.innerHTML='<div class="ta-note">아직 스킬 실행 기록이 없다 — <b>/namoobi-trading-agents</b> 를 실행하면 판정이 여기에 표시된다.</div>'; }
@@ -338,6 +365,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     h+='<div class="src" style="margin-top:10px">⚠️ 투자 자문이 아니며 판정은 참고용. 매매 판단과 책임은 사용자에게 있다. 원본 JSON: <a href="/api/db/ta_verdict" target="_blank">/api/db/ta_verdict</a></div>';
     el.innerHTML=h;
   }
+  }catch(e){console.error('[ta] SKILL RESULT 렌더 실패:',e);document.getElementById('ta_sr').innerHTML='<div class="ta-note">판정 카드 렌더 실패: '+esc(String(e&&e.message||e))+' · 원본 <a href="/api/db/ta_verdict" target="_blank">JSON</a></div>';}
 
 })();
 })();
