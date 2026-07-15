@@ -297,7 +297,8 @@ def stage2():
     # (2026-07-15) Layer1 z-score 스냅샷 — 재랭킹용(가중치 조절). Layer2 재계산 전 값 보존.
     _l1f=("code","name","mkt","close","mcap","fper","per","pbr","divy","growth","mom","near52")
     l1_kr=[{**{k:r.get(k) for k in _l1f},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
-            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")} for r in kr150]
+            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")}
+           for r in rows if r.get("score") is not None]
     # KR Layer2: naver annual
     def nv_fin(r):
         try:
@@ -363,7 +364,8 @@ def stage2():
     us150=sorted([r for r in us if r["score"] is not None],key=lambda r:-r["score"])[:150]
     _l1u=("sym","name","mcap","px","fpe","pb","divy","growth","w52","hi52","vs200","sector")
     l1_us=[{**{k:r.get(k) for k in _l1u},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
-            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")} for r in us150]
+            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")}
+           for r in us if r.get("score") is not None]
     op,crumb=yahoo_opener()
     def yqs(r):
         try:
