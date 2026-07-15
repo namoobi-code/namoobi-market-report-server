@@ -184,6 +184,21 @@
   #scr_tbl th:hover{background:#e0e7f2}
   #scr_tbl th.dn::after{content:" \25be";color:#1f6feb}
   #scr_tbl th.up::after{content:" \25b4";color:#1f6feb}
+
+  /* ── SCREENER stage2 랭킹 ── */
+  .stgseg .stg{padding:7px 13px;font-size:12.5px}
+  .wpanel{display:flex;gap:14px;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .wax{flex:1 1 150px;min-width:150px}
+  .wax .wh{display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:700;margin-bottom:5px}
+  .wax .wh label{display:flex;align-items:center;gap:6px;cursor:pointer}
+  .wax .wh .wv{color:#1f6feb;font-variant-numeric:tabular-nums}
+  .wax input[type=range]{width:100%;accent-color:#1f6feb;cursor:pointer}
+  .wax.off{opacity:.4}
+  .wax .wd{font-size:10.5px;color:var(--tx2);margin-top:3px;line-height:1.3}
+  .wtop{display:flex;align-items:center;gap:8px;font-size:12.5px;margin-left:auto;white-space:nowrap}
+  .wtop input{width:60px;border:1px solid var(--line);border-radius:6px;padding:5px;font-size:12px;text-align:right}
+  #scr_tbl2 td.z{font-variant-numeric:tabular-nums;font-weight:600}
+  .zc2{color:#0b4fc4}.zc1{color:#5b8def}.zn1{color:#e08a2b}.zn2{color:#d1400a}
 </style>
 </head>
 <body><div class="wrap">
@@ -408,11 +423,21 @@
       <p class="note" style="margin:2px 0 8px">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
       <div class="scrtop">
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
+        <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button></div>
         <span class="scrcnt" id="scr_cnt">—</span>
-        <button class="scrrst" id="scr_rst">필터 초기화</button>
+        <button class="scrrst" id="scr_rst">초기화</button>
       </div>
-      <div class="fltbar" id="scr_fltbar"></div>
-      <div class="box" style="overflow:auto;max-height:560px;margin-top:9px"><table id="scr_tbl"></table></div>
+      <!-- 1단계 -->
+      <div id="scr_s1">
+        <div class="fltbar" id="scr_fltbar"></div>
+        <div class="box" style="overflow:auto;max-height:540px;margin-top:9px"><table id="scr_tbl"></table></div>
+      </div>
+      <!-- 2단계 z랭킹 -->
+      <div id="scr_s2" style="display:none">
+        <p class="note" style="margin:2px 0 8px">4축 z-score를 <b>가중치로 조절</b>해 실시간 재랭킹한다(서버 재실행 없음). 축 최소 3개. 값은 표준화 점수(0=평균, +1=상위, −1=하위).</p>
+        <div class="wpanel" id="scr_wpanel"></div>
+        <div class="box" style="overflow:auto;max-height:520px;margin-top:9px"><table id="scr_tbl2"></table></div>
+      </div>
       <div class="src" id="scr_src2"></div>
     </main>
   </div>

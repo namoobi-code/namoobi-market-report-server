@@ -1182,6 +1182,62 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function apply(){ applyTable(); renderChips(); }
 
+  // ── 2단계 z-score 랭킹 ──
+  const AX=[['val','V 밸류','싼 종목 (−PER·−PBR·+배당)'],['grw','G 성장','이익 모멘텀 (EPS 성장)'],
+            ['mom','M 모멘텀','주가 추세 (12−1M·52주고점)'],['qly','Q 수익성','ROE 근사 (PBR÷PER)']];
+  let S2={kr:[],us:[]}, s2loaded=false, W={val:1,grw:1,mom:1,qly:1}, ON={val:1,grw:1,mom:1,qly:1},
+      topN=30, sort2={k:'rscore',d:-1};
+  function resetW(){ W={val:1,grw:1,mom:1,qly:1}; ON={val:1,grw:1,mom:1,qly:1}; topN=30; sort2={k:'rscore',d:-1}; }
+  const zClass=z=>z==null?'':(z>=1.5?'zc2':z>=0.5?'zc1':z<=-1.5?'zn2':z<=-0.5?'zn1':'');
+  const zFmt=z=>z==null?'—':(z>0?'+':'')+z.toFixed(2);
+  function renderWPanel(){
+    const nOn=AX.filter(a=>ON[a[0]]).length;
+    $('scr_wpanel').innerHTML=AX.map(a=>{const k=a[0];
+      return `<div class="wax ${ON[k]?'':'off'}"><div class="wh"><label><input type="checkbox" data-axon="${k}" ${ON[k]?'checked':''}> ${E(a[1])}</label><span class="wv">${(W[k]).toFixed(1)}x</span></div>
+        <input type="range" min="0" max="3" step="0.1" value="${W[k]}" data-axw="${k}" ${ON[k]?'':'disabled'}>
+        <div class="wd">${E(a[2])}</div></div>`;}).join('')+
+      `<div class="wtop">Top <input type="number" min="1" max="150" value="${topN}" id="scr_topn"> 위 <span style="color:var(--tx2)">· 축 ${nOn}/4 (최소 3)</span></div>`;
+    $('scr_wpanel').querySelectorAll('[data-axw]').forEach(r=>r.oninput=()=>{
+      const k=r.dataset.axw; W[k]=+r.value; r.closest('.wax').querySelector('.wv').textContent=W[k].toFixed(1)+'x'; rankTbl(); });
+    $('scr_wpanel').querySelectorAll('[data-axon]').forEach(c=>c.onchange=()=>{
+      const k=c.dataset.axon; if(!c.checked && AX.filter(a=>ON[a[0]]).length<=3){ c.checked=true; return; } ON[k]=c.checked; renderWPanel(); rankTbl(); });
+    const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(1,Math.min(150,+tn.value||30)); rankTbl(); };
+  }
+  const COL2={
+    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1]],
+    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1]]
+  };
+  function cell2(r,c){const k=c[0];
+    if(k==='n') return mkt==='kr'?`<b>${E(r.name)}</b> <span class="note">${E(r.code)}</span>`:`<b>${E(r.sym)}</b> <span class="note">${E(r.name)}</span>`;
+    if(k==='rscore') return `<span class="z ${zClass(r.rscore)}">${zFmt(r.rscore)}</span>`;
+    if(k.startsWith('z_')) return `<span class="z ${zClass(r[k])}">${zFmt(r[k])}</span>`;
+    if(k==='divy'){const v=r.divy; return v==null?'—':(mkt==='us'&&v<1?(v*100).toFixed(2):(+v).toFixed(2));}
+    const v=r[k]; return v==null?'—':(+v).toFixed(1);
+  }
+  function rankTbl(){
+    const rows=S2[mkt].map(r=>{let sw=0,sz=0,n=0;
+      for(const[k]of AX){ if(!ON[k])continue; const z=r['z_'+k]; if(z==null)continue; sw+=W[k]; sz+=W[k]*z; n++; }
+      return Object.assign({},r,{rscore:n>=3?sz/sw:null});
+    }).filter(r=>r.rscore!=null);
+    const sk=sort2.k;
+    rows.sort((a,b)=>sort2.d*((a[sk]??-Infinity)-(b[sk]??-Infinity)));
+    $('scr_cnt').innerHTML=`상위 <b>${Math.min(topN,rows.length)}</b>위 <span style="opacity:.6">/ 채점 ${rows.length}종</span>`;
+    const cols=COL2[mkt], top=rows.slice(0,topN);
+    $('scr_tbl2').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-s2="${c[0]}" class="${sort2.k===c[0]?(sort2.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
+      top.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''} ${c[3]||''}">${cell2(r,c)}</td>`).join('')+'</tr>').join('');
+    $('scr_tbl2').querySelectorAll('[data-s2]').forEach(th=>th.onclick=()=>{
+      const k=th.dataset.s2; if(sort2.k===k)sort2.d*=-1; else{sort2.k=k;sort2.d=-1;} rankTbl(); });
+  }
+  function loadS2(cb){
+    if(s2loaded){cb&&cb();return;}
+    fetch('/api/db/ta_stage2').then(r=>r.json()).then(d=>{
+      d=d||{}; S2={kr:(d.kr||{}).l1||[],us:(d.us||{}).l1||[]}; s2loaded=true; cb&&cb();
+    }).catch(()=>{ S2={kr:[],us:[]}; s2loaded=true; cb&&cb(); });
+  }
+
+  let stage=1;
+  function refresh(){ if(stage===1) apply(); else { renderWPanel(); rankTbl(); } }
+
   window.renderScreener=function(){
     if(!loaded){
       loaded=true;
@@ -1189,17 +1245,24 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
         d=d||{}; POOL={kr:d.kr||[],us:d.us||[]};
         $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
-        $('scr_src2').innerHTML='출처: KRX OPEN API(유니버스·상장) + 네이버 전종목 시세 · Yahoo v7 배치(미국) · 하루 2회 갱신. '
-          +'ETF·스팩·비보통주 제외. 결측값은 해당 필터에서 관대 처리(통과).';
+        $('scr_src2').innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신. 2단계 z-score 는 1단계 통과분에서 계산.';
         resetF(); apply();
       }).catch(e=>{ $('scr_asof').textContent='풀 로드 실패: '+e; });
-    } else { apply(); }
+    } else { refresh(); }
   };
-  // 마켓 토글 · 초기화 · 팝오버 바깥클릭 닫기
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
-  // 즉시 바인딩 (app.js 는 body 끝에서 로드 — DOM 준비됨)
-  document.querySelectorAll('.mktseg .mkt').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('.mktseg .mkt').forEach(x=>x.classList.toggle('on',x===b));
-    mkt=b.dataset.mkt; sort={k:'cap',d:-1}; resetF(); apply(); });
-  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ sort={k:'cap',d:-1}; resetF(); apply(); };}
+  // 마켓 토글
+  document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
+    mkt=b.dataset.mkt; sort={k:'cap',d:-1}; sort2={k:'rscore',d:-1}; if(stage===1)resetF(); refresh(); });
+  // 스테이지 토글 (1단계/2단계)
+  document.querySelectorAll('.stgseg .stg').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',x===b));
+    stage=+b.dataset.stg;
+    $('scr_s1').style.display = stage===1?'':'none';
+    $('scr_s2').style.display = stage===2?'':'none';
+    if(stage===2) loadS2(()=>{ renderWPanel(); rankTbl(); });
+    else apply();
+  });
+  {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else {resetW();renderWPanel();rankTbl();} };}
 })();

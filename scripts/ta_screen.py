@@ -294,6 +294,10 @@ def stage2():
                             "mom":[lambda r:r["mom"],lambda r:r["near52"]],
                             "qly":[lambda r:r["roe_px"]]})
     kr150=sorted([r for r in rows if r["score"] is not None],key=lambda r:-r["score"])[:150]
+    # (2026-07-15) Layer1 z-score 스냅샷 — 재랭킹용(가중치 조절). Layer2 재계산 전 값 보존.
+    _l1f=("code","name","mkt","close","mcap","fper","per","pbr","divy","growth","mom","near52")
+    l1_kr=[{**{k:r.get(k) for k in _l1f},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
+            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")} for r in kr150]
     # KR Layer2: naver annual
     def nv_fin(r):
         try:
@@ -357,6 +361,9 @@ def stage2():
                          "mom":[lambda r:r["w52"],lambda r:r["hi52"],lambda r:r["vs200"]],
                          "qly":[lambda r:r["roe_px"]]})
     us150=sorted([r for r in us if r["score"] is not None],key=lambda r:-r["score"])[:150]
+    _l1u=("sym","name","mcap","px","fpe","pb","divy","growth","w52","hi52","vs200","sector")
+    l1_us=[{**{k:r.get(k) for k in _l1u},"z_val":r.get("z_val"),"z_grw":r.get("z_grw"),
+            "z_mom":r.get("z_mom"),"z_qly":r.get("z_qly"),"score":r.get("score")} for r in us150]
     op,crumb=yahoo_opener()
     def yqs(r):
         try:
@@ -390,8 +397,8 @@ def stage2():
     for r in us_final: r.pop("fcf",None)
     save_db("ta_stage2",{"trade_date":s1["trade_date"],"price_date":s1.get("price_date") or kr_price_date(),
                          "krx_base_date":s1.get("krx_base_date"),
-                         "kr":{"scored":len(rows),"drops":kr_drop,"top":kr_final},
-                         "us":{"scored":len(us),"drops":us_drop,"top":us_final}})
+                         "kr":{"scored":len(rows),"drops":kr_drop,"top":kr_final,"l1":l1_kr},
+                         "us":{"scored":len(us),"drops":us_drop,"top":us_final,"l1":l1_us}})
     print(f"stage2 ok: KR top{len(kr_final)} US top{len(us_final)}")
 
 # ================ STAGE 3 ================
