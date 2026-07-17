@@ -1027,7 +1027,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     .map(([k,v])=>`<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
       <div class="s" style="margin-top:7px">${E(v.key_message)}</div>
       <div class="src">강점: ${E(v.strength||'')}</div></div>`).join('');
-  $$('d_sec').innerHTML=houses(R.securities,{samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
+  $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
     shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
     yuanta:'유안타증권',hyundai:'현대차증권'});
   const CT=(R.securities||{}).common_themes;
@@ -1152,7 +1152,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     for(const k of KEYS){ const f=d[k]; if(f.fixed!==undefined) continue;
       if(f.tgl){o[k]={on:f.def};} else {o[k]={min:f.def[0],max:f.def[1]};} } return o; }
   function resetF(){ F_ST[mkt]=buildF(); F=F_ST[mkt]; }          // 초기화 → 현재 마켓만 기본값
-  function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF(); F=F_ST[mkt]; }  // 마켓 전환 → 저장분 로드(원복 안함)
+  function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF();           // 마켓 전환 → 저장분 로드(원복 안함)
+    else { const df=buildF(); for(const k in df) if(!(k in F_ST[mkt])) F_ST[mkt][k]=df[k]; } // 신규 필터키 백필(구버전 저장상태 호환)
+    F=F_ST[mkt]; }
   const ageOf=r=>r.yr?nowY-r.yr:null;
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
@@ -1169,7 +1171,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(st.max!=null && v>st.max) return false; }
     return true; }
 
-  function chipLabel(k){ const f=DEF[mkt][k], st=F[k];
+  function chipLabel(k){ const f=DEF[mkt][k], st=F[k]||{};
     if(f.fixed!==undefined) return `${f.label}: <span class="cv">${E(f.fixed)}</span>`;
     if(f.tgl) return `${f.label}: <span class="cv">${st.on?'ON':'OFF'}</span>`;
     const lo=st.min, hi=st.max;
