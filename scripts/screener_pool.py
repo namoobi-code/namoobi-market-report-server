@@ -45,6 +45,7 @@ def _enrich_kr(kr, d0s):
         try:
             j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/integration",timeout=10)
             o["tot"]={x["code"]:x.get("value") for x in j.get("totalInfos",[])}
+            o["cons"]=j.get("consensusInfo") or {}
         except Exception: pass
         try:
             j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/finance/annual",timeout=10)
@@ -59,7 +60,7 @@ def _enrich_kr(kr, d0s):
             o["fin"]=fin
         except Exception: pass
         try:
-            S=(datetime.date.today()-timedelta(days=400)).strftime("%Y%m%d"); E=datetime.date.today().strftime("%Y%m%d")
+            S=(date.today()-timedelta(days=400)).strftime("%Y%m%d"); E=date.today().strftime("%Y%m%d")
             dch=T.jget(f"https://api.stock.naver.com/chart/domestic/item/{r['c']}/day?startDateTime={S}&endDateTime={E}",timeout=12)
             cl=[x["closePrice"] for x in dch if x.get("closePrice")]
             if len(cl)>=100: o["ma200"]=cl[-1]/(sum(cl[-200:])/min(200,len(cl)))-1
@@ -80,6 +81,11 @@ def _enrich_kr(kr, d0s):
             sh0,sh12=T.num(a1.get("LIST_SHRS")),T.num(a12.get("LIST_SHRS"))
             if c1 and c12 and not (sh0 and sh12 and abs(sh0/sh12-1)>0.10): mom=c1/c12-1
         near52=(r["px"]/hi52-1) if (hi52 and r.get("px")) else None
+        # 컨센서스 목표주가·투자의견 (KR: recommMean 높을수록 매수)
+        cons=r.get("cons") or {}
+        tp=T.num(cons.get("priceTargetMean")); rec=T.num(cons.get("recommMean"))
+        upside=(tp/r["px"]-1) if (tp and tp>0 and r.get("px")) else None
+        recn=((rec-1)/4*100) if rec is not None else None
         # 실측 G/Q + 하드컷
         revg,opg=_yoy(fn.get("매출액")),_yoy(fn.get("영업이익"))
         la,le=_last(fn.get("매출액")),fn.get("매출액_E")
@@ -89,10 +95,11 @@ def _enrich_kr(kr, d0s):
         op3=[v for v in (fn.get("영업이익") or []) if v is not None]
         r.update(fper=fper,per=per,pbr=pbr,divy=divy,mom=mom,near52=near52,
                  roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
-                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")), vs200=r.get("ma200"))
+                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")), vs200=r.get("ma200"),
+                 tp=tp, rec=rec, upside=upside, recn=recn)
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
-        r.pop("tot",None); r.pop("fin",None); kr[i]=r
+        r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); kr[i]=r
     _score(kr,"c",{"val":[lambda r:(-r["fper"] if r.get("fper") else None),
                           lambda r:(-r["pbr"] if r.get("pbr") and r["pbr"]>0 else None),
                           lambda r:r.get("divy")],
@@ -128,7 +135,10 @@ def _enrich_us(us):
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
                 return {**r,"sector":ap.get("sector"),"de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
                         "roe":v(fdd.get("returnOnEquity")),"revg":v(fdd.get("revenueGrowth")),
-                        "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow"))}
+                        "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow")),
+                        "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
+                        "tplo":v(fdd.get("targetLowPrice")),"rec":v(fdd.get("recommendationMean")),
+                        "nan":v(fdd.get("numberOfAnalystOpinions"))}
             except Exception:
                 time.sleep(0.5*(att+1))
         return r
@@ -138,6 +148,10 @@ def _enrich_us(us):
         r["g_new"]=(sum(gg)/len(gg) if gg else None); r["growth"]=r["g_new"]
         r["fcfy"]=(r["fcf"]/r["cap"]) if (r.get("fcf") and r.get("cap")) else None
         r["isfin"]="Financial" in (r.get("sector") or "")
+        # 컨센서스 목표주가·투자의견 (US: recommendationMean 낮을수록 매수)
+        tp=r.get("tp"); rec=r.get("rec")
+        r["upside"]=(tp/r["px"]-1) if (tp and tp>0 and r.get("px")) else None
+        r["recn"]=((5-rec)/4*100) if rec is not None else None
         r.pop("fcf",None)
         r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap")
         us[i]=r
@@ -148,6 +162,27 @@ def _enrich_us(us):
                    "mom":[lambda r:r.get("w52"), lambda r:r.get("hi52"), lambda r:r.get("vs200")],
                    "qly":[lambda r:r.get("roe"), lambda r:r.get("fcfy"),
                           lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
+
+def _tp_history(rows):
+    """종목별 목표주가를 날짜별로 누적(tp_history.json)하고, ~30일 전 대비 리비전(tp_rev)을 계산."""
+    H=T.load_db("tp_history") or {}
+    hist=H.get("hist") or {}
+    tds=date.today().isoformat()
+    for r in rows:
+        tp=r.get("tp")
+        if tp is None or tp<=0: continue
+        hist.setdefault(r["c"],{})[tds]=round(tp,2)
+    for c in list(hist):                       # 종목별 최근 90일만 보관
+        d=hist[c]
+        if len(d)>90:
+            for k in sorted(d)[:-90]: d.pop(k,None)
+    cutoff=(date.today()-timedelta(days=30)).isoformat()
+    for r in rows:                             # 목표주가 상향/하향 추세
+        d=hist.get(r["c"]) or {}; ks=sorted(d)
+        if r.get("tp") and len(ks)>=2:
+            base=next((d[k] for k in ks if k>=cutoff), d[ks[0]])
+            r["tp_rev"]=(r["tp"]/base-1) if base else None
+    T.save_db("tp_history",{"hist":hist})
 
 def build():
     today=date.today()
@@ -209,6 +244,8 @@ def build():
     except Exception as e: print("[pool] KR enrich 실패:", repr(e)[:80])
     try: _enrich_us(us)
     except Exception as e: print("[pool] US enrich 실패:", repr(e)[:80])
+    try: _tp_history(kr+us)
+    except Exception as e: print("[pool] tp_history 실패:", repr(e)[:80])
     _pd=T.kr_price_date()
     out={"asof":T.now_kst(),"price_date":_pd,
          "kr":sorted(kr,key=lambda r:-(r["cap"] or 0)),
