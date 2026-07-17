@@ -110,6 +110,10 @@ def _enrich_kr(kr, d0s):
 
 def _enrich_us(us):
     """미국 전종목 실측 재무: 캐시 quotes(V·M) + quoteSummary(실측 G/Q·하드컷)."""
+    prev={}
+    try:
+        for r in (T.load_db("screener_pool") or {}).get("us",[]): prev[r.get("c")]=r
+    except Exception: pass
     uq=f"{T.CACHE}/us_quotes.json"; qmap={}
     if os.path.exists(uq):
         for q in json.load(open(uq)):
@@ -157,6 +161,26 @@ def _enrich_us(us):
                 time.sleep(0.5*(att+1))
         return r
     us2=T.pmap(yqs, us, workers=6)
+    # 갭필: quoteSummary 실패분(assetProfile 미수신 = 'sector' 키 없음)을 저동시성으로 여러 라운드 재시도
+    by={r["c"]:r for r in us2}
+    for rnd in range(4):
+        miss=[by[c] for c in by if "sector" not in by[c]]
+        if not miss: break
+        time.sleep(2)
+        for r in T.pmap(yqs, miss, workers=3): by[r["c"]]=r
+    ok=sum(1 for c in by if "sector" in by[c])
+    print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
+    # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
+    CF=("sector","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg")
+    cf=0
+    for c in by:
+        if "sector" not in by[c] and c in prev:
+            p=prev[c]
+            for k in CF:
+                if p.get(k) is not None: by[c][k]=p.get(k)
+            if "sector" in by[c]: by[c]["_cf"]=True; cf+=1
+    if cf: print(f"[pool] US carry-forward {cf}종(직전 풀 값 이월)")
+    us2=[by[r["c"]] for r in us]
     for i,r in enumerate(us2):
         gg=[min(x,3.0) for x in (r.get("revg"),r.get("epsg")) if x is not None]
         r["g_new"]=(sum(gg)/len(gg) if gg else None); r["growth"]=r["g_new"]
