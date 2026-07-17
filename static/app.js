@@ -755,6 +755,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   // 아직 업로드 전이면 404 → onerror 로 조용히 숨긴다(레이아웃 안 깨짐).
   const SP=n=>n?`<img class="spk" src="/charts/spark_${n}.png" loading="lazy" alt=""
       onerror="this.style.display='none'">`:'';
+  // (2026-07-17) 행에 chart 경로가 있으면 그걸 우선 사용 — 테마/반도체 표의 spark_etf_<빈값> 404 근본 수정
+  const SPC=(r,fb)=>(r&&r.chart)?`<img class="spk" src="/${String(r.chart).replace(/^\//,'')}" loading="lazy" alt=""
+      onerror="this.style.display='none'">`:SP(fb);
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
@@ -864,13 +867,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   T('d_theme',TH,(M.korea_theme_rows||[]).map(r=>
     [`<b>${E(r.theme||'')}</b>`,`<span class="note">${E(TE[r.theme]||r.etf||'')}</span>`,
      `<span class="num">${N(r.current)}</span>`,P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),
-      P(r['6mo_pct']),P(r['1y_pct']),SP('etf_'+(r.code||r.symbol||''))]));
+      P(r['6mo_pct']),P(r['1y_pct']),SPC(r,'etf_'+(r.code||r.symbol||''))]));
   $$('d_theme_c').innerHTML=E(M.korea_themes_comment||'');
 
   const SH=['종목','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
   const srow=r=>[`<b>${E(r.name||'')}</b> <span class="note">${E(r.code||r.symbol||'')}</span>`,
     `<span class="num">${N(r.current)}</span>`,P(r['1d_pct']),P(r['1w_pct']),P(r['1mo_pct']),P(r['3mo_pct']),
-    P(r['6mo_pct']),P(r['1y_pct']),SP('etf_'+(r.code||r.symbol||'')),`<span class="note">${E(r.trend||'')}</span>`];
+    P(r['6mo_pct']),P(r['1y_pct']),SPC(r,'etf_'+(r.code||r.symbol||'')),`<span class="note">${E(r.trend||'')}</span>`];
   T('d_semis',SH,(M.semi_ai_stocks||[]).map(srow));
   $$('d_semis_c').innerHTML=E(M.semi_ai_stocks_comment||'');
   T('d_semie',SH,(M.semi_ai_etfs||[]).map(srow));
@@ -956,7 +959,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             ${x.desc?`<br><span class="note">${E(x.desc)}</span>`:''}</td>
           <td class="num">${N(x.current)}</td><td>${P(x['1d_pct']??x.prev_pct)}</td><td>${P(x['1w_pct'])}</td>
           <td>${P(x['1mo_pct'])}</td><td>${P(x['3mo_pct'])}</td><td>${P(x['6mo_pct'])}</td><td>${P(x['1y_pct'])}</td>
-          <td>${SP(x.symbol?('c_'+x.symbol):'')}</td>
+          <td>${(()=>{const s=x.symbol||x.code||((String(x.name||'').match(/\(([A-Za-z]{2,6})\)/)||[])[1]||'');return SP(s?String(s).toLowerCase():'');})()}</td>
           <td class="note">${E(x.trend||'')}</td></tr>`).join('')}</table></div>`:'';})()}
     </div>`).join('') + (NF.comment?`<div class="lead">${E(NF.comment)}</div>`:'');
 
