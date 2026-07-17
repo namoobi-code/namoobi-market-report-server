@@ -1129,7 +1129,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
       rev:{label:'리비전',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['상향(0% ↑)',0],['5% ↑',5],['10% ↑',10]],def:[null,null]},
       nan:{label:'애널리스트수',fixed:'— (KR 미제공)'},
-      cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
+      cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'},
+      per:{label:'PER',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['10배 ↓',null,10],['15배 ↓',null,15],['20배 ↓',null,20]],def:[null,null]},
+      pbr:{label:'PBR',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['1배 ↓',null,1],['2배 ↓',null,2],['3배 ↓',null,3]],def:[null,null]},
+      divy:{label:'배당',fmt:v=>v.toFixed(1)+'%',min:1,presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]],def:[null,null]},
+      grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
+      mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
+      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]}
     },
     us:{
       cap:{label:'시가총액',fmt:usdF,presets:[['전체',null,null],['$200B ↑',2e11,null],['$10~200B',1e10,2e11],['$2~10B',2e9,1e10],['$300M~2B',3e8,2e9],['$300M ↓',null,3e8]],def:[2e9,null]},
@@ -1145,10 +1152,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
       rev:{label:'리비전',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['상향(0% ↑)',0],['5% ↑',5],['10% ↑',10]],def:[null,null]},
       nan:{label:'애널리스트수',fmt:v=>v.toFixed(0)+'명',min:1,reqData:1,presets:[['전체',null],['1명 ↑',1],['3명 ↑',3],['10명 ↑',10]],def:[null,null]},
-      cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
+      cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'},
+      per:{label:'PER',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['10배 ↓',null,10],['15배 ↓',null,15],['20배 ↓',null,20]],def:[null,null]},
+      pbr:{label:'PBR',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['1배 ↓',null,1],['2배 ↓',null,2],['3배 ↓',null,3]],def:[null,null]},
+      divy:{label:'배당',fmt:v=>v.toFixed(1)+'%',min:1,presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]],def:[null,null]},
+      grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
+      mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
+      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]}
     }
   };
-  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','rev','nan','cov'];
+  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','rev','nan','cov','per','pbr','divy','grw','mom','hi','v200'];
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1168,9 +1182,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         if(k==='cov' && r.tp==null) return false;
         continue; }
       if(f.fin && r.isfin) continue;   // 금융업 면제
+      const _hi=(mkt==='kr'?r.near52:r.hi52);
       let v=k==='cap'?r.cap:k==='tv'?r.tv:k==='px'?r.px:k==='age'?ageOf(r):k==='de'?r.de:k==='cr'?r.cr:
             k==='upside'?(r.upside!=null?r.upside*100:null):k==='rec'?r.recn:k==='nan'?r.nan:
-            k==='rev'?(r.rev!=null?r.rev*100:null):null;
+            k==='rev'?(r.rev!=null?r.rev*100:null):
+            k==='per'?(mkt==='kr'?r.fper:r.fpe):k==='pbr'?(mkt==='kr'?r.pbr:r.pb):k==='divy'?r.divy:
+            k==='grw'?(r.g_new!=null?r.g_new*100:null):
+            k==='mom'?(mkt==='kr'?(r.mom!=null?r.mom*100:null):r.w52):
+            k==='hi'?(_hi!=null?_hi*100:null):k==='v200'?(r.vs200!=null?r.vs200*100:null):null;
       if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }  // 데이터 필수 필터: 값 없으면 제외
       if(st.min!=null && v<st.min) return false;
       if(st.max!=null && v>st.max) return false; }
@@ -1313,7 +1332,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_fltbar2').querySelectorAll('[data-man2]').forEach(inp=>inp.oninput=()=>{const k=inp.dataset.man2;const f=DEF2[mkt][k];F2[k].v=inp.value===''?null:(+inp.value)*f.u;
       const bt=$('scr_fltbar2').querySelector(`[data-chip2="${k}"]`); if(bt){bt.innerHTML=chipLabel2(k);bt.classList.toggle('act',F2[k].v!=null);} rankTbl();});
   }
-  function renderS2(){ renderWPanel(); renderChips2(); rankTbl(); }
+  function renderS2(){ renderWPanel(); rankTbl(); }   /* 원자료 하드컷은 1단계로 이동 */
   const zClass=z=>z==null?'':(z>=1.5?'zc2':z>=0.5?'zc1':z<=-1.5?'zn2':z<=-0.5?'zn1':'');
   const zFmt=z=>z==null?'—':(z>0?'+':'')+z.toFixed(2);
   function renderWPanel(){
@@ -1346,7 +1365,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function rankTbl(){
     const nOn=AX.filter(a=>ON[a[0]]).length;
-    let rows=S2[mkt].filter(pass).filter(pass2).map(r=>{let sw=0,sz=0,n=0;
+    let rows=S2[mkt].filter(pass).map(r=>{let sw=0,sz=0,n=0;
       for(const[k]of AX){ if(!ON[k])continue; const z=r['z_'+k]; if(z==null)continue; sw+=W[k]; sz+=W[k]*z; n++; }
       return Object.assign({},r,{rscore:(nOn>0&&n>=Math.min(3,nOn))?sz/sw:null});  // 축 3개↑면 최소3 유효, 그 이하면 켠 축 전부 필요
     });
