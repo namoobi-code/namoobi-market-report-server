@@ -214,12 +214,28 @@ def _tp_history(rows):
         d=hist[c]
         if len(d)>90:
             for k in sorted(d)[:-90]: d.pop(k,None)
-    cutoff=(date.today()-timedelta(days=30)).isoformat()
-    for r in rows:                             # 목표주가 상향/하향 추세
-        d=hist.get(r["c"]) or {}; ks=sorted(d)
-        if r.get("tp") and len(ks)>=2:
-            base=next((d[k] for k in ks if k>=cutoff), d[ks[0]])
-            r["tp_rev"]=(r["tp"]/base-1) if base else None
+    cutoff=(date.today()-timedelta(days=90)).isoformat()
+    for r in rows:                             # 목표주가 추세: 90일 구간 순증감 + 상향 '꾸준함'
+        d=hist.get(r["c"]) or {}
+        ks=[k for k in sorted(d) if k>=cutoff]
+        if not r.get("tp") or len(ks)<2:
+            r["tp_rev"]=None; r["tp_trend"]=None; continue
+        seq=[d[k] for k in ks]
+        levels=[seq[0]]                        # 유의미한 변경만 남긴 계단열
+        for p in seq[1:]:
+            if levels[-1] and abs(p-levels[-1])/levels[-1]>1e-4: levels.append(p)
+        r["tp_rev"]=(levels[-1]/levels[0]-1) if levels[0] else None
+        if len(levels)<2:
+            r["tp_trend"]="flat"
+        else:
+            diffs=[levels[i+1]-levels[i] for i in range(len(levels)-1)]
+            ups=sum(1 for x in diffs if x>0); downs=sum(1 for x in diffs if x<0)
+            net=r["tp_rev"] or 0
+            if   ups>=1 and downs==0: r["tp_trend"]="up_steady"    # 꾸준상승(하향 0회)
+            elif downs>=1 and ups==0: r["tp_trend"]="down_steady"  # 꾸준하락
+            elif net>0.001:  r["tp_trend"]="up"
+            elif net<-0.001: r["tp_trend"]="down"
+            else: r["tp_trend"]="flat"
     T.save_db("tp_history",{"hist":hist})
 
 def build():

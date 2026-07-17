@@ -1231,7 +1231,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(key==='upside'){const v=r.upside; return v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
     if(key==='recn'){const v=r.recn; if(v==null)return '<span class="note">—</span>'; const lab=v>=85?'강력매수':v>=65?'매수':v>=45?'중립':'매도'; return `${v.toFixed(0)} <span class="note">${lab}</span>`;}
     if(key==='nan'){const v=r.nan; return v==null?'<span class="note">—</span>':v.toFixed(0)+'명';}
-    if(key==='tp_rev'){const v=r.tp_rev; return v==null?'<span class="note">누적중</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
+    if(key==='tp_rev'){const v=r.tp_rev; if(v==null) return '<span class="note">누적중</span>';
+      const t=r.tp_trend, ar=t==='up_steady'?'⇈':t==='up'?'↑':t==='down_steady'?'⇊':t==='down'?'↓':'→';
+      const cls=v>0?'up':(v<0?'dn':'note'), tt=t==='up_steady'?'꾸준상승':t==='down_steady'?'꾸준하락':'';
+      return `<span class="${cls}" title="${tt}">${ar} ${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
     if(key==='age'){const a=ageOf(r); return a==null?'—':a+'년';}
     return '';
   }
