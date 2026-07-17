@@ -163,11 +163,11 @@ def _enrich_us(us):
     us2=T.pmap(yqs, us, workers=6)
     # 갭필: quoteSummary 실패분(assetProfile 미수신 = 'sector' 키 없음)을 저동시성으로 여러 라운드 재시도
     by={r["c"]:r for r in us2}
-    for rnd in range(4):
+    for rnd in range(2):
         miss=[by[c] for c in by if "sector" not in by[c]]
         if not miss: break
         time.sleep(2)
-        for r in T.pmap(yqs, miss, workers=3): by[r["c"]]=r
+        for r in T.pmap(yqs, miss, workers=5): by[r["c"]]=r
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
