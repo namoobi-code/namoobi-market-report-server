@@ -94,6 +94,9 @@ def _enrich_kr(kr, d0s):
         tp=T.num(cons.get("priceTargetMean")); rec=T.num(cons.get("recommMean"))
         upside=(tp/r["px"]-1) if (tp and tp>0 and r.get("px")) else None
         recn=((rec-1)/4*100) if rec is not None else None
+        frgn=T.num(t.get("foreignRate"))                    # 외국인 소진율(%)
+        _dv,_ep=T.num(t.get("dividend")),T.num(t.get("eps")) # 배당성향 = 주당배당/EPS
+        payout=(_dv/_ep) if (_dv is not None and _ep and _ep>0) else None
         # 실측 G/Q + 하드컷
         revg,opg=_yoy(fn.get("매출액")),_yoy(fn.get("영업이익"))
         la,le=_last(fn.get("매출액")),fn.get("매출액_E")
@@ -104,7 +107,7 @@ def _enrich_kr(kr, d0s):
         r.update(fper=fper,per=per,pbr=pbr,divy=divy,mom=mom,near52=near52,
                  roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
                  op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")), vs200=r.get("ma200"),
-                 tp=tp, rec=rec, upside=upside, recn=recn)
+                 tp=tp, rec=rec, upside=upside, recn=recn, frgn=frgn, payout=payout)
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
         r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); kr[i]=r
@@ -160,11 +163,11 @@ def _enrich_us(us):
         for att in range(3):
             try:
                 j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
-                         f"?modules=financialData,assetProfile,earningsTrend&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                         f"?modules=financialData,assetProfile,earningsTrend,summaryDetail&crumb={_up.quote(crumb)}",opener=op,timeout=12)
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
-                fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{})
+                fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{}); sd=fd.get("summaryDetail",{})
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
-                return {**r,"sector":ap.get("sector"),"de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
+                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),"de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
                         "roe":v(fdd.get("returnOnEquity")),"revg":v(fdd.get("revenueGrowth")),
                         "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow")),
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
@@ -185,7 +188,7 @@ def _enrich_us(us):
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
-    CF=("sector","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","eps_rev")
+    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","eps_rev")
     cf=0
     for c in by:
         if "sector" not in by[c] and c in prev:

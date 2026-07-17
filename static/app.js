@@ -1136,7 +1136,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
-      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]}
+      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]},
+      roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
+      mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
+      ogrw:{label:'영익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      frgn:{label:'외인소진율',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
+      payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     },
     us:{
       cap:{label:'시가총액',fmt:usdF,presets:[['전체',null,null],['$200B ↑',2e11,null],['$10~200B',1e10,2e11],['$2~10B',2e9,1e10],['$300M~2B',3e8,2e9],['$300M ↓',null,3e8]],def:[2e9,null]},
@@ -1159,10 +1164,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
-      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]}
+      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]},
+      roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
+      mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
+      ogrw:{label:'EPS성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      frgn:{label:'외인소진율',fixed:'— (US 미제공)'},
+      payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
   };
-  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','rev','nan','cov','per','pbr','divy','grw','mom','hi','v200'];
+  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','rev','nan','cov','per','pbr','divy','grw','mom','hi','v200','roe','mgrw','ogrw','frgn','payout'];
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1189,7 +1199,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             k==='per'?(mkt==='kr'?r.fper:r.fpe):k==='pbr'?(mkt==='kr'?r.pbr:r.pb):k==='divy'?r.divy:
             k==='grw'?(r.g_new!=null?r.g_new*100:null):
             k==='mom'?(mkt==='kr'?(r.mom!=null?r.mom*100:null):r.w52):
-            k==='hi'?(_hi!=null?_hi*100:null):k==='v200'?(r.vs200!=null?r.vs200*100:null):null;
+            k==='hi'?(_hi!=null?_hi*100:null):k==='v200'?(r.vs200!=null?r.vs200*100:null):
+            k==='roe'?(r.roe!=null?(mkt==='kr'?r.roe:r.roe*100):null):
+            k==='mgrw'?(r.revg!=null?r.revg*100:null):
+            k==='ogrw'?((mkt==='kr'?r.opg:r.epsg)!=null?((mkt==='kr'?r.opg:r.epsg)*100):null):
+            k==='frgn'?r.frgn:k==='payout'?(r.payout!=null?r.payout*100:null):null;
       if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }  // 데이터 필수 필터: 값 없으면 제외
       if(st.min!=null && v<st.min) return false;
       if(st.max!=null && v>st.max) return false; }
@@ -1283,7 +1297,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['성장','매출·EPS 전년동기比 성장률(Yahoo)'],
         ['추세','52주 주가 변화율(가격 모멘텀)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
-        ['200일선','200일 이동평균 대비 현재가(장기 추세 위치)']
+        ['200일선','200일 이동평균 대비 현재가(장기 추세 위치)'],
+        ['ROE','자기자본이익률(순이익÷자기자본). 수익성 핵심'],
+        ['매출성장','매출 전년동기比 성장률(Yahoo)'],
+        ['EPS성장','주당순이익 전년동기比 성장률(Yahoo)'],
+        ['배당성향','배당금÷순이익(payout ratio). 순이익 중 배당 비율']
       ] : [
         ['건전성 신호','200일 이동평균 대비 −30% 미만(심각한 하락추세) 종목 제외'],
         ['유동비율(당좌)','당좌자산÷유동부채 — 단기 지급능력. 금융업 면제'],
@@ -1293,7 +1311,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['성장','매출·영업이익 전년동기比 실측 성장률 평균'],
         ['추세','12−1개월 주가 모멘텀(장기 상승 강도)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
-        ['200일선','200일 이동평균 대비 현재가(장기 추세 위치)']
+        ['200일선','200일 이동평균 대비 현재가(장기 추세 위치)'],
+        ['ROE','자기자본이익률(순이익÷자기자본). 수익성 핵심, 높을수록 좋음'],
+        ['매출성장','매출액 전년동기比 성장률'],
+        ['영익성장','영업이익 전년동기比 성장률'],
+        ['외인소진율','외국인 보유 비중(%). 높으면 외국인 선호도 큼'],
+        ['배당성향','주당배당÷EPS. 순이익 중 배당으로 나가는 비율']
       ];
       rn.innerHTML='<b style="color:var(--tx)">필터 설명</b><br>'+g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');
     }}
