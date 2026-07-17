@@ -1373,6 +1373,32 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   function refresh(){ if(stage===1) apply(); else if(stage===2) renderS2(); else renderS3(); }
 
+  // ── 스크리너 상태 저장·복원 (새로고침에도 필터 유지) ──
+  function saveScr(){ try{
+    sessionStorage.setItem('nmr_scr', JSON.stringify({mkt,stage,topN,topN3,sort,sort2,F_ST,F2_ST,W,ON}));
+  }catch(e){} }
+  function restoreScr(){ try{
+    const d=JSON.parse(sessionStorage.getItem('nmr_scr')||'null'); if(!d) return false;
+    if(d.mkt) mkt=d.mkt; if(d.stage) stage=d.stage;
+    if(typeof d.topN==='number') topN=d.topN; if(typeof d.topN3==='number') topN3=d.topN3;
+    if(d.sort) sort=d.sort; if(d.sort2) sort2=d.sort2;
+    if(d.F_ST) Object.assign(F_ST,d.F_ST); if(d.F2_ST) Object.assign(F2_ST,d.F2_ST);
+    if(d.W) W=d.W; if(d.ON) ON=d.ON;
+    return true;
+  }catch(e){ return false; } }
+  function applyRestored(){
+    document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x.dataset.mkt===mkt));
+    document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',+x.dataset.stg===stage));
+    $('scr_s1').style.display = stage===1?'':'none';
+    $('scr_s2').style.display = stage===2?'':'none';
+    $('scr_s3').style.display = stage===3?'':'none';
+    loadF(); loadF2();
+    if(stage===2) loadS2(()=>renderS2());
+    else if(stage===3) loadS3(()=>renderS3());
+    else apply();
+  }
+  window.addEventListener('beforeunload', saveScr);
+
   window.renderScreener=function(){
     if(!loaded){
       loaded=true;
@@ -1381,7 +1407,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         d=d||{}; POOL={kr:d.kr||[],us:d.us||[]};
         $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
         {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
-        resetF(); apply();
+        if(restoreScr()) applyRestored(); else { resetF(); apply(); }
       }).catch(e=>{ $('scr_asof').textContent='풀 로드 실패: '+e; });
     } else { refresh(); }
   };
