@@ -1273,9 +1273,30 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       (rows.length>400?`<tr><td colspan="${cols.length+1}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
     $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
-    {const rn=$('scr_revnote'); if(rn) rn.innerHTML = mkt==='us'
-      ? '<b>리비전</b> = EPS 추정치 90일 변화율(FY1+FY2), Yahoo에서 즉시 <span class="note">(예: NVDA ↑+11.1% · GOOGL +16.2% · INTC +81.7%)</span>'
-      : '<b>리비전</b> = 목표주가 90일 변화율, 누적/백필 기반 <span class="note">(예: 삼성전자 ⇈+72% · SK하이닉스 ⇈+104% — 메모리 슈퍼사이클 실제 상향)</span>';}
+    {const rn=$('scr_revnote'); if(rn){
+      const g = mkt==='us' ? [
+        ['건전성 신호','200일 이동평균 대비 −30% 미만(심각한 하락추세) 종목 제외'],
+        ['유동비율','유동자산÷유동부채(current ratio) — 단기 지급능력. 금융업 면제'],
+        ['리비전','EPS 추정치 90일 변화율(FY1+FY2), Yahoo에서 즉시 — 애널리스트 상향세 (예: NVDA ↑+11%)'],
+        ['PER','forward P/E(예상 순이익 대비 주가). 낮을수록 저평가'],
+        ['PBR','P/B(순자산 대비 주가). 낮을수록 저평가'],
+        ['성장','매출·EPS 전년동기比 성장률(Yahoo)'],
+        ['추세','52주 주가 변화율(가격 모멘텀)'],
+        ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
+        ['200일선','200일 이동평균 대비 현재가(장기 추세 위치)']
+      ] : [
+        ['건전성 신호','200일 이동평균 대비 −30% 미만(심각한 하락추세) 종목 제외'],
+        ['유동비율(당좌)','당좌자산÷유동부채 — 단기 지급능력. 금융업 면제'],
+        ['리비전','목표주가 90일 변화율(누적/백필) — 애널리스트 상향세 (예: 삼성전자 ⇈+72%, 메모리 슈퍼사이클 실제 상향)'],
+        ['PER','추정 주가수익비율(순이익 대비 주가). 낮을수록 저평가'],
+        ['PBR','주가순자산비율(순자산 대비 주가). 낮을수록 저평가'],
+        ['성장','매출·영업이익 전년동기比 실측 성장률 평균'],
+        ['추세','12−1개월 주가 모멘텀(장기 상승 강도)'],
+        ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
+        ['200일선','200일 이동평균 대비 현재가(장기 추세 위치)']
+      ];
+      rn.innerHTML='<b style="color:var(--tx)">필터 설명</b><br>'+g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');
+    }}
   }
   function apply(){ applyTable(); renderChips(); }
 
