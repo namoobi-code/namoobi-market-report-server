@@ -462,7 +462,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
 
   /* ── KRX ── */
   const kx=b.krx_brief?.data;
-  if(kx) $('krx').innerHTML='<div class="note" style="grid-column:1/-1;margin-bottom:2px">업데이트: 매 실행 KRX 게시판 최신 회차 자동 조사 — 신규 회차 게시 시 갱신(주말·휴장일은 직전 거래일 회차)</div>'+
+  if(kx) $('krx').innerHTML='<div class="note" style="grid-column:1/-1;margin-bottom:2px">🖥 서버 자체 수집 — 매일 2회(06:35·15:35 KST) KRX 게시판 최신 회차 자동 조사 + 리포트 실행 시 회차 체크(주말·휴장일은 직전 거래일 회차)</div>'+
     Object.entries(kx).filter(([k])=>k==='krx'||k==='short').map(([k,v])=>{
       const pfx=k==='krx'?'krx_brief':'short_brief', dir=`${k==='krx'?'krx':'short'}_${v.att_seq}`;
       let imgs='';
@@ -561,24 +561,52 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     series_mem_nand_contract:'NAND 고정거래가(계약가) 시계열 (3.1.9)',
     series_mem_nand_spot:'NAND 현물가 시계열 (3.1.9)',
     series_us10y_daily:'미국 10년물 국채금리 일별 시계열 (3.1.1 차트)',
-    series_us2y_daily:'미국 2년물 국채금리 일별 시계열 (3.1.1 차트)'};
+    series_us2y_daily:'미국 2년물 국채금리 일별 시계열 (3.1.1 차트)',
+    series_semi_status:'반도체 사이클 3신호 판정상태 타임라인 — 0안전/1주의/2경보 (3.1.11 차트)',
+    ta_stage1:'TradingAgents 1단계 — 유니버스·거래가능성 하드컷 통과 종목 (한국·미국)',
+    ta_stage2:'TradingAgents 2단계 — 4축 z-score 랭킹 (축별 표준화 점수·종합)',
+    ta_stage3:'TradingAgents 3단계 — 실측 재무 팩터 후보 번들 (/namoobi-trading-agents 토론 입력)',
+    ta_calls:'TradingAgents 판정 기록 — 회차별 토론 채택/관망/탈락 (/namoobi-trading-agents 실행 시 기록)',
+    ta_verdict:'TradingAgents 최종 판정 — 리스크 심사 결과·승인 종목·가격 스냅샷 (스킬 실행 시 기록)',
+    ta_perf:'TradingAgents 5단계 성과추적 — 판정 종목 경과 수익률·벤치마크 α (탈락 포함, 생존편향 방지)',
+    ta_status:'TradingAgents 스크리닝 파이프라인 실행 상태·회차 로그',
+    ta_flag:'TradingAgents 스크리닝 완료 플래그 — 거래일·완료 여부'};
+  // (2026-07-17) 수집 주체 — 🖥 서버 cron 자체 수집(리포트 실행과 무관하게 최신) vs 📄 리포트 실행 시 수집
+  const SRV={customs:'06:35·15:35',leading:'06:35·15:35',series_leading:'06:35·15:35',krx_brief:'06:35·15:35',
+    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',
+    series_mem_dram_spot:'06:45·15:45',series_mem_dram_contract:'06:45·15:45',series_mem_nand_spot:'06:45·15:45',
+    series_mem_nand_contract:'06:45·15:45',series_mem_hbm_asp:'06:45·15:45',series_mem_hbm_share:'06:45·15:45',
+    series_mem_hbm_ddr5_gap:'06:45·15:45',series_mem_leading_px:'06:45·15:45',series_mem_mem_vs_gpu:'06:45·15:45',
+    ta_stage1:'06:50·15:50',ta_stage2:'06:50·15:50',ta_stage3:'06:50·15:50',ta_status:'06:50·15:50',ta_flag:'06:50·15:50',ta_perf:'07:10'};
   const inv=Object.keys(b).filter(k=>k!=='_poll').sort().map(k=>{
     const d=b[k],dat=d?.data; let n='—',kind='—';
     if(Array.isArray(dat)&&dat.length&&Array.isArray(dat[0])){kind='시계열';n=dat.length+'점';}
     else if(Array.isArray(dat)){kind='표';n=dat.length+'행';}
     else if(dat&&typeof dat==='object'){kind='복합';n=Object.keys(dat).length+'키';}
+    else if(!dat&&d&&typeof d==='object'){ // (2026-07-17) data 래퍼 없는 파일(ta_* 등) — 최상위 구조로 판정
+      const ks=Object.keys(d).filter(x=>x!=='as_of'&&x!=='marker');
+      const arr=ks.map(x=>d[x]).find(v=>Array.isArray(v)&&v.length);
+      if(arr){kind='복합';n=ks.length+'키·'+arr.length+'행';} else if(ks.length){kind='복합';n=ks.length+'키';} }
     // (2026-07-12) 기준일 자동 폴백 — as_of 공란이면 marker(날짜꼴) → 시계열 최신일 → '—'
     let ao=d?.as_of;
     if(!ao){ const mk2=String(d?.marker||'').slice(0,10);
       if(/^\d{4}-\d{2}-\d{2}$/.test(mk2)) ao=mk2;
       else if(Array.isArray(dat)&&dat.length&&Array.isArray(dat[0])){ const l=String(dat[dat.length-1][0]).slice(0,10); if(/^\d{4}-\d{2}-\d{2}$/.test(l)) ao=l; } }
-    return {k,kind,n,asof:ao||'—',desc:DESC[k]||''};
+    return {k,kind,n,asof:ao||'—',desc:DESC[k]||'',srv:SRV[k]||null};
   });
   // (2026-07-12) 좌측 사이드바 컴팩트 — 항목당 2줄(1줄: 이름+형태·규모·기준일 / 2줄: 설명)
+  // (2026-07-17) 수집주체 배지 + as_of 자동 최신화(10분 주기 /api/domains 재조회)
   $('inv').innerHTML=inv.map(r=>`<div class="it">
-    <div class="l1"><b>${esc(r.k)}</b><span class="m">${r.kind} ${r.n} · ${esc(r.asof)}</span></div>
-    <div class="l2">${esc(r.desc)}</div></div>`).join('');
-  $('inv_n').textContent=`${inv.length}종 전량`;
+    <div class="l1"><b>${esc(r.k)}</b><span class="m">${r.srv?'🖥':'📄'} ${r.kind} ${r.n} · <span data-inv="${esc(r.k)}">${esc(r.asof)}</span></span></div>
+    <div class="l2">${r.srv?'<b style="color:#2f6fd0">서버 자체 수집 '+r.srv+' KST</b> · ':''}${esc(r.desc)}</div></div>`).join('');
+  const nSrv=inv.filter(r=>r.srv).length;
+  $('inv_n').textContent=`${inv.length}종 (🖥 서버 자체 수집 ${nSrv} · 📄 리포트 실행 수집 ${inv.length-nSrv})`;
+  async function refreshInv(){ try{
+    const ds=await (await fetch('/api/domains')).json();
+    ds.forEach(d=>{ const el=document.querySelector(`[data-inv="${d.name}"]`);
+      if(el){ let a=d.as_of||''; if(!a&&/^\d{4}-\d{2}-\d{2}/.test(String(d.marker||''))) a=String(d.marker).slice(0,10); if(a) el.textContent=a; }});
+  }catch(e){} }
+  setInterval(refreshInv, 600000);
 
   /* ── 보고서 (최신 5건만 — 서버는 7일치 보관, 목록은 5건으로 컷) ── */
   $('reports').innerHTML=rs.slice(0,3).map(r=>`<div class="rpt">
@@ -1384,4 +1412,55 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(!t.length){alert('선택된 종목이 없습니다 — 1·2단계 필터를 확인하세요');return;}
     try{navigator.clipboard.writeText(t.join(', '));}catch(e){}
     alert('분석요청 TOP '+t.length+'종 (클립보드 복사됨):\n'+t.join(', ')+'\n\n/namoobi-trading-agents 실행 시 이 종목으로 토론·리스크심사합니다.'); };}
+})();
+
+/* ── 3.1.14 국내 유동성·레버리지 점검판 — /api/krliq (서버 1일 3회 수집) ── */
+(async()=>{
+  const $=i=>document.getElementById(i);
+  if(!$('kl_c1')) return;
+  let D; try{ D=await (await fetch('/api/krliq?days=420')).json(); }catch(e){ return; }
+  const rows=D.daily||[], V=D.verdict;
+  const fd=s=>s.slice(2,4)+'.'+s.slice(4,6)+'.'+s.slice(6);
+  // 판정 배지
+  if(V){
+    const col={'강세':'#0a7d33','중립':'#8a6d00','경계':'#b45309','약세':'#b91c1c'}[V.tone]||'#57606a';
+    $('kl_verdict').innerHTML=
+      `<b style="color:${col}">자동 판정: ${V.label} (${V.tone})</b> — 예탁금 5일 ${V.dep_5d_pct>0?'+':''}${V.dep_5d_pct}% · `+
+      `회전배수 5일 ${V.turn_5d_chg>0?'+':''}${V.turn_5d_chg}p · 기준 ${fd(V.as_of)} (T+2) · `+
+      `<span class="note">예탁금 증감 × 회전배수 방향 2×2: 유입·가동(강세) / 유입·관망(중립) / 이탈·소진성 회전(경계) / 이탈·위축(약세)</span>`;
+  } else $('kl_verdict').textContent='데이터 수집 대기 중 (서버 06:35 / 14:10 / 16:10 KST)';
+  const mk2=(id,labels,sets,o={})=>{const el=$(id); if(!el||!labels.length) return;
+    new Chart(el,{data:{labels,datasets:sets.map(s=>({type:s.bar?'bar':'line',label:s.n,data:s.d,
+      borderColor:s.c,backgroundColor:s.c+(s.bar?'88':''),yAxisID:s.y||'y',
+      borderWidth:s.w||1.6,pointRadius:0,tension:.15,borderDash:s.dash||[],spanGaps:true}))},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        interaction:{intersect:false,mode:'index'},
+        plugins:{legend:{display:true,labels:{boxWidth:10,boxHeight:2,font:{size:9.5},padding:6}}},
+        scales:{x:{ticks:{maxTicksLimit:7,font:{size:9}},grid:{display:false}},
+          y:{position:'left',ticks:{font:{size:9}},grid:{color:'#eef0f3'},beginAtZero:o.y0},
+          y1:{position:'right',ticks:{font:{size:9}},grid:{display:false},beginAtZero:o.y10}}}});};
+  // 일별: [0]date [1]예탁금 [2]미수금 [3]반대매매 [4]비중 [5]신용전체 [6]코스피분 [7]코스닥분 [8]코스피 [9]코스피대금 [10]코스닥 [11]코스닥대금
+  const dep=rows.filter(r=>r[1]!=null), px=rows.filter(r=>r[8]!=null);
+  mk2('kl_c1',dep.map(r=>fd(r[0])),[
+    {n:'예탁금(조원·T+2)',d:dep.map(r=>+(r[1]/1e12).toFixed(2)),c:'#1d4ed8',w:2},
+    {n:'코스피(T+0)',d:dep.map(r=>r[8]),c:'#94a3b8',y:'y1'}]);
+  const tn=dep.filter(r=>r[9]!=null);
+  mk2('kl_c2',tn.map(r=>fd(r[0])),[
+    {n:'회전배수(배)',d:tn.map(r=>+(r[9]/r[1]).toFixed(3)),c:'#ea580c',w:2},
+    {n:'거래대금(조원·T+0)',d:tn.map(r=>+(r[9]/1e12).toFixed(2)),c:'#bfdbfe',bar:1,y:'y1'}],{y10:true});
+  const cr=rows.filter(r=>r[5]!=null);
+  mk2('kl_c3',cr.map(r=>fd(r[0])),[
+    {n:'신용융자잔고(조원·T+2)',d:cr.map(r=>+(r[5]/1e12).toFixed(2)),c:'#7c3aed',w:2},
+    {n:'반대매매(억원·T+2)',d:cr.map(r=>r[3]==null?null:+(r[3]/1e8).toFixed(0)),c:'#fca5a5',bar:1,y:'y1'}],{y10:true});
+  mk2('kl_c4',cr.map(r=>fd(r[0])),[
+    {n:'코스닥 신용(조원·T+2)',d:cr.map(r=>+(r[7]/1e12).toFixed(2)),c:'#7c3aed',w:2},
+    {n:'코스닥 지수(T+0)',d:cr.map(r=>r[10]),c:'#94a3b8',y:'y1'}]);
+  // 월별 YoY
+  const M=D.monthly||[], mi=Object.fromEntries(M.map(r=>[r[0],r]));
+  const yoy=(t,i)=>{const p=mi[String(+t-100)]; return (p&&p[i]&&mi[t][i])?+((mi[t][i]/p[i]-1)*100).toFixed(1):null;};
+  const ts=M.map(r=>r[0]).filter(t=>t>='201601');
+  mk2('kl_c5',ts.map(t=>t.slice(0,4)+'.'+t.slice(4)),[
+    {n:'M2 YoY(%)',d:ts.map(t=>yoy(t,1)),c:'#059669',w:2.2},
+    {n:'KOSPI YoY(%)',d:ts.map(t=>yoy(t,2)),c:'#dc2626',y:'y1'},
+    {n:'KOSDAQ YoY(%)',d:ts.map(t=>yoy(t,3)),c:'#f59e0b',dash:[5,3],y:'y1'}]);
 })();

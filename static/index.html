@@ -277,6 +277,17 @@
       <h3 id="d317">3.1.7 미국 빅테크(M7) 실적 전망</h3><div class="box" style="overflow-x:auto"><table id="d_m7"></table></div>
       <h3 id="d3112">3.1.12 심리·자금흐름 보조지표</h3><div class="box" style="overflow-x:auto"><table id="d_sent"></table></div>
 
+      <h3 id="d3114">3.1.14 국내 유동성·레버리지 점검판<em>서버 1일 3회 자동 수집 (금융위·다음·ECOS)</em></h3>
+      <div class="lead" id="kl_verdict" style="margin-bottom:8px">불러오는 중…</div>
+      <div class="grid g2">
+        <div class="card"><div class="k">① 투자자예탁금(조원·T+2) vs 코스피(T+0)</div><canvas id="kl_c1"></canvas></div>
+        <div class="card"><div class="k">① 예탁금 회전배수 = 거래대금 ÷ 예탁금 (T+2)</div><canvas id="kl_c2"></canvas></div>
+        <div class="card"><div class="k">③ 신용융자잔고(조원·T+2) vs 반대매매금액(억원·미수금 기반)</div><canvas id="kl_c3"></canvas></div>
+        <div class="card"><div class="k">④ 코스닥 신용융자(조원·T+2) vs 코스닥 지수 — 마진콜 조기경보</div><canvas id="kl_c4"></canvas></div>
+      </div>
+      <div class="card" style="margin-top:12px"><div class="k">② M2 YoY vs 코스피·코스닥 YoY (월별 10년 · M2 약 2개월 지연)</div><canvas id="kl_c5"></canvas></div>
+      <div class="note" style="margin-top:8px">반대매매는 위탁매매 미수금(D+2 미납) 기반 공식 통계만 존재. 신용융자 마진콜 반대매매는 공표 통계가 없어 ④ 코스닥 신용잔고 급감으로 간접 추정.</div>
+
       <h2 id="d32">3.2 한국 증시</h2>
       <div class="box" style="overflow-x:auto"><table id="d_kr"></table></div>
       <h3 id="d321">3.2.1 투자자별 수급 동향</h3><div class="grid g2" id="d_kinv"></div>
@@ -287,8 +298,7 @@
       <div class="lead" id="d_semis_c" style="margin-top:10px"></div>
       <h3 id="d323e">반도체·AI ETF</h3><div class="box" style="overflow-x:auto"><table id="d_semie"></table></div>
       <div class="lead" id="d_semie_c" style="margin-top:10px"></div>
-      <h3 id="s32">3.2.4 / 3.2.5 KRX 브리프 (매일 최신 회차 조사)</h3>
-      <div class="grid g2" id="krx"></div>
+      <div class="note" style="margin:6px 0 10px">3.2.4 / 3.2.5 KRX 브리프는 <b>🖥 서버 자체 수집</b>(매일 2회)으로 전환 — <b>DB data</b> 탭에서 확인.</div>
 
       <h2 id="d33">3.3 미국 증시</h2>
       <div class="box" style="overflow-x:auto"><table id="d_us"></table></div>
@@ -504,7 +514,7 @@
   </div>
 
   <div class="grid g2" id="s333" style="margin-top:12px">
-    <div><h3 style="margin-top:0">하이일드(HY) 스프레드 — 美 HY OAS (%)</h3><div class="lead" id="hy_cur"></div></div>
+    <div><h3 style="margin-top:0">하이일드(HY) 스프레드 — 美 HY OAS (%) <span class="note">🖥 서버 매일 2회 + 실행 시 실측</span></h3><div class="lead" id="hy_cur"></div></div>
     <div class="card"><div class="k">ICE BofA US HY OAS — 1년 추이 (%)</div><canvas id="c_hy"></canvas></div>
   </div>
 
@@ -529,7 +539,7 @@
   <h2 id="s314">3.1.4 OECD 경기선행지수 (CLI)<em>17개국 · 기준선 100</em></h2>
   <div class="card"><div class="cbox" style="height:560px"><canvas id="c_cli"></canvas></div><div class="src" id="cli_src"></div></div>
 
-  <h2 id="s315">3.1.5 경기선행지수 순환변동치<em>한국 · 주가 동행 선행지표</em></h2>
+  <h2 id="s315">3.1.5 경기선행지수 순환변동치<em>한국 · 주가 동행 선행지표 · 🖥 서버 매일 2회</em></h2>
   <div class="grid g2">
     <div class="box"><table id="lead"></table></div>
     <div class="card"><div class="k" id="lead_k">순환변동치 추이 (기준 100)</div><canvas id="c_lead"></canvas></div>
@@ -546,12 +556,12 @@
   </div>
   <div class="lead" id="capex_c" style="margin-top:12px"></div>
 
-  <h2 id="s319">3.1.9 메모리 + HBM 지표<em id="mem_asof"></em></h2>
+  <h2 id="s319">3.1.9 메모리 + HBM 지표<em id="mem_asof"></em><em>🖥 서버 매일 2회 06:45·15:45</em></h2>
 
   <h3>① HBM 시장규모 · 수요 증가율</h3>
   <div class="card"><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
 
-  <h3>② HBM ASP 추이 <span class="note">— 매일 08:30 자동 누적</span></h3>
+  <h3>② HBM ASP 추이 <span class="note">— 서버 매일 2회(06:45·15:45) 자동 누적</span></h3>
   <div class="grid g2">
     <div class="box"><table id="asp_t"></table></div>
     <div class="card"><canvas id="c_asp"></canvas></div>
@@ -616,7 +626,7 @@
   <div class="box" style="overflow-x:auto"><table id="meta_t"></table></div>
   <div class="src" style="margin-top:6px">※ '변동 주기'는 수집 주기가 아니라 값이 실제로 바뀌는 주기다. 계약가처럼 월 1회만 바뀌는 값은 추세선이 계단 모양으로 그려지는 것이 정상이다.</div>
 
-  <h2 id="s3110">3.1.10 관세청 수출 잠정치<em>10일 단위</em></h2>
+  <h2 id="s3110">3.1.10 관세청 수출 잠정치<em>10일 단위 · 🖥 서버 매일 2회</em></h2>
   <div class="grid g2">
     <div class="card"><div class="k">전체 수출 — 최근 24개월 (백만 달러)</div><canvas id="c_cus_t"></canvas></div>
     <div class="card"><div class="k">반도체 수출 — 최근 24개월 (백만 달러)</div><canvas id="c_cus_s"></canvas></div>
@@ -637,7 +647,7 @@
   <h3>점검 패널</h3>
   <div class="grid g2" id="semi_panels"></div>
 
-  <h2 id="s3113">3.1.13 파생시장 포지셔닝<em>현물 선행신호 · 롤링 z-score(60일)</em></h2>
+  <h2 id="s3113">3.1.13 파생시장 포지셔닝<em>현물 선행신호 · 롤링 z-score(60일) · 🖥 옵션·VKOSPI=서버 마감캡처(韓 15:48 · 美 06:40)</em></h2>
   <div class="grid g3" id="deriv_idx"></div>
   <h3>값 · z-score 매트릭스 <span class="note">|z| ≥ 1.5 강조</span></h3>
   <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="deriv_t"></table></div>
@@ -646,6 +656,9 @@
     <div class="card"><div class="k">한국 시장 해석</div><div class="s" id="dv_kr"></div></div>
   </div>
   <div class="lead" id="dv_syn" style="margin-top:12px"></div>
+
+  <h2 id="s32">3.2.4 / 3.2.5 KRX 브리프<em>🖥 서버 자체 수집 · 매일 2회 06:35·15:35 KST</em></h2>
+  <div class="grid g2" id="krx"></div>
 
   <h2 id="sberk">버크셔 해서웨이 13F</h2>
   <div class="lead" id="berk_sum"></div>

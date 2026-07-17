@@ -141,6 +141,44 @@ def poll(metric: str, limit: int = 200):
         c.close()
     return [{"ts": r[0], "symbol": r[1], "value": r[2]} for r in reversed(rows)]
 
+KRLIQ = BASE / "data" / "kr_liquidity.db"
+
+@app.get("/api/krliq")
+def krliq(days: int = 420):
+    """3.1.14 국내 유동성·레버리지 — 서버가 1일 3회 수집 (scripts/fetch_kr_liquidity.py).
+    daily: [date, 예탁금, 미수금, 반대매매금액, 반대매매비중%, 신용전체, 신용코스피, 신용코스닥,
+            코스피, 코스피거래대금, 코스닥, 코스닥거래대금]  (금액 원 단위)
+    monthly: [month, M2(십억원), 코스피종가, 코스닥종가]
+    verdict: ① 예탁금 5일 증감 × 회전배수 5일 방향 2×2 자동 판정"""
+    if not KRLIQ.exists():
+        raise HTTPException(404, "kr_liquidity.db not found")
+    c = sqlite3.connect(KRLIQ)
+    try:
+        daily = c.execute(
+            "SELECT date,deposit,ucol,opp_amt,opp_ratio,crd_whl,crd_kospi,crd_kosdaq,"
+            "kospi,kospi_trdval,kosdaq,kosdaq_trdval FROM kr_liq_daily "
+            "ORDER BY date DESC LIMIT ?", (days,)).fetchall()[::-1]
+        monthly = c.execute(
+            "SELECT month,m2,kospi,kosdaq FROM kr_liq_monthly ORDER BY month").fetchall()
+        vrows = c.execute(         # 판정은 days 파라미터와 무관하게 최근 40행에서 계산
+            "SELECT date,deposit,kospi_trdval FROM kr_liq_daily "
+            "WHERE deposit IS NOT NULL AND kospi_trdval IS NOT NULL "
+            "ORDER BY date DESC LIMIT 40").fetchall()[::-1]
+    finally:
+        c.close()
+    verdict = None
+    dep = vrows
+    if len(dep) >= 6:
+        d5 = (dep[-1][1] / dep[-6][1] - 1) * 100
+        t_now, t_prev = dep[-1][2] / dep[-1][1], dep[-6][2] / dep[-6][1]
+        t5 = (t_now - t_prev)
+        lab = (("유입·가동", "강세") if d5 > 0 and t5 > 0 else
+               ("유입·관망", "중립") if d5 > 0 else
+               ("이탈·소진성 회전", "경계") if t5 > 0 else ("이탈·위축", "약세"))
+        verdict = {"label": lab[0], "tone": lab[1], "dep_5d_pct": round(d5, 2),
+                   "turn_5d_chg": round(t5, 4), "as_of": dep[-1][0]}
+    return {"daily": daily, "monthly": monthly, "verdict": verdict}
+
 @app.get("/api/health")
 def health():
     return {"ok": True,
