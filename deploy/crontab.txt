@@ -24,6 +24,9 @@
 50 6 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_screen.py all >> /home/ubuntu/namoobi/ta_screen.log 2>&1
 55 6 * * * cd /home/ubuntu/namoobi && python3 scripts/sync_apk.py >> /home/ubuntu/namoobi/apk_sync.log 2>&1
 
+# ── [스크리너] KR 목표주가 컨센서스 월별 백필 (주 1회 — WiseReport 월말 신규점 회수, 전종목 스캔) ──
+40 5 * * 0 cd /home/ubuntu/namoobi && python3 scripts/backfill_tp_history.py --all --sleep 0.3 >> /home/ubuntu/namoobi/tp_backfill.log 2>&1
+
 # ── [3.1.14] 국내 유동성·레버리지 수집 (1일 3회 — 멱등 upsert) ──
 #  06:35 안전망(전일 재시도+ECOS 월별)  · 14:10 금융위 T+2 신규분(13시 갱신 직후)
 #  16:10 다음금융 T+0 당일 종가·거래대금
