@@ -1127,6 +1127,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cr:{label:'유동비율(당좌)',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'목표주가 대비 상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
+      rev:{label:'리비전',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['상향(0% ↑)',0],['5% ↑',5],['10% ↑',10]],def:[null,null]},
       nan:{label:'애널리스트수',fixed:'— (KR 미제공)'},
       cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
     },
@@ -1142,11 +1143,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'목표주가 대비 상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
+      rev:{label:'리비전',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['상향(0% ↑)',0],['5% ↑',5],['10% ↑',10]],def:[null,null]},
       nan:{label:'애널리스트수',fmt:v=>v.toFixed(0)+'명',min:1,reqData:1,presets:[['전체',null],['1명 ↑',1],['3명 ↑',3],['10명 ↑',10]],def:[null,null]},
       cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
     }
   };
-  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','nan','cov'];
+  const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','rev','nan','cov'];
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1167,7 +1169,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         continue; }
       if(f.fin && r.isfin) continue;   // 금융업 면제
       let v=k==='cap'?r.cap:k==='tv'?r.tv:k==='px'?r.px:k==='age'?ageOf(r):k==='de'?r.de:k==='cr'?r.cr:
-            k==='upside'?(r.upside!=null?r.upside*100:null):k==='rec'?r.recn:k==='nan'?r.nan:null;
+            k==='upside'?(r.upside!=null?r.upside*100:null):k==='rec'?r.recn:k==='nan'?r.nan:
+            k==='rev'?(r.rev!=null?r.rev*100:null):null;
       if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }  // 데이터 필수 필터: 값 없으면 제외
       if(st.min!=null && v<st.min) return false;
       if(st.max!=null && v>st.max) return false; }
@@ -1216,8 +1219,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
 
   const COLS={
-    kr:[['n','종목',0],['mk','시장',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['tp','목표주가',1],['upside','상승여력',1],['recn','투자의견',1],['tp_rev','목표추세',1],['age','상장',1]],
-    us:[['n','종목명',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['tp','목표주가',1],['upside','상승여력',1],['recn','투자의견',1],['nan','애널',1],['tp_rev','목표추세',1],['age','상장',1]]
+    kr:[['n','종목',0],['mk','시장',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['tp','목표주가',1],['upside','상승여력',1],['recn','투자의견',1],['rev','리비전',1],['age','상장',1]],
+    us:[['n','종목명',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['tp','목표주가',1],['upside','상승여력',1],['recn','투자의견',1],['nan','애널',1],['rev','리비전',1],['age','상장',1]]
   };
   function cell(r,key){
     if(key==='n') return mkt==='kr'?`<b>${E(r.n)}</b> <span class="note">${E(r.c)}</span>`:`<b>${E(r.c)}</b> <span class="note">${E(r.n)}</span>`;
@@ -1231,9 +1234,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(key==='upside'){const v=r.upside; return v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
     if(key==='recn'){const v=r.recn; if(v==null)return '<span class="note">—</span>'; const lab=v>=85?'강력매수':v>=65?'매수':v>=45?'중립':'매도'; return `${v.toFixed(0)} <span class="note">${lab}</span>`;}
     if(key==='nan'){const v=r.nan; return v==null?'<span class="note">—</span>':v.toFixed(0)+'명';}
-    if(key==='tp_rev'){const v=r.tp_rev; if(v==null) return '<span class="note">누적중</span>';
-      const t=r.tp_trend, ar=t==='up_steady'?'⇈':t==='up'?'↑':t==='down_steady'?'⇊':t==='down'?'↓':'→';
-      const cls=v>0?'up':(v<0?'dn':'note'), tt=t==='up_steady'?'꾸준상승':t==='down_steady'?'꾸준하락':'';
+    if(key==='rev'){const v=r.rev; if(v==null) return mkt==='kr'?'<span class="note">누적중</span>':'<span class="note">—</span>';
+      const t=r.tp_trend, ar=t==='up_steady'?'⇈':t==='down_steady'?'⇊':(v>0?'↑':v<0?'↓':'→');
+      const cls=v>0?'up':(v<0?'dn':'note'), tt=t==='up_steady'?'꾸준상승':t==='down_steady'?'꾸준하락':(mkt==='us'?'EPS 추정치 90일 변화':'목표주가 90일 변화');
       return `<span class="${cls}" title="${tt}">${ar} ${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
     if(key==='age'){const a=ageOf(r); return a==null?'—':a+'년';}
     return '';
@@ -1256,7 +1259,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   // ── 2단계 z-score 랭킹 ──
   const AX=[['val','V 밸류','싼 종목 (−PER·−PBR·+배당)'],['grw','G 성장','이익 모멘텀 (EPS 성장)'],
-            ['mom','M 모멘텀','주가 추세 (12−1M·52주고점·200일선)'],['qly','Q 수익성','ROE 근사 (PBR÷PER)']];
+            ['mom','M 모멘텀','주가·리비전 모멘텀 (12−1M·52주고점·200일선·추정 리비전)'],['qly','Q 수익성','ROE 근사 (PBR÷PER)']];
   let S2={kr:[],us:[]}, s2loaded=false, W={val:1,grw:1,mom:1,qly:1}, ON={val:1,grw:1,mom:1,qly:1},
       topN=0, sort2={k:'rscore',d:-1};
   function resetW(){ W={val:1,grw:1,mom:1,qly:1}; ON={val:1,grw:1,mom:1,qly:1}; topN=0; sort2={k:'rscore',d:-1}; resetF2(); }

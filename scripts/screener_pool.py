@@ -31,6 +31,14 @@ def _yoy(l):
     a=[v for v in (l or []) if v is not None]
     return (a[-1]/a[-2]-1) if (len(a)>=2 and a[-2] and a[-2]>0) else None
 
+KR_AXDEF={"val":[lambda r:(-r["fper"] if r.get("fper") else None),
+                 lambda r:(-r["pbr"] if r.get("pbr") and r["pbr"]>0 else None),
+                 lambda r:r.get("divy")],
+          "grw":[lambda r:r.get("g_new")],
+          "mom":[lambda r:r.get("mom"), lambda r:r.get("near52"), lambda r:r.get("vs200"), lambda r:r.get("rev")],
+          "qly":[lambda r:r.get("roe"),
+                 lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]}
+
 def _enrich_kr(kr, d0s):
     """한국 전종목 실측 재무: integration(V·실시간 PER/PBR) + finance/annual(실측 G/Q·하드컷)."""
     d0=datetime.strptime(d0s,"%Y%m%d").date()
@@ -100,13 +108,7 @@ def _enrich_kr(kr, d0s):
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
         r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); kr[i]=r
-    _score(kr,"c",{"val":[lambda r:(-r["fper"] if r.get("fper") else None),
-                          lambda r:(-r["pbr"] if r.get("pbr") and r["pbr"]>0 else None),
-                          lambda r:r.get("divy")],
-                   "grw":[lambda r:r.get("g_new")],
-                   "mom":[lambda r:r.get("mom"), lambda r:r.get("near52"), lambda r:r.get("vs200")],
-                   "qly":[lambda r:r.get("roe"),
-                          lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
+    _score(kr,"c",KR_AXDEF)   # rev(tp_rev)는 이 시점 None → tp_history 후 build()에서 재채점
 
 def _enrich_us(us):
     """미국 전종목 실측 재무: 캐시 quotes(V·M) + quoteSummary(실측 G/Q·하드컷)."""
@@ -143,11 +145,22 @@ def _enrich_us(us):
                 if len(vals)>=3: return all(v<0 for v in vals[-3:])
         except Exception: pass
         return None
+    def _eps_rev(fd):
+        """EPS 추정치 리비전: FY1(0y)·FY2(+1y) 컨센 EPS의 90일 변화율 평균."""
+        et=(fd.get("earningsTrend") or {}).get("trend",[]) or []
+        revs=[]
+        for per in ("0y","+1y"):
+            t=next((x for x in et if x.get("period")==per),None)
+            if not t: continue
+            tr=t.get("epsTrend") or {}
+            cur=(tr.get("current") or {}).get("raw"); ago=(tr.get("90daysAgo") or {}).get("raw")
+            if cur is not None and ago and ago>0: revs.append(cur/ago-1.0)
+        return (sum(revs)/len(revs)) if revs else None
     def yqs(r):
         for att in range(3):
             try:
                 j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
-                         f"?modules=financialData,assetProfile&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                         f"?modules=financialData,assetProfile,earningsTrend&crumb={_up.quote(crumb)}",opener=op,timeout=12)
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
                 fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{})
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
@@ -156,7 +169,8 @@ def _enrich_us(us):
                         "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow")),
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
                         "tplo":v(fdd.get("targetLowPrice")),"rec":v(fdd.get("recommendationMean")),
-                        "nan":v(fdd.get("numberOfAnalystOpinions")),"op3neg":_op3neg_us(r["c"])}
+                        "nan":v(fdd.get("numberOfAnalystOpinions")),"op3neg":_op3neg_us(r["c"]),
+                        "eps_rev":_eps_rev(fd)}
             except Exception:
                 time.sleep(0.5*(att+1))
         return r
@@ -171,7 +185,7 @@ def _enrich_us(us):
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
-    CF=("sector","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg")
+    CF=("sector","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","eps_rev")
     cf=0
     for c in by:
         if "sector" not in by[c] and c in prev:
@@ -190,6 +204,7 @@ def _enrich_us(us):
         tp=r.get("tp"); rec=r.get("rec")
         r["upside"]=(tp/r["px"]-1) if (tp and tp>0 and r.get("px")) else None
         r["recn"]=((5-rec)/4*100) if rec is not None else None
+        r["rev"]=r.get("eps_rev")            # US 리비전 = EPS 추정치 변화율(즉시)
         r.pop("fcf",None)
         r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap")
         us[i]=r
@@ -197,12 +212,13 @@ def _enrich_us(us):
                           lambda r:(-r["pb"] if r.get("pb") else None),
                           lambda r:r.get("divy")],
                    "grw":[lambda r:r.get("g_new")],
-                   "mom":[lambda r:r.get("w52"), lambda r:r.get("hi52"), lambda r:r.get("vs200")],
+                   "mom":[lambda r:r.get("w52"), lambda r:r.get("hi52"), lambda r:r.get("vs200"), lambda r:r.get("rev")],
                    "qly":[lambda r:r.get("roe"), lambda r:r.get("fcfy"),
                           lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
 
 def _tp_history(rows):
-    """종목별 목표주가를 날짜별로 누적(tp_history.json)하고, ~30일 전 대비 리비전(tp_rev)을 계산."""
+    """KR 전용: 목표주가를 날짜별로 누적(tp_history.json), 90일 변화율(tp_rev)·추세(tp_trend) 계산 → rev.
+    (US는 Yahoo EPS 리비전을 즉시 받으므로 누적 불필요.)"""
     H=T.load_db("tp_history") or {}
     hist=H.get("hist") or {}
     tds=date.today().isoformat()
@@ -219,7 +235,7 @@ def _tp_history(rows):
         d=hist.get(r["c"]) or {}
         ks=[k for k in sorted(d) if k>=cutoff]
         if not r.get("tp") or len(ks)<2:
-            r["tp_rev"]=None; r["tp_trend"]=None; continue
+            r["tp_rev"]=None; r["tp_trend"]=None; r["rev"]=None; continue
         seq=[d[k] for k in ks]
         levels=[seq[0]]                        # 유의미한 변경만 남긴 계단열
         for p in seq[1:]:
@@ -236,6 +252,7 @@ def _tp_history(rows):
             elif net>0.001:  r["tp_trend"]="up"
             elif net<-0.001: r["tp_trend"]="down"
             else: r["tp_trend"]="flat"
+        r["rev"]=r["tp_rev"]                    # KR 리비전 = 목표주가 변화율
     T.save_db("tp_history",{"hist":hist})
 
 def build():
@@ -298,7 +315,7 @@ def build():
     except Exception as e: print("[pool] KR enrich 실패:", repr(e)[:80])
     try: _enrich_us(us)
     except Exception as e: print("[pool] US enrich 실패:", repr(e)[:80])
-    try: _tp_history(kr+us)
+    try: _tp_history(kr); _score(kr,"c",KR_AXDEF)   # KR만 누적→rev(tp_rev) 세팅 후 M축 재채점
     except Exception as e: print("[pool] tp_history 실패:", repr(e)[:80])
     _pd=T.kr_price_date()
     out={"asof":T.now_kst(),"price_date":_pd,
