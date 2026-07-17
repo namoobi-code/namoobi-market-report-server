@@ -1518,28 +1518,49 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
 /* ══ 스크롤스파이 — 현재 섹션 네비 칩 실시간 하이라이트 (daily·DB data·AI 추론 3탭 공통) ══ */
 (function(){
+  let pin=null, prog=false;                            // pin: 클릭 고정 / prog: 프로그램 스크롤 중
   function activeNav(){
     const p=document.querySelector('.pane.on'); if(!p) return null;
     const n=p.querySelector('nav'); return (n && n.querySelector('a[data-go],a[data-go2]'))?n:null;
   }
+  function mark(nav,a){ nav.querySelectorAll('a').forEach(x=>x.classList.toggle('spy',x===a)); }
   function spy(){
     const nav=activeNav(); if(!nav) return;
+    if(pin && nav.contains(pin)){ mark(nav,pin); return; }   // 클릭 고정 — 사용자가 스크롤할 때까지 유지
     const links=[...nav.querySelectorAll('a[data-go],a[data-go2]')]; if(!links.length) return;
-    const ref=nav.getBoundingClientRect().bottom+8;   // 스티키 네비 바로 아래 기준선
+    const ref=nav.getBoundingClientRect().bottom+16;  // 스티키 네비 바로 아래 기준선
     let cur=null;
     for(const a of links){
       const el=document.getElementById(a.dataset.go2||a.dataset.go); if(!el) continue;
       if(el.getBoundingClientRect().top<=ref) cur=a; else break;
     }
-    if(!cur) cur=links[0];
-    links.forEach(a=>a.classList.toggle('spy',a===cur));
+    mark(nav, cur||links[0]);
   }
-  let tk=false;
-  const onScroll=()=>{ if(tk)return; tk=true; requestAnimationFrame(()=>{tk=false; spy();}); };
+  function go(a){                                      // 네비 클릭 → 섹션을 스티키 네비 바로 아래로
+    const el=document.getElementById(a.dataset.go2||a.dataset.go); if(!el) return;
+    const nav=a.closest('nav'); const mc=document.querySelector('.mainc');
+    const scroller = (mc && mc.scrollHeight>mc.clientHeight+4) ? mc : (document.scrollingElement||document.documentElement);
+    const desired = () => nav.getBoundingClientRect().bottom + 6;  // 목표: 섹션 top = 네비 바로 아래
+    prog=true;
+    scroller.scrollBy({top: el.getBoundingClientRect().top - desired(), behavior:'auto'});
+    requestAnimationFrame(()=>{                        // 스티키·리플로우 보정 1회
+      const d2 = el.getBoundingClientRect().top - desired();
+      if(Math.abs(d2)>2) scroller.scrollBy({top:d2, behavior:'auto'});
+    });
+    setTimeout(()=>{ prog=false; },150);               // rAF와 무관하게 항상 해제(백그라운드 탭 대비)
+    pin=a; mark(nav, a);                               // 클릭 즉시 고정(짧은 pane에서도 유지)
+  }
+  document.addEventListener('click',e=>{               // 캡처 단계 — 기존 핸들러보다 먼저 처리
+    const a=e.target.closest('nav a[data-go],nav a[data-go2]');
+    if(a){ e.preventDefault(); e.stopPropagation(); go(a); }
+  }, true);
+  let lastSpy=0;
+  const onScroll=()=>{ if(prog) return; pin=null;      // 사용자 스크롤 → 고정 해제
+    const now=Date.now(); if(now-lastSpy<70) return; lastSpy=now; spy(); };  // rAF 대신 시간 스로틀(백그라운드 탭 대비)
   const mc=document.querySelector('.mainc');
   if(mc) mc.addEventListener('scroll',onScroll,{passive:true});
   window.addEventListener('scroll',onScroll,{passive:true});
-  window.addEventListener('resize',onScroll,{passive:true});
-  document.querySelectorAll('.tab[data-pane]').forEach(t=>t.addEventListener('click',()=>setTimeout(spy,80)));
-  setInterval(spy,1500); setTimeout(spy,900);
+  window.addEventListener('resize',()=>{pin=null; spy();},{passive:true});
+  document.querySelectorAll('.tab[data-pane]').forEach(t=>t.addEventListener('click',()=>{pin=null; setTimeout(spy,80);}));
+  setInterval(spy,1200); setTimeout(spy,900);
 })();
