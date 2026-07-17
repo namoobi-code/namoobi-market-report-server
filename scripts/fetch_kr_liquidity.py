@@ -158,6 +158,19 @@ def main():
                      "WHERE deposit IS NOT NULL ORDER BY date DESC LIMIT 1").fetchone()
     nd = c.execute("SELECT COUNT(*) FROM kr_liq_daily").fetchone()[0]
     nm = c.execute("SELECT COUNT(*) FROM kr_liq_monthly").fetchone()[0]
+    # DB 데이터 인벤토리 등록용 스냅샷 (원본은 kr_liquidity.db — 이 json 은 목록·기준일 표시용)
+    try:
+        t0 = c.execute("SELECT date FROM kr_liq_daily WHERE kospi IS NOT NULL ORDER BY date DESC LIMIT 1").fetchone()
+        snap = {"as_of": f"{last[0][:4]}-{last[0][4:6]}-{last[0][6:]}" if last else "",
+                "marker": f"T+2:{last[0] if last else ''}|T0:{t0[0] if t0 else ''}|d{nd}m{nm}",
+                "data": {"daily_rows": nd, "monthly_rows": nm,
+                         "deposit_t": round(last[1]/1e12, 1) if last and last[1] else None,
+                         "opp_amt_e": round(last[2]/1e8) if last and last[2] else None,
+                         "crd_kosdaq_t": round(last[3]/1e12, 2) if last and last[3] else None}}
+        dbdir = BASE / "data" / "db"; dbdir.mkdir(parents=True, exist_ok=True)
+        (dbdir / "kr_liquidity.json").write_text(json.dumps(snap, ensure_ascii=False), encoding="utf-8")
+    except Exception as e:
+        print("db 스냅샷 실패:", e)
     print(f"{dt.datetime.now():%m-%d %H:%M} rows={r} daily={nd} monthly={nm} 최신T+2={last}")
     c.close()
 

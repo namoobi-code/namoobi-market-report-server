@@ -277,16 +277,6 @@
       <h3 id="d317">3.1.7 미국 빅테크(M7) 실적 전망</h3><div class="box" style="overflow-x:auto"><table id="d_m7"></table></div>
       <h3 id="d3112">3.1.12 심리·자금흐름 보조지표</h3><div class="box" style="overflow-x:auto"><table id="d_sent"></table></div>
 
-      <h3 id="d3114">3.1.14 국내 유동성·레버리지 점검<em>서버 1일 3회 자동 수집 (금융위·다음·ECOS)</em></h3>
-      <div class="lead" id="kl_verdict" style="margin-bottom:8px">불러오는 중…</div>
-      <div class="grid g2">
-        <div class="card"><div class="k">① 투자자예탁금(조원·T+2) vs 코스피(T+0)</div><canvas id="kl_c1"></canvas></div>
-        <div class="card"><div class="k">① 예탁금 회전배수 = 거래대금 ÷ 예탁금 (T+2)</div><canvas id="kl_c2"></canvas></div>
-        <div class="card"><div class="k">③ 신용융자잔고(조원·T+2) vs 반대매매금액(억원·미수금 기반)</div><canvas id="kl_c3"></canvas></div>
-        <div class="card"><div class="k">④ 코스닥 신용융자(조원·T+2) vs 코스닥 지수 — 마진콜 조기경보</div><canvas id="kl_c4"></canvas></div>
-      </div>
-      <div class="card" style="margin-top:12px"><div class="k">② M2 YoY vs 코스피·코스닥 YoY (월별 10년 · M2 약 2개월 지연)</div><canvas id="kl_c5"></canvas></div>
-      <div class="note" style="margin-top:8px">반대매매는 위탁매매 미수금(D+2 미납) 기반 공식 통계만 존재. 신용융자 마진콜 반대매매는 공표 통계가 없어 ④ 코스닥 신용잔고 급감으로 간접 추정.</div>
 
       <h2 id="d32">3.2 한국 증시</h2>
       <div class="box" style="overflow-x:auto"><table id="d_kr"></table></div>
@@ -656,6 +646,28 @@
     <div class="card"><div class="k">한국 시장 해석</div><div class="s" id="dv_kr"></div></div>
   </div>
   <div class="lead" id="dv_syn" style="margin-top:12px"></div>
+
+  <h2 id="s3114">3.1.14 국내 유동성·레버리지 점검<em>🖥 서버 자체 수집 · 매일 3회 06:35·14:10·16:10 KST · 차트=최신 보고서 회차 PNG(보고서와 동일)</em></h2>
+  <div class="lead" id="kl_verdict">불러오는 중…</div>
+  <h3>요약 (최신 관측치)</h3>
+  <div class="box" style="overflow-x:auto"><table id="kl_sum"></table></div>
+  <h3>① 예탁금 + 거래대금 — 대기자금이 실제로 시장에 들어오는지</h3>
+  <div class="card"><img class="klimg" style="width:100%;max-width:920px;display:block;margin:0 auto" src="/charts/krliq_1.png" alt="" loading="lazy" onerror="this.closest('.card').style.display='none'"></div>
+  <div class="lead" style="margin-top:8px"><b>자동 판정 로직: 예탁금 5일 증감 × 회전배수(거래대금÷예탁금) 5일 방향의 2×2 매트릭스.</b></div>
+  <div class="box" style="overflow-x:auto;margin-top:6px"><table id="kl_mx"></table></div>
+  <div class="lead" id="kl_cur1" style="margin-top:6px"></div>
+  <h3>② M2 + 코스피/코스닥 — 거시 유동성과 주가 추세</h3>
+  <div class="card"><img class="klimg" style="width:100%;max-width:920px;display:block;margin:0 auto" src="/charts/krliq_2.png" alt="" loading="lazy" onerror="this.closest('.card').style.display='none'"></div>
+  <div class="lead" id="kl_txt2" style="margin-top:8px"></div>
+  <h3>③ 신용융자 + 변동성 + 반대매매 — 레버리지 과열 점검</h3>
+  <div class="card"><img class="klimg" style="width:100%;max-width:920px;display:block;margin:0 auto" src="/charts/krliq_3.png" alt="" loading="lazy" onerror="this.closest('.card').style.display='none'"></div>
+  <div class="lead" id="kl_txt3" style="margin-top:8px"></div>
+  <div class="note" style="margin-top:6px">유의: 이 통계는 미수거래 반대매매만 포함 — 신용융자 담보부족(마진콜) 반대매매는 공표 통계가 없어 ④ 코스닥 신용잔고 급감으로 간접 추정한다.</div>
+  <h3>④ 코스닥 신용 — 마진콜 조기경보</h3>
+  <div class="card"><img class="klimg" style="width:100%;max-width:920px;display:block;margin:0 auto" src="/charts/krliq_4.png" alt="" loading="lazy" onerror="this.closest('.card').style.display='none'"></div>
+  <div class="lead" style="margin-top:8px">설계 근거: 마진콜 반대매매는 신용잔고율이 높은 코스닥 중소형주에서 먼저 터지므로, 코스닥 신용잔고의 상대적 급감이 조기 신호. 상단 = 코스닥 신용잔고 vs 코스닥 지수 vs 전체 중 코스닥 비중, 하단 = 잔고 일간 증감(감소=적색) — 자발적 상환+강제청산 합산의 근사치.</div>
+  <div class="lead" id="kl_txt4" style="margin-top:6px"></div>
+  <div class="note" style="margin-top:6px">반대매매 급증은 선행지표가 아닌 후행 확인 지표이며 역사적으로 항복(단기 바닥) 국면과 동행하는 경우가 많음. 데이터: 금융위 공공데이터(금투협 원천, T+2) · 다음금융(T+0) · 한국은행 ECOS — 서버 1일 3회 자동 수집. 리서치용·투자권유 아님.</div>
 
   <h2 id="s32">3.2.4 / 3.2.5 KRX 브리프<em>🖥 서버 자체 수집 · 매일 2회 06:35·15:35 KST</em></h2>
   <div class="grid g2" id="krx"></div>

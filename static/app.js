@@ -104,7 +104,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('nav').innerHTML=[['slive','실시간 시세'],
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
-    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s32','3.2 KRX'],
+    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['s32','3.2 KRX'],
     ['sberk','버크셔'],['spoll','서버수집']]
     .map(([i,t])=>`<a href="#${i}" data-go="${i}">${t}</a>`).join('');
   // 앵커 클릭: 본문 컨테이너 내부 스크롤 (URL 해시 오염 없이)
@@ -525,6 +525,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     krx_brief:'KRX 증시 Brief·공매도 데일리 브리프 회차 메타 (3.2.4/3.2.5)',
     leading:'한국 경기선행지수 순환변동치 최근월 요약 (3.1.5)',
     memory:'메모리(DRAM·NAND·HBM) 가격·시장 스냅샷 (3.1.9)',
+    kr_liquidity:'국내 유동성·레버리지 — 예탁금·미수금·반대매매·신용잔고(코스피/코스닥)·M2 (3.1.14, 원본=data/kr_liquidity.db)',
     oecd_cli:'OECD 경기선행지수(CLI) 주요국 월별 (3.1.4)',
     policy_rates:'주요 6개국 정책금리 현재값·비고 (3.1.1 카드)',
     semi_cycle:'반도체 사이클→코스피 점검판 3대 신호 (3.1.11)',
@@ -573,7 +574,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     ta_flag:'TradingAgents 스크리닝 완료 플래그 — 거래일·완료 여부'};
   // (2026-07-17) 수집 주체 — 🖥 서버 cron 자체 수집(리포트 실행과 무관하게 최신) vs 📄 리포트 실행 시 수집
   const SRV={customs:'06:35·15:35',leading:'06:35·15:35',series_leading:'06:35·15:35',krx_brief:'06:35·15:35',
-    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',
+    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',kr_liquidity:'06:35·14:10·16:10',
     series_mem_dram_spot:'06:45·15:45',series_mem_dram_contract:'06:45·15:45',series_mem_nand_spot:'06:45·15:45',
     series_mem_nand_contract:'06:45·15:45',series_mem_hbm_asp:'06:45·15:45',series_mem_hbm_share:'06:45·15:45',
     series_mem_hbm_ddr5_gap:'06:45·15:45',series_mem_leading_px:'06:45·15:45',series_mem_mem_vs_gpu:'06:45·15:45',
@@ -757,7 +758,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
-  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d316','3.1.6 FactSet'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d3114','3.1.14 유동성·레버리지'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
+  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d316','3.1.6 FactSet'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
     ['d33','3.3 미국'],['d331','3.3.1 美ETF'],['d332','3.3.2 리밸런싱'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
     ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d6','6 크립토'],['d7','7 증권사'],['d8','8 글로벌IB'],
     ['dB','부록B AI'],['dC','부록C 밸류체인'],['dD','부록D 관계도']]
@@ -1440,93 +1441,47 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     alert('분석요청 TOP '+t.length+'종 (클립보드 복사됨):\n'+t.join(', ')+'\n\n/namoobi-trading-agents 실행 시 이 종목으로 토론·리스크심사합니다.'); };}
 })();
 
-/* ── 3.1.14 국내 유동성·레버리지 점검판 — /api/krliq (서버 1일 3회 수집) ── */
+/* ── 3.1.14 국내 유동성·레버리지 점검 — /api/krliq (서버 1일 3회 수집 · 보고서 renderKrLiquidity 와 동일 구성) ── */
 (async()=>{
   const $=i=>document.getElementById(i);
-  if(!$('kl_c1')) return;
+  if(!$('kl_sum')) return;
   let D; try{ D=await (await fetch('/api/krliq?days=420')).json(); }catch(e){ return; }
-  const rows=D.daily||[], V=D.verdict;
-  const fd=s=>s.slice(2,4)+'.'+s.slice(4,6)+'.'+s.slice(6);
-  // 판정 배지
-  if(V){
-    const col={'강세':'#0a7d33','중립':'#8a6d00','경계':'#b45309','약세':'#b91c1c'}[V.tone]||'#57606a';
-    $('kl_verdict').innerHTML=
-      `<b style="color:${col}">자동 판정: ${V.label} (${V.tone})</b> — 예탁금 5일 ${V.dep_5d_pct>0?'+':''}${V.dep_5d_pct}% · `+
-      `회전배수 5일 ${V.turn_5d_chg>0?'+':''}${V.turn_5d_chg}p · 기준 ${fd(V.as_of)} (T+2) · `+
-      `<span class="note">예탁금 증감 × 회전배수 방향 2×2: 유입·가동(강세) / 유입·관망(중립) / 이탈·소진성 회전(경계) / 이탈·위축(약세)</span>`;
-  } else $('kl_verdict').textContent='데이터 수집 대기 중 (서버 06:35 / 14:10 / 16:10 KST)';
-  const mk2=(id,labels,sets,o={})=>{const el=$(id); if(!el||!labels.length) return;
-    new Chart(el,{data:{labels,datasets:sets.map(s=>({type:s.bar?'bar':'line',label:s.n,data:s.d,
-      borderColor:s.c,backgroundColor:s.c+(s.bar?'88':''),yAxisID:s.y||'y',
-      borderWidth:s.w||1.6,pointRadius:0,tension:.15,borderDash:s.dash||[],spanGaps:true}))},
-      options:{responsive:true,maintainAspectRatio:false,animation:false,
-        interaction:{intersect:false,mode:'index'},
-        plugins:{legend:{display:true,labels:{boxWidth:10,boxHeight:2,font:{size:9.5},padding:6}}},
-        scales:{x:{ticks:{maxTicksLimit:7,font:{size:9}},grid:{display:false}},
-          y:{position:'left',ticks:{font:{size:9}},grid:{color:'#eef0f3'},beginAtZero:o.y0},
-          y1:{position:'right',ticks:{font:{size:9}},grid:{display:false},beginAtZero:o.y10}}}});};
+  const rows=D.daily||[], M=D.monthly||[], V=D.verdict||{};
   // 일별: [0]date [1]예탁금 [2]미수금 [3]반대매매 [4]비중 [5]신용전체 [6]코스피분 [7]코스닥분 [8]코스피 [9]코스피대금 [10]코스닥 [11]코스닥대금
-  const dep=rows.filter(r=>r[1]!=null), px=rows.filter(r=>r[8]!=null);
-  mk2('kl_c1',dep.map(r=>fd(r[0])),[
-    {n:'예탁금(조원·T+2)',d:dep.map(r=>+(r[1]/1e12).toFixed(2)),c:'#1d4ed8',w:2},
-    {n:'코스피(T+0)',d:dep.map(r=>r[8]),c:'#94a3b8',y:'y1'}]);
-  const tn=dep.filter(r=>r[9]!=null);
-  mk2('kl_c2',tn.map(r=>fd(r[0])),[
-    {n:'회전배수(배)',d:tn.map(r=>+(r[9]/r[1]).toFixed(3)),c:'#ea580c',w:2},
-    {n:'거래대금(조원·T+0)',d:tn.map(r=>+(r[9]/1e12).toFixed(2)),c:'#bfdbfe',bar:1,y:'y1'}],{y10:true});
-  const cr=rows.filter(r=>r[5]!=null);
-  mk2('kl_c3',cr.map(r=>fd(r[0])),[
-    {n:'신용융자잔고(조원·T+2)',d:cr.map(r=>+(r[5]/1e12).toFixed(2)),c:'#7c3aed',w:2},
-    {n:'반대매매(억원·T+2)',d:cr.map(r=>r[3]==null?null:+(r[3]/1e8).toFixed(0)),c:'#fca5a5',bar:1,y:'y1'}],{y10:true});
-  mk2('kl_c4',cr.map(r=>fd(r[0])),[
-    {n:'코스닥 신용(조원·T+2)',d:cr.map(r=>+(r[7]/1e12).toFixed(2)),c:'#7c3aed',w:2},
-    {n:'코스닥 지수(T+0)',d:cr.map(r=>r[10]),c:'#94a3b8',y:'y1'}]);
-  // 월별 YoY
-  const M=D.monthly||[], mi=Object.fromEntries(M.map(r=>[r[0],r]));
-  const yoy=(t,i)=>{const p=mi[String(+t-100)]; return (p&&p[i]&&mi[t][i])?+((mi[t][i]/p[i]-1)*100).toFixed(1):null;};
-  const ts=M.map(r=>r[0]).filter(t=>t>='201601');
-  mk2('kl_c5',ts.map(t=>t.slice(0,4)+'.'+t.slice(4)),[
-    {n:'M2 YoY(%)',d:ts.map(t=>yoy(t,1)),c:'#059669',w:2.2},
-    {n:'KOSPI YoY(%)',d:ts.map(t=>yoy(t,2)),c:'#dc2626',y:'y1'},
-    {n:'KOSDAQ YoY(%)',d:ts.map(t=>yoy(t,3)),c:'#f59e0b',dash:[5,3],y:'y1'}]);
-})();
-
-/* ══════════════════════════════════════════════════════════════════
-   자동 새로고침 (2026-07) — 켜둔 화면이 서버 cron 갱신을 자동 반영.
-   무작정 reload 하면 조작을 끊으므로: 탭 보이는 중 + 최근 60초 무조작 +
-   필터 팝오버 안 열림 일 때만 새로고침하고, 활성 탭/화면은 복원한다.
-   ══════════════════════════════════════════════════════════════════ */
-(function(){
-  const REFRESH_MIN = 10;                 // 새로고침 주기(분) — 서버 cron 은 하루 2회라 넉넉히
-  const IDLE_MS = 60*1000;                // 최근 이 시간 내 조작이 있으면 새로고침 보류
-  let lastAct = Date.now();
-  ['mousemove','keydown','click','scroll','touchstart','input'].forEach(ev=>
-    document.addEventListener(ev, ()=>{ lastAct=Date.now(); }, {passive:true, capture:true}));
-
-  // 복원 — 새로고침 전에 저장해 둔 활성 화면으로 되돌린다
-  try{
-    const v = sessionStorage.getItem('nmr_view');
-    if(v){ sessionStorage.removeItem('nmr_view');
-      setTimeout(()=>{
-        if(v==='screener'){ const b=document.getElementById('btn_screener'); if(b) b.click(); }
-        else { const t=document.querySelector('.tab[data-pane="'+v+'"]'); if(t) t.click(); }
-      }, 500);
-    }
-  }catch(e){}
-
-  function saveView(){
-    try{
-      const sb=document.getElementById('btn_screener');
-      const view = (sb && sb.classList.contains('on')) ? 'screener'
-                 : (document.querySelector('.tab.on') && document.querySelector('.tab.on').dataset.pane) || 'p_db';
-      sessionStorage.setItem('nmr_view', view);
-    }catch(e){}
-  }
-  setInterval(()=>{
-    if(document.visibilityState!=='visible') return;      // 백그라운드 탭 → 스킵
-    if(Date.now()-lastAct < IDLE_MS) return;              // 조작 중 → 스킵(조작 안 끊음)
-    if(document.querySelector('.fpop.open')) return;      // 필터 팝오버 열림 → 스킵
-    saveView();
-    location.reload();
-  }, REFRESH_MIN*60*1000);
+  const last=i=>{for(let k=rows.length-1;k>=0;k--) if(rows[k][i]!=null) return rows[k]; return null;};
+  const fmtD=s=>String(s).replace(/(\d{4})(\d{2})(\d{2})/,'$2/$3');
+  const nn=v=>(v==null?'—':v), sgn=v=>(v==null?'—':(v>0?'+':'')+(+v).toLocaleString());
+  const ld=last(1), lt=rows.filter(r=>r[1]!=null&&r[9]!=null).pop(), lc=last(5), lo=last(3);
+  const kl={as_of:ld?ld[0]:'', deposit_t:ld?+(ld[1]/1e12).toFixed(1):null,
+    turnover:lt?+(lt[9]/lt[1]).toFixed(2):null,
+    crd_t:lc?+(lc[5]/1e12).toFixed(1):null, crd_kosdaq_t:lc?+(lc[7]/1e12).toFixed(2):null,
+    kosdaq_share:(lc&&lc[5]&&lc[7])?+(lc[7]/lc[5]*100).toFixed(1):null,
+    opp_amt_e:lo?Math.round(lo[3]/1e8):null, opp_ratio:lo?lo[4]:null, opp_date:lo?lo[0]:''};
+  const cq=rows.filter(r=>r[7]!=null);
+  kl.kosdaq_chg5_e=cq.length>5?Math.round((cq[cq.length-1][7]-cq[cq.length-6][7])/1e8):null;
+  const mi={}; M.forEach(r=>mi[r[0]]=r);
+  const yoy=(t,i)=>{const p=mi[String(+t-100)];return (p&&p[i]&&mi[t]&&mi[t][i])?+((mi[t][i]/p[i]-1)*100).toFixed(1):null;};
+  const ts=M.map(r=>r[0]).filter(t=>yoy(t,1)!=null&&yoy(t,2)!=null);
+  const lm=ts[ts.length-1];
+  if(lm){kl.m2_month=lm; kl.m2_yoy=yoy(lm,1); kl.kospi_yoy=yoy(lm,2); kl.kosdaq_yoy=yoy(lm,3);}
+  const toneC={'강세':'#0a7d33','중립':'#8a6d00','경계':'#b45309','약세':'#b91c1c'}[V.tone]||'#334155';
+  const vTxt=V.label?`자동 판정: ${V.label}(${V.tone}) — 예탁금 5일 ${V.dep_5d_pct>0?'+':''}${V.dep_5d_pct}% · 회전배수 5일 ${V.turn_5d_chg>0?'+':''}${V.turn_5d_chg}p`:'—';
+  $('kl_verdict').innerHTML=`<b style="color:${toneC}">${vTxt}</b> · 기준 ${fmtD(V.as_of||kl.as_of)} (T+2)`;
+  // 요약표 (보고서와 동일 4행)
+  const gapTxt=(kl.kospi_yoy!=null&&kl.m2_yoy!=null)?((kl.kospi_yoy-kl.m2_yoy>20)?'유동성 증가율 대비 주가 상승률 괴리 — 과열 신호':'유동성 증가율과 주가 추세 동행'):'—';
+  const T=(id,head,rws)=>{const el=$(id);el.innerHTML=`<tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr>`+rws.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('');};
+  T('kl_sum',['복합지표','최신 수치','기준일(지연)','판정/해석'],[
+    ['① 예탁금+거래대금',`예탁금 ${nn(kl.deposit_t)}조 · 회전배수 ${nn(kl.turnover)}배`,`${fmtD(kl.as_of)} (T+2)`,vTxt],
+    ['② M2+코스피/코스닥',`M2 YoY ${nn(kl.m2_yoy)}% · KOSPI ${nn(kl.kospi_yoy)}% · KOSDAQ ${nn(kl.kosdaq_yoy)}%`,`${kl.m2_month?String(kl.m2_month).replace(/(\d{4})(\d{2})/,'$1.$2'):'—'} (약 2개월)`,gapTxt],
+    ['③ 신용융자+변동성+반대매매',`신용융자 ${nn(kl.crd_t)}조 · 반대매매 ${nn(kl.opp_amt_e)}억(비중 ${nn(kl.opp_ratio)}%)`,`${fmtD(kl.opp_date||kl.as_of)} (T+2)`,'레버리지 수준 + 급락 후 강제청산 압력 확인'],
+    ['④ 코스닥 신용(마진콜 조기경보)',`코스닥 신용 ${nn(kl.crd_kosdaq_t)}조(비중 ${nn(kl.kosdaq_share)}%) · 5일 증감 ${sgn(kl.kosdaq_chg5_e)}억`,`${fmtD(kl.as_of)} (T+2)`,(kl.kosdaq_chg5_e!=null&&kl.kosdaq_chg5_e<0?'코스닥 잔고 순감 — 디레버리징(상환+강제청산 혼재) 진행':'코스닥 잔고 증가 — 레버리지 재축적')]]);
+  // ① 판정 매트릭스 (현재 위치 강조)
+  const mpos=({'유입·가동':[0,1],'유입·관망':[0,2],'이탈·소진성 회전':[1,1],'이탈·위축':[1,2]})[V.label]||null;
+  const mrows=[['예탁금 증가','유입·가동 (강세)','유입·관망 (중립)'],['예탁금 감소','이탈 속 소진성 회전 (경계)','이탈·위축 (약세)']];
+  if(mpos) mrows[mpos[0]][mpos[1]]=`<b style="color:${toneC}">${mrows[mpos[0]][mpos[1]]} ← 현재</b>`;
+  T('kl_mx',['','회전배수 상승','회전배수 하락'],mrows);
+  if(V.label) $('kl_cur1').innerHTML=`<b style="color:${toneC}">현재(${fmtD(V.as_of)} T+2): 예탁금 5일 ${V.dep_5d_pct>0?'+':''}${V.dep_5d_pct}% · 회전배수 5일 ${V.turn_5d_chg>0?'+':''}${V.turn_5d_chg}p → ${V.label}(${V.tone}).</b> 판정 결과는 차트 제목에 자동 표기.`;
+  $('kl_txt2').textContent=`한국은행 ECOS 월별(M2 평잔·코스피/코스닥 월말 종가, 약 2개월 지연). 최근 KOSDAQ YoY ${nn(kl.kosdaq_yoy)}% vs KOSPI ${nn(kl.kospi_yoy)}% — M2 YoY(${nn(kl.m2_yoy)}%)를 크게 웃도는 주가 상승률은 유동성 초과 랠리, 하회하면 유동성 대비 저평가 신호.`;
+  $('kl_txt3').textContent=`하단 반대매매 = 금융위 공공데이터 '미수금 대비 반대매매금액·비중'(일별 T+2, 금투협 원천) — 위탁매매 미수금(D+2 미납) 기반 강제청산의 공식 일별 통계. 급락 직후 반대매매 급증 + 비중 상승 = 강제청산 압력 확인. 최근 ${fmtD(kl.opp_date||kl.as_of)} ${nn(kl.opp_amt_e)}억원 · 비중 ${nn(kl.opp_ratio)}%.`;
+  $('kl_txt4').textContent=`현재(${fmtD(kl.as_of)} T+2): 코스닥 신용 ${nn(kl.crd_kosdaq_t)}조(전체의 ${nn(kl.kosdaq_share)}%) · 5일 누적 ${sgn(kl.kosdaq_chg5_e)}억. 지수 하락률 대비 잔고 감소율이 비정상적으로 크면 강제청산(마진콜) 우세로 해석 — 단, 상환과 강제청산은 구분 불가(마진콜 직접 통계 부재).`;
 })();
