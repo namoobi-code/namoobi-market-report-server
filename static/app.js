@@ -1254,6 +1254,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       (rows.length>400?`<tr><td colspan="${cols.length+1}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
     $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
+    {const rn=$('scr_revnote'); if(rn) rn.innerHTML = mkt==='us'
+      ? '<b>리비전</b> = EPS 추정치 90일 변화율(FY1+FY2), Yahoo에서 즉시 <span class="note">(예: NVDA ↑+11.1% · GOOGL +16.2% · INTC +81.7%)</span>'
+      : '<b>리비전</b> = 목표주가 90일 변화율, 누적/백필 기반 <span class="note">(예: 삼성전자 ⇈+72% · SK하이닉스 ⇈+104% — 메모리 슈퍼사이클 실제 상향)</span>';}
   }
   function apply(){ applyTable(); renderChips(); }
 
