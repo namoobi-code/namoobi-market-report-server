@@ -1125,7 +1125,6 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cr:{label:'유동비율(당좌)',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
-      nan:{label:'애널리스트',fixed:'— (KR 미제공)'},
       cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
     },
     us:{
@@ -1149,7 +1148,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
   function buildF(){ const o={}; const d=DEF[mkt];
-    for(const k of KEYS){ const f=d[k]; if(f.fixed!==undefined) continue;
+    for(const k of KEYS){ const f=d[k]; if(!f || f.fixed!==undefined) continue;
       if(f.tgl){o[k]={on:f.def};} else {o[k]={min:f.def[0],max:f.def[1]};} } return o; }
   function resetF(){ F_ST[mkt]=buildF(); F=F_ST[mkt]; }          // 초기화 → 현재 마켓만 기본값
   function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF();           // 마켓 전환 → 저장분 로드(원복 안함)
@@ -1182,6 +1181,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const d=DEF[mkt];
     $('scr_fltbar').innerHTML=KEYS.map(k=>{
       const f=d[k];
+      if(!f) return '';
       if(f.fixed!==undefined) return `<div class="fchip"><button disabled style="opacity:.75;cursor:default">${chipLabel(k)}</button></div>`;
       const st=F[k]; const active = f.tgl? st.on : (st.min!=null||st.max!=null);
       let pop;
