@@ -1027,7 +1027,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     .map(([k,v])=>`<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
       <div class="s" style="margin-top:7px">${E(v.key_message)}</div>
       <div class="src">강점: ${E(v.strength||'')}</div></div>`).join('');
-  $$('d_sec').innerHTML=houses(R.securities,{samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
+  $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
     shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
     yuanta:'유안타증권',hyundai:'현대차증권'});
   const CT=(R.securities||{}).common_themes;
