@@ -1119,12 +1119,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'저가주',fmt:wonF,min:1,presets:[['전체',null],['1,000원 ↑',1000],['5,000원 ↑',5000],['1만원 ↑',10000]],def:[1000,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'보통주만'},
-      health:{label:'건전성 신호',fixed:'—'},
+      health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'},
       opLoss:{label:'3년 영업적자',tgl:1,def:true,tglLabel:'3년 연속 영업적자 제외'},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율(당좌)',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
+      nan:{label:'애널리스트수',fixed:'— (KR 미제공)'},
       cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
     },
     us:{
@@ -1139,7 +1140,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
-      nan:{label:'애널리스트',fmt:v=>v.toFixed(0)+'명',min:1,reqData:1,presets:[['전체',null],['1명 ↑',1],['3명 ↑',3],['10명 ↑',10]],def:[null,null]},
+      nan:{label:'애널리스트수',fmt:v=>v.toFixed(0)+'명',min:1,reqData:1,presets:[['전체',null],['1명 ↑',1],['3명 ↑',3],['10명 ↑',10]],def:[null,null]},
       cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'}
     }
   };
@@ -1158,7 +1159,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
       if(f.tgl){ if(!st.on) continue;
-        if(k==='health' && r.d200!=null && r.d200<-0.30) return false;
+        if(k==='health'){ const h = mkt==='kr'? r.vs200 : r.d200; if(h!=null && h<-0.30) return false; }
         if(k==='opLoss' && r.op3neg) return false;
         if(k==='cov' && r.tp==null) return false;
         continue; }
