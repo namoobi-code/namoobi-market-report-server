@@ -1515,3 +1515,31 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   $('kl_txt3').textContent=`하단 반대매매 = 금융위 공공데이터 '미수금 대비 반대매매금액·비중'(일별 T+2, 금투협 원천) — 위탁매매 미수금(D+2 미납) 기반 강제청산의 공식 일별 통계. 급락 직후 반대매매 급증 + 비중 상승 = 강제청산 압력 확인. 최근 ${fmtD(kl.opp_date||kl.as_of)} ${nn(kl.opp_amt_e)}억원 · 비중 ${nn(kl.opp_ratio)}%.`;
   $('kl_txt4').textContent=`현재(${fmtD(kl.as_of)} T+2): 코스닥 신용 ${nn(kl.crd_kosdaq_t)}조(전체의 ${nn(kl.kosdaq_share)}%) · 5일 누적 ${sgn(kl.kosdaq_chg5_e)}억. 지수 하락률 대비 잔고 감소율이 비정상적으로 크면 강제청산(마진콜) 우세로 해석 — 단, 상환과 강제청산은 구분 불가(마진콜 직접 통계 부재).`;
 })();
+
+/* ══ 스크롤스파이 — 현재 섹션 네비 칩 실시간 하이라이트 (daily·DB data·AI 추론 3탭 공통) ══ */
+(function(){
+  function activeNav(){
+    const p=document.querySelector('.pane.on'); if(!p) return null;
+    const n=p.querySelector('nav'); return (n && n.querySelector('a[data-go],a[data-go2]'))?n:null;
+  }
+  function spy(){
+    const nav=activeNav(); if(!nav) return;
+    const links=[...nav.querySelectorAll('a[data-go],a[data-go2]')]; if(!links.length) return;
+    const ref=nav.getBoundingClientRect().bottom+8;   // 스티키 네비 바로 아래 기준선
+    let cur=null;
+    for(const a of links){
+      const el=document.getElementById(a.dataset.go2||a.dataset.go); if(!el) continue;
+      if(el.getBoundingClientRect().top<=ref) cur=a; else break;
+    }
+    if(!cur) cur=links[0];
+    links.forEach(a=>a.classList.toggle('spy',a===cur));
+  }
+  let tk=false;
+  const onScroll=()=>{ if(tk)return; tk=true; requestAnimationFrame(()=>{tk=false; spy();}); };
+  const mc=document.querySelector('.mainc');
+  if(mc) mc.addEventListener('scroll',onScroll,{passive:true});
+  window.addEventListener('scroll',onScroll,{passive:true});
+  window.addEventListener('resize',onScroll,{passive:true});
+  document.querySelectorAll('.tab[data-pane]').forEach(t=>t.addEventListener('click',()=>setTimeout(spy,80)));
+  setInterval(spy,1500); setTimeout(spy,900);
+})();
