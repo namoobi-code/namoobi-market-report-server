@@ -1524,6 +1524,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const n=p.querySelector('nav'); return (n && n.querySelector('a[data-go],a[data-go2]'))?n:null;
   }
   function mark(nav,a){ nav.querySelectorAll('a').forEach(x=>x.classList.toggle('spy',x===a)); }
+  function scrollParent(el){                            // 섹션이 실제로 스크롤되는 조상 컨테이너 탐색
+    let n=el&&el.parentElement;
+    while(n){ const cs=getComputedStyle(n);
+      if(/(auto|scroll)/.test(cs.overflowY) && n.scrollHeight>n.clientHeight+4) return n;
+      n=n.parentElement; }
+    return document.scrollingElement||document.documentElement;
+  }
   function spy(){
     const nav=activeNav(); if(!nav) return;
     if(pin && nav.contains(pin)){ mark(nav,pin); return; }   // 클릭 고정 — 사용자가 스크롤할 때까지 유지
@@ -1538,8 +1545,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function go(a){                                      // 네비 클릭 → 섹션을 스티키 네비 바로 아래로
     const el=document.getElementById(a.dataset.go2||a.dataset.go); if(!el) return;
-    const nav=a.closest('nav'); const mc=document.querySelector('.mainc');
-    const scroller = (mc && mc.scrollHeight>mc.clientHeight+4) ? mc : (document.scrollingElement||document.documentElement);
+    const nav=a.closest('nav'); const scroller=scrollParent(el);   // 탭마다 스크롤 컨테이너 다름 → 동적 탐색
     const desired = () => nav.getBoundingClientRect().bottom + 6;  // 목표: 섹션 top = 네비 바로 아래
     prog=true;
     scroller.scrollBy({top: el.getBoundingClientRect().top - desired(), behavior:'auto'});
@@ -1557,8 +1563,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let lastSpy=0;
   const onScroll=()=>{ if(prog) return; pin=null;      // 사용자 스크롤 → 고정 해제
     const now=Date.now(); if(now-lastSpy<70) return; lastSpy=now; spy(); };  // rAF 대신 시간 스로틀(백그라운드 탭 대비)
-  const mc=document.querySelector('.mainc');
-  if(mc) mc.addEventListener('scroll',onScroll,{passive:true});
+  document.addEventListener('scroll',onScroll,{capture:true,passive:true});  // 모든 스크롤 컨테이너 포착(캡처)
   window.addEventListener('scroll',onScroll,{passive:true});
   window.addEventListener('resize',()=>{pin=null; spy();},{passive:true});
   document.querySelectorAll('.tab[data-pane]').forEach(t=>t.addEventListener('click',()=>{pin=null; setTimeout(spy,80);}));
