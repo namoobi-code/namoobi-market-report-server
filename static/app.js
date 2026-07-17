@@ -758,6 +758,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   // (2026-07-17) 행에 chart 경로가 있으면 그걸 우선 사용 — 테마/반도체 표의 spark_etf_<빈값> 404 근본 수정
   const SPC=(r,fb)=>(r&&r.chart)?`<img class="spk" src="/${String(r.chart).replace(/^\//,'')}" loading="lazy" alt=""
       onerror="this.style.display='none'">`:SP(fb);
+  // 비철금속(4.4) 행 심볼 추출 — symbol/code 없으면 name 의 선두 토큰("LIT (…)") 또는 괄호 티커("테슬라 (TSLA)")
+  const nfSym=x=>{ const nm=String((x&&x.name)||'');
+    let m=nm.match(/^([A-Za-z]{2,6})\s*\(/); if(!m) m=nm.match(/\(([A-Za-z]{2,6})\)/);
+    const s=(x&&(x.symbol||x.code))||(m&&m[1])||''; return s?String(s).toLowerCase():''; };
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
@@ -959,7 +963,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             ${x.desc?`<br><span class="note">${E(x.desc)}</span>`:''}</td>
           <td class="num">${N(x.current)}</td><td>${P(x['1d_pct']??x.prev_pct)}</td><td>${P(x['1w_pct'])}</td>
           <td>${P(x['1mo_pct'])}</td><td>${P(x['3mo_pct'])}</td><td>${P(x['6mo_pct'])}</td><td>${P(x['1y_pct'])}</td>
-          <td>${(()=>{const s=x.symbol||x.code||((String(x.name||'').match(/\(([A-Za-z]{2,6})\)/)||[])[1]||'');return SP(s?String(s).toLowerCase():'');})()}</td>
+          <td>${SP(nfSym(x))}</td>
           <td class="note">${E(x.trend||'')}</td></tr>`).join('')}</table></div>`:'';})()}
     </div>`).join('') + (NF.comment?`<div class="lead">${E(NF.comment)}</div>`:'');
 
@@ -1051,7 +1055,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         <td><b>${E(x.name||'')}</b> <span class="note">${E(x.symbol||x.code||'')}</span></td>
         <td class="num">${N(x.current)}</td><td>${P(x['1d_pct'])}</td><td>${P(x['1w_pct'])}</td>
         <td>${P(x['1mo_pct'])}</td><td>${P(x['3mo_pct'])}</td><td>${P(x['1y_pct'])}</td>
-        <td>${SP('c_'+(x.symbol||x.code||''))}</td>
+        <td>${SP('c_'+String(x.symbol||x.code||'').replace(/\./g,'_'))}</td>
         <td class="note">${E(x.desc||'')}</td></tr>`).join('')}</table></div>`;}).join('')
     + (AC.asof?`<div class="src">기준 ${E(AC.asof)}</div>`:'');
 
