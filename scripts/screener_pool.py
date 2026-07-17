@@ -125,6 +125,20 @@ def _enrich_us(us):
         r["vs200"]=q.get("twoHundredDayAverageChangePercent")
     op,crumb=T.yahoo_opener()
     import urllib.parse as _up
+    _p2=int(time.time()); _p1=_p2-5*365*24*3600
+    def _op3neg_us(sym):
+        """fundamentals-timeseries annualOperatingIncome → 최근 3년 연속 영업적자 여부."""
+        try:
+            t=T.jget(f"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{sym}"
+                     f"?symbol={sym}&type=annualOperatingIncome&period1={_p1}&period2={_p2}&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+            res=(t.get("timeseries",{}) or {}).get("result",[]) or []
+            for r0 in res:
+                arr=r0.get("annualOperatingIncome") or []
+                vals=[(x.get("reportedValue",{}) or {}).get("raw") for x in arr if x]
+                vals=[x for x in vals if x is not None]
+                if len(vals)>=3: return all(v<0 for v in vals[-3:])
+        except Exception: pass
+        return None
     def yqs(r):
         for att in range(3):
             try:
@@ -138,7 +152,7 @@ def _enrich_us(us):
                         "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow")),
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
                         "tplo":v(fdd.get("targetLowPrice")),"rec":v(fdd.get("recommendationMean")),
-                        "nan":v(fdd.get("numberOfAnalystOpinions"))}
+                        "nan":v(fdd.get("numberOfAnalystOpinions")),"op3neg":_op3neg_us(r["c"])}
             except Exception:
                 time.sleep(0.5*(att+1))
         return r

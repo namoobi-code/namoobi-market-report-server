@@ -1135,7 +1135,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'EQUITY만(ETF·워런트 제외)'},
       health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'},
-      opLoss:{label:'3년 영업적자',fixed:'— (US 미제공)'},
+      opLoss:{label:'3년 영업적자',tgl:1,def:true,tglLabel:'3년 연속 영업적자 제외'},
       de:{label:'D/E',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
