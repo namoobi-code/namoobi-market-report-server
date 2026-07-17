@@ -1464,3 +1464,43 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     {n:'KOSPI YoY(%)',d:ts.map(t=>yoy(t,2)),c:'#dc2626',y:'y1'},
     {n:'KOSDAQ YoY(%)',d:ts.map(t=>yoy(t,3)),c:'#f59e0b',dash:[5,3],y:'y1'}]);
 })();
+
+/* ══════════════════════════════════════════════════════════════════
+   자동 새로고침 (2026-07) — 켜둔 화면이 서버 cron 갱신을 자동 반영.
+   무작정 reload 하면 조작을 끊으므로: 탭 보이는 중 + 최근 60초 무조작 +
+   필터 팝오버 안 열림 일 때만 새로고침하고, 활성 탭/화면은 복원한다.
+   ══════════════════════════════════════════════════════════════════ */
+(function(){
+  const REFRESH_MIN = 10;                 // 새로고침 주기(분) — 서버 cron 은 하루 2회라 넉넉히
+  const IDLE_MS = 60*1000;                // 최근 이 시간 내 조작이 있으면 새로고침 보류
+  let lastAct = Date.now();
+  ['mousemove','keydown','click','scroll','touchstart','input'].forEach(ev=>
+    document.addEventListener(ev, ()=>{ lastAct=Date.now(); }, {passive:true, capture:true}));
+
+  // 복원 — 새로고침 전에 저장해 둔 활성 화면으로 되돌린다
+  try{
+    const v = sessionStorage.getItem('nmr_view');
+    if(v){ sessionStorage.removeItem('nmr_view');
+      setTimeout(()=>{
+        if(v==='screener'){ const b=document.getElementById('btn_screener'); if(b) b.click(); }
+        else { const t=document.querySelector('.tab[data-pane="'+v+'"]'); if(t) t.click(); }
+      }, 500);
+    }
+  }catch(e){}
+
+  function saveView(){
+    try{
+      const sb=document.getElementById('btn_screener');
+      const view = (sb && sb.classList.contains('on')) ? 'screener'
+                 : (document.querySelector('.tab.on') && document.querySelector('.tab.on').dataset.pane) || 'p_db';
+      sessionStorage.setItem('nmr_view', view);
+    }catch(e){}
+  }
+  setInterval(()=>{
+    if(document.visibilityState!=='visible') return;      // 백그라운드 탭 → 스킵
+    if(Date.now()-lastAct < IDLE_MS) return;              // 조작 중 → 스킵(조작 안 끊음)
+    if(document.querySelector('.fpop.open')) return;      // 필터 팝오버 열림 → 스킵
+    saveView();
+    location.reload();
+  }, REFRESH_MIN*60*1000);
+})();
