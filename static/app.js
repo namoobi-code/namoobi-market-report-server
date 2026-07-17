@@ -758,9 +758,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   // (2026-07-17) 행에 chart 경로가 있으면 그걸 우선 사용 — 테마/반도체 표의 spark_etf_<빈값> 404 근본 수정
   const SPC=(r,fb)=>(r&&r.chart)?`<img class="spk" src="/${String(r.chart).replace(/^\//,'')}" loading="lazy" alt=""
       onerror="this.style.display='none'">`:SP(fb);
-  // 비철금속(4.4) 행 심볼 추출 — symbol/code 없으면 name 의 선두 토큰("LIT (…)") 또는 괄호 티커("테슬라 (TSLA)")
+  // 비철금속(4.4) 행 심볼 추출 — 알려진 행은 스파크 파일명 직접 매핑, 그 외 선두 토큰/괄호 첫 티커
+  const NF_MAP={'탄산리튬':'lithium','KODEX 2차전지산업':'kodex_batt','우라늄':'sruuf','HANARO 원자력iSelect':'hanaro_nuke','구리 선물':'copper','KODEX 구리선물':'kodex_copper'};
   const nfSym=x=>{ const nm=String((x&&x.name)||'');
-    let m=nm.match(/^([A-Za-z]{2,6})\s*\(/); if(!m) m=nm.match(/\(([A-Za-z]{2,6})\)/);
+    for(const k in NF_MAP) if(nm.startsWith(k)) return NF_MAP[k];
+    let m=nm.match(/^([A-Za-z]{2,6})(?![A-Za-z])/); if(!m) m=nm.match(/\(([A-Za-z]{2,6})(?![A-Za-z])/);
     const s=(x&&(x.symbol||x.code))||(m&&m[1])||''; return s?String(s).toLowerCase():''; };
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
