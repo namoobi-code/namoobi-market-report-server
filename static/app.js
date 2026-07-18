@@ -1154,7 +1154,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
       macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓']},
-      bb:{label:'볼린저%b',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
+      bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
@@ -1190,7 +1190,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
       macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓']},
-      bb:{label:'볼린저%b',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
+      bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
@@ -1301,7 +1301,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     oploss:{l:'영업적자',n:1,m:'both'},
     age:{l:'상장기간',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
     v20:{l:'20일선',n:1,m:'both'}, v50:{l:'50일선',n:1,m:'both'}, align:{l:'이평배열',n:0,m:'both'},
-    rsi:{l:'RSI',n:1,m:'both'}, volx:{l:'거래량배수',n:1,m:'both'}, macd:{l:'MACD',n:0,m:'both'}, bb:{l:'볼린저%b',n:1,m:'both'},
+    rsi:{l:'RSI',n:1,m:'both'}, volx:{l:'거래량배수',n:1,m:'both'}, macd:{l:'MACD',n:0,m:'both'}, bb:{l:'볼린저밴드',n:1,m:'both'},
     mom:{l:'추세',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
@@ -1434,7 +1434,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     p.innerHTML=
       `<div class="cp-h"><b>표시 컬럼</b><span class="note">체크로 표시/숨김 · ▲▼로 순서 변경</span>
          <span class="cp-badge">${colsSaved?'💾 이 PC에 저장됨':'기본값 사용 중'}</span>
-         <button class="cp-x" id="cp_reset">기본값</button><button class="cp-x" id="cp_close">닫기</button></div>
+         <button class="cp-x" id="cp_reset">컬럼 초기화(default)</button><button class="cp-x" id="cp_close">닫기</button></div>
        <div class="cp-sec">표시 중 (${cur.length})</div><div class="cp-list">`+
       cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-coff="${k}" checked ${k==='n'?'disabled':''}>${E(cpl(k))}</label>
          <span class="cp-mvs"><button class="cp-mv" data-up="${k}" ${i===0?'disabled':''}>▲</button><button class="cp-mv" data-dn="${k}" ${i===cur.length-1?'disabled':''}>▼</button></span></div>`).join('')+
@@ -1497,7 +1497,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['이평배열','MA20>MA50>MA200=정배열(상승 구조) · 반대=역배열'],
         ['RSI(14)','상대강도지수 — 30↓ 과매도 · 70↑ 과매수'],
         ['MACD','12-26 EMA 차이 vs 시그널(9) — 골든/데드 크로스 상태'],
-        ['볼린저%b','볼린저(20,2) 밴드 내 위치 — 0=하단 · 100=상단'],
+        ['볼린저밴드','볼린저(20,2) 밴드 내 위치 — 0=하단 · 100=상단'],
         ['거래량배수','당일 거래량 ÷ 3개월 평균(미국)/20일 평균(한국)'],
         ['배당성향','배당금÷순이익(payout ratio)'],
         ['상장기간','상장 후 경과 연수'],
@@ -1520,7 +1520,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['RSI(14)','상대강도지수 — 30 이하 과매도(반등 후보), 50 상회 = 상승 모멘텀, 70 이상 과매수(조정 경계)'],
         ['거래량배수','최근 거래일 거래량 ÷ 직전 20일 평균 — 1.5배↑ 급증 = 추세 전환/돌파 확인 신호'],
         ['MACD','(12,26,9) 상태 — 골든↑=시그널 상향돌파+0선 위(강한 상승), 골든↓=0선 아래 반등, 데드↑/↓=하향 전환'],
-        ['볼린저%b','볼린저밴드(20,2) 내 위치 — 0=하단(과매도권), 50=중심선, 100 이상=상단 돌파(거래량 동반 시 추세가속)'],
+        ['볼린저밴드','볼린저밴드(20,2) 내 위치(%b) — 0=하단(과매도권), 50=중심선, 100 이상=상단 돌파(거래량 동반 시 추세가속)'],
         ['추세','12−1개월 주가 모멘텀'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['외인보유비중','외국인 보유 비중'],

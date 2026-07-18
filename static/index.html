@@ -189,6 +189,12 @@
   .scrrst:hover{border-color:var(--dark);color:var(--tx)}
   .scrgo{background:var(--dark);color:#fff;border-color:var(--dark);font-weight:700}
   .scrgo:hover{color:#fff;opacity:.88}
+  /* (2026-07-18) 우측 버튼 그룹 — 필터 초기화(위) + START·컬럼설정·필터설명(아래) */
+  .scrbtns{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+  .scrbtns .scrrst{margin-left:0}
+  .scrbtns-r{display:flex;gap:8px}
+  .scrrst2{border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--tx2)}
+  .scrrst2:hover{border-color:var(--dark);color:var(--tx)}
   .scrgo:disabled{opacity:.55;cursor:default}
   #scr_colbtn,#scr_rst{margin-left:6px}
   /* 컬럼 관리 패널 */
@@ -517,10 +523,15 @@
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>
         <span class="scrcnt" id="scr_cnt">—</span>
-        <button class="scrrst scrgo" id="scr_start">▶ START</button>
-        <button class="scrrst" id="scr_colbtn">⊞ 컬럼</button>
-        <button class="scrrst" id="scr_glsbtn">? 필터설명</button>
-        <button class="scrrst" id="scr_rst">초기화</button>
+        <!-- (2026-07-18) 필터 초기화는 START·컬럼설정 버튼 '위'에 별도 줄로 표시 -->
+        <div class="scrbtns">
+          <button class="scrrst2" id="scr_rst">↺ 필터 선택 초기화(default)</button>
+          <div class="scrbtns-r">
+            <button class="scrrst scrgo" id="scr_start">▶ START</button>
+            <button class="scrrst" id="scr_colbtn">⊞ 컬럼설정</button>
+            <button class="scrrst" id="scr_glsbtn">? 필터설명</button>
+          </div>
+        </div>
       </div>
       <p class="note" style="margin:8px 0 0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
       <!-- 1단계 -->
