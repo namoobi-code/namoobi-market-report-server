@@ -716,7 +716,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
 
   // 탭 전환
-  const panes=['p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener'];
+  {const wm=document.getElementById('wel_msg');          // 최초 진입 인사 (시간대별)
+   if(wm){const h=new Date().getHours();
+     wm.textContent = (h>=5&&h<11)?'좋은 아침입니다' : (h>=11&&h<17)?'좋은 점심입니다'
+                    : (h>=17&&h<21)?'좋은 저녁입니다' : '좋은 밤입니다';}}
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
     if(b.disabled||b.classList.contains('off')) return;   // 비활성 탭은 무시
     document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));

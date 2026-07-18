@@ -97,6 +97,11 @@
   .tab small{display:block;font-size:9.5px;font-weight:400;opacity:.65;margin-top:1px}
   .pane{display:none;flex:1;min-height:0;flex-direction:column}
   .pane.on{display:flex}
+  /* 최초 진입 인사 화면 */
+  #p_welcome{background:#0b0d10;border-radius:10px;overflow:hidden}
+  #p_welcome .wel{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
+  #p_welcome #wel_msg{color:#e8eaed;font-size:30px;font-weight:600;letter-spacing:-.6px;text-align:center}
+  @media(max-width:980px){ #p_welcome .wel{min-height:50vh} #p_welcome #wel_msg{font-size:24px} }
   .soon{flex:1;min-height:0;overflow-y:auto;padding:2px 8px 60px 0}
   .soon .hero{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--dark);
               border-radius:8px;padding:20px 22px;margin-bottom:16px}
@@ -231,7 +236,7 @@
     <div><h1>글로벌 시황 대시보드<span>namoobi market report</span></h1></div>
     <div class="tabs">
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
-      <button class="tab on" data-pane="p_db">DB data<small>누적·버전관리</small></button>
+      <button class="tab"    data-pane="p_db">DB data<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
       <button class="tab"    data-pane="p_ta">TradingAgents<small>종목 스크리닝</small></button>
       <button class="tab"    data-pane="p_auto">자동매매<small>KIS · 선정종목 집행</small></button>
@@ -260,6 +265,10 @@
 
   </aside>
   <div class="rightc">
+
+  <!-- ⓪ 최초 진입 인사 화면 -->
+  <div class="pane on" id="p_welcome"><div class="wel"><div id="wel_msg"></div></div></div>
+
 
   <!-- ① daily 조사 data (향후 개발) -->
   <div class="pane" id="p_daily">
@@ -478,7 +487,7 @@
   </div>
 
   <!-- ② DB data (현행 화면) -->
-  <div class="pane on" id="p_db">
+  <div class="pane" id="p_db">
   <nav id="nav"></nav>
   <main class="mainc">
   <h2 id="slive">실시간 시세<em>외부 링크</em></h2>
