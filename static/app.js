@@ -1133,8 +1133,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'가격',fmt:wonF,min:1,presets:[['전체',null],['1,000원 ↑',1000],['5,000원 ↑',5000],['1만원 ↑',10000]],def:[1000,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'보통주만'},
-      health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'},
-      opLoss:{label:'3년 영업적자',tgl:1,def:true,tglLabel:'3년 연속 영업적자 제외'},
+      opLoss:{label:'영업적자',fmt:v=>v.toFixed(0)+'년',presets:[['전체',null,null],['1년이상 제외',null,0],['2년이상 제외',null,1],['3년이상 제외',null,2]],def:[null,2]},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1148,7 +1147,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
-      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]},
+      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
@@ -1163,8 +1162,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'가격',fmt:usdF,min:1,presets:[['전체',null],['$5 ↑',5],['$10 ↑',10],['$50 ↑',50]],def:[5,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'EQUITY만(ETF·워런트 제외)'},
-      health:{label:'건전성 신호',tgl:1,def:true,tglLabel:'200일선 −30%↓ 제외'},
-      opLoss:{label:'3년 영업적자',tgl:1,def:true,tglLabel:'3년 연속 영업적자 제외'},
+      opLoss:{label:'영업적자',fmt:v=>v.toFixed(0)+'년',presets:[['전체',null,null],['1년이상 제외',null,0],['2년이상 제외',null,1],['3년이상 제외',null,2]],def:[null,2]},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1178,7 +1176,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
-      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['위(0%)',0],['+10% ↑',10],['+20% ↑',20]],def:[null,null]},
+      v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
@@ -1186,12 +1184,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
   };
-  /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권구분·건전성 신호·
-     3년 영업적자)는 값이 아닌 '제외 토글'이라 맨 뒤에 배치 */
-  const KEYS=['mk','sector','px','chg','cap','tv','de','cr','cov','upside','rec','rev',
+  /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
+  const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','cov','upside','rec','rev',
               'nan','per','pbr','divy','grw','mgrw','ogrw','roe','mom','hi','v200',
-              'frgn','payout','age','sec','health','opLoss'];
-  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp'};   // 필터키 → 컬럼키(값 접근자 공통화)
+              'frgn','payout','age','sec'];
+  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1208,8 +1205,6 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
       if(f.tgl){ if(!st.on) continue;
-        if(k==='health'){ const h = mkt==='kr'? r.vs200 : r.d200; if(h!=null && h<-0.30) return false; }
-        if(k==='opLoss' && r.op3neg) return false;
         if(k==='cov' && r.tp==null) return false;
         continue; }
       if(f.cat){ if(st.v!=null && String(r[k]||'')!==st.v) return false; continue; }
@@ -1284,6 +1279,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
     cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
     de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
+    oploss:{l:'영업적자',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'},
@@ -1304,10 +1300,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
   /* 기본 표시 컬럼 = 초기화 상태에서 값이 걸리는 필터들과 일치시킴
      (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
-     ※ 건전성 신호·3년 영업적자·증권 구분은 값이 아닌 '제외 토글'이라 대응 컬럼 없음 */
+     ※ 증권 구분만 고정값이라 대응 컬럼 없음 */
   const CDEFAULT={
-    kr:['n','mk','px','chg','cap','tv','de','cr','tp','upside','recn','rev','age'],
-    us:['n','sector','px','chg','cap','tv','de','cr','tp','upside','recn','rev','nan','age']
+    kr:['n','mk','px','chg','cap','tv','de','cr','oploss','tp','upside','recn','rev','age'],
+    us:['n','sector','px','chg','cap','tv','de','cr','oploss','tp','upside','recn','rev','nan','age']
   };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
@@ -1347,6 +1343,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'hi': {const v=mkt==='kr'?r.near52:r.hi52; return v!=null?v*100:null;}
       case 'v200': return r.vs200!=null?r.vs200*100:null;
       case 'de': return r.de; case 'cr': return r.cr;
+      case 'oploss': return r.oploss!=null?r.oploss:(r.op3neg?3:null);
       case 'frgn': return r.frgn;
       case 'payout': return r.payout!=null?r.payout*100:null;
     }
@@ -1378,6 +1375,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'cr': return v.toFixed(1);
       case 'roe': case 'frgn': return v.toFixed(1)+'%';
       case 'payout': return v.toFixed(0)+'%';
+      case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
       case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': return sgn(0);
     }
@@ -1445,6 +1443,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['등락','전일 대비 등락률'],
         ['부채비율','D/E(부채÷자기자본). 금융업 면제'],
         ['유동비율','유동자산÷유동부채(current ratio). 금융업 면제'],
+        ['영업적자','최근 연속 영업적자 연수. 기본 3년이상 제외'],
         ['목표주가','애널리스트 컨센서스 목표주가. 필터는 \'있는 종목만\' 토글'],
         ['상승여력','목표주가 ÷ 현재가 − 1'],
         ['투자의견','컨센서스 등급을 0~100 매수강도로 환산(높을수록 매수)'],
@@ -1459,11 +1458,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['ROE','자기자본이익률(순이익÷자기자본)'],
         ['추세','52주 주가 변화율(모멘텀)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
-        ['200일선','200일 이동평균 대비 현재가'],
+        ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
         ['배당성향','배당금÷순이익(payout ratio)'],
         ['상장기간','상장 후 경과 연수'],
-        ['건전성 신호','200일선 −30% 미만(심각한 하락추세) 제외 — 값이 아닌 제외 토글'],
-        ['3년 영업적자','3년 연속 영업적자 제외 — 제외 토글'],
         ['증권 구분','EQUITY만(ETF·워런트 제외) — 고정']
       ] : [
         ['시장','거래소 구분(KOSPI·KOSDAQ)'],
@@ -1471,6 +1468,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['등락','전일 대비 등락률'],
         ['부채비율','부채÷자기자본. 금융업 면제'],
         ['유동비율','당좌자산÷유동부채(당좌비율) — 단기 지급능력. 금융업 면제'],
+        ['영업적자','최근 연속 영업적자 연수. 기본 3년이상 제외'],
         ['목표주가','애널리스트 컨센서스 목표주가. 필터는 \'있는 종목만\' 토글'],
         ['상승여력','목표주가 ÷ 현재가 − 1'],
         ['투자의견','컨센서스 등급을 0~100 매수강도로 환산(높을수록 매수)'],
@@ -1485,12 +1483,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['ROE','자기자본이익률(순이익÷자기자본)'],
         ['추세','12−1개월 주가 모멘텀'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
-        ['200일선','200일 이동평균 대비 현재가'],
+        ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
         ['외인소진율','외국인 보유 비중'],
         ['배당성향','주당배당÷EPS'],
         ['상장기간','상장 후 경과 연수'],
-        ['건전성 신호','200일선 −30% 미만(심각한 하락추세) 제외 — 값이 아닌 제외 토글'],
-        ['3년 영업적자','3년 연속 영업적자 제외 — 제외 토글'],
         ['증권 구분','보통주만 — 고정']
       ];
       rn.innerHTML='<b style="color:var(--tx)">필터 설명</b><br>'+g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');

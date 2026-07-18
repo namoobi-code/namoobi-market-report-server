@@ -24,6 +24,14 @@ def _isfin(name):
         FIN_RE=re.compile(r"은행|금융|증권|보험|생명|화재|카드|캐피탈|종금|저축|지주")
     return bool(FIN_RE.search(name or ""))
 
+def _neg_streak(vals):
+    """최근 연도부터 연속으로 영업적자인 햇수 (0=적자 아님)."""
+    n=0
+    for v in reversed(vals or []):
+        if v is not None and v<0: n+=1
+        else: break
+    return n
+
 def _last(l):
     for v in reversed(l or []):
         if v is not None: return v
@@ -106,7 +114,8 @@ def _enrich_kr(kr, d0s):
         op3=[v for v in (fn.get("영업이익") or []) if v is not None]
         r.update(fper=fper,per=per,pbr=pbr,divy=divy,mom=mom,near52=near52,
                  roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
-                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), isfin=_isfin(r.get("n")), vs200=r.get("ma200"),
+                 op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), oploss=_neg_streak(op3),
+                 isfin=_isfin(r.get("n")), vs200=r.get("ma200"),
                  tp=tp, rec=rec, upside=upside, recn=recn, frgn=frgn, payout=payout)
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
@@ -136,7 +145,7 @@ def _enrich_us(us):
     import urllib.parse as _up
     _p2=int(time.time()); _p1=_p2-5*365*24*3600
     def _op3neg_us(sym):
-        """fundamentals-timeseries annualOperatingIncome → 최근 3년 연속 영업적자 여부."""
+        """fundamentals-timeseries annualOperatingIncome → 연속 영업적자 연수(0=아님)."""
         try:
             t=T.jget(f"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{sym}"
                      f"?symbol={sym}&type=annualOperatingIncome&period1={_p1}&period2={_p2}&crumb={_up.quote(crumb)}",opener=op,timeout=12)
@@ -145,7 +154,7 @@ def _enrich_us(us):
                 arr=r0.get("annualOperatingIncome") or []
                 vals=[(x.get("reportedValue",{}) or {}).get("raw") for x in arr if x]
                 vals=[x for x in vals if x is not None]
-                if len(vals)>=3: return all(v<0 for v in vals[-3:])
+                if vals: return _neg_streak(vals)
         except Exception: pass
         return None
     def _eps_rev(fd):
@@ -172,7 +181,7 @@ def _enrich_us(us):
                         "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow")),
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
                         "tplo":v(fdd.get("targetLowPrice")),"rec":v(fdd.get("recommendationMean")),
-                        "nan":v(fdd.get("numberOfAnalystOpinions")),"op3neg":_op3neg_us(r["c"]),
+                        "nan":v(fdd.get("numberOfAnalystOpinions")),"oploss":_op3neg_us(r["c"]),
                         "eps_rev":_eps_rev(fd)}
             except Exception:
                 time.sleep(0.5*(att+1))
@@ -188,7 +197,7 @@ def _enrich_us(us):
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
-    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","eps_rev")
+    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev")
     cf=0
     for c in by:
         if "sector" not in by[c] and c in prev:
@@ -208,6 +217,7 @@ def _enrich_us(us):
         r["upside"]=(tp/r["px"]-1) if (tp and tp>0 and r.get("px")) else None
         r["recn"]=((5-rec)/4*100) if rec is not None else None
         r["rev"]=r.get("eps_rev")            # US 리비전 = EPS 추정치 변화율(즉시)
+        r["op3neg"]=((r.get("oploss") or 0)>=3)   # 3년 연속 영업적자(파생)
         r.pop("fcf",None)
         r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap")
         us[i]=r
