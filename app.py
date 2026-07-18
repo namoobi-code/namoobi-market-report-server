@@ -1,8 +1,8 @@
 import json, time, urllib.request, os, re, sqlite3
 from pathlib import Path
 from datetime import datetime
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 BASE = Path(__file__).parent
@@ -31,10 +31,19 @@ def domains():
     return out
 
 @app.get("/api/db/{name}")
-def get_db(name: str):
+def get_db(name: str, request: Request):
+    """원본 JSON 바이트를 그대로 전송(파싱/재직렬화 생략) + ETag 재검증 캐시."""
     if not re.fullmatch(r"[a-zA-Z0-9_]+", name):
         raise HTTPException(400, "bad name")
-    return load(name)
+    p = DB / f"{name}.json"
+    if not p.exists():
+        raise HTTPException(404, f"{name} not found")
+    st = p.stat()
+    etag = 'W/"%x-%x"' % (int(st.st_mtime), st.st_size)
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "no-cache"})
+    return Response(content=p.read_bytes(), media_type="application/json",
+                    headers={"ETag": etag, "Cache-Control": "no-cache"})
 
 @app.get("/api/summary")
 def summary():
