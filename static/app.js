@@ -1896,6 +1896,34 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   window.addEventListener('beforeunload', saveScr);
 
   let prepped=false;
+  /* 풀 머리말 — 장중이면 ⚡LIVE, 장외면 '왜 안 움직이는지'와 다음 갱신 시각을 밝힌다.
+     (수집 시각만 덩그러니 있으면 갱신이 고장 난 것처럼 보인다) */
+  function poolMeta(d){
+    const E2=s=>E(s==null?'':s);
+    let tail;
+    if(d.live_at){
+      tail = ` · <b style="color:#1f6feb">⚡LIVE ${E2(d.live_at)}</b>`;
+    }else{
+      // 브라우저 시간대와 무관하게 KST 로 환산해 판단
+      const k=new Date(Date.now()+(9*60+new Date().getTimezoneOffset())*60000);
+      const wd=k.getDay(), hm=k.getHours()*60+k.getMinutes();
+      const krOpen = wd>=1&&wd<=5 && hm>=540 && hm<=930;              // 09:00~15:30
+      const usOpen = ((wd>=1&&wd<=5&&hm>=1350)||(wd>=2&&wd<=6&&hm<=360)); // 22:30~06:00
+      let nxt;
+      if(wd===6)      nxt='월 09:00 한국장';
+      else if(wd===0) nxt='월 09:00 한국장';
+      else if(hm<540) nxt='오늘 09:00 한국장';
+      else if(hm<=930)nxt='';
+      else if(hm<1350)nxt=(wd===5?'월 09:00 한국장':'오늘 22:30 미국장');
+      else            nxt='';
+      tail = (krOpen||usOpen)
+        ? ' · <b style="color:#b7791f">장중인데 아직 갱신 전 — 5분 내 반영</b>'
+        : ` · <span style="color:var(--tx2)">장마감 (장중에만 5분마다 갱신${nxt?' · 다음 '+nxt:''})</span>`;
+    }
+    return `기준일 <b>${E2(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()}`
+         + ` · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E2(d.asof||'')}${tail}`;
+  }
+
   function loadPool(then){                    // 전종목 풀 로드 (START 눌렀을 때만)
     if(loaded){ then&&then(); return; }
     const gb=$('scr_start');
@@ -1903,7 +1931,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_asof').textContent='전종목 풀 불러오는 중…';
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
       d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loaded=true;
-      $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}${d.live_at?` · <b style="color:#1f6feb">⚡LIVE ${E(d.live_at)}</b>`:''}`;
+      $('scr_asof').innerHTML=poolMeta(d);
       {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
       if(gb){gb.disabled=false; gb.textContent='▶ START';}
       then&&then();
@@ -1950,7 +1978,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
       if(!d||!d.kr||!d.kr.length) return;
       POOL={kr:d.kr||[],us:d.us||[]}; if(s2loaded) S2=POOL;
-      $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}${d.live_at?` · <b style="color:#1f6feb">⚡LIVE ${E(d.live_at)}</b>`:''}`;
+      $('scr_asof').innerHTML=poolMeta(d);
       refresh();
     }).catch(()=>{});
   }, 300000);
