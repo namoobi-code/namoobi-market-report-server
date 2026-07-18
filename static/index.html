@@ -179,7 +179,7 @@
   .funnel .ar{color:var(--tx2);font-weight:700}
 
   /* ── SCREENER interactive (2026-07-15) ── */
-  .scrtop{display:flex;align-items:center;gap:12px;margin:6px 0 9px;flex-wrap:wrap}
+  .scrtop{display:flex;align-items:center;gap:12px;margin:3px 0 2px;flex-wrap:wrap}  /* (2026-07-18) 여백 축소 */
   .mktseg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
   .mktseg .mkt{border:none;background:#fff;padding:7px 15px;font-size:13px;font-weight:600;cursor:pointer;color:var(--tx2)}
   .mktseg .mkt.on{background:var(--dark);color:#fff}
@@ -216,6 +216,8 @@
   #scr_tbl th.colbtn{cursor:pointer;text-align:center;color:#1f6feb;font-size:15px;width:36px}
   #scr_tbl th.colbtn:hover{background:#e0e7f2}
   .fltbar{display:flex;gap:8px;flex-wrap:wrap}
+  /* (2026-07-18) 1단계에서 버튼 그룹을 필터 바 우측 끝으로 이동(JS placeBtns가 append) */
+  .fltbar .scrbtns{margin-left:auto;align-self:flex-end}
   .fchip{position:relative}
   .fchip>button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--tx)}
   .fchip>button:hover{border-color:var(--dark)}
@@ -518,13 +520,13 @@
   <div class="pane" id="p_screener">
     <main class="mainc">
       <div class="lead" id="scr_asof" style="margin-top:2px">불러오는 중…</div>
-      <h2 style="margin-bottom:2px">종목 스크리너</h2>
+      <h2 style="margin:8px 0 3px">종목 스크리너</h2><!-- (2026-07-18) 위·아래 여백 축소 -->
       <div class="scrtop">
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>
         <span class="scrcnt" id="scr_cnt">—</span>
         <!-- (2026-07-18) 필터 초기화는 START·컬럼설정 버튼 '위'에 별도 줄로 표시 -->
-        <div class="scrbtns">
+        <div class="scrbtns" id="scr_btns_grp">
           <button class="scrrst2" id="scr_rst">↺ 필터 선택 초기화(default)</button>
           <div class="scrbtns-r">
             <button class="scrrst scrgo" id="scr_start">▶ START</button>
@@ -533,7 +535,7 @@
           </div>
         </div>
       </div>
-      <p class="note" style="margin:8px 0 0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
+      <p class="note" style="margin:2px 0 0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
       <!-- 1단계 -->
       <div id="scr_s1">
         <div class="fltbar" id="scr_fltbar"></div>
@@ -569,7 +571,8 @@
           </div>
         </div>
         <div id="scr_glspanel" style="display:none">
-          <div style="display:flex;justify-content:flex-end"><button class="cp-x" id="gls_close">닫기</button></div>
+          <!-- (2026-07-18) 제목·닫기 한 줄 — 설명 위 빈 공간 축소 -->
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><b style="font-size:12.5px">필터 설명</b><button class="cp-x" id="gls_close">닫기</button></div>
           <div id="scr_revnote" class="src"></div>
         </div>
       </div>

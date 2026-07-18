@@ -1245,6 +1245,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
     return `${f.label}: <span class="cv">${E(v)}</span>`; }
 
+  /* (2026-07-18) START·컬럼설정·필터설명·초기화 그룹 위치 — 1단계=필터 바 우측 끝, 2·3단계=상단 원위치 */
+  const BTNS_GRP=document.getElementById('scr_btns_grp');
+  function placeBtns(){ if(!BTNS_GRP) return;
+    const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
+    if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP); }
   function renderChips(){
     const d=DEF[mkt];
     $('scr_fltbar').innerHTML=KEYS.map(k=>{
@@ -1285,6 +1290,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_fltbar').querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{
       F[b.dataset.cat].v = b.dataset.v||null; apply(); });
     $('scr_fltbar').querySelectorAll('[data-tgl]').forEach(t=>t.onchange=()=>{ F[t.dataset.tgl].on=t.checked; apply(); });
+    placeBtns();   // innerHTML 재작성 후 버튼 그룹 재부착
   }
 
   /* ── 컬럼 레지스트리 (표시 On/OFF + 순서 변경) ── */
@@ -1539,7 +1545,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['배당','배당수익률'],
         ['증권 구분','보통주만 — 고정']
       ];
-      rn.innerHTML='<b style="color:var(--tx)">필터 설명</b><br>'+g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');
+      rn.innerHTML=g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');   // 제목은 패널 헤더로 이동
     }}
   }
   function apply(){ applyTable(); renderChips(); }
@@ -1881,6 +1887,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_s1').style.display = stage===1?'':'none';
     $('scr_s2').style.display = stage===2?'':'none';
     $('scr_s3').style.display = stage===3?'':'none';
+    placeBtns();
     loadF(); loadF2();
     if(stage===2) loadS2(()=>renderS2());
     else if(stage===3) loadS3(()=>renderS3());
@@ -1960,6 +1967,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_s1').style.display = stage===1?'':'none';
     $('scr_s2').style.display = stage===2?'':'none';
     $('scr_s3').style.display = stage===3?'':'none';
+    placeBtns();
     if(!loaded){ renderChips(); waitScreen(); return; }   // START 전에는 대기 화면 유지
     if(stage===2) loadS2(()=>renderS2());
     else if(stage===3) loadS3(()=>renderS3());
