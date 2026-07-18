@@ -1267,6 +1267,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     age:{l:'상장',n:1,m:'both'}
   };
   const CALL=Object.keys(CDEF);
+  /* '추가 가능' 목록 정렬 = 필터가 없는 컬럼 먼저(종목·시장·섹터·등락·목표주가)
+     → 그다음은 위 필터 바(KEYS)와 동일한 순서로 나열 */
+  const CK2FK={}; for(const fk of KEYS){ const ck=FK2CK[fk]||fk; if(CDEF[ck]) CK2FK[ck]=fk; }
+  const CORDER=CALL.filter(k=>!CK2FK[k])
+                   .concat(KEYS.map(fk=>FK2CK[fk]||fk).filter(ck=>CDEF[ck]));
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
   const CDEFAULT={
     kr:['n','mk','px','chg','cap','tv','tp','upside','recn','rev','age'],
@@ -1366,7 +1371,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function renderColPanel(){
     const p=$('scr_colpanel'); if(!p) return;
     const cur=COLST[mkt].filter(cAvail);
-    const rest=CALL.filter(k=>cAvail(k)&&cur.indexOf(k)<0);
+    const rest=CORDER.filter(k=>cAvail(k)&&cur.indexOf(k)<0);
     p.innerHTML=
       `<div class="cp-h"><b>표시 컬럼</b><span class="note">체크로 표시/숨김 · ▲▼로 순서 변경</span>
          <span class="cp-badge">${colsSaved?'💾 이 PC에 저장됨':'기본값 사용 중'}</span>
