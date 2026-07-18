@@ -144,6 +144,8 @@ def etf_quotes(op, crumb):
         print(f"etf_quotes: {len(rows)}종목")
 
 def main():
+    if "--news" in sys.argv:            # 뉴스만 (매시 갱신용 — 최신 헤드라인 놓치지 않도록)
+        news_pool(); return
     op, crumb = T.yahoo_opener()
     for name, fn in (("m7", lambda: m7_outlook(op, crumb)), ("news", news_pool),
                      ("factset", factset), ("etf", lambda: etf_quotes(op, crumb))):

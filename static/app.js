@@ -298,13 +298,13 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         const yoy=vals.map((v,i)=>(i>0&&vals[i-1])?+((v/vals[i-1]-1)*100).toFixed(0):null);
         mk($('c_hbm_mkt'),yr,[{n:'시장규모($B)',d:vals,c:C.g},
           {n:'수요 증가율(%)',d:yoy,c:C.p,dash:[5,3],w:2.2}],{bar:true,legend:true,y0:true});
-        $('hbm_mkt_src').textContent='[추정] Yole Group·TrendForce 연간 전망 — 연 1~2회 갱신(조사기관 발표 시)';
+        ($('hbm_mkt_src')||{}).textContent='[추정] Yole Group·TrendForce 연간 전망 — 연 1~2회 갱신(조사기관 발표 시)';
       } else if(H.market){
         const yr=H.market.revenue_bn.map(r=>r[0]);
         const dy=Object.fromEntries(H.market.demand_yoy||[]);
         mk($('c_hbm_mkt'),yr,[{n:'시장규모($B)',d:H.market.revenue_bn.map(r=>r[1]),c:C.g},
           {n:'수요 증가율(%)',d:yr.map(y=>dy[y]??null),c:C.p,dash:[5,3],w:2.2}],{bar:true,legend:true,y0:true});
-        $('hbm_mkt_src').textContent=H.market.revenue_src;
+        ($('hbm_mkt_src')||{}).textContent=H.market.revenue_src;
       } }
     // ② HBM ASP
     if(H.asp){
@@ -356,7 +356,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
           <td class="note">${pos?`현물이 계약가 ${g.toFixed(0)}% 상회 → 인상 압력`:`현물이 계약가 ${Math.abs(g).toFixed(0)}% 하회 → 압력 없음`}</td></tr>`;
         }).join('');
       mk($('c_spgap'),gl,[{n:'스팟−계약 갭(%)',d:gv,c:gv.map(v=>v>0?C.r:C.b)}],{bar:true});
-      $('spgap_src').textContent='현물가가 계약가를 상회하는 폭. 갭이 클수록 다음 계약 협상에서 계약가 인상 압력이 커진다 — 메모리 3사 실적의 선행지표. DDR4 8Gb 갭 +89%, NAND 64Gb 갭 +55%로 인상 압력이 지속되고 있다.';
+      ($('spgap_src')||{}).textContent='현물가가 계약가를 상회하는 폭. 갭이 클수록 다음 계약 협상에서 계약가 인상 압력이 커진다 — 메모리 3사 실적의 선행지표. DDR4 8Gb 갭 +89%, NAND 64Gb 갭 +55%로 인상 압력이 지속되고 있다.';
     }
 
     // ⑨ HBM:DDR5 격차 — (req12 2026-07-12) 매일 환산 시계열(series_mem_hbm_ddr5_gap) 우선
@@ -367,13 +367,13 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
           [{n:'배율(HBM÷DDR5)',d:gs.map(r=>r[1]['배율']??null),c:C.p,w:2.4},
            {n:'HBM $/GB',d:gs.map(r=>r[1]['HBM $/GB']??null),c:C.o,dash:[4,3]},
            {n:'DDR5 $/GB',d:gs.map(r=>r[1]['DDR5 $/GB']??null),c:C.b,dash:[4,3]}],{legend:true,y0:true});
-        $('gap_src').textContent=`[환산 추정] HBM3E 스택 ASP÷용량 vs DDR5 계약가 $/GB — 최신 ${last['배율']}배 (HBM $${last['HBM $/GB']}/GB vs DDR5 $${last['DDR5 $/GB']}/GB). 통상 5~6배 · 배율 급락=범용 DRAM 급등(삼성 상대 유리) 신호 · 매일 계산·누적.`;
+        ($('gap_src')||{}).textContent=`[환산 추정] HBM3E 스택 ASP÷용량 vs DDR5 계약가 $/GB — 최신 ${last['배율']}배 (HBM $${last['HBM $/GB']}/GB vs DDR5 $${last['DDR5 $/GB']}/GB). 통상 5~6배 · 배율 급락=범용 DRAM 급등(삼성 상대 유리) 신호 · 매일 계산·누적.`;
       } else if(H.per_gb){
         const p=H.per_gb;
         mk($('c_gap'),['DDR5 현물','HBM3','HBM3E','HBM4E'],
           [{n:'USD/GB',d:[p.ddr5_spot_usd_per_gb,p.hbm3_usd_per_gb,p.hbm3e_usd_per_gb,p.hbm4_usd_per_gb],c:C.r}],
           {bar:true,y0:true});
-        $('gap_src').textContent=`DDR5 현물이 HBM3E의 ${p.premium_x}배 — 통상 HBM이 5~6배 프리미엄인데 역전됨. ${p.note}`;
+        ($('gap_src')||{}).textContent=`DDR5 현물이 HBM3E의 ${p.premium_x}배 — 통상 HBM이 5~6배 프리미엄인데 역전됨. ${p.note}`;
       } }
     // ⑪ 선행지표 (매일) + 메모리/GPU 상대강도
     const LD=md.leading||{};
@@ -1149,15 +1149,25 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const LNK=t=>t.replace(/(https?:\/\/[^\s<)"']+|(?:[a-z0-9-]+\.)+(?:com|net|org|io)\/[^\s<,)"']+)/g,
     m2=>`<a href="${m2.startsWith('http')?m2:'https://'+m2}" target="_blank" rel="noopener">${m2}</a>`);
   const EL=v=>LNK(E(vtext(v)));
+  /* (4차 2026-07-19) 증권사 공식 리서치 페이지 — key_reports 에 url 이 없으면 이 주소로 확정 링크.
+     비동기 매칭에 기대지 않고 렌더 시점에 바로 링크되도록 한다(링크 누락 방지). */
+  const KROFF={kb:'https://rc.kbsec.com/today/index.able',nh:'https://m.nhqv.com/research/boardList?rshPprDitCd=02',
+    samsung:'https://www.samsungpop.com/mbw/research.do',miraeasset:'https://securities.miraeasset.com/bbs/board/message/list.do?categoryId=1521',
+    korea_inv:'https://research.truefriend.com',shinhan:'https://bbs2.shinhaninvest.com/bbs/report',
+    kiwoom:'https://invest.kiwoom.com/inv/research',meritz:'https://home.imeritz.com/include/resource/research/rsList.do',
+    hana:'https://www.hanaw.com/main/research/research/list.cmd',kyobo:'https://www.iprovest.com',
+    yuanta:'https://www.myasset.com/myasset/research/rs_list.cmd',hyundai:'https://www.hmsec.com/mn/research/research_list.do'};
   const houses=(obj,names,extras)=>{
     const src=(obj&&obj.firm&&typeof obj.firm==='object')?obj.firm:obj;
     return Object.entries(src||{}).filter(([k,v])=>names[k]&&v&&typeof v==='object')
     .map(([k,v])=>{
+      const off=KROFF[k]||'';
       const views=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv)
         .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${EL(vv)}</div>`).join('');
       const reps=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
-        .map(rp=>`<div class="s" style="margin-top:3px">📄 ${rp.url?`<a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>`:`<span class="rep-plain">${E(rp.title||'')}</span>`}
-          ${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`).join('');
+        .map(rp=>{const u=rp.url||off;
+          return `<div class="s" style="margin-top:3px">📄 ${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>${rp.url?'':' <span class="note">↗공식</span>'}`:E(rp.title||'')}
+          ${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`;}).join('');
       return `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
       ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${EL(v.key_message)}</div>`:''}
       ${views}${reps}
