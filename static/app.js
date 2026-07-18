@@ -1133,7 +1133,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'가격',fmt:wonF,min:1,presets:[['전체',null],['1,000원 ↑',1000],['5,000원 ↑',5000],['1만원 ↑',10000]],def:[1000,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'보통주만'},
-      opLoss:{label:'영업적자',fmt:v=>v.toFixed(0)+'년',presets:[['전체',null,null],['1년이상 제외',null,0],['2년이상 제외',null,1],['3년이상 제외',null,2]],def:[null,2]},
+      opLoss:{label:'영업적자',exclGE:1,maxOnly:1,fmt:v=>v.toFixed(0)+'년이상 제외',presets:[['전체',null,null],['1년이상 제외',null,1],['2년이상 제외',null,2],['3년이상 제외',null,3]],def:[null,3]},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1162,7 +1162,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       px:{label:'가격',fmt:usdF,min:1,presets:[['전체',null],['$5 ↑',5],['$10 ↑',10],['$50 ↑',50]],def:[5,null]},
       age:{label:'상장기간',fmt:v=>v+'년',min:1,presets:[['전체',null],['1년 ↑',1],['3년 ↑',3],['5년 ↑',5],['10년 ↑',10]],def:[1,null]},
       sec:{label:'증권 구분',fixed:'EQUITY만(ETF·워런트 제외)'},
-      opLoss:{label:'영업적자',fmt:v=>v.toFixed(0)+'년',presets:[['전체',null,null],['1년이상 제외',null,0],['2년이상 제외',null,1],['3년이상 제외',null,2]],def:[null,2]},
+      opLoss:{label:'영업적자',exclGE:1,maxOnly:1,fmt:v=>v.toFixed(0)+'년이상 제외',presets:[['전체',null,null],['1년이상 제외',null,1],['2년이상 제외',null,2],['3년이상 제외',null,3]],def:[null,3]},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1210,7 +1210,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(f.cat){ if(st.v!=null && String(r[k]||'')!==st.v) return false; continue; }
       if(f.fin && r.isfin) continue;   // 금융업 면제
       let v=colVal(r, FK2CK[k]||k);   // 필터키 → 컬럼키 매핑 후 공통 접근자 사용
-      if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }  // 데이터 필수 필터: 값 없으면 제외
+      if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }
+      if(f.exclGE){ if(st.max!=null && v>=st.max) return false; continue; }   // N년이상 제외  // 데이터 필수 필터: 값 없으면 제외
       if(st.min!=null && v<st.min) return false;
       if(st.max!=null && v>st.max) return false; }
     return true; }
@@ -1224,6 +1225,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(f.fixed!==undefined) return `${f.label}: <span class="cv">${E(f.fixed)}</span>`;
     if(f.tgl) return `${f.label}: <span class="cv">${st.on?'ON':'OFF'}</span>`;
     if(f.cat) return `${f.label}: <span class="cv">${E(st.v||'전체')}</span>`;
+    if(f.exclGE) return `${f.label}: <span class="cv">${st.max==null?'전체':st.max+'년이상 제외'}</span>`;
     const lo=st.min, hi=st.max;
     let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
     return `${f.label}: <span class="cv">${E(v)}</span>`; }
@@ -1247,8 +1249,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           const sel=(st.min===lo && (st.max===hi || (f.min&&hi==null)));
           return `<button class="preset ${sel?'sel':''}" data-k="${k}" data-lo="${lo==null?'':lo}" data-hi="${hi==null?'':hi}">${E(p[0])}</button>`;
         }).join('')+
-        `<div class="man"><span>직접</span><input type="number" placeholder="최소" data-man="${k}" data-mm="min" value="${st.min??''}">`+
-        (f.min?'':`<span>~</span><input type="number" placeholder="최대" data-man="${k}" data-mm="max" value="${st.max??''}">`)+`</div>`;
+        `<div class="man"><span>직접</span>`+
+        (f.maxOnly?'':`<input type="number" placeholder="최소" data-man="${k}" data-mm="min" value="${st.min??''}">`)+
+        (f.min?'':`${f.maxOnly?'':'<span>~</span>'}<input type="number" placeholder="${f.maxOnly?'N년이상':'최대'}" data-man="${k}" data-mm="max" value="${st.max??''}">`)+`</div>`;
       }
       return `<div class="fchip"><button class="${active?'act':''}" data-chip="${k}">${chipLabel(k)}</button><div class="fpop" id="pop_${k}">${pop}</div></div>`;
     }).join('');
