@@ -1544,15 +1544,29 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_detail').style.display='';
     $('sd_name').textContent = mkt==='kr'? (r.n||'') : r.c;
     $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
-    $('sd_last').textContent='';
+    $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
-    $('sd_src').textContent='차트 불러오는 중…';
-    try{
-      const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
-      if(dcode!==c) return;                       // 로드 중 다른 종목 클릭됨
-      drawAll(D);
-      $('sd_src').textContent=`종가 기준 일봉(최근 1년) · ${mkt==='kr'?'네이버':'Yahoo'} · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)`;
-    }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
+    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd'];
+    if(mkt==='kr'){
+      /* 한국: 네이버 인터랙티브 차트(fchart) 임베드 — 1분~월·기간줌·보조지표 추가/삭제 */
+      cvs.forEach(id=>{const e=$(id); if(e)e.style.display='none';});
+      $('sd_naver').style.display='';
+      const ifr=$('sd_nifr');
+      const src=`https://finance.naver.com/item/fchart.naver?code=${encodeURIComponent(c)}`;
+      if(ifr.getAttribute('src')!==src) ifr.setAttribute('src',src);
+      $('sd_nlink').href=`https://finance.naver.com/item/main.naver?code=${encodeURIComponent(c)}`;
+      $('sd_src').textContent='네이버 증권 차트(실시간) — 상단에서 1분·일·주·월 전환, 보조지표 메뉴로 지표 추가/삭제, 드래그로 기간 조절.';
+    } else {
+      $('sd_naver').style.display='none';
+      cvs.forEach(id=>{const e=$(id); if(e)e.style.display='block';});
+      $('sd_src').textContent='차트 불러오는 중…';
+      try{
+        const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
+        if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
+        drawAll(D);
+        $('sd_src').textContent='종가 기준 일봉(최근 1년) · Yahoo · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)';
+      }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
+    }
     $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   function renderSum(r){
