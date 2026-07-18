@@ -11,12 +11,12 @@
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:-apple-system,'Segoe UI','Malgun Gothic',sans-serif;background:var(--bg);color:var(--tx);line-height:1.5;font-size:14px}
   /* ── (2026-07-12) 앱셸: 헤더·좌측·네비는 고정, 본문(mainc)만 스크롤 ── */
-  .wrap{max-width:1260px;margin:0 auto;height:100vh;height:100dvh;display:flex;flex-direction:column;
-        overflow:hidden;padding:18px 14px 10px}
-  .shell{flex:1;min-height:0;display:grid;grid-template-columns:300px minmax(0,1fr);gap:20px;margin-top:8px}
+  .wrap{max-width:none;margin:0;height:100vh;height:100dvh;display:flex;flex-direction:column;
+        overflow:hidden;padding:14px 10px 8px}
+  .shell{flex:1;min-height:0;display:grid;grid-template-columns:248px minmax(0,1fr);gap:12px;margin-top:8px}
   .side{min-height:0;display:flex;flex-direction:column;overflow:hidden}
   .rightc{min-height:0;display:flex;flex-direction:column}
-  .mainc{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 8px 60px 0}
+  .mainc{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 60px 0}
   .mainc::-webkit-scrollbar,.invlist::-webkit-scrollbar,.side::-webkit-scrollbar{width:9px}
   .mainc::-webkit-scrollbar-thumb,.invlist::-webkit-scrollbar-thumb,.side::-webkit-scrollbar-thumb{background:#cfd4da;border-radius:9px}
   header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:2px solid var(--dark);flex:0 0 auto}
@@ -70,7 +70,7 @@
   .invlist .l2{font-size:10.5px;color:var(--tx2);margin-top:2px;line-height:1.35}
   /* 모바일·좁은 창: 앱셸 해제 → 평범한 문서 스크롤 (안드로이드 앱 웹뷰 포함) */
   @media(max-width:980px){
-    .wrap{height:auto;overflow:visible;display:block;padding:18px 14px 60px}
+    .wrap{height:auto;overflow:visible;display:block;padding:14px 10px 60px}
     .shell{display:block}
     .side,.rightc,.mainc{display:block;overflow:visible;min-height:0}
     .mainc{padding:0}
