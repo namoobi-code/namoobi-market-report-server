@@ -192,7 +192,7 @@ root.innerHTML=`
 <div class="ta-pane" id="ta_p3">${S3A}<div class="ta-h">B. 오늘의 토론 대기 후보 10×2 + 번들 (2단계 후 순차 실행)</div><div id="ta_s3">불러오는 중…</div></div>
 <div class="ta-pane" id="ta_p4">${S4}</div>
 <div class="ta-pane" id="ta_pR"><div class="ta-h">스킬 실행 결과 — /namoobi-trading-agents 토론·리스크 심사 판정</div><div id="ta_sr">불러오는 중…</div></div>
-<div class="ta-pane" id="ta_p5">${S5}</div>
+<div class="ta-pane" id="ta_p5"><div class="ta-h">스크리닝 성적표 — 그룹별 판정 이후 성과 (α = 벤치마크 대비)</div><div id="ta_s5">불러오는 중…</div>${S5}</div>
 <div class="src" style="margin-top:16px">⚠️ 투자 자문이 아니며, 스크리닝 결과는 참고용이다. 매매 판단과 책임은 사용자에게 있다.</div>`;
 root.querySelectorAll('.ta-btn').forEach(b=>b.onclick=()=>{
   root.querySelectorAll('.ta-btn').forEach(x=>x.classList.toggle('on',x===b));
@@ -269,6 +269,33 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
        <br>※ <b>기준일</b> = 기준가가 실제로 형성된 날(종가일). 번들의 <code>trade_date</code>(KRX 기본정보 기준일)는
        1영업일 지연돼 실제 가격일과 다르므로 성과 계산에 쓰지 않는다.
        <br>${esc(pf.note||'')}`;
+  } else if(pf&&pf.summary&&typeof pf.summary==='object'&&Object.keys(pf.summary).length&&Array.isArray(pf.calls)){
+    // 호환 렌더 (2026-07-17 추가): 신 ta_perf.py 스키마 — summary 가 dict, 종목행은 calls[].stocks.
+    // 구(배열) 스키마가 복원되면 위 분기가 그대로 처리하므로 이 분기는 건드리지 않아도 된다.
+    const pcf=v=>v==null?'<span class="note">경과 전</span>':`<b class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(2)}%</b>`;
+    const ORD=['승인','채택(미승인)','관망','탈락'];
+    const ks=ORD.filter(k=>pf.summary[k]).concat(Object.keys(pf.summary).filter(k=>!ORD.includes(k)));
+    document.getElementById('ta_perf_sum').innerHTML=
+      box(tbl(['구분','콜수','평균 수익률','평균 α(벤치 대비)'],
+        ks.map(k=>{const s=pf.summary[k]||{};return [
+          (k==='승인'?`<b>${esc(k)}</b>`:(k==='탈락'?`<span class="note">${esc(k)}</span>`:esc(k))),
+          String(s.n??'—'),pcf(s.avg_ret),pcf(s.avg_alpha)];})))
+      +`<div class="ta-note">α = 종목수익률 − 벤치마크(KR=KOSPI·US=SPY). <b>탈락 = 대조군</b> — 승인 α가 탈락 α를 지속적으로 앞서야 필터가 작동한다는 증거다. 경과 0거래일 회차는 집계에서 제외된다.</div>`;
+    const rws=[];
+    pf.calls.slice().sort((a,b)=>String(b.trade_date||'').localeCompare(String(a.trade_date||''))).forEach(c=>{
+      if((c.stocks||[]).length) c.stocks.forEach(s=>rws.push({c,s}));
+      else rws.push({c,s:null});
+    });
+    document.getElementById('ta_perf_rows').innerHTML=`<div class="ta-scroll">`+
+      tbl(['회차','종목','시장','그룹','기준가','경과일','당일','현재 수익률','α(현재)'],
+        rws.map(({c,s})=>s?[
+          esc(c.trade_date||'—'),esc(s.종목||'—'),esc(s.시장||'—'),
+          (s.그룹==='승인'?`<b class="up">승인</b>`:(s.그룹==='탈락'?`<span class="note">탈락</span>`:esc(s.그룹||'—'))),
+          (s.기준가==null?'—':Number(s.기준가).toLocaleString()),
+          String(s.days??'—'),pcf(s.ret_1d),pcf(s.ret_now),pcf(s.alpha_now)
+        ]:[esc(c.trade_date||'—'),'<span class="note">경과 0거래일 — 다음 갱신 대기</span>','—','—','—','0','—','—','—']))+`</div>`;
+    document.getElementById('ta_perf_note').innerHTML=
+      `갱신 ${esc(pf.as_of||'')} · 누적 ${esc(String(pf.runs??'—'))}회차 · 벤치마크 KR=^KS11 · US=SPY<br>${esc(pf.설명||'')}`;
   } else {
     document.getElementById('ta_perf_sum').innerHTML='<div class="ta-note">아직 판정 이력이 없다 — /namoobi-trading-agents 를 1회 이상 실행해야 추적이 시작된다.</div>';
     document.getElementById('ta_perf_rows').innerHTML='';
@@ -345,7 +372,7 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     h+=`<div style="margin:6px 0 14px"><span class="ta-chip g">채택 ${cnt('채택')}</span><span class="ta-chip y">관망 ${cnt('관망')}</span><span class="ta-chip r">탈락 ${cnt('탈락')}</span></div>`;
     if(ap.length){
       h+=`<div class="ta-appr"><b style="font-size:13px">✅ 최종 승인 ${ap.length}종목 (리스크 심사 통과)</b><div style="margin-top:8px">`+
-        tbl(['종목','시장','토론 확신도','비중 가이드','사유'],ap.map(r=>[`<b>${esc(r['종목'])}</b>`,esc(r['시장']||''),(r['확신도']??'-')+'/10',esc(r['비중가이드']||''),esc(r['사유']||'')]))+'</div></div>';
+        tbl(['종목','시장','토론 확신도','비중 가이드','손절선','무효화 조건','사유'],ap.map(r=>[`<b>${esc(r['종목'])}</b>`,esc(r['시장']||''),(r['확신도']??'-')+'/10',esc(r['비중가이드']||''),r['손절선']?Number(r['손절선']).toLocaleString():'-',esc(r['무효화']||'-'),esc(r['사유']||'')]))+'</div></div>';
     } else h+='<div class="ta-appr"><b>최종 승인 없음</b> — 리스크 심사에서 전원 반려</div>';
     const rej=(rr['심사대상']||[]).filter(r=>!r['승인']);
     if(rej.length) h+=`<div class="ta-note"><b>리스크 심사 반려</b>: ${rej.map(r=>esc(r['종목'])+' — '+esc(r['사유']||'')).join(' · ')}</div>`;
@@ -364,6 +391,26 @@ const J=async n=>{try{const r=await fetch('/api/db/'+n);return r.ok?await r.json
     }
     h+='<div class="src" style="margin-top:10px">⚠️ 투자 자문이 아니며 판정은 참고용. 매매 판단과 책임은 사용자에게 있다. 원본 JSON: <a href="/api/db/ta_verdict" target="_blank">/api/db/ta_verdict</a></div>';
     el.innerHTML=h;
+  }
+  // ---- 5단계 성적표 (ta_perf) ----
+  const pf=await J('ta_perf'); const e5=document.getElementById('ta_s5');
+  if(!pf||!pf.summary){ e5.innerHTML='<div class="ta-note">아직 성과 데이터 없음 — 스킬 실행이 쌓이면 매일 07:10에 자동 계산된다.</div>'; }
+  else{
+    const G=['승인','채택(미승인)','관망','탈락'];
+    let h5=`<div class="ta-note">갱신 ${esc(pf.as_of)} · 판정 ${pf.runs}회차 누적 · ${esc(pf['설명']||'')}</div>`;
+    h5+=box(tbl(['그룹','종목-콜 수','평균 수익률','평균 α(벤치 대비)'],
+      G.filter(g=>pf.summary[g]).map(g=>{const x=pf.summary[g];
+        return [`<b>${g}</b>`,x.n,pc(x.avg_ret,2),pc(x.avg_alpha,2)];})));
+    h5+='<div class="ta-note">해석: <b>승인군 α가 관망·탈락군보다 지속적으로 높아야</b> 이 파이프라인에 엣지가 있는 것이다. 회차가 적을 때는 통계적 의미가 없다.</div>';
+    for(const c of [...(pf.calls||[])].reverse()){
+      h5+=`<details class="ta-card"><summary><b>${esc(c.trade_date)}</b> 회차 <span style="color:var(--tx2);font-weight:400">경과 ${c['경과거래일']}거래일 · 벤치 KOSPI ${c.bench&&c.bench.KOSPI!=null?(c.bench.KOSPI*100).toFixed(1)+'%':'-'} / SPY ${c.bench&&c.bench.SPY!=null?(c.bench.SPY*100).toFixed(1)+'%':'-'}</span>`+
+        G.filter(g=>c.groups[g]).map(g=>`<span class="ta-chip ${g==='승인'?'g':g==='탈락'?'r':'y'}">${g} ${(c.groups[g].avg_ret*100).toFixed(1)}%</span>`).join('')+
+        `</summary><div class="bd">`+
+        tbl(['종목','시장','그룹','기준가','현재까지','1일','1주','1개월','α'],
+          c.stocks.map(st=>[esc(st['종목']).slice(0,22),st['시장'],st['그룹'],Number(st['기준가']).toLocaleString(),pc(st.ret_now,1),pc(st.ret_1d,1),pc(st.ret_1w,1),pc(st.ret_1m,1),pc(st.alpha_now,1)]))+
+        `</div></details>`;
+    }
+    e5.innerHTML=h5;
   }
   }catch(e){console.error('[ta] SKILL RESULT 렌더 실패:',e);document.getElementById('ta_sr').innerHTML='<div class="ta-note">판정 카드 렌더 실패: '+esc(String(e&&e.message||e))+' · 원본 <a href="/api/db/ta_verdict" target="_blank">JSON</a></div>';}
 

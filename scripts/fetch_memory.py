@@ -105,9 +105,12 @@ def fetch_hbm():
     out["supplier_revenue"] = [{"vendor": r["name"], "share_pct": _n(r.get("share")),
                                 "revenue_bn": _n(r.get("revenue")), "note": r.get("note", "")}
                                for r in (d.get("supplierRevenue") or [])]
+    # (req7-⑦ 2026-07-17) ASP 오염 가드 — 2026-07-13 실측: API 가 'DRAM (HBM context...)' 행과
+    #   단위 붕괴값(HBM3E 12-Hi 2600→8.33 $/GB 형)을 섞어 보냄 → HBM 스택가($100 이상)만 채택.
     out["asp"] = [{"product": r["product"], "price": r.get("price"), "price_mid": _n(r.get("price")),
                    "trend": r.get("trend"), "change": r.get("change"), "driver": r.get("driver", "")}
-                  for r in (d.get("spotPrices") or [])]
+                  for r in (d.get("spotPrices") or [])
+                  if str(r.get("product", "")).startswith("HBM") and (_n(r.get("price")) or 0) >= 100]
     out["specs"] = [{"gen": r["type"], "bandwidth": r.get("bw"), "capacity": r.get("cap"),
                      "pin": r.get("pin"), "note": r.get("note", "")} for r in (d.get("specs") or [])]
     out["platform_revenue"] = [{"platform": r["platform"], "units_m": _n(r.get("units")),
@@ -305,11 +308,19 @@ def compute_ddr5_gap(result):
                     mm = _re3.search(r"(\d+)\s*GB", it)
                     if mm:
                         ddr5 = float(r["avg"]); ddr5_gb = float(mm.group(1)); ddr5_src = it + " 모듈가 환산"; break
+        # (req7-⑨ 2026-07-17) DDR5 '현물' 기반 배율 추가 — 계약가 분모는 월 1회라 그래프가 일직선.
+        #   현물(매일 변동) 분모 배율을 병기해 일별 움직임을 보이게 한다.
+        ddr5_spot = None
+        for r in ((result.get("tables") or {}).get("dram_spot") or {}).get("rows", []):
+            if "DDR5 16Gb" in str(r.get("item", "")) and r.get("avg"):
+                ddr5_spot = float(r["avg"]); break
         if asp and ddr5 and cap_gb:
             h_gb = asp / cap_gb; d_gb = ddr5 / ddr5_gb
             ratio = round(h_gb / d_gb, 1)
+            ratio_spot = (round(h_gb / (ddr5_spot / 2.0), 1) if ddr5_spot else None)
             result.setdefault("hbm", {})["ddr5_gap"] = {
                 "hbm_per_gb": round(h_gb, 2), "ddr5_per_gb": round(d_gb, 2), "ratio": ratio,
+                "ddr5_spot_per_gb": (round(ddr5_spot / 2.0, 2) if ddr5_spot else None), "ratio_spot": ratio_spot,
                 "basis": f"HBM3E {cap_gb:.0f}GB 스택 ASP ${asp:,.0f} ÷ {cap_gb:.0f}GB vs {ddr5_src} ${ddr5:.2f} ÷ {ddr5_gb:.0f}GB (환산 추정)",
                 "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"}
             print(f"[memory] ✅ HBM:DDR5 격차  {ratio}배 (HBM ${h_gb:.1f}/GB vs DDR5 ${d_gb:.2f}/GB)")
@@ -392,7 +403,9 @@ def accumulate(result, dbdir):
     # (req12) HBM:DDR5 GB당 단가 격차 — 매일 환산 누적
     gap = (hbm.get("ddr5_gap") or {})
     if gap.get("ratio") is not None:
-        snaps["hbm_ddr5_gap"] = {"HBM $/GB": gap.get("hbm_per_gb"), "DDR5 $/GB": gap.get("ddr5_per_gb"), "배율": gap.get("ratio")}
+        snaps["hbm_ddr5_gap"] = {"HBM $/GB": gap.get("hbm_per_gb"), "DDR5 $/GB": gap.get("ddr5_per_gb"),
+                                 "배율": gap.get("ratio"), "배율(계약)": gap.get("ratio"),
+                                 "배율(현물)": gap.get("ratio_spot"), "DDR5 현물 $/GB": gap.get("ddr5_spot_per_gb")}
 
     n = 0
     for key, snap in snaps.items():
@@ -425,7 +438,7 @@ def fetch_leading():
     import time as _t
     out = {}
     for key, tk, label, why in LEAD:
-        px = chg1y = chg1m = None
+        px = chg1y = chg1m = None; ser1y = []
         for a in range(3):
             try:
                 d = json.loads(get(LCHART % tk))
@@ -434,6 +447,15 @@ def fetch_leading():
                 px = r["meta"].get("regularMarketPrice") or c[-1]
                 chg1y = round((c[-1] / c[0] - 1) * 100, 1)
                 chg1m = round((c[-1] / c[-22] - 1) * 100, 1) if len(c) > 22 else None
+                # (req7-⑩ 2026-07-17) 1년 일별 종가 시계열 — ⑩ 통합 라인차트(종목별 색상)용
+                try:
+                    _ts = r.get("timestamp") or []
+                    _cl = r["indicators"]["quote"][0]["close"]
+                    _ser1y = [[_t.strftime("%Y-%m-%d", _t.gmtime(t0)), round(float(v0), 2)]
+                              for t0, v0 in zip(_ts, _cl) if v0]
+                    ser1y = _ser1y[-260:]
+                except Exception:
+                    ser1y = []
                 break
             except Exception:
                 if a == 2: break
@@ -441,7 +463,8 @@ def fetch_leading():
         if px is None:
             print(f"[memory] ⚠️ 선행지표 {key} 수집 실패(비차단)"); continue
         out[key] = {"ticker": tk, "label": label, "why": why,
-                    "price": px, "chg_1y_pct": chg1y, "chg_1m_pct": chg1m}
+                    "price": px, "chg_1y_pct": chg1y, "chg_1m_pct": chg1m,
+                    "series_1y": ser1y}
         _t.sleep(1.0)
 
     # ★ 메모리/GPU 상대강도 — 가치 이동 신호

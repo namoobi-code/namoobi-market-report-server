@@ -296,10 +296,13 @@ def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_bu
 
     # 25델타 스큐 = 25델타 풋 IV − 25델타 콜 IV (양수 = 하방 헤지 수요 우위 = 공포)
     def d25(side, tgt):
-        cand = [r for r in rows if r["side"] == side and r["iv"] > 0 and abs(r["delta"]) > 0.01]
+        cand = [r for r in rows if r["side"] == side and 0 < r["iv"] < 150 and 0.05 <= abs(r["delta"]) <= 0.60]
         return min(cand, key=lambda r: abs(abs(r["delta"]) - tgt)) if cand else None
     cp, pp = d25("C", 0.25), d25("P", 0.25)
     skew = round(pp["iv"] - cp["iv"], 2) if (cp and pp) else None
+    if skew is not None and abs(skew) > 30:
+        # (sanity · 2026-07-17) 장전/호가공백 구간의 이론가 IV 왜곡(실측: 장전 콜 25d IV 170%) — ±30pp 초과 스큐는 퇴화값으로 폐기
+        skew = None
 
     # 딜러 감마(GEX) — 콜은 딜러 롱감마(+), 풋은 숏감마(−). 계약승수 25만원.
     gex = sum((1 if r["side"] == "C" else -1) * r["gamma"] * r["oi"] * 250000 * (spot ** 2) / 100
@@ -308,7 +311,7 @@ def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_bu
     return {"asof": datetime.date.today().isoformat(), "expiry": ym, "spot": spot,
             "scanned": len(scan), "strikes": len(ks),
             "call_oi": C, "put_oi": P, "pcr_oi": round(P / C, 3) if C else None,
-            "call_vol": cv, "put_vol": pv, "pcr_vol": round(pv / cv, 3) if cv else None,
+            "call_vol": cv, "put_vol": pv, "pcr_vol": (round(pv / cv, 3) if (cv >= 100 and pv >= 100) else None),  # (sanity) 양쪽 거래량 100계약 미만(장전·개장직후)이면 미산출 — 4,199 같은 퇴화 PCR 방지
             "iv_skew": skew,
             "iv_call_25d": cp["iv"] if cp else None, "iv_put_25d": pp["iv"] if pp else None,
             "gex": round(gex / 1e8, 1) if gex else None,     # 억원
