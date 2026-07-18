@@ -1,101 +1,101 @@
 {
  "marker": "2026-09-15|19",
- "as_of": "2026-07-13",
+ "as_of": "2026-07-18",
  "data": [
   {
    "date": "2025-07-29~30",
    "stance": "동결",
-   "note": "목표범위 4.25~4.50% 동결(월러·바우먼 2인 25bp 인하 소수의견), SEP 미실시. 출처: federalreserve.gov FOMC statement 2025-07-30"
+   "note": "4.25~4.50% 동결(5회 연속). Bowman·Waller 2인이 25bp 인하를 주장하며 소수의견(1993년 이후 최초로 2인 이상 이견). SEP 미실시. (출처: federalreserve.gov FOMC statement 2025-07-30)"
   },
   {
    "date": "2025-07-30",
    "stance": "동결",
-   "note": "목표범위 4.25-4.50% 유지(SEP 미발표 회차). Bowman·Waller 등 인하 소수의견 존재."
+   "note": "목표범위 4.25-4.50% 동결"
   },
   {
    "date": "2025-09-16~17",
    "stance": "인하",
-   "note": "25bp 인하 → 4.00~4.25%(2025-09-18 발효), 9월 SEP 실시. 출처: federalreserve.gov FOMC statement 2025-09-17"
+   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하, 2025-09-18 발효). 11-1 가결(Miran은 50bp 인하 주장 소수의견). SEP 실시 — 연내 추가 50bp 인하 시사. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
   },
   {
    "date": "2025-09-17",
-   "stance": "인하(-25bp)",
-   "note": "목표범위 4.00-4.25%로 인하(11-1 가결, Miran은 50bp 인하 주장). SEP 발표: 2025년 말 3.6% 전망(6월 3.9%에서 하향), 2026·2027년 각 1회 추가 인하 시사."
+   "stance": "인하",
+   "note": "25bp 인하, 목표범위 4.00-4.25%로. SEP 발표"
   },
   {
    "date": "2025-10-28~29",
    "stance": "인하",
-   "note": "25bp 인하 → 3.75~4.00%, 2인 반대(50bp 인하 1명, 동결 1명), SEP 미실시. 출처: federalreserve.gov FOMC statement 2025-10-29"
+   "note": "25bp 추가 인하 → 3.75~4.00%. 2인 반대(50bp 인하 1명, 동결 1명). 노동시장 약화 대응 '리스크관리성 인하'로, 연방정부 셧다운으로 일부 지표 발표가 지연된 가운데 결정. SEP 미실시. (출처: federalreserve.gov FOMC statement 2025-10-29)"
   },
   {
    "date": "2025-10-29",
-   "stance": "인하(-25bp)",
-   "note": "목표범위 3.75-4.00%로 인하(10-2 가결, Miran 50bp 인하·Schmid 동결 주장). SEP 미발표 회차. 보유증권 축소(양적긴축) 12/1 종료 결정."
+   "stance": "인하",
+   "note": "25bp 인하, 목표범위 3.75-4.00%로"
   },
   {
    "date": "2025-12-09~10",
    "stance": "인하",
-   "note": "25bp 인하 → 3.50~3.75%, 3인 반대(50bp 인하 1명 Miran, 동결 2명 Goolsbee·Schmid), 12월 SEP 실시. 출처: federalreserve.gov FOMC statement 2025-12-10"
+   "note": "25bp 인하 → 3.50~3.75%(2025년 3연속 인하 마무리). 9-2 가결(Miran 50bp 인하, Goolsbee·Schmid 동결 각각 소수의견). SEP 실시 — 2026년 1회·2027년 1회 추가 인하 시사(종착점 3.125%). (출처: federalreserve.gov FOMC statement·SEP 2025-12-10)"
   },
   {
    "date": "2025-12-10",
-   "stance": "인하(-25bp)",
-   "note": "목표범위 3.50-3.75%로 인하(2025년 3번째 인하, Miran 50bp 인하·Goolsbee·Schmid 동결 주장으로 소수의견 다수). SEP 발표: 2026년 1회·2027년 1회 추가 인하 후 장기중립 약 3% 시사."
+   "stance": "인하",
+   "note": "25bp 인하, 목표범위 3.50-3.75%로(2025년 9·10·12월 3연속 인하 마무리)"
   },
   {
    "date": "2026-01-27~28",
    "stance": "동결",
-   "note": "3.50~3.75% 동결, SEP 미실시. 출처: federalreserve.gov FOMC statement 2026-01-28"
+   "note": "3.50~3.75% 동결. 10-2 가결(Miran·Waller 25bp 인하 주장 소수의견). 3연속 인하 이후 숨고르기 — Powell '정책이 크게 제약적이라 보기 어렵다' 발언. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-01-28)"
   },
   {
    "date": "2026-01-28",
    "stance": "동결",
-   "note": "목표범위 3.50-3.75% 유지. SEP 미발표 회차."
+   "note": "목표범위 3.50-3.75% 동결. Miran·Waller 위원 25bp 인하 소수의견(Miran 4연속 반대)"
   },
   {
    "date": "2026-03-17~18",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(2연속), 3월 SEP 실시(점도표 median 2026년말 3.4%). 출처: federalreserve.gov FOMC statement 2026-03-18"
+   "note": "3.50~3.75% 동결(2연속). 11-1 가결(Miran 25bp 인하 주장 소수의견). SEP 실시 — 2026년말 중간값 3.4%(추가 1회 인하 시사), 2027·2028년 3.1%, 장기중립 3.1%. (출처: federalreserve.gov FOMC statement·SEP 2026-03-18)"
   },
   {
    "date": "2026-03-18",
    "stance": "동결",
-   "note": "목표범위 3.50-3.75% 유지. SEP 발표: 2026년 말 중간값 3.4%(추가 인하 1회 시사), 2027·2028·장기중립 각 3.1%."
+   "note": "목표범위 3.50-3.75% 동결(1명 25bp 인하 반대). SEP: 2026년말 정책금리 중간값 3.4%로 하향(연내 1회 인하 시사), 중동發 유가상승으로 인플레 우려 언급"
   },
   {
    "date": "2026-04-28~29",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(3연속), SEP 미실시. 출처: federalreserve.gov FOMC statement 2026-04-29"
+   "note": "3.50~3.75% 동결(3연속). 8-4 가결로 1992년 10월 이후 최다 소수의견 — Miran은 인하 주장, Hammack·Logan·Kashkari는 동결에는 동의하되 성명서의 '완화 편향' 문구 포함에 반대. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-04-29)"
   },
   {
    "date": "2026-04-29",
    "stance": "동결",
-   "note": "목표범위 3.50-3.75% 유지(11-1 가결). Powell은 인플레이션 우려 및 지정학 리스크(이란 관련 사태)를 이유로 완화 중단 시사. SEP 미발표 회차."
+   "note": "목표범위 3.50-3.75% 동결, 8-4 표결(1992년 10월 이후 최다 반대표, 추가 인하 메시지를 둘러싼 이견)"
   },
   {
    "date": "2026-06-16~17",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(4연속), 6월 SEP 실시 — 점도표 매파적 상향(median 2026년말 3.8%, 9명이 최소 1회 인상 시사), 워시(Warsh) 의장은 점 미제출. 출처: federalreserve.gov FOMC statement 2026-06-17, SEP 2026-06-17"
+   "note": "3.50~3.75% 동결(4연속). 12-0 만장일치(Kevin Warsh 신임 의장 첫 회의, 의장은 점도표 미제출). SEP 실시 — 2026년말 중간값이 3.4%(3월)→3.8%로 매파적 급선회, 18명 중 9명이 연내 1회 이상 인상 전망. (출처: federalreserve.gov FOMC statement·SEP 2026-06-17)"
   },
   {
    "date": "2026-06-17",
    "stance": "동결",
-   "note": "목표범위 3.50-3.75% 유지. SEP 발표: 2026년 말 중간값이 3.4%→3.8%로 큰 폭 상향되며 오히려 추가 인상 가능성을 시사(PCE 인플레이션 전망 3.6%로 상향); 2027년 3.6%, 2028년 3.4%, 장기중립 3.1%."
+   "note": "목표범위 3.50-3.75% 동결. Kevin Warsh 신임 의장 첫 회의. SEP 중간값 대폭 상향(2026년말 3.8%, 인플레 전망 상향)"
   },
   {
    "date": "2026-07-28~29",
    "stance": "예정",
-   "note": ""
+   "note": "SEP(점도표) 미발표 회의. 6월 SEP 매파적 전환 이후 첫 회의로, CME FedWatch 기준 동결 확률 약 89%(2026-07-14 기준). 7/2 발표 6월 비농업고용은 +5.7만명에 그쳐 노동시장 냉각 신호도 병존. (출처: federalreserve.gov FOMC calendar; Forbes Fed Meeting Tracker 2026-07)"
   },
   {
    "date": "2026-07-29",
    "stance": "예정",
-   "note": "차기 FOMC 회의(SEP 미발표 회차)."
+   "note": ""
   },
   {
    "date": "2026-09-15~16",
    "stance": "예정",
-   "note": ""
+   "note": "SEP(점도표) 발표 예정 회의(3·6·9·12월 분기 공개 주기). (출처: federalreserve.gov FOMC calendar 2026)"
   }
  ]
 }

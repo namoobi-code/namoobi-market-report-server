@@ -3,3 +3,5 @@ __pycache__/
 data/
 *.log
 *.key
+charts/
+/nmr_krx_brief.json
