@@ -133,6 +133,7 @@
   #p_vis th.vs-sh{cursor:pointer;user-select:none}
   #p_vis th.vs-sh:hover{color:#2b57d0}
   .vs-ar{color:#2b57d0;font-size:9px;margin-left:2px}
+  .rep-plain{color:inherit}
   .vs-bar{display:flex;align-items:flex-end;gap:2px;height:56px;margin:4px 0 2px}
   .vs-bar i{flex:1;background:#2b57d0;border-radius:2px 2px 0 0;min-height:1px;position:relative}
   .vs-bar i.b{background:#e2e8f0}
@@ -483,6 +484,9 @@
       <h2 id="d7">7. 한국 주요 증권사 리서치<em>10사</em></h2>
       <div class="grid g2" id="d_sec"></div>
 
+      <h3 style="margin-top:16px">7.7 네이버 금융리서치 모음 <span class="note">🖥 최근 2일 · 6개 게시판 테마별 · 제목·링크·작성사·작성일·요약</span></h3>
+      <div id="d_sec_nv"></div>
+
       <div class="lead" id="d_sec_c" style="margin-top:12px"></div>
 
       <h2 id="d8">8. 글로벌 IB 리서치<em>UBS · GS · JPM · MS · BlackRock</em></h2>
@@ -783,19 +787,11 @@
   <div class="note" style="margin-bottom:8px">※ 서버 자체 수집 — 보고서 실행 시점 조사가 아니라 서버가 주기 수집·누적한 DB 사용 · 매일 2회(06:45·15:45 KST) + 리포트 실행 시 병합.
   ① DRAM 현물 / ② DRAM 계약 / ③ NAND 현물 / ④ NAND 계약 / ⑤ 스팟-계약 갭 / ⑥ HBM 점유율 / ⑦ HBM ASP / ⑧ HBM 시장규모 / ⑨ HBM:DDR5 격차 / ⑩ 선행지표 1년 성과 / ⑪ 메모리/GPU 상대강도 — 11개 패널. 가격·주가=공개 소스 실측, ⑦⑧⑨=공개 추정치 환산.</div>
 
-  <div class="grid g2">
-    <div class="card"><div class="k">① DRAM 현물(스팟) 추이</div><canvas id="c_ds"></canvas></div>
-    <div class="card"><div class="k">② DRAM 고정거래(계약) 추이</div><canvas id="c_dc"></canvas></div>
-    <div class="card"><div class="k">③ NAND 현물(스팟) 추이</div><canvas id="c_ns"></canvas></div>
-    <div class="card"><div class="k">④ NAND 고정거래(계약) 추이</div><canvas id="c_nc"></canvas></div>
-    <div class="card"><div class="k">⑤ 스팟 − 계약 갭 (%)</div><canvas id="c_spgap"></canvas></div>
-    <div class="card"><div class="k">⑥ HBM 업체별 점유율 추이</div><canvas id="c_share"></canvas></div>
-    <div class="card"><div class="k">⑦ HBM ASP 추이</div><canvas id="c_asp"></canvas></div>
-    <div class="card"><div class="k">⑧ HBM 시장규모 · 수요 증가율 (연간)</div><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
-    <div class="card"><div class="k">⑨ HBM : DDR5 GB당 단가 격차 (환산 추정)</div><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
-    <div class="card"><div class="k">⑩ 선행지표 1년 성과</div><canvas id="c_lead1y"></canvas></div>
-    <div class="card"><div class="k">⑪ 메모리/GPU 상대강도 (MU ÷ NVDA)</div><canvas id="c_rs"></canvas></div>
-  </div>
+  <!-- (4차 2026-07-19) docx와 "같은 스크립트·같은 DB"로 서버가 생성한 이미지 — 그래프 모양 픽셀 일치 -->
+  <div class="card"><img src="/charts/hbm_dashboard.png" alt="메모리·HBM 지표 대시보드 (11패널)"
+       style="width:100%;max-width:1180px;display:block;margin:0 auto"
+       onerror="this.closest('.card').style.display='none'">
+    <div class="src">🖥 서버 매일 2회(06:52·15:52) gen_hbm_dashboard.py 재생성 — docx 3.1.9 이미지와 동일 산출물</div></div>
 
   <h3>■ 스팟-계약 갭 (계약가 인상 압력 선행지표)</h3>
   <div class="note" style="margin-bottom:6px">현물가가 계약가를 크게 상회하면 다음 계약 협상에서 인상 압력으로 작용한다 — 메모리 3사 실적의 선행지표.</div>

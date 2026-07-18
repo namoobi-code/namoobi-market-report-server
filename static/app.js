@@ -1156,7 +1156,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const views=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv)
         .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${EL(vv)}</div>`).join('');
       const reps=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
-        .map(rp=>`<div class="s" style="margin-top:3px">📄 ${rp.url?`<a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>`:E(rp.title||'')}
+        .map(rp=>`<div class="s" style="margin-top:3px">📄 ${rp.url?`<a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>`:`<span class="rep-plain">${E(rp.title||'')}</span>`}
           ${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`).join('');
       return `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
       ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${EL(v.key_message)}</div>`:''}
@@ -1187,8 +1187,40 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
            <div class="src">🖥 서버 수집 — 네이버 금융리서치 최신 리포트</div></div>`);
       }
     });
+    /* (4차 2026-07-19) 링크 없는 리포트 제목 링크화 — 서버 수집분에서 제목 유사 매칭,
+       못 찾으면 그 증권사 공식 리서치 페이지로 연결 */
+    {const norm=t=>String(t||'').replace(/[\s\[\]()·\-–—:/,.]+/g,'').toLowerCase();
+     const pool=[];
+     br.firms.forEach(f=>(f.reports||[]).forEach(rp=>pool.push({b:f.broker,n:norm(rp.title),u:rp.url})));
+     Object.entries(byName).forEach(([name,card])=>{
+       const firm=br.firms.find(f=>f.broker===name);
+       card.querySelectorAll('.rep-plain').forEach(sp=>{
+         const n=norm(sp.textContent);
+         if(!n) return;
+         let hit=pool.find(x=>x.b===name&&(x.n.includes(n.slice(0,18))||n.includes(x.n.slice(0,18))));
+         if(!hit) hit=pool.find(x=>x.n.includes(n.slice(0,14))||n.includes(x.n.slice(0,14)));
+         const url=(hit&&hit.u)||(firm&&firm.official)||'';
+         if(url){const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener';
+           a.textContent=sp.textContent; sp.replaceWith(a);}
+       });
+     });}
     wrap.insertAdjacentHTML('beforeend',
       `<div class="note" style="grid-column:1/-1">🖥 ${E(br.desc||'')} · ${E(br.as_of||'')}</div>`);
+
+    /* (4차 2026-07-19) 7.7 네이버 금융리서치 모음 — 최근 2일 · 테마별 표(제목·링크·작성사·작성일·요약) */
+    const nv=$$('d_sec_nv');
+    if(nv&&br.recent){
+      nv.innerHTML=Object.entries(br.recent).filter(([,arr])=>arr&&arr.length).map(([cat,arr])=>
+        `<h4 style="margin:14px 0 6px">${E(cat)} <span class="note">${arr.length}건</span></h4>
+        <div class="box" style="overflow-x:auto"><table>
+          <tr><th>작성일</th><th>작성사</th><th>제목${cat==='종목분석'||cat==='산업분석'?' · 대상':''}</th><th>간단요약</th><th></th></tr>
+          ${arr.map(it=>`<tr><td class="note">${E((it.date||'').slice(5))}</td>
+            <td>${E(it.broker)}</td>
+            <td><a href="${esc(it.url)}" target="_blank" rel="noopener">${E(it.title)}</a>${it.stock?` <span class="note">${E(it.stock)}</span>`:''}</td>
+            <td class="note">${E((it.summary||'').slice(0,80))}</td>
+            <td style="width:40px;text-align:right">${it.pdf?`<a href="${esc(it.pdf)}" target="_blank" rel="noopener" class="note">PDF</a>`:''}</td></tr>`).join('')}
+        </table></div>`).join('');
+    }
   }).catch(()=>{});
   const CT=(R.securities||{}).common_themes;
   $$('d_sec_c').innerHTML=Array.isArray(CT)?CT.map(t=>`• ${E(typeof t==='string'?t:(t.theme||JSON.stringify(t)))}`).join('<br>'):E(CT||'');
