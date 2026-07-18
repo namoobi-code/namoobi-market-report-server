@@ -133,6 +133,46 @@ def bundle(request: Request):
         return Response(status_code=304, headers=hdr)
     return Response(content=_bundle_cache["body"], media_type="application/json", headers=hdr)
 
+_chart_cache = {}
+
+@app.get("/api/chart/{mkt}/{code}")
+def chart_api(mkt: str, code: str):
+    """종목 일봉(종가 기준) 프록시 — KR: 네이버 / US: Yahoo v8. 10분 메모리 캐시."""
+    if mkt not in ("kr", "us") or not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
+        raise HTTPException(400, "bad params")
+    key = f"{mkt}:{code}"; now = time.time()
+    hit = _chart_cache.get(key)
+    if hit and now - hit[0] < 600:
+        return hit[1]
+    try:
+        from datetime import date as _d, timedelta as _td, datetime as _dt
+        if mkt == "kr":
+            E = _d.today().strftime("%Y%m%d"); S = (_d.today() - _td(days=430)).strftime("%Y%m%d")
+            url = f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime={S}&endDateTime={E}"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            rows = json.loads(urllib.request.urlopen(req, timeout=12).read())
+            out = {"t": [str(r.get("localDate") or "") for r in rows],
+                   "o": [r.get("openPrice") for r in rows], "h": [r.get("highPrice") for r in rows],
+                   "l": [r.get("lowPrice") for r in rows], "c": [r.get("closePrice") for r in rows],
+                   "v": [r.get("accumulatedTradingVolume") for r in rows]}
+        else:
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}?range=1y&interval=1d"
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+            j = json.loads(urllib.request.urlopen(req, timeout=12).read())
+            res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]
+            ts = res.get("timestamp") or []
+            out = {"t": [_dt.utcfromtimestamp(x).strftime("%Y%m%d") for x in ts],
+                   "o": q.get("open"), "h": q.get("high"), "l": q.get("low"),
+                   "c": q.get("close"), "v": q.get("volume")}
+        _chart_cache[key] = (now, out)
+        if len(_chart_cache) > 300:
+            _chart_cache.clear()
+        return out
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(502, f"chart fetch failed: {e}")
+
 @app.get("/api/reports")
 def reports():
     out = []

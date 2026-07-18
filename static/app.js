@@ -1460,11 +1460,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const cols=COLST[mkt].filter(cAvail); const cap=rows.slice(0,400);
     $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(cl(k))}</th>`).join('')
       +'<th class="colbtn" id="scr_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
-      cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
+      cap.map((r,i)=>`<tr data-c="${E(r.c)}"><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
       (rows.length>400?`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
     $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
     {const pl=$('scr_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
+    $('scr_tbl').querySelectorAll('tr[data-c]').forEach(tr=>tr.onclick=()=>showDetail(tr.dataset.c));
     {const rn=$('scr_revnote'); if(rn){
       const g = mkt==='us' ? [
         ['시장·섹터','거래소·업종 분류(Technology·Financial 등)'],
@@ -1492,36 +1493,169 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['상장기간','상장 후 경과 연수'],
         ['증권 구분','EQUITY만(ETF·워런트 제외) — 고정']
       ] : [
+        // (2026-07-18) 필터 바 나열 순서(KEYS)와 동일하게 정렬 + 기술 필터 7종 설명 추가
         ['시장','거래소 구분(KOSPI·KOSDAQ)'],
         ['가격','현재가. 기본값 1,000원↑ = 저가주 제외'],
         ['등락','전일 대비 등락률'],
+        ['시가총액','보통주 시가총액. 기본 3,000억↑'],
+        ['거래대금','최근 거래일 거래대금. 기본 30억↑ = 유동성 하한'],
         ['부채비율','부채÷자기자본. 금융업 면제'],
         ['유동비율','당좌자산÷유동부채(당좌비율) — 단기 지급능력. 금융업 면제'],
         ['영업적자','최근 연속 영업적자 연수. 기본 3년이상 제외'],
+        ['상장기간','상장 후 경과 연수'],
+        ['200일선','200일 이동평균 대비 현재가 — 장기 추세. 기본 −30%↑ = 심각한 하락추세 제외'],
+        ['20일선','20일 이동평균 대비 현재가 — 단기 추세'],
+        ['50일선','50일 이동평균 대비 현재가 — 중기 추세'],
+        ['이평배열','20·50·200일선 배열 — 정배열(20>50>200)=상승추세장, 역배열=하락추세장, 혼조=전환 구간'],
+        ['RSI(14)','상대강도지수 — 30 이하 과매도(반등 후보), 50 상회 = 상승 모멘텀, 70 이상 과매수(조정 경계)'],
+        ['거래량배수','최근 거래일 거래량 ÷ 직전 20일 평균 — 1.5배↑ 급증 = 추세 전환/돌파 확인 신호'],
+        ['MACD','(12,26,9) 상태 — 골든↑=시그널 상향돌파+0선 위(강한 상승), 골든↓=0선 아래 반등, 데드↑/↓=하향 전환'],
+        ['볼린저%b','볼린저밴드(20,2) 내 위치 — 0=하단(과매도권), 50=중심선, 100 이상=상단 돌파(거래량 동반 시 추세가속)'],
+        ['추세','12−1개월 주가 모멘텀'],
+        ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
+        ['외인보유비중','외국인 보유 비중'],
         ['목표주가','애널리스트 컨센서스 목표주가. 필터는 \'있는 종목만\' 토글'],
         ['상승여력','목표주가 ÷ 현재가 − 1'],
         ['투자의견','컨센서스 등급을 0~100 매수강도로 환산(높을수록 매수)'],
         ['리비전','목표주가 90일 변화율(누적/백필) — 애널리스트 상향세'],
         ['애널수','KR 미제공'],
-        ['PER','추정 주가수익비율(순이익 대비 주가). 낮을수록 저평가'],
-        ['PBR','주가순자산비율(순자산 대비 주가). 낮을수록 저평가'],
-        ['배당','배당수익률'],
         ['성장','매출·영업이익 성장률 평균'],
         ['매출성장','매출액 전년동기比 성장률'],
         ['이익성장','영업이익 전년동기比 성장률'],
+        ['PER','추정 주가수익비율(순이익 대비 주가). 낮을수록 저평가'],
+        ['PBR','주가순자산비율(순자산 대비 주가). 낮을수록 저평가'],
         ['ROE','자기자본이익률(순이익÷자기자본)'],
-        ['추세','12−1개월 주가 모멘텀'],
-        ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
-        ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
-        ['외인보유비중','외국인 보유 비중'],
         ['배당성향','주당배당÷EPS'],
-        ['상장기간','상장 후 경과 연수'],
+        ['배당','배당수익률'],
         ['증권 구분','보통주만 — 고정']
       ];
       rn.innerHTML='<b style="color:var(--tx)">필터 설명</b><br>'+g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');
     }}
   }
   function apply(){ applyTable(); renderChips(); }
+
+  /* ── 종목 상세: 종가 기준 일봉 차트(기술지표) + 지표 요약 ── */
+  let dcode=null;
+  function hideDetail(){ const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
+  {const b=$('sd_close'); if(b) b.onclick=hideDetail;}
+  async function showDetail(c){
+    const r=POOL[mkt].find(x=>x.c===c); if(!r) return;
+    dcode=c;
+    $('scr_detail').style.display='';
+    $('sd_name').textContent = mkt==='kr'? (r.n||'') : r.c;
+    $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
+    $('sd_last').textContent='';
+    renderSum(r);
+    $('sd_src').textContent='차트 불러오는 중…';
+    try{
+      const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
+      if(dcode!==c) return;                       // 로드 중 다른 종목 클릭됨
+      drawAll(D);
+      $('sd_src').textContent=`종가 기준 일봉(최근 1년) · ${mkt==='kr'?'네이버':'Yahoo'} · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)`;
+    }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
+    $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+  function renderSum(r){
+    const G=[['시세',['px','chg','cap','tv']],
+             ['기술적 지표',['mom','hi','v200','v50','v20','align','rsi','macd','bb','volx']],
+             ['컨센서스',['tp','upside','recn','rev','nan']],
+             ['밸류·수익성',['per','pbr','divy','payout','roe']],
+             ['성장',['grw','revg','opg']],
+             ['건전성',['de','cr','oploss']],
+             ['기타',['frgn','age']]];
+    $('sd_sum').innerHTML=G.map(([t,ks])=>{
+      const items=ks.filter(k=>CDEF[k]&&cAvail(k)).map(k=>`<div class="si"><span>${E(cl(k))}</span><b>${cell(r,k)}</b></div>`).join('');
+      return items?`<div class="sg"><div class="sgt">${t}</div>${items}</div>`:'';
+    }).join('');
+  }
+  // 지표 계산
+  const _sma=(a,n)=>a.map((_,i)=>{ if(i<n-1) return null; let s=0; for(let j=i-n+1;j<=i;j++){ const v=a[j]; if(v==null) return null; s+=v; } return s/n; });
+  function _ema(a,n){ const k=2/(n+1); let e=null; return a.map(x=>{ if(x==null) return e; e = e==null? x : x*k + e*(1-k); return e; }); }
+  function _rsiArr(c,n){ n=n||14; const out=Array(c.length).fill(null); let g=0,l=0,ag=0,al=0;
+    for(let i=1;i<c.length;i++){ const d=(c[i]??c[i-1])-(c[i-1]??c[i]);
+      if(i<=n){ g+=Math.max(d,0); l+=Math.max(-d,0);
+        if(i===n){ ag=g/n; al=l/n; out[i]=100-100/(1+ag/(al||1e-9)); } }
+      else { ag=(ag*(n-1)+Math.max(d,0))/n; al=(al*(n-1)+Math.max(-d,0))/n; out[i]=100-100/(1+ag/(al||1e-9)); } }
+    return out; }
+  function _cvs(id){ const cv=$(id); const w=cv.clientWidth||760, h=cv.clientHeight||80; cv.width=w; cv.height=h; const x=cv.getContext('2d'); x.clearRect(0,0,w,h); return [x,w,h]; }
+  function drawAll(D){
+    // 데이터 정리 (null 보간)
+    const full=D.c.slice();
+    for(let i=0;i<full.length;i++) if(full[i]==null) full[i]=full[i-1]??null;
+    const N=Math.min(250, full.length), off=full.length-N;
+    const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
+    const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
+    const ma20=sl(_sma(full,20)), ma50=sl(_sma(full,50)), ma200=sl(_sma(full,200));
+    const bm=_sma(full,20), bsd=full.map((x,i)=>{ if(i<19||bm[i]==null) return null; let s=0; for(let j=i-19;j<=i;j++) s+=(full[j]-bm[i])**2; return Math.sqrt(s/20); });
+    const bU=sl(bm.map((m,i)=>m==null?null:m+2*bsd[i])), bL=sl(bm.map((m,i)=>m==null?null:m-2*bsd[i]));
+    const rsi=sl(_rsiArr(full,14));
+    const e12=_ema(full,12), e26=_ema(full,26);
+    const macdF=full.map((_,i)=>(e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null);
+    const sigF=_ema(macdF,9);
+    const macd=sl(macdF), sig=sl(sigF), hist=macd.map((x,i)=>(x!=null&&sig[i]!=null)?x-sig[i]:null);
+    const UP='#d33', DN='#1f6feb';
+    const last=c[c.length-1], prev=c[c.length-2]??last, chg=prev?(last/prev-1)*100:0;
+    $('sd_last').innerHTML=`${mkt==='kr'?Math.round(last).toLocaleString()+'원':'$'+(+last).toFixed(2)} <span class="${chg>=0?'up':'dn'}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>`;
+    // ① 메인(캔들+MA+BB+52주고점)
+    {const [x,W,H]=_cvs('sd_main'); const P={l:6,r:52,t:8,b:16};
+     const lo=Math.min(...ll,...bL.filter(y=>y!=null)), hi=Math.max(...hh,...bU.filter(y=>y!=null));
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p-lo)/((hi-lo)||1));
+     // BB 밴드
+     x.beginPath(); let st=false;
+     for(let i=0;i<N;i++){ if(bU[i]==null)continue; st?x.lineTo(X(i),Y(bU[i])):(x.moveTo(X(i),Y(bU[i])),st=true); }
+     for(let i=N-1;i>=0;i--){ if(bL[i]==null)continue; x.lineTo(X(i),Y(bL[i])); }
+     x.closePath(); x.fillStyle='rgba(130,150,170,.10)'; x.fill();
+     // y 그리드 3줄
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.strokeStyle='#eceff3';
+     for(let g=0;g<=3;g++){ const p=lo+(hi-lo)*g/3, y=Y(p);
+       x.beginPath(); x.moveTo(P.l,y); x.lineTo(W-P.r,y); x.stroke();
+       x.fillText(mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2), W-P.r+4, y+3); }
+     // 52주 최고 점선
+     const mx=Math.max(...hh); x.setLineDash([4,3]); x.strokeStyle='#b7b0a6';
+     x.beginPath(); x.moveTo(P.l,Y(mx)); x.lineTo(W-P.r,Y(mx)); x.stroke(); x.setLineDash([]);
+     // 캔들
+     const bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ const up=c[i]>=o[i]; x.strokeStyle=x.fillStyle=up?UP:DN;
+       x.beginPath(); x.moveTo(X(i),Y(hh[i])); x.lineTo(X(i),Y(ll[i])); x.stroke();
+       const y1=Y(Math.max(o[i],c[i])), y2=Y(Math.min(o[i],c[i]));
+       x.fillRect(X(i)-bw/2, y1, bw, Math.max(1,y2-y1)); }
+     // MA 라인
+     const line=(a,col)=>{ x.strokeStyle=col; x.lineWidth=1.4; x.beginPath(); let s=false;
+       for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); x.lineWidth=1; };
+     line(ma20,'#f39c12'); line(ma50,'#27ae60'); line(ma200,'#8e44ad');
+     // x축 날짜 5틱
+     x.fillStyle='#98a2ad';
+     for(let g=0;g<5;g++){ const i=Math.floor(N*g/5), d=String(t[i]||'').replace(/-/g,'');
+       x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-4); } }
+    // ② 거래량
+    {const [x,W,H]=_cvs('sd_vol'); const P={l:6,r:52,t:2,b:2};
+     const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ x.fillStyle=(c[i]>=o[i])?'rgba(221,51,51,.45)':'rgba(31,111,235,.45)';
+       const h2=(H-P.t-P.b)*v[i]/vm; x.fillRect(X(i)-bw/2, H-P.b-h2, bw, h2); }
+     const va=_sma(v,20); x.strokeStyle='#666'; x.beginPath(); let s=false;
+     for(let i=0;i<N;i++){ if(va[i]==null)continue; const y=H-P.b-(H-P.t-P.b)*va[i]/vm; s?x.lineTo(X(i),y):(x.moveTo(X(i),y),s=true); } x.stroke();
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('VOL·20평균', W-P.r+4, 12); }
+    // ③ RSI(14)
+    {const [x,W,H]=_cvs('sd_rsi'); const P={l:6,r:52,t:4,b:4};
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-p/100);
+     x.strokeStyle='#eceff3'; [30,50,70].forEach(g=>{ x.beginPath(); x.moveTo(P.l,Y(g)); x.lineTo(W-P.r,Y(g)); x.stroke(); });
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('RSI 70',W-P.r+4,Y(70)+3); x.fillText('30',W-P.r+4,Y(30)+3);
+     x.strokeStyle='#555'; x.beginPath(); let s=false;
+     for(let i=0;i<N;i++){ if(rsi[i]==null)continue; s?x.lineTo(X(i),Y(rsi[i])):(x.moveTo(X(i),Y(rsi[i])),s=true); } x.stroke(); }
+    // ④ MACD
+    {const [x,W,H]=_cvs('sd_macd'); const P={l:6,r:52,t:4,b:4};
+     const vals=[...macd,...sig,...hist].filter(y=>y!=null);
+     const mx=Math.max(...vals.map(Math.abs))||1;
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p+mx)/(2*mx));
+     x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke();
+     const bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ if(hist[i]==null)continue; x.fillStyle=hist[i]>=0?'rgba(221,51,51,.5)':'rgba(31,111,235,.5)';
+       const y0=Y(0), y1=Y(hist[i]); x.fillRect(X(i)-bw/2, Math.min(y0,y1), bw, Math.max(1,Math.abs(y1-y0))); }
+     const line=(a,col)=>{ x.strokeStyle=col; x.beginPath(); let s=false;
+       for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); };
+     line(macd,'#333'); line(sig,'#f39c12');
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('MACD·시그널', W-P.r+4, 12); }
+  }
 
   // ── 2단계 z-score 랭킹 ──
   const AX=[['val','V 밸류','싼 종목 (−PER·−PBR·+배당)'],['grw','G 성장','이익 모멘텀 (EPS 성장)'],
@@ -1715,6 +1849,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(gb){gb.disabled=false; gb.textContent='▶ START';} });
   }
   function waitScreen(){                      // START 전 대기 화면 (필터는 미리 조정 가능)
+    hideDetail();
     $('scr_asof').innerHTML='<b>START</b>를 누르면 전종목 풀을 불러와 필터를 적용합니다.';
     $('scr_cnt').innerHTML='<span style="opacity:.55">대기 중</span>';
     const msg='필터를 설정한 뒤 <b>▶ START</b> 버튼을 누르세요.';
@@ -1741,7 +1876,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   // 마켓 토글
   document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
-    mkt=b.dataset.mkt; loadF(); loadF2();
+    mkt=b.dataset.mkt; loadF(); loadF2(); hideDetail();
     if(loaded) refresh(); else { renderChips(); waitScreen(); } });   // 원복 안함 — 마켓별 선택 유지
   // 스테이지 토글 (1단계/2단계)
   document.querySelectorAll('.stgseg .stg').forEach(b=>b.onclick=()=>{
