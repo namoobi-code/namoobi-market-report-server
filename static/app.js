@@ -1432,6 +1432,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       else if(f.cat){o[k]={v:null};}
       else {o[k]={min:f.def[0],max:f.def[1]};} } return o; }
   function resetF(){ F_ST[mkt]=buildF(); F=F_ST[mkt]; }          // 초기화 → 현재 마켓만 기본값
+  /* 전부전체 = 모든 필터를 '전체'로 (buildF 와 같은 구조에 기본값 대신 빈 값) */
+  function clearF(){ const o={}; const d=DEF[mkt];
+    for(const k of KEYS){ const f=d[k]; if(!f || f.fixed!==undefined) continue;
+      if(f.tgl){o[k]={on:false};}
+      else if(f.cat){o[k]={v:null};}
+      else {o[k]={min:null,max:null};} } return o; }
+  function allF(){ F_ST[mkt]=clearF(); F=F_ST[mkt]; }
   function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF();           // 마켓 전환 → 저장분 로드(원복 안함)
     else { const df=buildF(); for(const k in df) if(!(k in F_ST[mkt])) F_ST[mkt][k]=df[k]; } // 신규 필터키 백필(구버전 저장상태 호환)
     F=F_ST[mkt]; }
@@ -1468,7 +1475,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const BTNS_GRP=document.getElementById('scr_btns_grp');
   function placeBtns(){ if(!BTNS_GRP) return;
     const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
-    if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP); }
+    if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP);
+    /* 전부전체는 1단계 필터 전용 — 2·3단계(가중치 화면)에선 의미가 없어 숨긴다 */
+    {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';} }
   /* ── 종목 찾기 칩 (돋보기 → 입력창, 입력 즉시 필터) ── */
   let findQ='', findOpen=false, findCaret=null, findIME=false;
   function findHit(r){
@@ -2287,6 +2296,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     else apply();
   });
   {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else if(stage===2){resetW();renderS2();} else {resetW();renderS3();} };}
+  /* 전부전체 — 하드컷 전부 해제 + 종목 찾기도 해제해 말 그대로 전종목을 띄운다 */
+  {const ab=$('scr_allf'); if(ab) ab.onclick=()=>{ if(stage!==1) return;
+    allF(); findQ=''; findOpen=false; findIME=false; apply(); };}
   // 3단계 상위 N · 분석요청 버튼
   {const tn=$('scr_topn3'); if(tn) tn.oninput=()=>{ topN3=Math.max(1,Math.min(100,+tn.value||30)); rankCards3(); };}
   {const pw=$('scr_pw'), ab0=$('scr_ask');
