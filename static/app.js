@@ -1470,7 +1470,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
     if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP); }
   /* ── 종목 찾기 칩 (돋보기 → 입력창, 입력 즉시 필터) ── */
-  let findQ='', findOpen=false, findCaret=null;
+  let findQ='', findOpen=false, findCaret=null, findIME=false;
   function findHit(r){
     if(!findQ) return true;
     const q=findQ.toLowerCase();
@@ -1483,6 +1483,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       : `<div class="fchip"><button class="${findQ?'act':''}" id="find_btn" title="종목명·코드로 찾기">🔎 종목: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }
   function renderChips(){
+    /* 한글 조합 중엔 칩을 다시 그리지 않는다 — input 이 새로 만들어지면 조합이 끊겨 'ㅅㅏㅁ'이 된다 */
+    if(findOpen && findIME) return;
     const d=DEF[mkt];
     const parts=KEYS.map(k=>{
       const f=d[k];
@@ -1508,8 +1510,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       }
       return `<div class="fchip"><button class="${active?'act':''}" data-chip="${k}">${chipLabel(k)}</button><div class="fpop" id="pop_${k}">${pop}</div></div>`;
     });
-    // 종목 찾기 칩 — 시장(또는 섹터) 칩 바로 뒤에 끼워 넣는다
-    {const ai=parts.findIndex(h=>h!==''); parts.splice(ai<0?0:ai+1, 0, findChipHTML());}
+    parts.unshift(findChipHTML());   // 종목 찾기 칩 = 필터 바 맨 앞(시장 왼쪽)
     $('scr_fltbar').innerHTML=parts.join('');
     // 이벤트
     $('scr_fltbar').querySelectorAll('[data-chip]').forEach(b=>b.onclick=e=>{
@@ -1529,13 +1530,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     {const b=$('find_btn'); if(b) b.onclick=e=>{ e.stopPropagation();
       document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open'));
       findOpen=true; findCaret=null; renderChips(); };}
-    {const x=$('find_x'); if(x) x.onclick=e=>{ e.stopPropagation(); findQ=''; findOpen=false; apply(); };}
+    {const x=$('find_x'); if(x) x.onclick=e=>{ e.stopPropagation(); findIME=false; findQ=''; findOpen=false; apply(); };}
     {const fi=$('find_in'); if(fi){
       fi.onclick=e=>e.stopPropagation();
-      fi.oninput=()=>{ findQ=fi.value.trim(); findCaret=fi.selectionStart; apply(); };
+      /* 입력 중엔 applyTable() 만 — apply()(=renderChips 포함)를 부르면 입력창이 새로 그려져 한글 조합이 깨진다 */
+      fi.oncompositionstart=()=>{ findIME=true; };
+      fi.oncompositionend=()=>{ findIME=false; findQ=fi.value.trim(); findCaret=fi.selectionStart; applyTable(); };
+      fi.oninput=()=>{ findQ=fi.value.trim(); findCaret=fi.selectionStart; applyTable(); };
       fi.onkeydown=e=>{ e.stopPropagation();
-        if(e.key==='Escape'){ findQ=''; findOpen=false; apply(); }
-        if(e.key==='Enter'){ const t=$('scr_tbl').querySelector('tr[data-c]'); if(t) showDetail(t.dataset.c); } };
+        if(e.key==='Escape'){ findIME=false; findQ=''; findOpen=false; apply(); }
+        if(e.key==='Enter'&&!findIME){ const t=$('scr_tbl').querySelector('tr[data-c]'); if(t) showDetail(t.dataset.c); } };
       /* 표 자동갱신으로 칩이 다시 그려져도 입력 위치를 유지 (다른 입력창 사용 중이면 양보) */
       const ae=document.activeElement;
       if(!(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)&&ae.id!=='find_in')){
