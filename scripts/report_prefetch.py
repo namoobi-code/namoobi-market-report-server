@@ -76,28 +76,60 @@ def m7_outlook(op, crumb):
         print(f"m7_estimates: {len(out)}종목")
 
 # ── ② 뉴스 헤드라인 풀 ────────────────────────────────────
+#   매시 갱신하되 무한정 쌓지 않는다 — 기존 풀에 새 헤드라인만 합치고(제목 중복 제거),
+#   발행 3일 지난 건은 버린다. 주제당 상한도 둔다.
+NEWS_KEEP_DAYS = 3
+NEWS_PER_SNAP = 30               # 매 수집 때 주제당 상위 N건
+NEWS_CAP = 60                    # 주제당 최대 보관 (6주제 × 60 = 최대 360건, 3일 누적)
+
+def _pubdt(s):
+    """구글 RSS pubDate('Mon, 18 Jul 2026 07:12:00 GMT') → date 문자열. 실패 시 오늘."""
+    try:
+        from email.utils import parsedate_to_datetime
+        return parsedate_to_datetime(s).strftime("%Y-%m-%d")
+    except Exception:
+        return datetime.now().strftime("%Y-%m-%d")
+
 def news_pool():
+    from datetime import timedelta
+    cutoff = (datetime.now() - timedelta(days=NEWS_KEEP_DAYS)).strftime("%Y-%m-%d")
+    prev = {}
+    try:
+        prev = json.loads((DB / "news_pool.json").read_text(encoding="utf-8")).get("topics") or {}
+    except Exception:
+        pass
+
+    today = datetime.now().strftime("%Y-%m-%d")
     topics = {}
     for cat, q in NEWS_TOPICS:
+        keep = {}                # 제목정규화 → item (중복 제거)
+        # 기존 풀 중 '처음 담은 날(seen)'이 3일 이내인 것만 유지
+        for it in (prev.get(cat) or []):
+            if (it.get("seen") or it.get("date") or "") >= cutoff:
+                keep[re.sub(r"\s+", "", it.get("title", ""))] = it
         try:
             u = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
                  + "&hl=ko&gl=KR&ceid=KR:ko")
             req = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0"})
             root = ET.fromstring(urllib.request.urlopen(req, timeout=15).read())
-            items = []
-            for it in list(root.iter("item"))[:15]:
+            for it in list(root.iter("item"))[:NEWS_PER_SNAP]:   # 이번 스냅샷 관련도순 상위 → 항상 유지
                 t = html.unescape(it.findtext("title") or "")
+                title = t.rsplit(" - ", 1)[0][:110]
                 src = t.rsplit(" - ", 1)[-1] if " - " in t else ""
-                items.append({"title": t.rsplit(" - ", 1)[0][:110], "src": src[:24],
-                              "url": it.findtext("link") or "",
-                              "pub": (it.findtext("pubDate") or "")[:22]})
-            topics[cat] = items
+                k = re.sub(r"\s+", "", title)
+                seen = (keep.get(k) or {}).get("seen") or today   # 재등장이면 최초 seen 유지
+                keep[k] = {"title": title, "src": src[:24], "url": it.findtext("link") or "",
+                           "pub": (it.findtext("pubDate") or "")[:22],
+                           "date": _pubdt(it.findtext("pubDate") or ""), "seen": seen}
         except Exception as e:
             print(f"  news {cat} 실패: {type(e).__name__}")
+        # 발행일 최신순 + 상한
+        topics[cat] = sorted(keep.values(), key=lambda r: r.get("date", ""), reverse=True)[:NEWS_CAP]
+
     if topics:
-        save("news_pool", {"topics": topics,
-             "desc": "구글뉴스 RSS 주제별 헤드라인 풀 — 보고서 1장은 여기서 Top10 선별·요약만 (재검색 불필요)"})
-        print(f"news_pool: {sum(len(v) for v in topics.values())}건 · {len(topics)}주제")
+        save("news_pool", {"topics": topics, "keep_days": NEWS_KEEP_DAYS,
+             "desc": "구글뉴스 RSS 주제별 헤드라인 풀 — 매시 갱신·최근 3일 누적(중복제거·자동만료). 보고서 1장은 여기서 Top10 선별·요약만"})
+        print(f"news_pool: {sum(len(v) for v in topics.values())}건 · {len(topics)}주제 · 최근 {NEWS_KEEP_DAYS}일")
 
 # ── ③ FactSet Earnings Insight ────────────────────────────
 def factset():

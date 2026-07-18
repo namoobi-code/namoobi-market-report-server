@@ -1149,25 +1149,23 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const LNK=t=>t.replace(/(https?:\/\/[^\s<)"']+|(?:[a-z0-9-]+\.)+(?:com|net|org|io)\/[^\s<,)"']+)/g,
     m2=>`<a href="${m2.startsWith('http')?m2:'https://'+m2}" target="_blank" rel="noopener">${m2}</a>`);
   const EL=v=>LNK(E(vtext(v)));
-  /* (4차 2026-07-19) 증권사 공식 리서치 페이지 — key_reports 에 url 이 없으면 이 주소로 확정 링크.
-     비동기 매칭에 기대지 않고 렌더 시점에 바로 링크되도록 한다(링크 누락 방지). */
-  const KROFF={kb:'https://rc.kbsec.com/today/index.able',nh:'https://m.nhqv.com/research/boardList?rshPprDitCd=02',
-    samsung:'https://www.samsungpop.com/mbw/research.do',miraeasset:'https://securities.miraeasset.com/bbs/board/message/list.do?categoryId=1521',
-    korea_inv:'https://research.truefriend.com',shinhan:'https://bbs2.shinhaninvest.com/bbs/report',
-    kiwoom:'https://invest.kiwoom.com/inv/research',meritz:'https://home.imeritz.com/include/resource/research/rsList.do',
-    hana:'https://www.hanaw.com/main/research/research/list.cmd',kyobo:'https://www.iprovest.com',
-    yuanta:'https://www.myasset.com/myasset/research/rs_list.cmd',hyundai:'https://www.hmsec.com/mn/research/research_list.do'};
+  /* (4차 2026-07-19) key_reports 는 분석 에이전트가 정리한 대표 리포트 제목 — URL 이 대부분 없다.
+     공식 홈페이지(목록)로 링크하면 제목이 안 보여 오해를 준다. 그래서:
+       · 실제 url 이 있으면 그대로 링크
+       · 없으면 '증권사+제목' 네이버 통합검색으로 링크(🔍) — 실제 리포트를 찾아준다(가짜 직행 링크 금지) */
+  const searchUrl=(broker,title)=>'https://search.naver.com/search.naver?query='
+        + encodeURIComponent((broker||'')+' '+String(title||'').replace(/\([^)]*\)/g,' ').trim());
   const houses=(obj,names,extras)=>{
     const src=(obj&&obj.firm&&typeof obj.firm==='object')?obj.firm:obj;
     return Object.entries(src||{}).filter(([k,v])=>names[k]&&v&&typeof v==='object')
     .map(([k,v])=>{
-      const off=KROFF[k]||'';
+      const bnm=names[k]||k;
       const views=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv)
         .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${EL(vv)}</div>`).join('');
       const reps=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
-        .map(rp=>{const u=rp.url||off;
-          return `<div class="s" style="margin-top:3px">📄 ${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>${rp.url?'':' <span class="note">↗공식</span>'}`:E(rp.title||'')}
-          ${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`;}).join('');
+        .map(rp=>rp.url
+          ? `<div class="s" style="margin-top:3px">📄 <a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`
+          : `<div class="s" style="margin-top:3px">📄 <a href="${esc(searchUrl(bnm,rp.title))}" target="_blank" rel="noopener">${E(rp.title||'')}</a> <span class="note">🔍검색</span>${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`).join('');
       return `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
       ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${EL(v.key_message)}</div>`:''}
       ${views}${reps}
