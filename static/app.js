@@ -1151,7 +1151,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
-      frgn:{label:'외인소진율',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
+      frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     },
     us:{
@@ -1180,7 +1180,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
-      frgn:{label:'외인소진율',fixed:'— (US 미제공)'},
+      frgn:{label:'외인보유비중',fixed:'— (US 미제공)'},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
   };
@@ -1286,7 +1286,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'},
     roe:{l:'ROE',n:1,m:'both'}, mom:{l:'추세',n:1,m:'both'},
     hi:{l:'고점比',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
-    frgn:{l:'외인소진율',n:1,m:'kr'}, payout:{l:'배당성향',n:1,m:'both'},
+    frgn:{l:'외인보유비중',n:1,m:'kr'}, payout:{l:'배당성향',n:1,m:'both'},
     age:{l:'상장기간',n:1,m:'both'}
   };
   const cl =k=>CDEF[k].l;   // 표 헤더 = 패널 = 필터, 모두 동일 라벨
@@ -1484,7 +1484,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['추세','12−1개월 주가 모멘텀'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
-        ['외인소진율','외국인 보유 비중'],
+        ['외인보유비중','외국인 보유 비중'],
         ['배당성향','주당배당÷EPS'],
         ['상장기간','상장 후 경과 연수'],
         ['증권 구분','보통주만 — 고정']
