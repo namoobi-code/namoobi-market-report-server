@@ -278,6 +278,71 @@ def _enrich_us(us):
         r.pop("fcf",None)
         r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap")
         us[i]=r
+    # (2026-07-18) US 2차 기술지표 — Yahoo spark 배치(6mo 일봉, 20심볼/호출 ≈ 261회, 수 분).
+    # 거래량배수는 quotes(당일 거래량 ÷ 3개월 평균)로 요청 추가 없음. 이평배열은 ma20(spark)+ma50/200(quotes).
+    def _spark_batch(syms):
+        try:
+            u=("https://query1.finance.yahoo.com/v7/finance/spark?symbols=%s&range=6mo&interval=1d"
+               % _up.quote(",".join(syms)))
+            j=T.jget(u,opener=op,timeout=15)
+            out={}
+            for r0 in (j.get("spark",{}) or {}).get("result") or []:
+                sym=r0.get("symbol"); resp=(r0.get("response") or [{}])[0]
+                cl=(((resp.get("indicators",{}) or {}).get("quote") or [{}])[0].get("close")) or []
+                cl=[x for x in cl if x is not None]
+                if len(cl)>=30: out[sym]=cl
+            return out
+        except Exception: return {}
+    try:
+        codes=[r["c"] for r in us]
+        chunks=[codes[i:i+20] for i in range(0,len(codes),20)]
+        closes={}
+        for res in T.pmap(_spark_batch, chunks, workers=6): closes.update(res)
+        ok_ta=0
+        for r in us:
+            q=qmap.get(r["c"]) or {}
+            vol,va3=q.get("regularMarketVolume"),q.get("averageDailyVolume3Month")
+            if vol and va3: r["volx"]=round(vol/va3,2)
+            cl=closes.get(r["c"])
+            if not cl or len(cl)<30: continue
+            c=cl[-1]; n=len(cl)
+            ma20=sum(cl[-20:])/20; r["v20"]=c/ma20-1
+            ma50v,ma200v=q.get("fiftyDayAverage"),q.get("twoHundredDayAverage")
+            if ma50v and ma200v:
+                r["align"]="정배열" if ma20>ma50v>ma200v else ("역배열" if ma20<ma50v<ma200v else "혼조")
+            g=l=None
+            for i2 in range(1,n):
+                d1=cl[i2]-cl[i2-1]; up=max(d1,0.0); dn=max(-d1,0.0)
+                if i2<14: g=(g or 0)+up; l=(l or 0)+dn
+                elif i2==14: g=(g+up)/14; l=(l+dn)/14
+                else: g=(g*13+up)/14; l=(l*13+dn)/14
+            if n>14 and (g is not None):
+                r["rsi"]=round(100.0 if l==0 else 100-100/(1+g/l),1)
+            e12=e26=None; macds=[]
+            for i2,p in enumerate(cl):
+                e12=p if e12 is None else (p*2/13+e12*11/13)
+                e26=p if e26 is None else (p*2/27+e26*25/27)
+                if i2>=25: macds.append(e12-e26)
+            if len(macds)>=10:
+                sig=None
+                for m0 in macds: sig=m0 if sig is None else (m0*2/10+sig*8/10)
+                mv=macds[-1]
+                r["macd"]=("골든↑" if mv>sig and mv>0 else "골든↓" if mv>sig else
+                           "데드↓" if mv<=sig and mv<0 else "데드↑")
+            sd=(sum((x-ma20)**2 for x in cl[-20:])/20)**0.5
+            if sd>0: r["bb"]=round((c-(ma20-2*sd))/(4*sd)*100,1)
+            ok_ta+=1
+        # spark 누락 종목은 직전 풀 값 이월
+        cfta=0
+        for r in us:
+            if r.get("rsi") is None and r["c"] in prev:
+                p=prev[r["c"]]
+                for k in ("v20","align","rsi","macd","bb","volx"):
+                    if r.get(k) is None and p.get(k) is not None: r[k]=p[k]
+                if r.get("rsi") is not None: cfta+=1
+        print(f"[pool] US 기술지표(spark) {ok_ta}/{len(us)} (+이월 {cfta})")
+    except Exception as e:
+        print("[pool] US spark 실패:", repr(e)[:80])
     _score(us,"c",{"val":[lambda r:(-r["fpe"] if r.get("fpe") else None),
                           lambda r:(-r["pb"] if r.get("pb") else None),
                           lambda r:r.get("divy")],
