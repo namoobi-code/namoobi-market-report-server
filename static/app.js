@@ -1185,9 +1185,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
-  const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','v200','age',
-              'cov','upside','rec','rev','nan','per','pbr','divy','grw','mgrw','ogrw',
-              'roe','mom','hi','frgn','payout','sec'];
+  const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age','v200',
+              'mom','hi','frgn','cov','upside','rec','rev','nan',
+              'grw','mgrw','ogrw','per','pbr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
@@ -1283,14 +1283,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
     de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
     oploss:{l:'영업적자',n:1,m:'both'},
-    v200:{l:'200일선',n:1,m:'both'}, age:{l:'상장기간',n:1,m:'both'},
+    age:{l:'상장기간',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
+    mom:{l:'추세',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
-    per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'},
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'},
-    roe:{l:'ROE',n:1,m:'both'}, mom:{l:'추세',n:1,m:'both'},
-    hi:{l:'고점比',n:1,m:'both'},
-    frgn:{l:'외인보유비중',n:1,m:'kr'}, payout:{l:'배당성향',n:1,m:'both'}
+    per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
+    payout:{l:'배당성향',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'}
   };
   const cl =k=>CDEF[k].l;   // 표 헤더 = 패널 = 필터, 모두 동일 라벨
   const cpl=cl;
@@ -1305,8 +1304,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
      ※ 증권 구분만 고정값이라 대응 컬럼 없음 */
   const CDEFAULT={
-    kr:['n','mk','px','chg','cap','tv','de','cr','oploss','v200','age','tp','upside','recn','rev'],
-    us:['n','sector','px','chg','cap','tv','de','cr','oploss','v200','age','tp','upside','recn','rev','nan']
+    kr:['n','mk','px','chg','cap','tv','de','cr','oploss','age','v200','tp','upside','recn','rev'],
+    us:['n','sector','px','chg','cap','tv','de','cr','oploss','age','v200','tp','upside','recn','rev','nan']
   };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
