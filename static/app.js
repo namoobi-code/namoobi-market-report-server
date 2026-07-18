@@ -1539,7 +1539,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function hideDetail(){ const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
   {const b=$('sd_close'); if(b) b.onclick=hideDetail;}
   /* 차트 소스: tv(TradingView 임베드) / canvas(자체) — PC별 저장. 네이버는 새창(임베드 시 시세 차단) */
-  let chartSrc=(()=>{try{const v=localStorage.getItem('nmr_csrc'); return (v==='canvas'||v==='tv')?v:'tv';}catch(e){return 'tv';}})();
+  let chartSrc=(()=>{try{const v=localStorage.getItem('nmr_csrc'); return (v==='canvas'||v==='tv')?v:'canvas';}catch(e){return 'canvas';}})();
   document.querySelectorAll('.csrc').forEach(b=>b.onclick=()=>{
     chartSrc=b.dataset.s; try{localStorage.setItem('nmr_csrc',chartSrc);}catch(e){}
     if(dcode) showDetail(dcode);
