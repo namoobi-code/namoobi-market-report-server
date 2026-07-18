@@ -169,6 +169,10 @@
   .scrcnt b{color:#1f6feb;font-size:19px;font-variant-numeric:tabular-nums;margin-right:2px}
   .scrrst{margin-left:auto;border:1px solid var(--line);background:#fff;border-radius:7px;padding:6px 12px;font-size:12px;cursor:pointer;color:var(--tx2)}
   .scrrst:hover{border-color:var(--dark);color:var(--tx)}
+  .scrgo{background:var(--dark);color:#fff;border-color:var(--dark);font-weight:700}
+  .scrgo:hover{color:#fff;opacity:.88}
+  .scrgo:disabled{opacity:.55;cursor:default}
+  #scr_rst{margin-left:6px}
   .fltbar{display:flex;gap:8px;flex-wrap:wrap}
   .fchip{position:relative}
   .fchip>button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--tx)}
@@ -458,6 +462,7 @@
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>
         <span class="scrcnt" id="scr_cnt">—</span>
+        <button class="scrrst scrgo" id="scr_start">▶ START</button>
         <button class="scrrst" id="scr_rst">초기화</button>
       </div>
       <p class="note" style="margin:8px 0 0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>

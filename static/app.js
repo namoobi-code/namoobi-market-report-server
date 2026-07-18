@@ -1281,6 +1281,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function sortVal(r,k){ return k==='age'?(ageOf(r)??-1):k==='n'?String(r.n||''):(r[k]??-Infinity); }
   let popCloser=false;
   function applyTable(){
+    if(!loaded){ waitScreen(); return; }      // START 전: 대기 화면 유지(빈 표로 덮어쓰지 않음)
     const rows=POOL[mkt].filter(pass);
     rows.sort((a,b)=>{const x=sortVal(a,sort.k),y=sortVal(b,sort.k);
       if(typeof x==='string')return sort.d*x.localeCompare(y); return sort.d*(x-y);});
@@ -1503,23 +1504,49 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   window.addEventListener('beforeunload', saveScr);
 
+  let prepped=false;
+  function loadPool(then){                    // 전종목 풀 로드 (START 눌렀을 때만)
+    if(loaded){ then&&then(); return; }
+    const gb=$('scr_start');
+    if(gb){gb.disabled=true; gb.textContent='불러오는 중…';}
+    $('scr_asof').textContent='전종목 풀 불러오는 중…';
+    fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
+      d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loaded=true;
+      $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
+      {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
+      if(gb){gb.disabled=false; gb.textContent='▶ START';}
+      then&&then();
+    }).catch(e=>{ $('scr_asof').textContent='풀 로드 실패: '+e;
+      if(gb){gb.disabled=false; gb.textContent='▶ START';} });
+  }
+  function waitScreen(){                      // START 전 대기 화면 (필터는 미리 조정 가능)
+    $('scr_asof').innerHTML='<b>START</b>를 누르면 전종목 풀을 불러와 필터를 적용합니다.';
+    $('scr_cnt').innerHTML='<span style="opacity:.55">대기 중</span>';
+    const msg='필터를 설정한 뒤 <b>▶ START</b> 버튼을 누르세요.';
+    const row=`<tr><td class="note" style="text-align:center;padding:30px">${msg}</td></tr>`;
+    for(const id of ['scr_tbl','scr_tbl2']){ const t=$(id); if(t) t.innerHTML=row; }
+    const c=$('scr_cards'); if(c) c.innerHTML=`<div class="note" style="grid-column:1/-1;text-align:center;padding:30px">${msg}</div>`;
+  }
   window.renderScreener=function(){
-    if(!loaded){
-      loaded=true;
-      $('scr_asof').textContent='전종목 풀 불러오는 중…';
-      fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
-        d=d||{}; POOL={kr:d.kr||[],us:d.us||[]};
-        $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
-        {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
-        if(restoreScr()) applyRestored(); else { resetF(); apply(); }
-      }).catch(e=>{ $('scr_asof').textContent='풀 로드 실패: '+e; });
-    } else { refresh(); }
+    if(loaded){ refresh(); return; }
+    if(!prepped){ prepped=true;
+      if(!restoreScr()) resetF();
+      loadF(); loadF2();
+      document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x.dataset.mkt===mkt));
+      document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',+x.dataset.stg===stage));
+      $('scr_s1').style.display = stage===1?'':'none';   // 복원된 단계 pane 표시
+      $('scr_s2').style.display = stage===2?'':'none';
+      $('scr_s3').style.display = stage===3?'':'none';
+    }
+    renderChips(); waitScreen();
   };
+  {const gb=$('scr_start'); if(gb) gb.onclick=()=>loadPool(()=>applyRestored());}
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
   // 마켓 토글
   document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
-    mkt=b.dataset.mkt; loadF(); loadF2(); refresh(); });   // 원복 안함 — 마켓별 선택 유지
+    mkt=b.dataset.mkt; loadF(); loadF2();
+    if(loaded) refresh(); else { renderChips(); waitScreen(); } });   // 원복 안함 — 마켓별 선택 유지
   // 스테이지 토글 (1단계/2단계)
   document.querySelectorAll('.stgseg .stg').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',x===b));
@@ -1527,6 +1554,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_s1').style.display = stage===1?'':'none';
     $('scr_s2').style.display = stage===2?'':'none';
     $('scr_s3').style.display = stage===3?'':'none';
+    if(!loaded){ renderChips(); waitScreen(); return; }   // START 전에는 대기 화면 유지
     if(stage===2) loadS2(()=>renderS2());
     else if(stage===3) loadS3(()=>renderS3());
     else apply();
