@@ -197,7 +197,7 @@
             r.me ? '나 해제' : '나로 표시'}</button></td></tr>`).join('');
 
     const meRows = mkRows(s.sessions.filter(r=>r.me))
-      || '<tr><td colspan="11" style="color:var(--tx2);padding:14px">아직 없다 — 로그인하면 그 회선이 자동으로 등록된다.</td></tr>';
+      || '<tr><td colspan="11" style="color:var(--tx2);padding:14px">아직 없다 — 아래 방문 목록에서 \'나로 표시\' 버튼으로 직접 등록한다.</td></tr>';
     const otRows = mkRows(s.sessions.filter(r=>!r.me))
       || '<tr><td colspan="11" style="color:var(--tx2);padding:14px">기록 없음</td></tr>';
 
@@ -265,7 +265,7 @@
         <tbody id="vs_rules"><tr><td colspan="6" style="color:var(--tx2);padding:12px">불러오는 중…</td></tr></tbody>
       </table></div>
 
-      <h2 style="margin-top:18px">내 접속<em>로그인한 회선은 자동 등록된다</em></h2>
+      <h2 style="margin-top:18px">내 접속<em>'나로 표시' 버튼으로 직접 등록 (자동 등록 없음)</em></h2>
       <div class="box" style="overflow-x:auto"><table>
         <thead>${head()}</thead>
         <tbody>${meRows}</tbody></table></div>

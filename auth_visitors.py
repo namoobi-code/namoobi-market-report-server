@@ -242,7 +242,8 @@ async def auth_login(request: Request, response: Response):
     tok = secrets.token_urlsafe(32)
     SESS[tok] = {"u": user, "exp": now + SESS_TTL, "ip": ip}
     _save_sess(SESS)
-    remember_my_ip(ip, request.headers.get("user-agent", ""))   # 이 회선·기기를 '나'로 기억
+    # (2026-07-18) 자동 '나' 등록 제거 — 공유기(NAT) 뒤 다른 기기·앱까지 IP+기기+브라우저
+    # 조합으로 오인 등록될 수 있어, '나' 표시는 방문 목록의 수동 버튼으로만 한다.
     https = (request.headers.get("x-forwarded-proto") == "https"
              or request.url.scheme == "https")
     response.set_cookie("nmr_sess", tok, max_age=SESS_TTL, httponly=True,
@@ -296,7 +297,7 @@ async def auth_setup(request: Request, response: Response):
     tok = secrets.token_urlsafe(32)
     SESS[tok] = {"u": user, "exp": now + SESS_TTL, "ip": ip}
     _save_sess(SESS)
-    remember_my_ip(ip, request.headers.get("user-agent", ""))   # 이 회선·기기를 '나'로 기억
+    # (2026-07-18) 자동 '나' 등록 제거 — 수동 버튼으로만 등록
     https = (request.headers.get("x-forwarded-proto") == "https"
              or request.url.scheme == "https")
     response.set_cookie("nmr_sess", tok, max_age=SESS_TTL, httponly=True,
