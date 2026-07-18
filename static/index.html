@@ -62,10 +62,13 @@
   .hdr-r{display:flex;align-items:center;gap:9px}
   .hbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;color:var(--tx2);font-weight:600;white-space:nowrap}
   .hbtn:hover{border-color:var(--dark);color:var(--tx)}
-  /* 개발자 로그인 — 눈에 띄지 않게 */
-  .lockbtn{padding:8px 9px;opacity:.35;font-size:11px}
-  .lockbtn:hover{opacity:1}
-  .lockbtn.on{opacity:1;border-color:#2b57d0;color:#2b57d0}
+  /* 개발자 로그인 — 로그인 전에는 흐릿하고 작게 */
+  .lockbtn{padding:6px 7px;font-size:10px;opacity:.22;border-color:#e2e8f0;font-weight:400}
+  .lockbtn:hover{opacity:.9;border-color:var(--dark)}
+  .lockbtn.on{padding:8px 12px;font-size:12px;opacity:1;font-weight:600;
+              border-color:#2b57d0;color:#2b57d0;background:#eef4ff}
+  #auth_out{display:none;padding:6px 9px;font-size:11px;color:var(--tx2)}
+  #auth_out.on{display:inline-block}
   /* 로그인 창 */
   #lg_ov{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;z-index:9000;
          align-items:center;justify-content:center;padding:20px}
@@ -80,8 +83,11 @@
   #lg_row{display:flex;gap:8px;margin-top:6px}
   #lg_row button{flex:1;border-radius:7px;padding:9px;font-size:12.5px;cursor:pointer;
                  font-weight:600;font-family:inherit;border:1px solid var(--line);background:#fff}
-  #lg_go{background:#2b57d0;border-color:#2b57d0;color:#fff}
-  #lg_go:disabled{opacity:.5;cursor:default}
+  /* #lg_row button 이 (1,0,1) 로 #lg_go (1,0,0) 보다 우선순위가 높다 —
+     선택자를 같은 수준으로 올려야 파란 배경이 먹는다 */
+  #lg_row button#lg_go{background:#2b57d0;border-color:#2b57d0;color:#fff}
+  #lg_row button#lg_go:hover{background:#1c3fa8;border-color:#1c3fa8}
+  #lg_row button#lg_go:disabled{opacity:.5;cursor:default}
   #lg_err{font-size:11.5px;color:#c0392b;min-height:16px;margin-top:8px;line-height:1.45}
   #lg_warn{font-size:11px;color:#b7791f;background:#fffbeb;border:1px solid #fde68a;
            border-radius:6px;padding:7px 9px;margin-bottom:12px;line-height:1.5;display:none}
@@ -97,6 +103,12 @@
             font-variant-numeric:tabular-nums;white-space:nowrap}
   #p_vis tr:hover td{background:#f8fafc}
   .vs-me{background:#eef4ff!important}
+  .vs-g{display:inline-block;background:#ede9fe;color:#6d28d9;border-radius:4px;
+        padding:0 5px;font-size:10px;font-weight:700;margin-left:3px}
+  .vs-mk{border:1px solid var(--line);background:#fff;border-radius:5px;padding:2px 7px;
+         font-size:10px;cursor:pointer;color:var(--tx2);font-family:inherit;white-space:nowrap}
+  .vs-mk:hover{border-color:#2b57d0;color:#2b57d0}
+  .vs-mk:disabled{opacity:.4}
   .vs-bar{display:flex;align-items:flex-end;gap:2px;height:56px;margin:4px 0 2px}
   .vs-bar i{flex:1;background:#2b57d0;border-radius:2px 2px 0 0;min-height:1px;position:relative}
   .vs-bar i.b{background:#e2e8f0}
@@ -351,6 +363,7 @@
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
       <button class="hbtn lockbtn" id="auth_btn" title="개발자 로그인">🔒</button>
+      <button class="hbtn" id="auth_out" title="로그아웃">로그아웃</button>
       <div class="meta" id="meta">불러오는 중…</div></div>
   </header>
 

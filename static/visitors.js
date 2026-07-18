@@ -16,8 +16,15 @@
     tab.style.display = me ? '' : 'none';
     lock.classList.toggle('on', !!me);
     lock.title = me ? (me + ' 로그인됨 — 방문자 탭 열기') : '개발자 로그인';
-    lock.textContent = me ? '🔓' : '🔒';
+    lock.textContent = me ? ('🔓 ' + me) : '🔒';
+    $('auth_out').classList.toggle('on', !!me);
     const w = $('vs_who'); if(w) w.textContent = me ? (me + ' · 관리자 전용') : '관리자 전용';
+  }
+
+  async function logout(){
+    await fetch('/api/auth/logout', {method:'POST'}).catch(()=>{});
+    me = null; paint();
+    const h = $('go_home'); if(h) h.click();
   }
 
   fetch('/api/auth/me').then(r=>r.json()).then(d=>{
@@ -76,11 +83,8 @@
   ['lg_tk','lg_id','lg_pw','lg_pw2'].forEach(id => $(id).addEventListener('keydown',
     e => { if(e.key === 'Enter') login(); }));
 
-  $('vs_out').addEventListener('click', async ()=>{
-    await fetch('/api/auth/logout', {method:'POST'}).catch(()=>{});
-    me = null; paint();
-    document.getElementById('go_home').click();
-  });
+  $('vs_out').addEventListener('click', logout);
+  $('auth_out').addEventListener('click', logout);
 
   // ── 방문자 통계 렌더 ────────────────────────────────────
   function render(s){
@@ -93,15 +97,44 @@
     const bbar = s.hourly.map(h =>
       `<i class="b" style="height:${Math.round((h.bot/mx)*100)}%" title="${h.hour}시 봇 ${h.bot}"></i>`).join('');
 
-    const rows = s.sessions.map(r=>{
-      const mine = r.ip === s.you;
-      return `<tr class="${mine?'vs-me':''}">
-        <td>${esc(r.ip)}${mine?' <b style="color:#2b57d0">(나)</b>':''}</td>
-        <td>${esc(r.start)}</td><td>${esc(r.end)}</td>
-        <td>${r.dur >= 60 ? (r.dur/60).toFixed(1)+'시간' : r.dur+'분'}</td>
-        <td>${r.reqs}</td><td>${r.kb}KB</td><td>${esc(r.ua)}</td>
-        <td style="color:var(--tx2)">${esc(r.last)}</td></tr>`;
-    }).join('') || '<tr><td colspan="8" style="color:var(--tx2);padding:14px">기록 없음</td></tr>';
+    const dur = d => d >= 60 ? (d/60).toFixed(1)+'시간' : d+'분';
+    const line = r => {
+      if(r.relay) return '<span title="애플 iCloud 사설 릴레이 — 실제 통신사·위치를 알 수 없다">🍎 릴레이</span>';
+      const t = [esc(r.isp)];
+      if(r.line) t.push('<span style="color:var(--tx2)">'+esc(r.line)+'</span>');
+      if(r.org)  t.push('<b style="color:#7c3aed" title="회사·기관 전용망">'+esc(r.org)+'</b>');
+      return t.join(' ') || '<span style="color:var(--tx2)">조회 중</span>';
+    };
+    const dev = r => {
+      let t = '';
+      if(r.app) t += '<b style="color:#d97706">'+esc(r.app)+'</b> ';
+      t += esc([r.dev, r.os, r.br].filter(Boolean).join(' · ')) || esc(r.ua);
+      return t;
+    };
+    const mkRows = list => list.map(r=>`<tr class="${r.me?'vs-me':''}">
+        <td>${esc(r.ip)}${r.me?' <b style="color:#2b57d0">(나)</b>':''}
+            ${r.grp?'<span class="vs-g" title="같은 사람으로 추정되는 묶음">#'+r.grp+'</span>':''}</td>
+        <td>${line(r)}</td>
+        <td>${esc(r.relay ? '—' : (r.loc || r.country || ''))}</td>
+        <td>${dev(r)}</td>
+        <td>${esc(r.start)}</td><td>${esc(r.end)}</td><td>${dur(r.dur)}</td>
+        <td>${r.reqs}</td>
+        <td style="color:var(--tx2)">${esc(r.last)}</td>
+        <td><button class="vs-mk" data-ip="${esc(r.ip)}" data-me="${r.me?1:0}">${
+            r.me ? '나 해제' : '나로 표시'}</button></td></tr>`).join('');
+
+    const meRows = mkRows(s.sessions.filter(r=>r.me))
+      || '<tr><td colspan="10" style="color:var(--tx2);padding:14px">아직 없다 — 로그인하면 그 회선이 자동으로 등록된다.</td></tr>';
+    const otRows = mkRows(s.sessions.filter(r=>!r.me))
+      || '<tr><td colspan="10" style="color:var(--tx2);padding:14px">기록 없음</td></tr>';
+
+    const grows = (s.groups||[]).map(g=>`<tr>
+        <td><span class="vs-g">#${g.id}</span></td>
+        <td>${esc(g.who)}${g.apps.length?' <b style="color:#d97706">'+esc(g.apps.join(','))+'</b>':''}</td>
+        <td>${esc(g.isp)}</td><td>${g.ips.length}개</td><td>${g.visits}</td><td>${g.reqs}</td>
+        <td>${esc(g.locs.join(' / '))}</td>
+        <td style="color:var(--tx2)">${esc(g.first)} ~ ${esc(g.last)}</td></tr>`).join('')
+      || '<tr><td colspan="8" style="color:var(--tx2);padding:14px">묶인 그룹 없음</td></tr>';
 
     const brows = s.bots.map(b=>`<tr>
         <td>${esc(b.ip)}</td><td>${b.n}</td><td>${esc(b.why)}</td>
@@ -113,12 +146,15 @@
 
     body.innerHTML = `
       <div class="vs-k">
-        <div><b>${q.visitors}</b><span>방문자 (고유 IP)</span></div>
-        <div><b>${q.visits}</b><span>방문 횟수</span></div>
+        <div><b style="color:#2b57d0">${q.others}</b><span>나 아닌 방문자</span></div>
+        <div><b>${q.me_visits}</b><span>내 방문</span></div>
+        <div><b style="color:#d97706">${q.inapp}</b><span>카톡·앱에서 유입</span></div>
         <div><b>${q.requests.toLocaleString()}</b><span>총 요청</span></div>
         <div><b style="color:#b7791f">${q.bot_ips}</b><span>봇 IP</span></div>
         <div><b style="color:#c0392b">${q.probes}</b><span>침투 시도 (차단됨)</span></div>
       </div>
+      ${q.geo_wait ? '<p class="note" style="margin:-6px 0 12px">통신사·위치 조회가 '
+        + q.geo_wait + '건 남았다. 새로고침하면 이어서 채워진다.</p>' : ''}
 
       <div class="grid g2">
         <div class="card"><div class="k">시간대별 접속 — 사람</div>
@@ -129,11 +165,25 @@
           <div class="vs-hx">${[0,6,12,18].map(h=>`<span style="flex:6">${h}시</span>`).join('')}</div></div>
       </div>
 
-      <h2 style="margin-top:18px">방문 세션<em>30분 이상 끊기면 별도 방문</em></h2>
-      <div class="box" style="overflow:auto;max-height:420px"><table>
-        <thead><tr><th>IP</th><th>들어온 시각</th><th>마지막 요청</th><th>체류</th>
-          <th>요청</th><th>전송량</th><th>기기 · 브라우저</th><th>마지막 화면</th></tr></thead>
-        <tbody>${rows}</tbody></table></div>
+      <h2 style="margin-top:18px">나 아닌 방문자<em>30분 이상 끊기면 별도 방문</em></h2>
+      <div class="box" style="overflow:auto;max-height:460px"><table>
+        <thead><tr><th>IP</th><th>통신사 · 회선</th><th>위치</th><th>기기 · 앱</th>
+          <th>들어온 시각</th><th>마지막 요청</th><th>체류</th><th>요청</th>
+          <th>마지막 화면</th><th></th></tr></thead>
+        <tbody>${otRows}</tbody></table></div>
+
+      <h2 style="margin-top:18px">동일인 추정 묶음<em>IP가 달라도 기기·브라우저·통신사가 같은 경우</em></h2>
+      <div class="box" style="overflow:auto;max-height:300px"><table>
+        <thead><tr><th>묶음</th><th>기기 · 브라우저</th><th>통신사</th><th>IP</th>
+          <th>방문</th><th>요청</th><th>위치</th><th>기간</th></tr></thead>
+        <tbody>${grows}</tbody></table></div>
+
+      <h2 style="margin-top:18px">내 접속<em>로그인한 회선은 자동 등록된다</em></h2>
+      <div class="box" style="overflow:auto;max-height:260px"><table>
+        <thead><tr><th>IP</th><th>통신사 · 회선</th><th>위치</th><th>기기 · 앱</th>
+          <th>들어온 시각</th><th>마지막 요청</th><th>체류</th><th>요청</th>
+          <th>마지막 화면</th><th></th></tr></thead>
+        <tbody>${meRows}</tbody></table></div>
 
       <h2 style="margin-top:18px">봇 · 스캐너<em>사람과 분리해 집계 — 전부 차단됨</em></h2>
       <div class="box" style="overflow:auto;max-height:340px"><table>
@@ -146,9 +196,22 @@
         <thead><tr><th>경로</th><th>호출</th></tr></thead><tbody>${prows}</tbody></table></div>
 
       <p class="note" style="margin-top:12px">
-        <b>판정 근거</b> — 진짜 브라우저는 화면을 열면 app.js 와 /api/ 를 반드시 함께 부른다.
+        <b>봇 판정</b> — 진짜 브라우저는 화면을 열면 app.js 와 /api/ 를 반드시 함께 부른다.
         그 흔적 없이 한두 번 찔러보고 사라지면 스캐너로 본다. 자칭 브라우저(User-Agent)는
-        얼마든지 위장할 수 있어 판정에 쓰지 않는다.</p>`;
+        얼마든지 위장할 수 있어 판정에 쓰지 않는다.<br>
+        <b>믿을 만한 것 / 아닌 것</b> — 통신사와 회사망은 IP 등록정보라 정확하다.
+        도시는 유선도 절반 남짓만 맞고, <b>모바일은 교환국 위치라 실제 있는 곳이 아니다</b>.
+        기기·앱은 위장 가능한 자기 신고값이다. 동일인 묶음은 어디까지나 추정으로,
+        같은 기종을 쓰는 다른 사람일 수 있다.</p>`;
+
+    body.querySelectorAll('.vs-mk').forEach(b => b.addEventListener('click', async ()=>{
+      b.disabled = true;
+      await fetch('/api/visitors/myips', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ip: b.dataset.ip, remove: b.dataset.me === '1'})
+      }).catch(()=>{});
+      load();
+    }));
   }
 
   async function load(){
