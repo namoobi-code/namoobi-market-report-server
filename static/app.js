@@ -1300,12 +1300,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const CORDER=CALL.filter(k=>!CK2FK[k])
                    .concat(KEYS.map(fk=>FK2CK[fk]||fk).filter(ck=>CDEF[ck]));
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
-  /* 기본 표시 컬럼 = 초기화 상태에서 값이 걸리는 필터들과 일치시킴
+  /* 기본 표시 컬럼 = 초기화 상태에서 '값이 걸린' 필터와 정확히 일치(구성·순서 동일)
      (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
      ※ 증권 구분만 고정값이라 대응 컬럼 없음 */
   const CDEFAULT={
-    kr:['n','mk','px','chg','cap','tv','de','cr','oploss','age','v200','tp','upside','recn','rev'],
-    us:['n','sector','px','chg','cap','tv','de','cr','oploss','age','v200','tp','upside','recn','rev','nan']
+    kr:['n','px','cap','tv','de','cr','oploss','age','v200'],
+    us:['n','px','cap','tv','de','cr','oploss','age','v200']
   };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
