@@ -103,9 +103,9 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   //   좌측 항목(보고서·DB)은 항상 보이므로 nav 에서 뺀다 — nav 는 본문 섹션 점프 전용.
   $('nav').innerHTML=[['slive','실시간 시세'],
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
-    ['s315','3.1.5 경기선행'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
-    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['s32','3.2 KRX'],
-    ['sberk','버크셔'],['spoll','서버수집']]
+    ['s315','3.1.5 경기선행'],['d316','3.1.6 FactSet'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
+    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],
+    ['sberk','버크셔']]
     .map(([i,t])=>`<a href="#${i}" data-go="${i}">${t}</a>`).join('');
   // 앵커 클릭: 본문 컨테이너 내부 스크롤 (URL 해시 오염 없이)
   document.querySelectorAll('nav a[data-go]').forEach(a=>a.addEventListener('click',e=>{
@@ -132,9 +132,27 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   if(dp?.rows) $('dot').innerHTML=`<tr><th>시점</th><th style="text-align:right">6월</th><th style="text-align:right">3월</th><th>비고</th></tr>`+
     dp.rows.map(r=>`<tr><td><b>${esc(r.year)}</b></td><td class="num">${esc(r.jun)}</td>
     <td class="num note">${esc(r.mar)}</td><td class="note">${esc((r.note||'').slice(0,58))}</td></tr>`).join('');
+  /* (req2 2026-07-18) FOMC 일정 — 이틀 회의('07-28~29'와 '07-29')가 두 줄로 들어와도
+     종료일 기준으로 1건으로 합치고(설명 긴 쪽 유지), 미래 3건 + 과거 5건만 보인다 */
   const fm=b.fomc_meetings?.data;
-  if(fm) $('fomc').innerHTML=`<tr><th>일자</th><th>상태</th><th>비고</th></tr>`+
-    fm.map(r=>`<tr><td><b>${esc(r.date)}</b></td><td>${esc(r.stance)}</td><td class="note">${esc(r.note)}</td></tr>`).join('');
+  if(fm){
+    const uniq={};
+    fm.forEach(r=>{
+      const end=(r.date||'').includes('~')
+        ? r.date.slice(0,8)+r.date.split('~').pop()   // '2025-07-29~30' → '2025-07-30'
+        : r.date;
+      if(!uniq[end] || (r.note||'').length>(uniq[end].note||'').length)
+        uniq[end]={...r, date:end, range:(r.date||'').includes('~')?r.date:uniq[end]?.range};
+    });
+    const rows=Object.values(uniq).sort((a,b2)=>a.date<b2.date?1:-1);   // 최신순
+    const today=new Date().toISOString().slice(0,10);
+    const fut=rows.filter(r=>r.date>=today).slice(-3);                  // 가까운 미래 3
+    const past=rows.filter(r=>r.date<today).slice(0,5);                 // 최근 과거 5
+    $('fomc').innerHTML=`<tr><th>일자</th><th>상태</th><th>비고</th></tr>`+
+      [...fut,...past].map(r=>`<tr${r.date>=today?' style="background:#f0f7ff"':''}>
+        <td><b>${esc(r.range||r.date)}</b></td><td>${esc(r.stance)}</td>
+        <td class="note">${esc(r.note)}</td></tr>`).join('');
+  }
 
   const t10=S(b,'series_us10y_daily'), t2=S(b,'series_us2y_daily'), sp=S(b,'series_curve_10_2');
   mk($('c_ust'),L(t10),[{n:'10년물',d:V(t10),c:C.r},{n:'2년물',d:V(t2),c:C.b}],{legend:true});
@@ -154,10 +172,13 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   const bei=S(b,'series_infl_exp');
   mk($('c_bei'),L(bei),[{n:'BEI',d:V(bei),c:C.p}]);
 
-  /* ── 3.1.3 고용 ── */
-  $('emp').innerHTML=`<tr><th>지표</th><th style="text-align:right">값</th><th>기준</th><th>주기</th><th>해석</th></tr>`+
+  /* ── 3.1.3 고용 ── (req3 2026-07-18) docx 표와 동일 컬럼: 지표·최신수치·기준·발표일자·의미·시장영향·예상영향 */
+  $('emp').innerHTML=`<tr><th>지표</th><th style="text-align:right">최신 수치</th><th>기준</th><th>발표일자</th>
+    <th>의미</th><th>시장영향</th><th>예상영향</th></tr>`+
     (b.employment?.data||[]).map(r=>`<tr><td><b>${esc(r.name)}</b></td><td class="num">${esc(r.value)}</td>
-    <td class="note">${esc(r.asof)}</td><td class="note">${esc(r.freq||'')}</td><td class="note">${esc(r.interp)}</td></tr>`).join('');
+    <td class="note">${esc(r.asof)}</td><td class="note">${esc(r.release||'')}</td>
+    <td class="note">${esc(r.meaning||'')}${r.freq?' · '+esc(r.freq):''}</td>
+    <td class="note">${esc(r.impact||'')}</td><td class="note">${esc(r.interp)}</td></tr>`).join('');
   const jb=fixJobless(S(b,'series_emp_jobless')), un=S(b,'series_emp_unemp').slice(-24),
         nf=fixNfp(S(b,'series_emp_nfp')).slice(-24), rt=fixRetail(S(b,'series_emp_retail')).slice(-24),
         im=S(b,'series_emp_ism_mfg').slice(-24), iv=S(b,'series_emp_ism_svc').slice(-24),
@@ -458,6 +479,12 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     $('dv_us').textContent=dv.market_us||'—';
     $('dv_kr').textContent=dv.market_kr||'—';
     $('dv_syn').textContent=dv.synthesis||'';
+    // (req7 2026-07-18) ③ 활성 신호 |z|≥1.5 — docx와 동일하게, 빨간 박스로 강조
+    const sg=dv.signals||dv.active_signals||[];
+    if(sg.length){
+      $('dv_sig').style.display='block';
+      $('dv_sig_list').innerHTML=sg.map(s2=>'• '+esc(s2)).join('<br>');
+    }
   }
 
   /* ── KRX ── */
@@ -498,19 +525,26 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       <td class="note">${esc(x.detail)}</td></tr>`).join('')||'<tr><td class="note">없음</td></tr>'}</table></div>`;
     $('berk_moves').innerHTML=sec('신규 매수',bk.new_buys,'up')+sec('비중 확대',bk.added,'up')+
       sec('비중 축소',bk.reduced,'dn')+sec('전량 매도',bk.exited,'dn');
+    // (req17 2026-07-18) A.5 상위 보유 종목
+    const th=bk.top_holdings||[];
+    const bt=$('berk_top');
+    if(bt&&th.length) bt.innerHTML=`<tr><th>#</th><th>종목</th><th>비중 · 평가액</th><th>비고</th></tr>`+
+      th.map((x,i)=>`<tr><td>${i+1}</td><td><b>${esc(x.ticker||'')}</b> ${esc(x.name||'')}</td>
+        <td class="num">${esc(x.weight_or_value||'')}</td><td class="note">${esc(x.note||'')}</td></tr>`).join('');
   }
+  /* (req8 2026-07-18) 패스트 엔트리 후보 — 서버 매일 뉴스 수집 */
+  fetch('/api/db/ipo_news').then(r=>r.json()).then(nw=>{
+    const el=$('d_ipo'); if(!el) return;
+    el.innerHTML=`<tr><th>일자</th><th>분류</th><th>헤드라인</th><th>매체</th></tr>`+
+      (nw.items||[]).slice(0,25).map(i=>`<tr><td class="note">${esc(i.date||'')}</td>
+        <td>${i.cat==='ipo'?'<span class="pill p-ok">IPO</span>':'<span class="pill">지수편입</span>'}</td>
+        <td><a href="${esc(i.url)}" target="_blank" rel="noopener">${esc(i.title)}</a></td>
+        <td class="note">${esc(i.src||'')}</td></tr>`).join('')+
+      `<tr><td colspan="4" class="note">${esc(nw.desc||'')} · ${esc(nw.as_of||'')}</td></tr>`;
+  }).catch(()=>{});
 
-  /* ── 서버 폴링 ── */
-  const pl=b._poll||{}, kim=pl.kimchi_premium||{}, syms=Object.keys(kim);
-  const fg=(pl.fear_greed||{})._||[];
-  const last=o=>o?.length?o[o.length-1][1]:null;
-  $('poll_now').innerHTML=[['공포탐욕지수',last(fg)??'—',''],['원/달러',last((pl.usdkrw||{})._)?.toLocaleString()??'—','KRW'],
-    ...syms.map(s=>[`김프 ${s}`,(last(kim[s])??0).toFixed(2)+'%',''])]
-    .map(([k,v,u])=>`<div class="card"><div class="k">${k}</div><div class="v" style="font-size:18px">${v}${u?' '+u:''}</div></div>`).join('');
-  if(syms.length) mk($('c_kim'),(kim[syms[0]]||[]).map(x=>x[0].slice(5,16).replace('T',' ')),
-    syms.map((s,i)=>({n:s,d:(kim[s]||[]).map(x=>x[1]),c:PAL[i]})),{legend:true});
-  if(fg.length) mk($('c_fg'),fg.map(x=>x[0].slice(5,16).replace('T',' ')),
-    [{n:'F&G',d:fg.map(x=>x[1]),c:C.r,fill:true,bg:'rgba(214,69,69,.08)'}],{y0:true});
+  /* ── 서버 폴링 ── (req18 2026-07-18) 김프·공포탐욕·원달러 카드는 폐지 —
+     daily 탭 6장에서 서버 수집 DB(kimp_series·crypto_fng)로 더 정밀하게 제공한다 */
 
   /* ── DB 인벤토리 (항목 설명 + 기준일) ── */
   const DESC={
@@ -777,8 +811,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
-  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d316','3.1.6 FactSet'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
-    ['d33','3.3 미국'],['d331','3.3.1 美ETF'],['d332','3.3.2 리밸런싱'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
+  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
+    ['d33','3.3 미국'],['d331','3.3.1 美ETF'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
     ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d6','6 크립토'],['d7','7 증권사'],['d8','8 글로벌IB'],
     ['dB','부록B AI'],['dC','부록C 밸류체인'],['dD','부록D 관계도']]
     .map(([i,t])=>`<a href="#${i}" data-go2="${i}">${t}</a>`).join('');
@@ -989,27 +1023,75 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const FH=['통화쌍','현재','1일','1주','1개월','3개월','6개월','1년','추세(1Y)','추세 평가'];
   T('d_fx',FH,fxr(M.fx_markets)); T('d_fxu',FH,fxr(M.fx_usd));
 
-  /* ── 6. 크립토 ── */
-  const mo=(CR.market_overview||{}).market_summary||{}, fg=(CR.fear_greed||{}).current||{};
-  $$('d_cry').innerHTML=[
-    ['24h 거래대금',mo.total_volume_24h?('$'+(mo.total_volume_24h/1e9).toFixed(1)+'B'):'—',`${mo.total_coins||0}개 코인`],
-    ['24h 평균 등락',mo.avg_change_24h!=null?`${mo.avg_change_24h>0?'+':''}${mo.avg_change_24h}%`:'—',
-      `상승 ${mo.coins_up||0} · 하락 ${mo.coins_down||0}`],
-    ['상승/하락',`${mo.coins_up||0} / ${mo.coins_down||0}`,'24시간 기준'],
-  ].map(([k,v,s2])=>`<div class="card"><div class="k">${E(k)}</div><div class="v">${E(v)}</div>
-      <div class="s">${E(s2)}</div></div>`).join('');
-  $$('d_fg').innerHTML=`<b>${E(fg.value??'—')} · ${E(fg.classification||'')}</b> — ${E(fg.description||'')}<br>
-    <span class="note">${E((CR.fear_greed||{}).trend_analysis||'')}</span>`;
+  /* ── 6. 크립토 ── (req9·10·11·19 2026-07-18)
+     보고서 실행 시점 스냅샷 대신 서버 수집 DB 를 우선 사용 — '-' 가 생길 이유가 없다.
+     crypto_overview(매시)·crypto_fng(1년 이력)·kimp_series(10분·1년 백필)·crypto_movers(각 10종목) */
+  fetch('/api/db/crypto_overview').then(r=>r.json()).then(o=>{
+    $$('d_cry').innerHTML=[
+      ['총 시가총액',o.mcap_usd?('$'+(o.mcap_usd/1e12).toFixed(2)+'T'):'—',
+        o.mcap_chg24!=null?`24h ${o.mcap_chg24>0?'+':''}${o.mcap_chg24.toFixed(2)}%`:''],
+      ['24h 거래대금',o.vol24_usd?('$'+(o.vol24_usd/1e9).toFixed(0)+'B'):'—',`${N(o.coins||0)}개 코인`],
+      ['BTC 도미넌스',o.btc_dom!=null?o.btc_dom.toFixed(1)+'%':'—',
+        o.eth_dom!=null?('ETH '+o.eth_dom.toFixed(1)+'%'):''],
+      ['갱신',E((o.as_of||'').slice(5)),'서버 매시 자동'],
+    ].map(([k,v,s2])=>`<div class="card"><div class="k">${E(k)}</div><div class="v">${v}</div>
+        <div class="s">${E(s2)}</div></div>`).join('');
+  }).catch(()=>{});
 
-  T('d_kimchi',['코인','업비트 (원)','바이낸스 ($)','김프','판정'],((CR.kimchi_premium||{}).coins||[]).map(c=>
-    [`<b>${E(c.symbol)}</b>`,`<span class="num">${N(c.upbit_krw)}</span>`,`<span class="num">${N(c.binance_usd)}</span>`,
-     P(c.premium_pct),`<span class="note">${E(c.status||'')}</span>`]));
+  fetch('/api/db/crypto_fng').then(r=>r.json()).then(f=>{
+    const now=f.now||{};
+    // (req10) 설명이 없으면 '—' 꼬리를 붙이지 않는다
+    $$('d_fg').innerHTML=`<b>${E(now.v??'—')} · ${E(now.label||'')}</b>`+
+      `<span class="note"> (${E(now.date||'')} · alternative.me)</span>`;
+    const h=f.hist||[];
+    if(h.length&&window.Chart) new Chart($$('c_fng'),{type:'line',
+      data:{labels:h.map(x=>x.date.slice(5)),datasets:[{data:h.map(x=>x.v),borderColor:'#e08c1a',
+        borderWidth:1.6,pointRadius:0,tension:.15,fill:true,backgroundColor:'rgba(224,140,26,.08)'}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+        scales:{x:{ticks:{maxTicksLimit:8,font:{size:9}},grid:{display:false}},
+                y:{min:0,max:100,ticks:{stepSize:25,font:{size:9}}}}}});
+  }).catch(()=>{});
 
-  const gl=(arr,lab,cls)=>`<div class="card"><div class="k" style="font-size:12.5px;font-weight:650;color:var(--${cls})">${lab}</div>`+
-    (Array.isArray(arr)&&arr.length?`<table style="border:none;margin-top:6px">${arr.map(x=>
-      `<tr><td><b>${E(x.symbol||x.name)}</b></td><td class="num ${cls==='up'?'up':'dn'}">${P(x.change_24h??x.change)}</td></tr>`).join('')}</table>`
-      :'<div class="note" style="margin-top:6px">데이터 없음 (수집 실패 시 빈 배열)</div>')+'</div>';
-  $$('d_gl').innerHTML=gl(CR.top_gainers,'24h Top Gainers','up')+gl(CR.top_losers,'24h Top Losers','dn');
+  fetch('/api/db/kimp_series').then(r=>r.json()).then(km=>{
+    const now=km.now||{}, S2=km.s||{}, order=['BTC','ETH','XRP','SOL'];
+    T('d_kimchi',['코인','업비트 (원)','바이낸스 ($)','김프','판정'],order.filter(s2=>now[s2]).map(s2=>{
+      const c=now[s2], p=c.pct;
+      const st=p>2?'과열(한국 프리미엄 확대)':p>0.5?'소폭 프리미엄':p>-0.5?'중립':p>-2?'역프리미엄(해외가 더 비쌈)':'역프 과대';
+      return [`<b>${s2}</b>`,`<span class="num">${N(c.krw)}</span>`,`<span class="num">${N(c.usd)}</span>`,
+              P(p),`<span class="note">${st}</span>`];
+    }));
+    // (req19) 30D 김프 차트 — kimpwatda 30D 뷰와 같은 구간
+    const cut=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+    $$('d_kimp_charts').innerHTML=order.map(s2=>{
+      const arr=(S2[s2]||[]).filter(x=>x[0]>=cut);
+      const cur=arr.length?arr[arr.length-1][1]:null;
+      return `<div class="cch"><div class="hd"><span class="sym">${s2} 김프 <span class="note">30D</span></span>
+        <span class="px ${cur>0?'up':'dn'}">${cur!=null?(cur>0?'+':'')+cur.toFixed(2)+'%':'—'}</span></div>
+        <canvas id="kp_${s2}"></canvas>
+        <div class="src">업비트÷(바이낸스×USD/KRW)−1 · 서버 10분 수집 (백필 구간은 일봉)</div></div>`;
+    }).join('');
+    if(window.Chart) order.forEach(s2=>{
+      const arr=(S2[s2]||[]).filter(x=>x[0]>=cut); if(!arr.length) return;
+      new Chart($$('kp_'+s2),{type:'line',
+        data:{labels:arr.map(x=>x[0].slice(5,10)),datasets:[{data:arr.map(x=>x[1]),
+          borderColor:'#d64545',borderWidth:1.5,pointRadius:0,tension:.1,fill:true,
+          backgroundColor:'rgba(214,69,69,.07)'}]},
+        options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+          scales:{x:{ticks:{maxTicksLimit:7,font:{size:9}},grid:{display:false}},
+                  y:{ticks:{font:{size:9},callback:v=>v+'%'}}}}});
+    });
+  }).catch(()=>{});
+
+  fetch('/api/db/crypto_movers').then(r=>r.json()).then(mv=>{
+    const gl=(arr,lab,cls)=>`<div class="card"><div class="k" style="font-size:12.5px;font-weight:650;color:var(--${cls})">${lab}</div>`+
+      (Array.isArray(arr)&&arr.length?`<table style="border:none;margin-top:6px">
+        <tr><th>코인</th><th style="text-align:right">가격($)</th><th style="text-align:right">24h</th><th style="text-align:right">거래대금</th></tr>${arr.map(x=>
+        `<tr><td><b>${E(x.sym)}</b> <span class="note">${E((x.name||'').slice(0,14))}</span></td>
+         <td class="num">${N(x.price)}</td><td class="num ${cls==='up'?'up':'dn'}">${P(x.chg24)}</td>
+         <td class="num note">$${(x.vol/1e6).toFixed(0)}M</td></tr>`).join('')}</table>`
+        :'<div class="note" style="margin-top:6px">수집 대기 중</div>')+'</div>';
+    $$('d_gl').innerHTML=gl(mv.gainers,'24h Top Gainers (10)','up')+gl(mv.losers,'24h Top Losers (10)','dn');
+  }).catch(()=>{});
 
   /* 6.2 코인 4종 1년 차트 (가격 + 거래량) — 서버 프록시가 Binance 를 1시간 캐시 */
   const SYMS=[['BTC','비트코인'],['ETH','이더리움'],['XRP','리플'],['SOL','솔라나']];
@@ -1103,9 +1185,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       ${al.map((x,i)=>`<tr><td><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${PC[i%PC.length]};margin-right:6px"></span>${E(x.asset)}</td>
         <td class="num">${x.weight_pct}%</td><td class="note">${E(x.vehicle||'')}</td></tr>`).join('')}</table>
       <div class="src" style="margin-top:9px">기대수익 <b>${E(p.expected_return||'—')}</b> · 최대낙폭 <b>${E(p.max_drawdown||'—')}</b> · 리밸런싱 ${E(p.rebalance||'—')}<br>${E(p.basis||'')}</div></div>`;}).join('');
-  T('a_act',['구분','액션'],(A.action_items||[]).map(a=>{
-    const t=String(a), m2=t.match(/^\[(.+?)\]\s*(.*)$/);
-    return m2?[`<b>${E(m2[1])}</b>`,E(m2[2])]:['—',E(t)];}));
+  /* (req15·16 2026-07-18) action_items 는 {short_term:[],mid_term:[],long_term:[]} 사전 —
+     리스트로 가정해 아무것도 안 그려지던 것을 고침. 13장 주의사항도 함께 렌더 */
+  {const ai=A.action_items||{};
+   const rows=Array.isArray(ai)
+     ? ai.map(t=>{const m2=String(t).match(/^\[(.+?)\]\s*(.*)$/); return m2?[`<b>${E(m2[1])}</b>`,E(m2[2])]:['—',E(t)];})
+     : [['<b>단기</b>','short_term'],['<b>중기</b>','mid_term'],['<b>장기</b>','long_term']]
+        .flatMap(([lab,k])=>((ai[k]||[]).map((t,i)=>[i===0?lab:'',E(t)])));
+   T('a_act',['구분','액션'],rows);}
+  {const dc=(A.meta||{}).disclaimer, el=$$('a_disc');
+   if(el) el.innerHTML=(dc?E(dc)+'<br><br>':'')+
+     '<b>출처</b> — 시세·지표: 네이버증권 · Yahoo Finance · FRED · KRX · CoinGecko · Upbit/Binance · alternative.me / '+
+     '리서치 요약: 각 증권사·IB 공개 발간물 / 자체 수집: namoobi 서버 DB (DB data 탭에서 원본 확인 가능)';}
 
   document.querySelectorAll('nav a[data-go2]').forEach(a=>a.addEventListener('click',e=>{
     const el=document.getElementById(a.dataset.go2);

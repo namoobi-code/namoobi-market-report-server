@@ -431,8 +431,7 @@
       <h3>2.3 빅테크 주요 이벤트 (신제품·신기술)</h3><div class="box" style="overflow-x:auto"><table id="d_evb"></table></div>
 
       <h2 id="d31">3.1 주요지표<em>매크로 대시보드 — DB data 탭에 없는 항목만</em></h2>
-      <div class="note" style="margin-bottom:10px">3.1.1~3.1.5 · 3.1.8~3.1.11 · 3.1.13 은 누적 지표라 <b>DB data</b> 탭에 있다. 여기엔 <b>매 실행 새로 조사되는 3종</b>만 둔다.</div>
-      <h3 id="d316">3.1.6 Earnings Insight (FactSet)</h3><div id="d_fs"></div>
+      <div class="note" style="margin-bottom:10px">3.1.1~3.1.5 · 3.1.8~3.1.11 · 3.1.13 은 누적 지표라 <b>DB data</b> 탭에 있다. 여기엔 <b>매 실행 새로 조사되는 2종</b>만 둔다. (3.1.6 FactSet · 3.3.2 리밸런싱은 주기가 길어 DB data 탭으로 이동 — req4·req8)</div>
       <h3 id="d317">3.1.7 미국 빅테크(M7) 실적 전망</h3><div class="box" style="overflow-x:auto"><table id="d_m7"></table></div>
       <h3 id="d3112">3.1.12 심리·자금흐름 보조지표</h3><div class="box" style="overflow-x:auto"><table id="d_sent"></table></div>
 
@@ -452,7 +451,6 @@
       <h2 id="d33">3.3 미국 증시</h2>
       <div class="box" style="overflow-x:auto"><table id="d_us"></table></div>
       <h3 id="d331">3.3.1 주요 미국 ETF (지수·섹터·테마·방어형)</h3><div id="d_usetf"></div>
-      <h3 id="d332">3.3.2 미국 지수 정기 리밸런싱 (S&amp;P 500 · 나스닥 100)</h3><div id="d_rebal"></div>
 
       <h2 id="d34">3.4 아시아 증시</h2>
       <div class="box" style="overflow-x:auto"><table id="d_as"></table></div>
@@ -485,9 +483,13 @@
       <h3>6.1 시장 개요</h3><div class="grid g4" id="d_cry"></div>
       <h3>6.2 주요 코인 1년 차트 (가격 · 거래량)</h3>
       <div class="grid g2" id="d_coins"></div>
-      <h3>공포·탐욕 지수</h3><div class="lead" id="d_fg"></div>
-      <h3>6.3 김치 프리미엄</h3><div class="box" style="overflow-x:auto"><table id="d_kimchi"></table></div>
-      <h3>6.4 24h Top Gainers / Losers</h3><div class="grid g2" id="d_gl"></div>
+      <h3>공포·탐욕 지수 <span class="note">🖥 서버 매시 수집 · 1년 이력</span></h3><div class="lead" id="d_fg"></div>
+      <div class="card" style="margin-top:8px"><div class="k">공포·탐욕 지수 — 1년 추이</div><canvas id="c_fng" style="max-height:170px"></canvas></div>
+      <h3>6.3 김치 프리미엄 <span class="note">🖥 서버 10분 간격 수집 · 업비트÷(바이낸스×환율)</span></h3>
+      <div class="box" style="overflow-x:auto"><table id="d_kimchi"></table></div>
+      <div class="grid g2" id="d_kimp_charts" style="margin-top:10px"></div>
+      <h3>6.4 24h Top Gainers / Losers <span class="note">🖥 서버 매시 수집 · CoinGecko 시총 상위 250 · 각 10종목</span></h3>
+      <div class="grid g2" id="d_gl"></div>
 
       <h2 id="d7">7. 한국 주요 증권사 리서치<em>10사</em></h2>
       <div class="grid g2" id="d_sec"></div>
@@ -495,7 +497,8 @@
 
       <h2 id="d8">8. 글로벌 IB 리서치<em>UBS · GS · JPM · MS · BlackRock</em></h2>
       <div class="grid g2" id="d_gsec"></div>
-      <div class="lead" id="d_gsec_c" style="margin-top:12px"></div>
+      <h3>8.6 글로벌 IB 공통 핵심 주제 · 8.7 월가 컨센서스</h3>
+      <div class="lead" id="d_gsec_c" style="margin-top:6px"></div>
 
       <h2 id="dB">[부록B] 최신 AI Trends</h2>
       <div class="box" style="overflow-x:auto"><table id="d_ai"></table></div>
@@ -537,7 +540,11 @@
       <h2 id="a12">12. 액션 아이템<em>단기 · 중기 · 장기 체크리스트</em></h2>
       <div class="box"><table id="a_act"></table></div>
 
-      <footer>docx 9~12장 — AI 추론 산출물. 수익률·낙폭은 시나리오 가정치이며 보장되지 않는다.</footer>
+      <!-- (req16 2026-07-18) docx 13장과 동일 -->
+      <h2 id="a13">13. 주의 사항 및 출처</h2>
+      <div class="lead" id="a_disc" style="border-left-color:var(--warn)"></div>
+
+      <footer>docx 9~13장 — AI 추론 산출물. 수익률·낙폭은 시나리오 가정치이며 보장되지 않는다.</footer>
     </main>
   </div>
 
@@ -765,6 +772,9 @@
   </div>
   <div class="lead" id="lead_note" style="margin-top:12px"></div>
 
+  <h2 id="d316">3.1.6 Earnings Insight (FactSet)<em>주간 발간 — 매일 변하지 않아 DB data 로 이동</em></h2>
+  <div id="d_fs"></div>
+
   <h2 id="s318">3.1.8 AI 빅테크 자본지출 (CAPEX)<em id="capex_asof"></em></h2>
   <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="capex_t"></table></div>
   <div class="grid g2">
@@ -870,6 +880,12 @@
   <div class="grid g3" id="deriv_idx"></div>
   <h3>값 · z-score 매트릭스 <span class="note">|z| ≥ 1.5 강조</span></h3>
   <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="deriv_t"></table></div>
+  <!-- (req7 2026-07-18) ③ 활성 신호 — 가장 중요한 정보라 빨간 강조 -->
+  <div id="dv_sig" style="display:none;border:2px solid #d64545;background:#fff5f5;border-radius:10px;
+       padding:12px 16px;margin-bottom:12px">
+    <div style="font-weight:800;color:#c0392b;font-size:13.5px;margin-bottom:6px">③ 활성 신호 (|z|≥1.5)</div>
+    <div id="dv_sig_list" style="color:#b02a2a;font-size:13px;line-height:1.7;font-weight:600"></div>
+  </div>
   <div class="grid g2">
     <div class="card"><div class="k">미국 시장 해석</div><div class="s" id="dv_us"></div></div>
     <div class="card"><div class="k">한국 시장 해석</div><div class="s" id="dv_kr"></div></div>
@@ -898,19 +914,18 @@
   <div class="lead" id="kl_txt4" style="margin-top:6px"></div>
   <div class="note" style="margin-top:6px">반대매매 급증은 선행지표가 아닌 후행 확인 지표이며 역사적으로 항복(단기 바닥) 국면과 동행하는 경우가 많음. 데이터: 금융위 공공데이터(금투협 원천, T+2) · 다음금융(T+0) · 한국은행 ECOS — 서버 1일 3회 자동 수집. 리서치용·투자권유 아님.</div>
 
+  <h2 id="d332">3.3.2 미국 지수 정기 리밸런싱 (S&amp;P 500 · 나스닥 100)<em>분기 이벤트 — DB data 로 이동 · 패스트엔트리 IPO 후보는 🖥 서버 매일 수집</em></h2>
+  <div id="d_rebal"></div>
+  <h3>패스트 엔트리 유력 후보 (대형 IPO) <span class="note">🖥 서버 매일 뉴스 수집</span></h3>
+  <div class="box" style="overflow-x:auto"><table id="d_ipo"></table></div>
+
   <h2 id="s32">3.2.4 / 3.2.5 KRX 브리프<em>🖥 서버 자체 수집 · 매일 2회 06:35·15:35 KST</em></h2>
   <div class="grid g2" id="krx"></div>
 
   <h2 id="sberk">버크셔 해서웨이 13F</h2>
   <div class="lead" id="berk_sum"></div>
   <div class="grid g2" id="berk_moves"></div>
-
-  <h2 id="spoll">서버 수집<em>김치프리미엄 · 공포탐욕 · 1일 2회</em></h2>
-  <div class="grid g4" id="poll_now"></div>
-  <div class="grid g2" style="margin-top:12px">
-    <div class="card"><div class="k">김치프리미엄 (%)</div><canvas id="c_kim"></canvas></div>
-    <div class="card"><div class="k">공포탐욕지수 (0=극도의 공포 · 100=극도의 탐욕)</div><canvas id="c_fg"></canvas></div>
-  </div>
+  <h3>A.5 상위 보유 종목</h3><div class="box" style="overflow-x:auto"><table id="berk_top"></table></div>
 
   <footer>보고서 목차 순서 · 리포트 실행 시점 스냅샷 · 실시간은 외부 링크 참조</footer>
   </main>
