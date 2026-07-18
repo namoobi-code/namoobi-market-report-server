@@ -1538,6 +1538,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let dcode=null;
   function hideDetail(){ const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
   {const b=$('sd_close'); if(b) b.onclick=hideDetail;}
+  /* 차트 소스: tv(TradingView 임베드) / canvas(자체) — PC별 저장. 네이버는 새창(임베드 시 시세 차단) */
+  let chartSrc=(()=>{try{const v=localStorage.getItem('nmr_csrc'); return (v==='canvas'||v==='tv')?v:'tv';}catch(e){return 'tv';}})();
+  document.querySelectorAll('.csrc').forEach(b=>b.onclick=()=>{
+    chartSrc=b.dataset.s; try{localStorage.setItem('nmr_csrc',chartSrc);}catch(e){}
+    if(dcode) showDetail(dcode);
+  });
+  {const nv=$('sd_nvopen'); if(nv) nv.onclick=()=>{ if(!dcode) return;
+    const url = mkt==='kr' ? `https://finance.naver.com/item/fchart.naver?code=${encodeURIComponent(dcode)}`
+                           : `https://finance.yahoo.com/chart/${encodeURIComponent(dcode)}`;
+    window.open(url,'nmr_chart','width=1150,height=900'); };}
   async function showDetail(c){
     const r=POOL[mkt].find(x=>x.c===c); if(!r) return;
     dcode=c;
@@ -1547,15 +1557,29 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
     const cvs=['sd_main','sd_vol','sd_rsi','sd_macd'];
-    if(mkt==='kr'){
-      /* 한국: 네이버 인터랙티브 차트(fchart) 임베드 — 1분~월·기간줌·보조지표 추가/삭제 */
+    /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
+    const mode = mkt==='kr' ? 'canvas' : chartSrc;
+    {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
+    document.querySelectorAll('.csrc').forEach(b=>{
+      b.style.display = (b.dataset.s==='tv' && mkt==='kr') ? 'none' : '';
+      b.classList.toggle('on', b.dataset.s===mode);
+    });
+    if(mode==='tv'){
       cvs.forEach(id=>{const e=$(id); if(e)e.style.display='none';});
       $('sd_naver').style.display='';
-      const ifr=$('sd_nifr');
-      const src=`https://finance.naver.com/item/fchart.naver?code=${encodeURIComponent(c)}`;
+      const wrap=$('sd_nwrap'), ifr=$('sd_nifr');
+      ifr.style.width='100%'; ifr.style.marginTop='0'; ifr.style.transform='none'; ifr.style.height='620px';
+      wrap.style.height='620px';
+      const sym = mkt==='kr' ? 'KRX:'+c : c;
+      const cfg={autosize:true,symbol:sym,interval:'D',theme:'light',style:'1',locale:'kr',
+                 withdateranges:true,hide_side_toolbar:false,allow_symbol_change:false,save_image:false,
+                 hide_volume:false,support_host:'https://www.tradingview.com'};
+      /* 심볼을 쿼리에도 포함 — 해시만 바뀌면 iframe이 리로드되지 않는 문제 방지 */
+      const src=`https://www.tradingview-widget.com/embed-widget/advanced-chart/?locale=kr&sym=${encodeURIComponent(sym)}#${encodeURIComponent(JSON.stringify(cfg))}`;
       if(ifr.getAttribute('src')!==src) ifr.setAttribute('src',src);
-      $('sd_nlink').href=`https://finance.naver.com/item/main.naver?code=${encodeURIComponent(c)}`;
-      $('sd_src').textContent='네이버 증권 차트(실시간) — 상단에서 1분·일·주·월 전환, 보조지표 메뉴로 지표 추가/삭제, 드래그로 기간 조절.';
+      $('sd_nlink').href = mkt==='kr' ? `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(c)}`
+                                      : `https://finance.yahoo.com/quote/${encodeURIComponent(c)}`;
+      $('sd_src').textContent='TradingView 인터랙티브 차트 — 상단에서 1분~월봉 전환, 지표 버튼으로 보조지표 추가/삭제, 드래그·휠로 기간 조절.';
     } else {
       $('sd_naver').style.display='none';
       cvs.forEach(id=>{const e=$(id); if(e)e.style.display='block';});
@@ -1564,7 +1588,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
         drawAll(D);
-        $('sd_src').textContent='종가 기준 일봉(최근 1년) · Yahoo · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)';
+        $('sd_src').textContent=`종가 기준 일봉(최근 1년) · ${mkt==='kr'?'네이버':'Yahoo'} · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)`;
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
     }
     $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});

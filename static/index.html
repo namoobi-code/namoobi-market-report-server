@@ -220,6 +220,7 @@
   #sd_vol{width:100%;height:60px;display:block;margin-top:2px}
   #sd_rsi{width:100%;height:60px;display:block;margin-top:2px}
   #sd_macd{width:100%;height:76px;display:block;margin-top:2px}
+  .csrc.on{background:var(--dark);color:#fff;border-color:var(--dark)}
   .sg{margin-bottom:10px}
   .sgt{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;border-bottom:1px solid var(--line);padding-bottom:3px}
   .si{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2.5px 0}
@@ -513,18 +514,25 @@
             <div class="box" style="padding:10px 12px">
               <div class="dhead"><b id="sd_name"></b> <span class="note" id="sd_code"></span>
                 <span class="note" id="sd_last" style="margin-left:8px"></span>
-                <button class="cp-x" id="sd_close" style="margin-left:auto">닫기</button></div>
+                <span id="sd_srcbtns" style="margin-left:auto;display:flex;gap:4px">
+                  <button class="cp-x csrc" data-s="tv">TradingView</button>
+                  <button class="cp-x csrc" data-s="canvas">자체차트</button>
+                  <button class="cp-x" id="sd_nvopen" title="네이버 차트는 임베드 시 시세 로딩이 차단되어 새창으로 엽니다">네이버 ↗</button>
+                </span>
+                <button class="cp-x" id="sd_close" style="margin-left:6px">닫기</button></div>
               <div id="sd_naver" style="display:none">
                 <div style="display:flex;align-items:center;margin-bottom:5px">
                   <a id="sd_nlink" target="_blank" rel="noopener" class="note" style="margin-left:auto;font-size:11.5px">네이버에서 크게 보기 ↗</a>
                 </div>
-                <iframe id="sd_nifr" style="width:100%;height:820px;border:1px solid var(--line);border-radius:6px;background:#fff" loading="lazy"></iframe>
+                <div id="sd_nwrap" style="overflow:hidden;border:1px solid var(--line);border-radius:6px;background:#fff;height:640px">
+                  <iframe id="sd_nifr" style="width:100%;height:760px;border:0;margin-top:-118px" loading="lazy"></iframe>
+                </div>
               </div>
               <canvas id="sd_main"></canvas><canvas id="sd_vol"></canvas>
               <canvas id="sd_rsi"></canvas><canvas id="sd_macd"></canvas>
               <div class="src" id="sd_src" style="margin-top:6px"></div>
             </div>
-            <div class="box" id="sd_sum" style="padding:10px 12px;overflow-y:auto;max-height:640px"></div>
+            <div class="box" id="sd_sum" style="padding:10px 12px"></div>
           </div>
         </div>
         <div id="scr_revnote" class="src" style="margin-top:9px"></div>
