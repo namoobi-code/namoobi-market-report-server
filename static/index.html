@@ -479,29 +479,22 @@
       <h3>원화 크로스</h3><div class="box" style="overflow-x:auto"><table id="d_fx"></table></div>
       <h3>달러 크로스</h3><div class="box" style="overflow-x:auto"><table id="d_fxu"></table></div>
 
-      <h2 id="d6">6. 암호화폐 시장</h2>
-      <h3>6.1 시장 개요</h3><div class="grid g4" id="d_cry"></div>
-      <h3>6.2 주요 코인 1년 차트 (가격 · 거래량)</h3>
-      <div class="grid g2" id="d_coins"></div>
-      <h3>공포·탐욕 지수 <span class="note">🖥 서버 매시 수집 · 1년 이력</span></h3><div class="lead" id="d_fg"></div>
-      <div class="card" style="margin-top:8px"><div class="k">공포·탐욕 지수 — 1년 추이</div><canvas id="c_fng" style="max-height:170px"></canvas></div>
-      <h3>6.3 김치 프리미엄 <span class="note">🖥 서버 10분 간격 수집 · 업비트÷(바이낸스×환율)</span></h3>
-      <div class="box" style="overflow-x:auto"><table id="d_kimchi"></table></div>
-      <div class="grid g2" id="d_kimp_charts" style="margin-top:10px"></div>
-      <h3>6.4 24h Top Gainers / Losers <span class="note">🖥 서버 매시 수집 · CoinGecko 시총 상위 250 · 각 10종목</span></h3>
-      <div class="grid g2" id="d_gl"></div>
 
       <h2 id="d7">7. 한국 주요 증권사 리서치<em>10사</em></h2>
       <div class="grid g2" id="d_sec"></div>
       <h3>증권사별 대표 리포트 · 링크 <span class="note">🖥 서버 매일 2회 네이버 리서치 수집 · 공식 페이지 링크 포함</span></h3>
       <div class="grid g2" id="d_sec_rpt"></div>
+      <h3>네이버 금융리서치 모음 <span class="note">🖥 최근 2일 · 6개 게시판 테마별 · 제목+링크+작성사+작성일+요약</span></h3>
+      <div id="d_sec_nv"></div>
       <div class="lead" id="d_sec_c" style="margin-top:12px"></div>
 
       <h2 id="d8">8. 글로벌 IB 리서치<em>UBS · GS · JPM · MS · BlackRock</em></h2>
       <div class="grid g2" id="d_gsec"></div>
       <div class="grid g2" id="d_gsec_pub"></div>
-      <h3>8.6 글로벌 IB 공통 핵심 주제 · 8.7 월가 컨센서스</h3>
+      <h3>8.6 글로벌 IB 공통 핵심 주제</h3>
       <div class="lead" id="d_gsec_c" style="margin-top:6px"></div>
+      <h3>8.7 월가 컨센서스</h3>
+      <div class="lead" id="d_gsec_w" style="margin-top:6px"></div>
 
       <h2 id="dB">[부록B] 최신 AI Trends</h2>
       <div class="box" style="overflow-x:auto"><table id="d_ai"></table></div>
@@ -730,13 +723,14 @@
   <!-- (req1 2026-07-18) docx 3.1.1 순서와 동일: 국채금리 → 금리차 → HY → 기준금리 → FOMC 일정 → 점도표 -->
   <h2 id="s311">3.1.1 금리·통화정책<em>국채금리 · HY · 기준금리 · FOMC</em></h2>
   <div class="grid g2">
-    <div class="card"><div class="k">■ 美 국채금리 — 10년물 · 2년물 (%)</div><canvas id="c_ust"></canvas></div>
-    <div class="card"><div class="k">■ 장단기 금리차(수익률곡선) 10Y−2Y (%p)</div><canvas id="c_spread"></canvas></div>
+    <div class="card"><div class="k">■ 美 국채금리 — 10년물 · 2년물 (%) <span id="ust_now" style="font-weight:400"></span></div><canvas id="c_ust"></canvas></div>
+    <div class="card"><div class="k">■ 장단기 금리차(수익률곡선) 10Y−2Y (%p) <span id="spread_now" style="font-weight:400"></span></div><canvas id="c_spread"></canvas></div>
   </div>
 
-  <div class="grid g2" id="s333" style="margin-top:12px">
-    <div><h3 style="margin-top:0">■ 하이일드(HY) 스프레드 — 美 HY OAS (%) <span class="note">🖥 서버 매일 2회 + 실행 시 실측</span></h3><div class="lead" id="hy_cur"></div></div>
-    <div class="card"><div class="k">ICE BofA US HY OAS — 1년 추이 (%)</div><canvas id="c_hy"></canvas></div>
+  <!-- (2차 req3) HY 현재값을 차트 위 텍스트로 통합 -->
+  <div class="card" id="s333" style="margin-top:12px">
+    <div class="k">■ 하이일드(HY) 스프레드 — ICE BofA US HY OAS 1년 추이 (%) <span id="hy_cur" style="font-weight:400"></span> <span class="note">🖥 서버 매일 2회 + 실행 시 실측</span></div>
+    <canvas id="c_hy"></canvas>
   </div>
 
   <h3 style="margin-top:14px">■ FOMC 기준금리 · 주요국 정책금리</h3>
@@ -788,62 +782,16 @@
   </div>
   <div class="lead" id="capex_c" style="margin-top:12px"></div>
 
-  <h2 id="s319">3.1.9 메모리 + HBM 지표<em id="mem_asof"></em><em>🖥 서버 매일 2회 06:45·15:45</em></h2>
+  <h2 id="s319">3.1.9 메모리 + HBM 지표<em id="mem_asof"></em><em>🖥 서버 매일 2회 06:45·15:45 · 순서 = docx 3.1.9 (갭→선행지표→EPS·PER→지표사전→시계열)</em></h2>
 
-  <h3>① HBM 시장규모 · 수요 증가율</h3>
-  <div class="card"><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
-
-  <h3>② HBM ASP 추이 <span class="note">— 서버 매일 2회(06:45·15:45) 자동 누적</span></h3>
-  <div class="grid g2">
-    <div class="box"><table id="asp_t"></table></div>
-    <div class="card"><canvas id="c_asp"></canvas></div>
-  </div>
-
-  <h3>③ HBM 업체별 점유율 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="share_t"></table></div>
-    <div class="card"><canvas id="c_share"></canvas></div>
-  </div>
-
-  <h3>④ DRAM 현물(스팟) 지수 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="ds_t"></table></div>
-    <div class="card"><canvas id="c_ds"></canvas></div>
-  </div>
-
-  <h3>⑤ DRAM 고정거래(계약) 가격 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="dc_t"></table></div>
-    <div class="card"><canvas id="c_dc"></canvas></div>
-  </div>
-
-  <h3>⑥ NAND 현물(스팟) 가격 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="ns_t"></table></div>
-    <div class="card"><canvas id="c_ns"></canvas></div>
-  </div>
-
-  <h3>⑦ NAND 고정거래(계약) 가격 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="nc_t"></table></div>
-    <div class="card"><canvas id="c_nc"></canvas></div>
-  </div>
-
-  <h3>⑧ 스팟 − 계약 갭 <span class="note">— 계약가 인상 압력 선행지표</span></h3>
+  <h3>① 스팟 − 계약 갭 <span class="note">— 계약가 인상 압력 선행지표</span></h3>
   <div class="grid g2">
     <div class="box"><table id="gap_t"></table></div>
     <div class="card"><canvas id="c_spgap"></canvas></div>
   </div>
   <div class="src" id="spgap_src" style="margin-top:6px"></div>
 
-  <h3>⑨ HBM : DDR5 GB당 단가 격차</h3>
-  <div class="card"><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
-
-  <h3>⑩ 메모리 3사 EPS · PER <span class="note">— PER = 현재가 ÷ EPS 직접 계산</span></h3>
-  <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="val_t"></table></div>
-  <div class="card"><div class="k">PER 비교 (배)</div><canvas id="c_per"></canvas></div>
-
-  <h3>⑪ 선행지표 <span class="note">— 메모리 가격보다 먼저 움직이는 신호 · 전 항목 매일 갱신</span></h3>
+  <h3>② 선행지표 <span class="note">— 메모리 가격보다 먼저 움직이는 신호 · 전 항목 매일 갱신</span></h3>
   <div class="grid g2">
     <div class="box"><table id="lead_t"></table></div>
     <div class="card"><div class="k">1년 성과 — 수요처(NVDA) vs 공급자(MU)</div><canvas id="c_lead1y"></canvas></div>
@@ -854,9 +802,55 @@
   </div>
   <div class="card" style="margin-top:12px"><div class="k">메모리/GPU 상대강도 추이 (MU ÷ NVDA)</div><canvas id="c_rs"></canvas></div>
 
-  <h3>⑫ 지표 사전 <span class="note">— 의미 · 해석 방법 · 실제 변동 주기</span></h3>
+  <h3>③ 메모리 3사 EPS · PER <span class="note">— PER = 현재가 ÷ EPS 직접 계산</span></h3>
+  <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="val_t"></table></div>
+  <div class="card"><div class="k">PER 비교 (배)</div><canvas id="c_per"></canvas></div>
+
+  <h3>④ 지표 사전 <span class="note">— 의미 · 해석 방법 · 실제 변동 주기</span></h3>
   <div class="box" style="overflow-x:auto"><table id="meta_t"></table></div>
   <div class="src" style="margin-top:6px">※ '변동 주기'는 수집 주기가 아니라 값이 실제로 바뀌는 주기다. 계약가처럼 월 1회만 바뀌는 값은 추세선이 계단 모양으로 그려지는 것이 정상이다.</div>
+
+  <h3>⑤ HBM 시장규모 · 수요 증가율</h3>
+  <div class="card"><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
+
+  <h3>⑥ HBM ASP 추이 <span class="note">— 서버 매일 2회(06:45·15:45) 자동 누적</span></h3>
+  <div class="grid g2">
+    <div class="box"><table id="asp_t"></table></div>
+    <div class="card"><canvas id="c_asp"></canvas></div>
+  </div>
+
+  <h3>⑦ HBM 업체별 점유율 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="share_t"></table></div>
+    <div class="card"><canvas id="c_share"></canvas></div>
+  </div>
+
+  <h3>⑧ DRAM 현물(스팟) 지수 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="ds_t"></table></div>
+    <div class="card"><canvas id="c_ds"></canvas></div>
+  </div>
+
+  <h3>⑨ DRAM 고정거래(계약) 가격 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="dc_t"></table></div>
+    <div class="card"><canvas id="c_dc"></canvas></div>
+  </div>
+
+  <h3>⑩ NAND 현물(스팟) 가격 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="ns_t"></table></div>
+    <div class="card"><canvas id="c_ns"></canvas></div>
+  </div>
+
+  <h3>⑪ NAND 고정거래(계약) 가격 추이</h3>
+  <div class="grid g2">
+    <div class="box"><table id="nc_t"></table></div>
+    <div class="card"><canvas id="c_nc"></canvas></div>
+  </div>
+
+  <h3>⑫ HBM : DDR5 GB당 단가 격차</h3>
+  <div class="card"><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
 
   <h2 id="s3110">3.1.10 관세청 수출 잠정치<em>10일 단위 · 🖥 서버 매일 2회</em></h2>
   <div class="grid g2">
@@ -924,6 +918,18 @@
 
   <h2 id="s32">3.2.4 / 3.2.5 KRX 브리프<em>🖥 서버 자체 수집 · 매일 2회 06:35·15:35 KST</em></h2>
   <div class="grid g2" id="krx"></div>
+
+  <h2 id="d6">6. 암호화폐 시장<em>🖥 전부 서버 자동 수집 — 매일 변동, daily 조사에서 이동 (2차 req31)</em></h2>
+  <h3>6.1 시장 개요</h3><div class="grid g4" id="d_cry"></div>
+  <h3>6.2 주요 코인 1년 차트 (가격 · 거래량)</h3>
+  <div class="grid g2" id="d_coins"></div>
+  <h3>공포·탐욕 지수 <span class="note">🖥 서버 매시 수집 · 1년 이력</span></h3><div class="lead" id="d_fg"></div>
+  <div class="card" style="margin-top:8px"><div class="k">공포·탐욕 지수 — 1년 추이</div><canvas id="c_fng" style="max-height:170px"></canvas></div>
+  <h3>6.3 김치 프리미엄 <span class="note">🖥 서버 10분 간격 수집 · 업비트÷(바이낸스×환율)</span></h3>
+  <div class="box" style="overflow-x:auto"><table id="d_kimchi"></table></div>
+  <div class="grid g2" id="d_kimp_charts" style="margin-top:10px"></div>
+  <h3>6.4 24h Top Gainers / Losers <span class="note">🖥 서버 매시 수집 · CoinGecko 시총 상위 250 · 각 10종목</span></h3>
+  <div class="grid g2" id="d_gl"></div>
 
   <h2 id="sberk">버크셔 해서웨이 13F</h2>
   <div class="lead" id="berk_sum"></div>

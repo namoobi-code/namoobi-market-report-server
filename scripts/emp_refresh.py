@@ -94,6 +94,42 @@ def main():
     save_series("series_emp_retail_mom",
                 [(rs[i][0], round((rs[i][1]/rs[i-1][1]-1)*100, 2)) for i in range(len(rs)-60, len(rs))])
 
+    # (2차 req30) ISM 제조업·서비스업 — FRED 미제공(라이선스 종료).
+    # tradingeconomics 공개 페이지 meta description 에 최신값·기준월이 문장으로 들어있어 파싱한다.
+    # 예: "decreased to 53.30 points in June from 54 points in May of 2026"
+    def ism(page, row_name, series_name):
+        try:
+            req2 = urllib.request.Request(f"https://tradingeconomics.com/united-states/{page}",
+                                          headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req2, timeout=20) as r:
+                h = r.read().decode(errors="replace")
+            import re as _re
+            m = _re.search(r'content="[^"]*?(?:increased|decreased|rose|fell|edged \w+|was unchanged at|came in at|stood at)'
+                           r' t?o? ?([0-9]{2}(?:\.[0-9]+)?) points in (\w+)[^"]*?of (\d{4})', h)
+            if not m:
+                return
+            v = float(m.group(1))
+            mon = datetime.strptime(m.group(2)[:3], "%b").month
+            asof = f"{m.group(3)}-{mon:02d}"
+            setv(row_name, f"{v:.1f}", asof,
+                 f"{v:.1f} — " + ("50 상회 확장, 경기민감·반도체 우호" if v >= 50 else "50 하회 위축, 경기둔화 신호"))
+            # 시계열도 이어붙임
+            sp = DB / f"{series_name}.json"
+            try:
+                sd = json.loads(sp.read_text(encoding="utf-8"))
+                arr = sd.get("data") or []
+                if not arr or arr[-1][0][:7] != asof:
+                    arr.append([asof + "-01", v])
+                sd["data"] = arr[-160:]
+                sd["as_of"] = sd["marker"] = today
+                sp.write_text(json.dumps(sd, ensure_ascii=False), encoding="utf-8")
+            except Exception:
+                pass
+        except Exception as e:
+            print(f"ISM {page} 실패: {type(e).__name__}")
+    ism("business-confidence", "ISM 제조업 PMI", "series_emp_ism_mfg")
+    ism("non-manufacturing-pmi", "ISM 서비스업 PMI", "series_emp_ism_svc")
+
     # GDP 성장률 (연율, 분기)
     g = fred("A191RL1Q225SBEA")
     setv("GDP 성장률 (연율)", f"{g[-1][1]:.1f}", g[-1][0][:7],

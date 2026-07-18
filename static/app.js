@@ -104,7 +104,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('nav').innerHTML=[['slive','실시간 시세'],
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['d316','3.1.6 FactSet'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
-    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],
+    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],
     ['sberk','버크셔']]
     .map(([i,t])=>`<a href="#${i}" data-go="${i}">${t}</a>`).join('');
   // 앵커 클릭: 본문 컨테이너 내부 스크롤 (URL 해시 오염 없이)
@@ -128,10 +128,18 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     mk($('c_pol'),all,ds,{legend:true,right:true,xt:8});
   }
 
+  /* (2차 req4 2026-07-18) 점도표 — 6월 vs 3월 변화값 컬럼 추가 (docx와 동일) */
   const dp=b.dot_plot?.data;
-  if(dp?.rows) $('dot').innerHTML=`<tr><th>시점</th><th style="text-align:right">6월</th><th style="text-align:right">3월</th><th>비고</th></tr>`+
-    dp.rows.map(r=>`<tr><td><b>${esc(r.year)}</b></td><td class="num">${esc(r.jun)}</td>
-    <td class="num note">${esc(r.mar)}</td><td class="note">${esc((r.note||'').slice(0,58))}</td></tr>`).join('');
+  if(dp?.rows) $('dot').innerHTML=`<tr><th>시점</th><th style="text-align:right">6월</th><th style="text-align:right">3월</th><th style="text-align:right">변화</th><th>비고</th></tr>`+
+    dp.rows.map(r=>{
+      const f=x=>parseFloat(String(x).replace(/[^0-9.\-]/g,''));
+      const j=f(r.jun), m2=f(r.mar);
+      const d2=(isFinite(j)&&isFinite(m2))?(j-m2):null;
+      const ch=d2==null?'—':(Math.abs(d2)<0.001?'동일':(d2>0?'+':'')+d2.toFixed(2).replace(/0+$/,'').replace(/\.$/,'')+'%p');
+      return `<tr><td><b>${esc(r.year)}</b></td><td class="num">${esc(r.jun)}</td>
+      <td class="num note">${esc(r.mar)}</td>
+      <td class="num ${d2>0?'up':d2<0?'dn':'note'}">${ch}</td>
+      <td class="note">${esc((r.note||'').slice(0,58))}</td></tr>`;}).join('');
   /* (req2 2026-07-18) FOMC 일정 — 이틀 회의('07-28~29'와 '07-29')가 두 줄로 들어와도
      종료일 기준으로 1건으로 합치고(설명 긴 쪽 유지), 미래 3건 + 과거 5건만 보인다 */
   const fm=b.fomc_meetings?.data;
@@ -157,13 +165,22 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   const t10=S(b,'series_us10y_daily'), t2=S(b,'series_us2y_daily'), sp=S(b,'series_curve_10_2');
   mk($('c_ust'),L(t10),[{n:'10년물',d:V(t10),c:C.r},{n:'2년물',d:V(t2),c:C.b}],{legend:true});
   mk($('c_spread'),L(sp),[{n:'10Y−2Y',d:V(sp),c:C.p,fill:true,bg:'rgba(131,88,196,.08)'}]);
+  /* (2차 req1 2026-07-18) 현재값을 차트 위 텍스트로 — 값은 차트와 같은 시계열의 마지막 점이라 항상 일치 */
+  {const lv=a=>{const v=V(a);return v.length?v[v.length-1]:null;};
+   const s10=lv(t10), s2=lv(t2), spv=lv(sp);
+   const el=$('spread_now');
+   if(el&&spv!=null) el.innerHTML=`현재 <b>${spv>0?'+':''}${spv.toFixed(2)}%p</b> → ${
+     spv>0?'정상(양전환)':'역전(경기침체 신호)'}${s10!=null&&s2!=null?` <span class="note">(10Y=${s10.toFixed(2)}% · 2Y=${s2.toFixed(2)}%)</span>`:''}`;
+   const eu=$('ust_now');
+   if(eu&&s10!=null) eu.innerHTML=`10년물 <b>${s10.toFixed(2)}%</b> · 2년물 <b>${s2!=null?s2.toFixed(2):'—'}%</b>`;}
 
-  /* ── 3.1.2 물가 ── */
-  $('infl').innerHTML=`<tr><th>지표</th><th style="text-align:right">전년비</th><th style="text-align:right">전월비</th>
-    <th>기준</th><th>발표</th><th>해석</th></tr>`+(b.inflation?.data||[]).map(r=>`<tr>
-    <td><b>${esc(r.name)}</b></td><td class="num up">${r.yoy!=null?r.yoy+'%':'—'}</td>
-    <td class="num ${r.mom>0?'up':'dn'}">${r.mom!=null?r.mom+'%':'—'}</td>
+  /* ── 3.1.2 물가 ── (2차 req5 2026-07-18) docx 표와 동일 컬럼: 지표·YoY·MoM·기준월·발표날짜·의미·시장영향·예상영향 */
+  $('infl').innerHTML=`<tr><th>지표</th><th style="text-align:right">최신값 YoY</th><th style="text-align:right">최신값 MoM</th>
+    <th>기준월</th><th>발표날짜</th><th>의미</th><th>시장영향</th><th>예상영향</th></tr>`+(b.inflation?.data||[]).map(r=>`<tr>
+    <td><b>${esc(r.name)}</b></td><td class="num up">${r.yoy!=null?(r.yoy>0?'+':'')+r.yoy+'%':'—'}</td>
+    <td class="num ${r.mom>0?'up':'dn'}">${r.mom!=null?(r.mom>0?'+':'')+r.mom+'%':'—'}</td>
     <td class="note">${esc(r.asof)}</td><td class="note">${esc(r.release||'')}</td>
+    <td class="note">${esc(r.meaning||'')}</td><td class="note">${esc(r.impact||'')}</td>
     <td class="note">${esc(r.interp)}</td></tr>`).join('');
   const ic=S(b,'series_infl_CPI'),icc=S(b,'series_infl_Core_CPI'),ip=S(b,'series_infl_PCE'),
         ipc=S(b,'series_infl_Core_PCE'),ippi=S(b,'series_infl_PPI');
@@ -225,18 +242,22 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   const cxd=b.capex?.data;
   if(cxd){
     $('capex_asof').textContent=`${cxd.asof} · 2023~2025 실측 교차검증`;
+    /* (2차 req6 2026-07-18) docx와 동일한 구조 — 회사별 4행: CAPEX / 매출 / Capex매출 / FCF */
     const YS=cxd.years, NM=cxd.companies;
     const fx=v=>(v===''||v==null)?'—':Number(v).toLocaleString(undefined,{maximumFractionDigits:0});
+    const sub=(lab,arr,cls)=>`<tr><td class="note" style="padding-left:18px">└ ${lab}</td>
+      ${YS.map((y,i)=>{const v=(arr||[])[i];
+        return `<td class="num note ${cls&&typeof v==='number'&&v<0?'dn':''}">${
+          lab==='Capex/매출'?(v==null||v===''?'—':fx(v)+'%'):fx(v)}</td>`;}).join('')}</tr>`;
     $('capex_t').innerHTML=
-      `<tr><th rowspan="2">기업</th><th colspan="${YS.length}" style="text-align:center">CAPEX</th>
-        <th colspan="${YS.length}" style="text-align:center;border-left:2px solid #dfe3e7">매출</th></tr>
-       <tr>${YS.map(y=>`<th style="text-align:right">${y}${y>=2026?'E':''}</th>`).join('')}
-        ${YS.map((y,i)=>`<th style="text-align:right${i===0?';border-left:2px solid #dfe3e7':''}">${y}${y>=2026?'E':''}</th>`).join('')}</tr>`+
-      NM.map((n,ci)=>`<tr><td><b style="color:${PAL[ci]}">${esc(n)}</b></td>
-        ${cxd.capex[n].map(v=>`<td class="num">${fx(v)}</td>`).join('')}
-        ${cxd.revenue[n].map((v,i)=>`<td class="num note"${i===0?' style="border-left:2px solid #dfe3e7"':''}>${fx(v)}</td>`).join('')}
-      </tr>`).join('')+
-      `<tr><td colspan="${1+YS.length*2}" class="note">단위: 십억 달러 · 2026 이후는 가이던스/컨센서스</td></tr>`;
+      `<tr><th>항목 (십억 $)</th>${YS.map(y=>`<th style="text-align:right">${y}${y>=2026?'E':''}</th>`).join('')}</tr>`+
+      NM.map((n,ci)=>
+        `<tr><td><b style="color:${PAL[ci]}">${esc(n)}</b> <span class="note">CAPEX</span></td>
+          ${(cxd.capex[n]||[]).map(v=>`<td class="num"><b>${fx(v)}</b></td>`).join('')}</tr>`+
+        sub('매출',cxd.revenue&&cxd.revenue[n])+
+        sub('Capex/매출',cxd.capex_to_rev&&cxd.capex_to_rev[n])+
+        sub('FCF',cxd.fcf&&cxd.fcf[n],true)).join('')+
+      `<tr><td colspan="${1+YS.length}" class="note">단위: 십억 달러 · 2026E 이후는 가이던스/컨센서스 · FCF 음수는 빨간색</td></tr>`;
     const S4=o=>NM.map((n,i)=>({n,c:PAL[i],w:2,pt:2,d:o[n].map(v=>v===''?null:v)}));
     mk($('c_capex'),YS,S4(cxd.capex),{legend:true});
     mk($('c_rev'),  YS,S4(cxd.revenue),{legend:true});
@@ -512,7 +533,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       vals=[['현재',cur],['1일',hy.d1],['1주',hy.w1],['1개월',hy.m1],['3개월',hy.m3],['6개월',hy.m6],['1년',hy.y1]];
     }
     // (req1 2026-07-12) OAS 레벨 표 폐지 — 현재값+차트만 (docx 3.1.1 과 동일)
-    if($('hy_cur')) $('hy_cur').innerHTML=`현재 OAS: <b>${cur==null?'-':Number(cur).toFixed(2)+'%'}</b> · 기준 ${esc(hs.length?hs[hs.length-1][0]:(hy.asof||''))}${hy.comment?('<br><span class="note">'+esc(hy.comment)+'</span>'):''}`;
+    if($('hy_cur')) $('hy_cur').innerHTML=`— 현재 <b>${cur==null?'-':Number(cur).toFixed(2)+'%'}</b> <span class="note">(기준 ${esc(hs.length?hs[hs.length-1][0]:(hy.asof||''))})</span>`;
     if(hs.length){const yr=hs.slice(-262); mk($('c_hy'),L(yr),[{n:'HY OAS',d:V(yr),c:C.o,w:2,fill:true,bg:'rgba(224,140,26,.08)'}]);}
   }}
 
@@ -813,7 +834,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
   $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
     ['d33','3.3 미국'],['d331','3.3.1 美ETF'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
-    ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d6','6 크립토'],['d7','7 증권사'],['d8','8 글로벌IB'],
+    ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d7','7 증권사'],['d8','8 글로벌IB'],
     ['dB','부록B AI'],['dC','부록C 밸류체인'],['dD','부록D 관계도']]
     .map(([i,t])=>`<a href="#${i}" data-go2="${i}">${t}</a>`).join('');
 
@@ -1061,11 +1082,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               P(p),`<span class="note">${st}</span>`];
     }));
     // (req19) 30D 김프 차트 — kimpwatda 30D 뷰와 같은 구간
-    const cut=new Date(Date.now()-30*864e5).toISOString().slice(0,10);
+    const cut=new Date(Date.now()-365*864e5).toISOString().slice(0,10);  // (2차 req31) 1년
     $$('d_kimp_charts').innerHTML=order.map(s2=>{
       const arr=(S2[s2]||[]).filter(x=>x[0]>=cut);
       const cur=arr.length?arr[arr.length-1][1]:null;
-      return `<div class="cch"><div class="hd"><span class="sym">${s2} 김프 <span class="note">30D</span></span>
+      return `<div class="cch"><div class="hd"><span class="sym">${s2} 김프 <span class="note">1Y</span></span>
         <span class="px ${cur>0?'up':'dn'}">${cur!=null?(cur>0?'+':'')+cur.toFixed(2)+'%':'—'}</span></div>
         <canvas id="kp_${s2}"></canvas>
         <div class="src">업비트÷(바이낸스×USD/KRW)−1 · 서버 10분 수집 (백필 구간은 일봉)</div></div>`;
@@ -1078,7 +1099,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           backgroundColor:'rgba(214,69,69,.07)'}]},
         options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
           scales:{x:{ticks:{maxTicksLimit:7,font:{size:9}},grid:{display:false}},
-                  y:{ticks:{font:{size:9},callback:v=>v+'%'}}}}});
+                  y:{ticks:{font:{size:9},callback:v=>Number(v).toFixed(2)+'%'}}}}});
     });
   }).catch(()=>{});
 
@@ -1117,10 +1138,26 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }).catch(()=>{$$('sr_'+s2).textContent='코인 시세 로드 실패 (네트워크 차단 가능)';}));
 
   /* ── 7·8. 리서치 ── */
-  const houses=(obj,names)=>Object.entries(obj||{}).filter(([,v])=>v&&typeof v==='object'&&v.key_message)
-    .map(([k,v])=>`<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
-      <div class="s" style="margin-top:7px">${E(v.key_message)}</div>
-      <div class="src">강점: ${E(v.strength||'')}</div></div>`).join('');
+  /* (2차 req8 2026-07-18) firms 가 securities.firm 아래 중첩 — 톱레벨만 뒤져 카드가 비던 버그.
+     오늘의 메시지 + 하우스별 '시각'(strategy_view 등 *_view) + 대표리포트(제목·링크·날짜) 렌더 */
+  const VIEWKO={strategy_view:'시황·투자전략 시각',global_strategy_view:'글로벌 전략 시각',asset_allocation_view:'자산배분 시각',
+    etf_emerging_view:'ETF·신흥국 시각',derivatives_view:'파생·선물 시각',ib_china_view:'IB·중국 시각',
+    global_etf_view:'글로벌 ETF 시각',sector_view:'섹터·반도체 시각',china_view:'중국·글로벌 시각',bond_view:'채권·매크로 시각',
+    daily_view:'데일리 섹터 시각',industrial_view:'산업·방산 시각',house_view:'하우스 뷰'};
+  const vtext=v=>typeof v==='string'?v:(v&&typeof v==='object'?(v.text||v.view||JSON.stringify(v)):String(v||''));
+  const houses=(obj,names)=>{
+    const src=(obj&&obj.firm&&typeof obj.firm==='object')?obj.firm:obj;
+    return Object.entries(src||{}).filter(([k,v])=>names[k]&&v&&typeof v==='object')
+    .map(([k,v])=>{
+      const views=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv)
+        .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${E(vtext(vv))}</div>`).join('');
+      const reps=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
+        .map(rp=>`<div class="s" style="margin-top:3px">📄 ${rp.url?`<a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>`:E(rp.title||'')}
+          ${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`).join('');
+      return `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
+      ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${E(vtext(v.key_message))}</div>`:''}
+      ${views}${reps}
+      ${v.strength?`<div class="src">강점: ${E(v.strength)}</div>`:''}</div>`;}).join('');};
   $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
     shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
     yuanta:'유안타증권',hyundai:'현대차증권'});
@@ -1132,9 +1169,25 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ${f.official?` <a href="${esc(f.official)}" target="_blank" rel="noopener" class="note">공식 리서치↗</a>`:''}</div>
       <table style="border:none;margin-top:5px">${(f.reports||[]).map(rp=>
         `<tr><td><a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title)}</a>
-          <span class="note">${E(rp.cat)}${rp.stock?' · '+E(rp.stock):''}</span></td>
+          <span class="note">${E(rp.cat)}${rp.stock?' · '+E(rp.stock):''}${rp.date?' · '+E(rp.date.slice(5)):''}</span></td>
         <td style="width:44px;text-align:right">${rp.pdf?`<a href="${esc(rp.pdf)}" target="_blank" rel="noopener" class="note">PDF</a>`:''}</td></tr>`).join('')}</table></div>`).join('')
       +`<div class="note" style="grid-column:1/-1">🖥 ${E(br.desc||'')} · ${E(br.as_of||'')}</div>`;
+    /* (2차 req9) 대표 리포트에 작성일 표시 */
+    el.querySelectorAll('table tr td:first-child a').forEach(()=>{});
+    /* (2차 req10) 네이버 금융리서치 모음 — 최근 2일 · 테마별 표 */
+    const nv=$$('d_sec_nv');
+    if(nv&&br.recent){
+      nv.innerHTML=Object.entries(br.recent).filter(([,arr])=>arr&&arr.length).map(([cat,arr])=>
+        `<h4 style="margin:14px 0 6px">${E(cat)} <span class="note">${arr.length}건</span></h4>
+        <div class="box" style="overflow-x:auto"><table>
+          <tr><th>작성일</th><th>증권사</th><th>제목${cat==='종목분석'||cat==='산업분석'?' · 대상':''}</th><th>요약</th><th></th></tr>
+          ${arr.map(it=>`<tr><td class="note">${E((it.date||'').slice(5))}</td>
+            <td>${E(it.broker)}</td>
+            <td><a href="${esc(it.url)}" target="_blank" rel="noopener">${E(it.title)}</a>${it.stock?` <span class="note">${E(it.stock)}</span>`:''}</td>
+            <td class="note">${E((it.summary||'').slice(0,70))}</td>
+            <td style="width:40px;text-align:right">${it.pdf?`<a href="${esc(it.pdf)}" target="_blank" rel="noopener" class="note">PDF</a>`:''}</td></tr>`).join('')}
+        </table></div>`).join('');
+    }
   }).catch(()=>{});
   const CT=(R.securities||{}).common_themes;
   $$('d_sec_c').innerHTML=Array.isArray(CT)?CT.map(t=>`• ${E(typeof t==='string'?t:(t.theme||JSON.stringify(t)))}`).join('<br>'):E(CT||'');
@@ -1143,15 +1196,26 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* (req13 2026-07-18) IB 대표 발간물 + 링크 — 보고서 실행이 rep_pubs 를 채우면 표시.
      (IB 리서치는 로그인 장벽·비정형 포털이라 서버 자동수집 불가 — 보고서 조사 시 수집) */
   {const IBN={ubs:'UBS',goldman:'Goldman Sachs',jpmorgan:'J.P. Morgan',morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'};
-   const cards=Object.entries(R.global_securities||{}).filter(([k,v])=>IBN[k]&&v&&Array.isArray(v.rep_pubs)&&v.rep_pubs.length)
-     .map(([k,v])=>`<div class="card"><div class="k" style="font-size:12.5px;font-weight:650">${IBN[k]} 대표 발간물</div>
-       ${v.rep_pubs.map(pb=>`<div class="s" style="margin-top:5px">${pb.url?`<a href="${esc(pb.url)}" target="_blank" rel="noopener">${E(pb.title||pb.url)}</a>`:E(pb.title||'')}
-         ${pb.date?`<span class="note"> · ${E(pb.date)}</span>`:''}</div>`).join('')}</div>`);
+   // (2차 req13) 공개 인사이트 페이지 — rep_pubs 가 아직 없어도 링크는 항상 제공
+   const IBP={ubs:[['House View · Investor Insights','https://www.ubs.com/global/en/wealthmanagement/insights.html']],
+     goldman:[['Goldman Sachs Insights','https://www.goldmansachs.com/insights'],['GS Research (Briefings)','https://www.goldmansachs.com/insights/briefings']],
+     jpmorgan:[['J.P. Morgan Global Research','https://www.jpmorgan.com/insights/global-research'],['Guide to the Markets','https://am.jpmorgan.com/us/en/asset-management/adv/insights/market-insights/guide-to-the-markets/']],
+     morgan_stanley:[['Morgan Stanley Ideas & Insights','https://www.morganstanley.com/insights'],['Thoughts on the Market (팟캐스트)','https://www.morganstanley.com/ideas/thoughts-on-the-market']],
+     blackrock:[['BlackRock Investment Institute','https://www.blackrock.com/corporate/insights/blackrock-investment-institute'],['Weekly Commentary','https://www.blackrock.com/us/individual/insights']]};
+   const cards=Object.keys(IBN).map(k=>{
+     const v=(R.global_securities||{})[k]||{};
+     const pubs=(Array.isArray(v.rep_pubs)&&v.rep_pubs.length)?v.rep_pubs
+       :IBP[k].map(([t,u])=>({title:t,url:u}));
+     return `<div class="card"><div class="k" style="font-size:12.5px;font-weight:650">${IBN[k]} 대표 발간물</div>
+       ${pubs.map(pb=>`<div class="s" style="margin-top:5px">${pb.url?`<a href="${esc(pb.url)}" target="_blank" rel="noopener">${E(pb.title||pb.url)}</a>`:E(pb.title||'')}
+         ${pb.date?`<span class="note"> · ${E(pb.date)}</span>`:''}</div>`).join('')}</div>`;});
    const el=$$('d_gsec_pub');
-   if(el) el.innerHTML=cards.join('')||'<div class="note" style="grid-column:1/-1">대표 발간물 링크는 다음 보고서 실행부터 수집됩니다 (rep_pubs)</div>';}
+   if(el) el.innerHTML=cards.join('');}
+  /* (2차 req14 2026-07-18) 8.6 과 8.7 을 docx처럼 분리 */
   const GC=(R.global_securities||{}).wall_street_consensus, GT=(R.global_securities||{}).common_themes;
-  $$('d_gsec_c').innerHTML=(Array.isArray(GT)?GT.map(t=>`• ${E(typeof t==='string'?t:JSON.stringify(t))}`).join('<br>'):'')+
-    (GC?`<div style="margin-top:8px"><b>월가 컨센서스</b> — ${E(typeof GC==='string'?GC:JSON.stringify(GC))}</div>`:'');
+  $$('d_gsec_c').innerHTML=Array.isArray(GT)?GT.map(t=>`• ${E(typeof t==='string'?t:JSON.stringify(t))}`).join('<br>'):E(GT||'—');
+  {const w=$$('d_gsec_w');
+   if(w) w.innerHTML=GC?(typeof GC==='string'?E(GC):Array.isArray(GC)?GC.map(t=>`• ${E(typeof t==='string'?t:JSON.stringify(t))}`).join('<br>'):Object.entries(GC).map(([k,v])=>`<b>${E(k)}</b> — ${E(typeof v==='string'?v:JSON.stringify(v))}`).join('<br>')):'—';}
 
   /* ── 부록B AI Trends ── */
   T('d_ai',['분류','내용'],((R.ai_trends||{}).items||[]).map(i=>
