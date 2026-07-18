@@ -1548,6 +1548,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const url = mkt==='kr' ? `https://finance.naver.com/item/fchart.naver?code=${encodeURIComponent(dcode)}`
                            : `https://search.naver.com/search.naver?query=${encodeURIComponent(dcode+' 주가')}`; // 해외는 네이버 증권 카드로
     window.open(url,'nmr_nv','width=1150,height=900'); };}
+  {const tvp=$('sd_tvopen'); if(tvp) tvp.onclick=()=>{ if(!dcode) return;
+    const sym = mkt==='kr' ? 'KRX:'+dcode : dcode;        // 사이트에서는 KRX 정상 제공
+    window.open(`https://kr.tradingview.com/chart/?symbol=${encodeURIComponent(sym)}`,'nmr_tv','width=1300,height=900'); };}
   {const yh=$('sd_yhopen'); if(yh) yh.onclick=()=>{ if(!dcode) return;
     let sym=dcode;
     if(mkt==='kr'){ const r=POOL.kr.find(x=>x.c===dcode); sym=dcode+(r&&r.mk==='KOSDAQ'?'.KQ':'.KS'); } // 야후 한국 심볼
