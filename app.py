@@ -314,6 +314,15 @@ def coin_series(sym: str):
             return hit[1]
         return {"symbol": sym, "data": [], "error": str(e)}
 
+# ── 로그인 + 방문자 통계 (개발자 전용) ──
+#   반드시 아래 StaticFiles 마운트보다 먼저 등록해야 한다.
+#   mount("/") 가 모든 경로를 가로채므로, 뒤에 붙이면 라우트가 죽는다.
+try:
+    from auth_visitors import router as _av_router
+    app.include_router(_av_router)
+except Exception as _e:
+    print(f"[app] auth_visitors 로드 실패: {_e}")
+
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
 CHARTS = BASE / "data" / "charts"
