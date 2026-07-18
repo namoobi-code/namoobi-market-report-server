@@ -1886,7 +1886,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_asof').textContent='전종목 풀 불러오는 중…';
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
       d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loaded=true;
-      $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}`;
+      $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}${d.live_at?` · <b style="color:#1f6feb">⚡LIVE ${E(d.live_at)}</b>`:''}`;
       {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
       if(gb){gb.disabled=false; gb.textContent='▶ START';}
       then&&then();
@@ -1917,6 +1917,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   };
   {const gb=$('scr_start'); if(gb) gb.onclick=()=>loadPool(()=>applyRestored());}
   {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
+  /* 장중 LIVE: 서버가 5분 증분 갱신한 풀을 자동 재조회(ETag 304면 무비용) */
+  setInterval(()=>{
+    if(!loaded) return;
+    const p=document.getElementById('p_screener');
+    if(!p || !p.classList.contains('on') || document.visibilityState!=='visible') return;
+    fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
+      if(!d||!d.kr||!d.kr.length) return;
+      POOL={kr:d.kr||[],us:d.us||[]}; if(s2loaded) S2=POOL;
+      $('scr_asof').innerHTML=`기준일 <b>${E(d.price_date||'—')}</b> · 전종목 풀 한국 ${POOL.kr.length.toLocaleString()} · 미국 ${POOL.us.length.toLocaleString()} · 수집 ${E(d.asof||'')}${d.live_at?` · <b style="color:#1f6feb">⚡LIVE ${E(d.live_at)}</b>`:''}`;
+      refresh();
+    }).catch(()=>{});
+  }, 300000);
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
   // 마켓 토글
   document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{

@@ -142,7 +142,7 @@ def chart_api(mkt: str, code: str):
         raise HTTPException(400, "bad params")
     key = f"{mkt}:{code}"; now = time.time()
     hit = _chart_cache.get(key)
-    if hit and now - hit[0] < 600:
+    if hit and now - hit[0] < 60:      # 장중 실시간성 — 1분 캐시
         return hit[1]
     try:
         from datetime import date as _d, timedelta as _td, datetime as _dt

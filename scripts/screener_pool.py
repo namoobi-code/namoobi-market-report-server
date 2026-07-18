@@ -118,6 +118,18 @@ def _enrich_kr(kr, d0s):
                 if len(vol)>=21:
                     va=sum(vol[-21:-1])/20
                     if va>0: o["volx"]=round(vol[-1]/va,2)
+                # (2026-07-18) 장중 증분 재계산용 상태 스냅샷 — 마지막 완결봉 기준.
+                # intraday_kr.py가 '상태 + 당일가' O(1) 갱신으로 전종목 지표를 5분마다 실시간화한다.
+                st={"pc":c,"n":n,
+                    "s19":sum(cl[-19:]), "q19":sum(x*x for x in cl[-19:])}
+                if n>14 and (g is not None): st["g"]=g; st["l"]=l
+                if e12 is not None: st["e12"]=e12; st["e26"]=e26
+                if len(macds)>=10: st["sig"]=sig
+                if n>=50: st["s49"]=sum(cl[-49:])
+                m=min(199,n-1)
+                if m>0: st["s199"]=sum(cl[-m:]); st["m199"]=m
+                if len(vol)>=20: st["va"]=sum(vol[-20:])/20
+                o["_st"]=st
         except Exception: pass
         return o
     enr=T.pmap(fetch, kr, workers=16)
@@ -159,7 +171,11 @@ def _enrich_kr(kr, d0s):
                  rsi=r.get("rsi"), macd=r.get("macd"), bb=r.get("bb"), volx=r.get("volx"))
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
+        if isinstance(r.get("_st"),dict) and hi52: r["_st"]["hi52"]=hi52   # 52주고점 상태 포함
         r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); kr[i]=r
+    # 장중 증분용 상태 DB 저장(풀 행에서는 제거)
+    try: T.save_db("ta_state", {"st": {r["c"]: r.pop("_st") for r in kr if isinstance(r.get("_st"),dict)}})
+    except Exception as e: print("[pool] ta_state 저장 실패:", repr(e)[:70])
     _score(kr,"c",KR_AXDEF)   # rev(tp_rev)는 이 시점 None → tp_history 후 build()에서 재채점
 
 def _enrich_us(us):
