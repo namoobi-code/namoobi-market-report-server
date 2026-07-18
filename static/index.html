@@ -208,6 +208,8 @@
   .fpop .man input{width:82px;border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:right;font-family:inherit}
   .fpop .man span{font-size:11px;color:var(--tx2)}
   .fpop .tgl{display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer;padding:3px 0}
+  /* 스크리너 표: 헤더·값 정렬 불일치 방지 — 숫자 셀도 좌측 밀착으로 통일 */
+  #scr_tbl td.num,#scr_tbl2 td.num{text-align:left}
   /* 스티키 헤더: 전역 table{overflow:hidden}이 클리핑 컨텍스트를 만들어 sticky를 무력화 → 해제 */
   #scr_tbl,#scr_tbl2{overflow:visible}
   #scr_tbl2 th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line)}
