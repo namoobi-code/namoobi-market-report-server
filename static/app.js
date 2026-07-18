@@ -1273,6 +1273,23 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     us:['n','px','chg','cap','tv','tp','upside','recn','nan','rev','age']
   };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
+  /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
+     (필터·정렬 등 나머지 상태는 세션 한정이라 sessionStorage 유지) */
+  const COLKEY='nmr_cols_v1';
+  let colsSaved=false;
+  function saveCols(){ try{ localStorage.setItem(COLKEY,JSON.stringify(COLST)); colsSaved=true; }catch(e){} }
+  function loadCols(){                       // 저장된 설정이 있는지 체크 → 있으면 사용, 없으면 기본값
+    try{
+      const raw=localStorage.getItem(COLKEY); if(!raw) return false;
+      const d=JSON.parse(raw);
+      if(!d||!Array.isArray(d.kr)||!Array.isArray(d.us)) return false;
+      const kr=d.kr.filter(k=>CDEF[k]), us=d.us.filter(k=>CDEF[k]);   // 모르는/폐기된 키 제거
+      if(!kr.length||!us.length) return false;
+      COLST={kr,us}; colsSaved=true; return true;
+    }catch(e){ return false; }
+  }
+  function clearCols(){ try{ localStorage.removeItem(COLKEY); }catch(e){} colsSaved=false; }
+  loadCols();
   // 컬럼·정렬·필터 공통 값 (모두 '표시 단위'로 통일)
   function colVal(r,k){
     switch(k){
@@ -1344,7 +1361,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function mvCol(k,d){
     const a=COLST[mkt], i=a.indexOf(k); if(i<0) return;
     const j=i+d; if(j<0||j>=a.length) return;
-    a.splice(j,0,a.splice(i,1)[0]); applyTable(); renderColPanel();
+    a.splice(j,0,a.splice(i,1)[0]); saveCols(); applyTable(); renderColPanel();
   }
   function renderColPanel(){
     const p=$('scr_colpanel'); if(!p) return;
@@ -1352,6 +1369,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const rest=CALL.filter(k=>cAvail(k)&&cur.indexOf(k)<0);
     p.innerHTML=
       `<div class="cp-h"><b>표시 컬럼</b><span class="note">체크로 표시/숨김 · ▲▼로 순서 변경</span>
+         <span class="cp-badge">${colsSaved?'💾 이 PC에 저장됨':'기본값 사용 중'}</span>
          <button class="cp-x" id="cp_reset">기본값</button><button class="cp-x" id="cp_close">닫기</button></div>
        <div class="cp-sec">표시 중 (${cur.length})</div><div class="cp-list">`+
       cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-coff="${k}" checked ${k==='n'?'disabled':''}>${E(CDEF[k].l)}</label>
@@ -1360,12 +1378,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       (rest.map(k=>`<div class="cp-it"><label><input type="checkbox" data-con="${k}">${E(CDEF[k].l)}</label></div>`).join('')
         || '<div class="note" style="padding:4px 2px">모두 표시 중</div>')+`</div>`;
     p.querySelectorAll('[data-coff]').forEach(c=>c.onchange=()=>{
-      COLST[mkt]=COLST[mkt].filter(x=>x!==c.dataset.coff); applyTable(); renderColPanel(); });
+      COLST[mkt]=COLST[mkt].filter(x=>x!==c.dataset.coff); saveCols(); applyTable(); renderColPanel(); });
     p.querySelectorAll('[data-con]').forEach(c=>c.onchange=()=>{
-      COLST[mkt]=COLST[mkt].concat([c.dataset.con]); applyTable(); renderColPanel(); });
+      COLST[mkt]=COLST[mkt].concat([c.dataset.con]); saveCols(); applyTable(); renderColPanel(); });
     p.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>mvCol(b.dataset.up,-1));
     p.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>mvCol(b.dataset.dn, 1));
-    $('cp_reset').onclick=()=>{ COLST[mkt]=CDEFAULT[mkt].slice(); applyTable(); renderColPanel(); };
+    $('cp_reset').onclick=()=>{ COLST={kr:CDEFAULT.kr.slice(),us:CDEFAULT.us.slice()}; clearCols(); applyTable(); renderColPanel(); };
     $('cp_close').onclick=()=>toggleColPanel(false);
   }
   let popCloser=false;
@@ -1571,7 +1589,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   // ── 스크리너 상태 저장·복원 (새로고침에도 필터 유지) ──
   function saveScr(){ try{
-    sessionStorage.setItem('nmr_scr', JSON.stringify({mkt,stage,topN,topN3,sort,sort2,F_ST,F2_ST,W,ON,COLST}));
+    sessionStorage.setItem('nmr_scr', JSON.stringify({mkt,stage,topN,topN3,sort,sort2,F_ST,F2_ST,W,ON}));
   }catch(e){} }
   function restoreScr(){ try{
     const d=JSON.parse(sessionStorage.getItem('nmr_scr')||'null'); if(!d) return false;
@@ -1579,12 +1597,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(typeof d.topN==='number') topN=d.topN; if(typeof d.topN3==='number') topN3=d.topN3;
     if(d.sort) sort=d.sort; if(d.sort2) sort2=d.sort2;
     if(d.F_ST) Object.assign(F_ST,d.F_ST); if(d.F2_ST) Object.assign(F2_ST,d.F2_ST);
-    if(d.W) W=d.W; if(d.ON) ON=d.ON;
-    if(d.COLST&&d.COLST.kr&&d.COLST.us){        // 저장된 컬럼 구성 복원(알 수 없는 키는 제거)
-      COLST={kr:d.COLST.kr.filter(k=>CDEF[k]), us:d.COLST.us.filter(k=>CDEF[k])};
-      if(!COLST.kr.length) COLST.kr=CDEFAULT.kr.slice();
-      if(!COLST.us.length) COLST.us=CDEFAULT.us.slice();
-    }
+    if(d.W) W=d.W; if(d.ON) ON=d.ON;   // 컬럼 구성은 localStorage(loadCols)에서 별도 복원
     return true;
   }catch(e){ return false; } }
   function applyRestored(){
