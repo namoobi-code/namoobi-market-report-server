@@ -1145,18 +1145,23 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     global_etf_view:'글로벌 ETF 시각',sector_view:'섹터·반도체 시각',china_view:'중국·글로벌 시각',bond_view:'채권·매크로 시각',
     daily_view:'데일리 섹터 시각',industrial_view:'산업·방산 시각',house_view:'하우스 뷰'};
   const vtext=v=>typeof v==='string'?v:(v&&typeof v==='object'?(v.text||v.view||JSON.stringify(v)):String(v||''));
-  const houses=(obj,names)=>{
+  /* (3차 2026-07-18) 본문 속 URL(https:// 또는 도메인/경로 꼴)을 클릭 가능한 링크로 — 이스케이프 후 치환이라 안전 */
+  const LNK=t=>t.replace(/(https?:\/\/[^\s<)"']+|(?:[a-z0-9-]+\.)+(?:com|net|org|io)\/[^\s<,)"']+)/g,
+    m2=>`<a href="${m2.startsWith('http')?m2:'https://'+m2}" target="_blank" rel="noopener">${m2}</a>`);
+  const EL=v=>LNK(E(vtext(v)));
+  const houses=(obj,names,extras)=>{
     const src=(obj&&obj.firm&&typeof obj.firm==='object')?obj.firm:obj;
     return Object.entries(src||{}).filter(([k,v])=>names[k]&&v&&typeof v==='object')
     .map(([k,v])=>{
       const views=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv)
-        .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${E(vtext(vv))}</div>`).join('');
+        .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${EL(vv)}</div>`).join('');
       const reps=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
         .map(rp=>`<div class="s" style="margin-top:3px">📄 ${rp.url?`<a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>`:E(rp.title||'')}
           ${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`).join('');
       return `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
-      ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${E(vtext(v.key_message))}</div>`:''}
+      ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${EL(v.key_message)}</div>`:''}
       ${views}${reps}
+      ${(extras&&extras[k])||''}
       ${v.strength?`<div class="src">강점: ${E(v.strength)}</div>`:''}</div>`;}).join('');};
   $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
     shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
@@ -1191,26 +1196,24 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }).catch(()=>{});
   const CT=(R.securities||{}).common_themes;
   $$('d_sec_c').innerHTML=Array.isArray(CT)?CT.map(t=>`• ${E(typeof t==='string'?t:(t.theme||JSON.stringify(t)))}`).join('<br>'):E(CT||'');
+  /* (3차) 리서치 센터 주소 — 각 IB 카드 안에 통합 (별도 '대표 발간물' 카드 폐지) */
+  const IBP={ubs:[['House View · Investor Insights','https://www.ubs.com/global/en/wealthmanagement/insights.html']],
+    goldman:[['Goldman Sachs Insights','https://www.goldmansachs.com/insights'],['GS Research (Briefings)','https://www.goldmansachs.com/insights/briefings']],
+    jpmorgan:[['J.P. Morgan Global Research','https://www.jpmorgan.com/insights/global-research'],['Guide to the Markets','https://am.jpmorgan.com/us/en/asset-management/adv/insights/market-insights/guide-to-the-markets/']],
+    morgan_stanley:[['Morgan Stanley Ideas & Insights','https://www.morganstanley.com/insights'],['Thoughts on the Market (팟캐스트)','https://www.morganstanley.com/ideas/thoughts-on-the-market']],
+    blackrock:[['BlackRock Investment Institute','https://www.blackrock.com/corporate/insights/blackrock-investment-institute'],['Weekly Commentary','https://www.blackrock.com/us/individual/insights']]};
+  const IBEX={};
+  Object.entries(IBP).forEach(([k,ls])=>{
+    const v=(R.global_securities||{})[k]||{};
+    const pubs=(Array.isArray(v.rep_pubs)&&v.rep_pubs.length)?v.rep_pubs.map(pb=>[pb.title||pb.url,pb.url]):ls;
+    IBEX[k]=`<div class="s" style="margin-top:7px"><b>리서치 센터 주소</b> — ${
+      pubs.filter(([,u])=>u).map(([t,u])=>`<a href="${esc(u)}" target="_blank" rel="noopener">${E(t)}</a>`).join(' · ')}</div>`;});
   $$('d_gsec').innerHTML=houses(R.global_securities,{ubs:'UBS',goldman:'Goldman Sachs',jpmorgan:'J.P. Morgan',
-    morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'});
+    morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'},IBEX);
   /* (req13 2026-07-18) IB 대표 발간물 + 링크 — 보고서 실행이 rep_pubs 를 채우면 표시.
      (IB 리서치는 로그인 장벽·비정형 포털이라 서버 자동수집 불가 — 보고서 조사 시 수집) */
-  {const IBN={ubs:'UBS',goldman:'Goldman Sachs',jpmorgan:'J.P. Morgan',morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'};
-   // (2차 req13) 공개 인사이트 페이지 — rep_pubs 가 아직 없어도 링크는 항상 제공
-   const IBP={ubs:[['House View · Investor Insights','https://www.ubs.com/global/en/wealthmanagement/insights.html']],
-     goldman:[['Goldman Sachs Insights','https://www.goldmansachs.com/insights'],['GS Research (Briefings)','https://www.goldmansachs.com/insights/briefings']],
-     jpmorgan:[['J.P. Morgan Global Research','https://www.jpmorgan.com/insights/global-research'],['Guide to the Markets','https://am.jpmorgan.com/us/en/asset-management/adv/insights/market-insights/guide-to-the-markets/']],
-     morgan_stanley:[['Morgan Stanley Ideas & Insights','https://www.morganstanley.com/insights'],['Thoughts on the Market (팟캐스트)','https://www.morganstanley.com/ideas/thoughts-on-the-market']],
-     blackrock:[['BlackRock Investment Institute','https://www.blackrock.com/corporate/insights/blackrock-investment-institute'],['Weekly Commentary','https://www.blackrock.com/us/individual/insights']]};
-   const cards=Object.keys(IBN).map(k=>{
-     const v=(R.global_securities||{})[k]||{};
-     const pubs=(Array.isArray(v.rep_pubs)&&v.rep_pubs.length)?v.rep_pubs
-       :IBP[k].map(([t,u])=>({title:t,url:u}));
-     return `<div class="card"><div class="k" style="font-size:12.5px;font-weight:650">${IBN[k]} 대표 발간물</div>
-       ${pubs.map(pb=>`<div class="s" style="margin-top:5px">${pb.url?`<a href="${esc(pb.url)}" target="_blank" rel="noopener">${E(pb.title||pb.url)}</a>`:E(pb.title||'')}
-         ${pb.date?`<span class="note"> · ${E(pb.date)}</span>`:''}</div>`).join('')}</div>`;});
-   const el=$$('d_gsec_pub');
-   if(el) el.innerHTML=cards.join('');}
+  // (3차) d_gsec_pub 별도 카드 폐지 — 리서치 센터 주소를 각 IB 카드에 통합
+
   /* (2차 req14 2026-07-18) 8.6 과 8.7 을 docx처럼 분리 */
   const GC=(R.global_securities||{}).wall_street_consensus, GT=(R.global_securities||{}).common_themes;
   $$('d_gsec_c').innerHTML=Array.isArray(GT)?GT.map(t=>`• ${E(typeof t==='string'?t:JSON.stringify(t))}`).join('<br>'):E(GT||'—');
