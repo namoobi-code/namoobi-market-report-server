@@ -526,20 +526,25 @@ async def my_ips_set(request: Request):
         body = await request.json()
     except Exception:
         body = {}
-    ip = str(body.get("ip", "")).strip()
-    if not re.fullmatch(r"[0-9a-fA-F.:]{3,45}", ip):
+    ips = body.get("ips") or ([body["ip"]] if body.get("ip") else [])
+    ips = [str(x).strip() for x in ips][:200]
+    bad = [x for x in ips if not re.fullmatch(r"[0-9a-fA-F.:]{3,45}", x)]
+    if bad or not ips:
         raise HTTPException(400, "IP 형식이 올바르지 않습니다")
+
     d = load_my_ips()
     if body.get("remove"):
-        d.pop(ip, None)
+        for ip in ips:
+            d.pop(ip, None)
     else:
         lb = str(body.get("label", "")).strip()[:40]
-        d[ip] = {"label": lb or _auto_label(ip),
-                 "since": d.get(ip, {}).get("since", datetime.now().strftime("%Y-%m-%d")),
-                 "auto": False}
+        for ip in ips:
+            d[ip] = {"label": lb or _auto_label(ip),
+                     "since": d.get(ip, {}).get("since", datetime.now().strftime("%Y-%m-%d")),
+                     "auto": not lb}
     save_my_ips(d)
     _cache["out"] = None                        # 표시가 바로 반영되게 캐시 비움
-    return {"ok": True, "count": len(d)}
+    return {"ok": True, "count": len(d), "changed": len(ips)}
 
 _cache = {"t": 0, "d": 0, "out": None}
 

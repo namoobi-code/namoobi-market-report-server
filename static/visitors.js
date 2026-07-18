@@ -87,7 +87,12 @@
   $('auth_out').addEventListener('click', logout);
 
   // ── 방문자 통계 렌더 ────────────────────────────────────
+  let DATA = null;                  // 마지막 응답 (정렬 시 재조회 없이 다시 그린다)
+  let sortK = 'start', sortD = -1;  // 기본: 최근 방문 먼저
+  const sel = new Set();            // 체크한 IP
+
   function render(s){
+    DATA = s;
     const q = s.summary, body = $('vs_body');
     $('vs_as').textContent = '집계 ' + s.as_of;
 
@@ -111,7 +116,44 @@
       t += esc([r.dev, r.os, r.br].filter(Boolean).join(' · ')) || esc(r.ua);
       return t;
     };
-    const mkRows = list => list.map(r=>`<tr class="${r.me?'vs-me':''}">
+    // ── 정렬 · 선택 ──────────────────────────────────────
+    // 세션은 IP 하나가 여러 줄일 수 있다. 체크는 '줄'이 아니라 'IP' 단위로 잡는다 —
+    // 나로 표시하는 대상이 IP 이기 때문이다.
+    const COLS = [
+      {k:'ip',    t:'IP',            w:'ip'},
+      {k:'isp',   t:'통신사 · 회선',  w:'s', v:r=>[r.isp, r.line, r.org].join(' ')},
+      {k:'loc',   t:'위치',          w:'s', v:r=>r.relay ? '' : (r.loc || r.country || '')},
+      {k:'dev',   t:'기기 · 앱',      w:'s', v:r=>[r.app, r.dev, r.os, r.br].join(' ')},
+      {k:'start', t:'들어온 시각',    w:'s'},
+      {k:'end',   t:'마지막 요청',    w:'s'},
+      {k:'dur',   t:'체류',          w:'n'},
+      {k:'reqs',  t:'요청',          w:'n'},
+      {k:'last',  t:'마지막 화면',    w:'s'},
+    ];
+    const ipNum = ip => (ip.split('.').length === 4)
+      ? ip.split('.').reduce((a,x)=>a*256 + (parseInt(x,10)||0), 0) : -1;
+    const sv = (r, c) => c.w === 'ip' ? ipNum(r.ip)
+                       : c.w === 'n'  ? (r[c.k] || 0)
+                       : String((c.v ? c.v(r) : r[c.k]) || '');
+
+    function sorted(list){
+      const c = COLS.find(x => x.k === sortK) || COLS[4];
+      return list.slice().sort((a,b)=>{
+        const x = sv(a,c), y = sv(b,c);
+        return (typeof x === 'number' ? x - y : x.localeCompare(y, 'ko')) * sortD;
+      });
+    }
+
+    function head(){
+      return '<tr><th class="vs-cw"><input type="checkbox" class="vs-all"></th>'
+        + COLS.map(c=>`<th class="vs-sh" data-k="${c.k}">${c.t}<span class="vs-ar">${
+            sortK===c.k ? (sortD>0?'▲':'▼') : ''}</span></th>`).join('')
+        + '<th></th></tr>';
+    }
+
+    const mkRows = list => sorted(list).map(r=>`<tr class="${r.me?'vs-me':''}">
+        <td class="vs-cw"><input type="checkbox" class="vs-ck" data-ip="${esc(r.ip)}"${
+            sel.has(r.ip)?' checked':''}></td>
         <td>${esc(r.ip)}${r.me?' <b style="color:#2b57d0">(나)</b>':''}
             ${r.grp?'<span class="vs-g" title="같은 사람으로 추정되는 묶음">#'+r.grp+'</span>':''}</td>
         <td>${line(r)}</td>
@@ -124,9 +166,9 @@
             r.me ? '나 해제' : '나로 표시'}</button></td></tr>`).join('');
 
     const meRows = mkRows(s.sessions.filter(r=>r.me))
-      || '<tr><td colspan="10" style="color:var(--tx2);padding:14px">아직 없다 — 로그인하면 그 회선이 자동으로 등록된다.</td></tr>';
+      || '<tr><td colspan="11" style="color:var(--tx2);padding:14px">아직 없다 — 로그인하면 그 회선이 자동으로 등록된다.</td></tr>';
     const otRows = mkRows(s.sessions.filter(r=>!r.me))
-      || '<tr><td colspan="10" style="color:var(--tx2);padding:14px">기록 없음</td></tr>';
+      || '<tr><td colspan="11" style="color:var(--tx2);padding:14px">기록 없음</td></tr>';
 
     const grows = (s.groups||[]).map(g=>`<tr>
         <td><span class="vs-g">#${g.id}</span></td>
@@ -165,34 +207,34 @@
           <div class="vs-hx">${[0,6,12,18].map(h=>`<span style="flex:6">${h}시</span>`).join('')}</div></div>
       </div>
 
-      <h2 style="margin-top:18px">나 아닌 방문자<em>30분 이상 끊기면 별도 방문</em></h2>
-      <div class="box" style="overflow:auto;max-height:460px"><table>
-        <thead><tr><th>IP</th><th>통신사 · 회선</th><th>위치</th><th>기기 · 앱</th>
-          <th>들어온 시각</th><th>마지막 요청</th><th>체류</th><th>요청</th>
-          <th>마지막 화면</th><th></th></tr></thead>
+      <h2 style="margin-top:18px">나 아닌 방문자<em>제목을 누르면 정렬 · 30분 이상 끊기면 별도 방문</em></h2>
+      <div class="vs-act" id="vs_act"><span id="vs_seln">0개 선택</span>
+        <button class="cp-x" id="vs_bme">선택한 IP를 나로 표시</button>
+        <button class="cp-x" id="vs_bno">나 해제</button>
+        <button class="cp-x" id="vs_bcl">선택 해제</button></div>
+      <div class="box" style="overflow-x:auto"><table>
+        <thead>${head()}</thead>
         <tbody>${otRows}</tbody></table></div>
 
       <h2 style="margin-top:18px">동일인 추정 묶음<em>IP가 달라도 기기·브라우저·통신사가 같은 경우</em></h2>
-      <div class="box" style="overflow:auto;max-height:300px"><table>
+      <div class="box" style="overflow-x:auto"><table>
         <thead><tr><th>묶음</th><th>기기 · 브라우저</th><th>통신사</th><th>IP</th>
           <th>방문</th><th>요청</th><th>위치</th><th>기간</th></tr></thead>
         <tbody>${grows}</tbody></table></div>
 
       <h2 style="margin-top:18px">내 접속<em>로그인한 회선은 자동 등록된다</em></h2>
-      <div class="box" style="overflow:auto;max-height:260px"><table>
-        <thead><tr><th>IP</th><th>통신사 · 회선</th><th>위치</th><th>기기 · 앱</th>
-          <th>들어온 시각</th><th>마지막 요청</th><th>체류</th><th>요청</th>
-          <th>마지막 화면</th><th></th></tr></thead>
+      <div class="box" style="overflow-x:auto"><table>
+        <thead>${head()}</thead>
         <tbody>${meRows}</tbody></table></div>
 
       <h2 style="margin-top:18px">봇 · 스캐너<em>사람과 분리해 집계 — 전부 차단됨</em></h2>
-      <div class="box" style="overflow:auto;max-height:340px"><table>
+      <div class="box" style="overflow-x:auto"><table>
         <thead><tr><th>IP</th><th>요청</th><th>판정 근거</th><th>기간</th>
           <th>자칭 브라우저</th><th>노린 경로</th></tr></thead>
         <tbody>${brows}</tbody></table></div>
 
       <h2 style="margin-top:18px">많이 불린 API<em>사람 요청만</em></h2>
-      <div class="box" style="overflow:auto;max-height:280px"><table>
+      <div class="box" style="overflow-x:auto"><table>
         <thead><tr><th>경로</th><th>호출</th></tr></thead><tbody>${prows}</tbody></table></div>
 
       <p class="note" style="margin-top:12px">
@@ -204,13 +246,48 @@
         기기·앱은 위장 가능한 자기 신고값이다. 동일인 묶음은 어디까지나 추정으로,
         같은 기종을 쓰는 다른 사람일 수 있다.</p>`;
 
-    body.querySelectorAll('.vs-mk').forEach(b => b.addEventListener('click', async ()=>{
-      b.disabled = true;
-      await fetch('/api/visitors/myips', {
+    // ── 정렬: 제목 클릭 ─────────────────────────────────
+    body.querySelectorAll('.vs-sh').forEach(th => th.addEventListener('click', ()=>{
+      const k = th.dataset.k;
+      if(sortK === k) sortD = -sortD; else { sortK = k; sortD = 1; }
+      render(DATA);                       // 서버 재조회 없이 다시 그린다
+    }));
+
+    // ── 선택 ────────────────────────────────────────────
+    function syncSel(){
+      $('vs_seln').textContent = sel.size + '개 선택';
+      $('vs_act').classList.toggle('on', sel.size > 0);
+      body.querySelectorAll('.vs-ck').forEach(c =>
+        c.checked = sel.has(c.dataset.ip));
+    }
+    body.querySelectorAll('.vs-ck').forEach(c => c.addEventListener('change', ()=>{
+      c.checked ? sel.add(c.dataset.ip) : sel.delete(c.dataset.ip);
+      syncSel();                          // 같은 IP 의 다른 줄도 함께 체크된다
+    }));
+    body.querySelectorAll('.vs-all').forEach(a => a.addEventListener('change', ()=>{
+      const tb = a.closest('table');
+      tb.querySelectorAll('.vs-ck').forEach(c =>
+        a.checked ? sel.add(c.dataset.ip) : sel.delete(c.dataset.ip));
+      syncSel();
+    }));
+    syncSel();
+
+    async function mark(ips, remove){
+      if(!ips.length) return;
+      const r = await fetch('/api/visitors/myips', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ip: b.dataset.ip, remove: b.dataset.me === '1'})
-      }).catch(()=>{});
-      load();
+        body: JSON.stringify({ips, remove})
+      }).catch(()=>null);
+      if(r && !r.ok && r.status === 401){ me = null; paint(); open(); return; }
+      sel.clear(); load();
+    }
+    $('vs_bme').addEventListener('click', ()=> mark([...sel], false));
+    $('vs_bno').addEventListener('click', ()=> mark([...sel], true));
+    $('vs_bcl').addEventListener('click', ()=>{ sel.clear(); syncSel(); });
+
+    body.querySelectorAll('.vs-mk').forEach(b => b.addEventListener('click', ()=>{
+      b.disabled = true;
+      mark([b.dataset.ip], b.dataset.me === '1');
     }));
   }
 

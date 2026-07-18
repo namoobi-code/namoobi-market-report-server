@@ -96,9 +96,12 @@
   .vs-k div{border:1px solid var(--line);border-radius:9px;padding:10px 12px;background:#fff}
   .vs-k b{display:block;font-size:20px;line-height:1.25;font-variant-numeric:tabular-nums}
   .vs-k span{font-size:10.5px;color:var(--tx2)}
+  /* 화면 전체가 고정 높이라 이 판 안에서 스크롤해야 한다 (.soon 과 같은 역할) */
+  #p_vis{overflow-y:auto;min-height:0;padding:0 8px 70px 0}
   #p_vis table{width:100%;border-collapse:collapse;font-size:11.5px}
   #p_vis th{text-align:left;font-weight:600;color:var(--tx2);border-bottom:1px solid var(--line);
-            padding:6px 8px;white-space:nowrap;font-size:10.5px}
+            padding:6px 8px;white-space:nowrap;font-size:10.5px;
+            position:sticky;top:0;background:var(--card);z-index:2}
   #p_vis td{padding:5px 8px;border-bottom:1px solid #f1f3f5;text-align:left;
             font-variant-numeric:tabular-nums;white-space:nowrap}
   #p_vis tr:hover td{background:#f8fafc}
@@ -109,6 +112,17 @@
          font-size:10px;cursor:pointer;color:var(--tx2);font-family:inherit;white-space:nowrap}
   .vs-mk:hover{border-color:#2b57d0;color:#2b57d0}
   .vs-mk:disabled{opacity:.4}
+  /* 체크박스 · 일괄 처리 막대 */
+  #p_vis td.vs-cw,#p_vis th.vs-cw{width:26px;padding-left:9px;padding-right:0}
+  #p_vis input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#2b57d0;margin:0}
+  .vs-act{display:none;align-items:center;gap:8px;margin:0 0 8px;padding:7px 11px;
+          background:#eef4ff;border:1px solid #c7d7fb;border-radius:8px;font-size:11.5px}
+  .vs-act.on{display:flex}
+  .vs-act #vs_seln{font-weight:700;color:#2b57d0;margin-right:2px}
+  /* 정렬 가능한 제목 */
+  #p_vis th.vs-sh{cursor:pointer;user-select:none}
+  #p_vis th.vs-sh:hover{color:#2b57d0}
+  .vs-ar{color:#2b57d0;font-size:9px;margin-left:2px}
   .vs-bar{display:flex;align-items:flex-end;gap:2px;height:56px;margin:4px 0 2px}
   .vs-bar i{flex:1;background:#2b57d0;border-radius:2px 2px 0 0;min-height:1px;position:relative}
   .vs-bar i.b{background:#e2e8f0}
