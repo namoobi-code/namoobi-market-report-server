@@ -280,7 +280,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   }
   // 표: 현재값 + 변동률
   function priceTbl(id,tkey){
-    const t=md?.tables?.[tkey]; if(!t) return;
+    const t=md?.tables?.[tkey]; if(!t||!$(id)) return;   // (3차) 표 표시 폐지 — 차트만 (docx 3.1.9 구성)
     $(id).innerHTML=`<tr><th>품목</th><th style="text-align:right">평균가</th><th style="text-align:right">변동</th></tr>`+
       t.rows.map(r=>{const c=r.chg_pct;
         return `<tr><td><b>${esc(r.item)}</b></td><td class="num">${r.avg.toLocaleString(undefined,{minimumFractionDigits:2})}</td>
@@ -308,7 +308,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       } }
     // ② HBM ASP
     if(H.asp){
-      $('asp_t').innerHTML=`<tr><th>제품</th><th style="text-align:right">가격(USD)</th><th style="text-align:right">변동</th><th>동인</th></tr>`+
+      if($('asp_t')) $('asp_t').innerHTML=`<tr><th>제품</th><th style="text-align:right">가격(USD)</th><th style="text-align:right">변동</th><th>동인</th></tr>`+
         H.asp.map(a=>`<tr><td><b>${esc(a.product)}</b></td><td class="num">${esc(a.price)}</td>
         <td class="num ${a.trend==='up'?'up':'note'}">${esc(a.change||'—')}</td>
         <td class="note">${esc((a.driver||'').slice(0,40))}</td></tr>`).join('');
@@ -317,7 +317,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     // ③ 점유율
     if(H.share){
       const sr=Object.fromEntries((H.supplier_revenue||[]).map(r=>[r.vendor,r]));
-      $('share_t').innerHTML=`<tr><th>업체</th><th style="text-align:right">HBM 점유율</th><th style="text-align:right">매출 기준</th><th>비고</th></tr>`+
+      if($('share_t')) $('share_t').innerHTML=`<tr><th>업체</th><th style="text-align:right">HBM 점유율</th><th style="text-align:right">매출 기준</th><th>비고</th></tr>`+
         H.share.map(r=>{const v=sr[r.vendor]||{};
         return `<tr><td><b>${esc(r.vendor)}</b></td><td class="num">${r.share_pct}%</td>
         <td class="num note">${v.share_pct?`${v.share_pct}% ($${v.revenue_bn}B)`:'—'}</td>
@@ -402,7 +402,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     // ⑫ 지표 사전 — 의미·해석·변동주기 (nmr_meta.py 단일 진실원천)
     const MT=md.meta||{};
     if(Object.keys(MT).length){
-      $('meta_t').innerHTML=`<tr><th>지표</th><th>변동 주기</th><th>의미</th><th>해석 방법</th></tr>`+
+      if($('dict_t')) $('dict_t').innerHTML=`<tr><th>지표</th><th>변동 주기</th><th>의미</th><th>해석 방법</th></tr>`+
         Object.values(MT).filter(o=>o&&o.label).map(o=>{
           const daily=/매일/.test(o.cadence||'');
           return `<tr><td><b>${esc(o.label)}</b></td>
@@ -416,19 +416,19 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     if(md.valuation){
       const V=md.valuation;
       const f=(v,K)=>v==null?'—':(K?Math.round(v).toLocaleString():v.toLocaleString(undefined,{maximumFractionDigits:2}));
-      $('val_t').innerHTML=`<tr><th>기업</th><th style="text-align:right">현재가</th>
-        <th style="text-align:right">TTM EPS</th><th style="text-align:right">PER</th>
-        <th style="text-align:right">2026E EPS</th><th style="text-align:right">PER</th>
-        <th style="text-align:right">2027E EPS</th><th style="text-align:right">PER</th></tr>`+
-        V.map(r=>{const K=r.currency==='KRW';
-        return `<tr><td><b>${esc(r.name)}</b></td><td class="num">${f(r.price,K)}</td>
-        <td class="num note">${f(r.eps_ttm,K)}</td><td class="num">${r.per_ttm}x</td>
-        <td class="num note">${f(r.eps_2026E,K)}</td><td class="num dn"><b>${r.per_2026E}x</b></td>
-        <td class="num note">${f(r.eps_2027E,K)}</td><td class="num" style="color:var(--ok)"><b>${r.per_2027E}x</b></td></tr>`;}).join('')+
-        `<tr><td colspan="8" class="note">단일 소스 db/hbm_eps.json — PER = 최신 종가 ÷ EPS 매일 재계산 (docx 3.1.9 표와 동일값) · ${esc((b.hbm_eps&&b.hbm_eps.price_note)||md.asof_valuation||'')}</td></tr>`;
-      mk($('c_per'),V.map(r=>r.name),
-        [{n:'TTM',d:V.map(r=>r.per_ttm),c:C.gy},{n:'2026E',d:V.map(r=>r.per_2026E),c:C.b},
-         {n:'2027E',d:V.map(r=>r.per_2027E),c:C.g}],{bar:true,legend:true,y0:true});
+      /* (3차 2026-07-18) docx 표3과 동일: 종목 | 2025(실적) | 2026E | 2027E | 2028E | 통화 — 셀='EPS x · PER y' */
+      const HE=(b.hbm_eps&&(b.hbm_eps.data||b.hbm_eps))||{};
+      const ORD=[['SK하이닉스','SK하이닉스'],['삼성전자','삼성전자'],['Micron','Micron (MU)']];
+      const cellv=(e,y,K)=>{const ep=e['y'+y+'_eps'],pr=e['y'+y+'_per'];
+        if(ep==null)return '—';
+        return `EPS ${K?Math.round(ep).toLocaleString():ep.toLocaleString(undefined,{maximumFractionDigits:2})} · PER ${pr!=null?pr+'x':'—'}`;};
+      if($('val_t')&&Object.keys(HE).length)
+        $('val_t').innerHTML=`<tr><th>종목</th><th>2025(실적)</th><th>2026(E)</th><th>2027(E)</th><th>2028(E)</th><th>통화</th></tr>`+
+          ORD.filter(([k])=>HE[k]).map(([k,lab])=>{const e=HE[k],K=e.currency==='KRW';
+            return `<tr><td><b>${esc(lab)}</b></td><td class="num">${cellv(e,2025,K)}</td>
+            <td class="num dn"><b>${cellv(e,2026,K)}</b></td><td class="num" style="color:var(--ok)">${cellv(e,2027,K)}</td>
+            <td class="num note">${cellv(e,2028,K)}</td><td class="note">${esc(e.currency||'')}</td></tr>`;}).join('')+
+          `<tr><td colspan="6" class="note">단일 소스 db/hbm_eps.json — 네이버 실적·컨센서스 매일 자동 갱신, PER = 최신 종가 ÷ EPS 재계산 (docx 3.1.9 표와 동일값) · ${esc((b.hbm_eps&&b.hbm_eps.price_note)||md.asof_valuation||'')}</td></tr>`;
     }
   }
 

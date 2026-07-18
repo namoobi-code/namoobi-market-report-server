@@ -782,75 +782,43 @@
   </div>
   <div class="lead" id="capex_c" style="margin-top:12px"></div>
 
-  <h2 id="s319">3.1.9 메모리 + HBM 지표<em id="mem_asof"></em><em>🖥 서버 매일 2회 06:45·15:45 · 순서 = docx 3.1.9 (갭→선행지표→EPS·PER→지표사전→시계열)</em></h2>
+  <h2 id="s319">3.1.9 반도체 주가 체크용 메모리+HBM 지표<em id="mem_asof"></em></h2>
+  <!-- (3차 2026-07-18) docx 3.1.9 와 동일 구성·순서: 차트 11패널 → 스팟-계약갭 표 → 선행지표 표 → HBM 3사 EPS·PER 표 → 지표 사전 -->
+  <div class="note" style="margin-bottom:8px">※ 서버 자체 수집 — 보고서 실행 시점 조사가 아니라 서버가 주기 수집·누적한 DB 사용 · 매일 2회(06:45·15:45 KST) + 리포트 실행 시 병합.
+  ① DRAM 현물 / ② DRAM 계약 / ③ NAND 현물 / ④ NAND 계약 / ⑤ 스팟-계약 갭 / ⑥ HBM 점유율 / ⑦ HBM ASP / ⑧ HBM 시장규모 / ⑨ HBM:DDR5 격차 / ⑩ 선행지표 1년 성과 / ⑪ 메모리/GPU 상대강도 — 11개 패널. 가격·주가=공개 소스 실측, ⑦⑧⑨=공개 추정치 환산.</div>
 
-  <h3>① 스팟 − 계약 갭 <span class="note">— 계약가 인상 압력 선행지표</span></h3>
   <div class="grid g2">
-    <div class="box"><table id="gap_t"></table></div>
-    <div class="card"><canvas id="c_spgap"></canvas></div>
+    <div class="card"><div class="k">① DRAM 현물(스팟) 추이</div><canvas id="c_ds"></canvas></div>
+    <div class="card"><div class="k">② DRAM 고정거래(계약) 추이</div><canvas id="c_dc"></canvas></div>
+    <div class="card"><div class="k">③ NAND 현물(스팟) 추이</div><canvas id="c_ns"></canvas></div>
+    <div class="card"><div class="k">④ NAND 고정거래(계약) 추이</div><canvas id="c_nc"></canvas></div>
+    <div class="card"><div class="k">⑤ 스팟 − 계약 갭 (%)</div><canvas id="c_spgap"></canvas></div>
+    <div class="card"><div class="k">⑥ HBM 업체별 점유율 추이</div><canvas id="c_share"></canvas></div>
+    <div class="card"><div class="k">⑦ HBM ASP 추이</div><canvas id="c_asp"></canvas></div>
+    <div class="card"><div class="k">⑧ HBM 시장규모 · 수요 증가율 (연간)</div><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
+    <div class="card"><div class="k">⑨ HBM : DDR5 GB당 단가 격차 (환산 추정)</div><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
+    <div class="card"><div class="k">⑩ 선행지표 1년 성과</div><canvas id="c_lead1y"></canvas></div>
+    <div class="card"><div class="k">⑪ 메모리/GPU 상대강도 (MU ÷ NVDA)</div><canvas id="c_rs"></canvas></div>
   </div>
+
+  <h3>■ 스팟-계약 갭 (계약가 인상 압력 선행지표)</h3>
+  <div class="note" style="margin-bottom:6px">현물가가 계약가를 크게 상회하면 다음 계약 협상에서 인상 압력으로 작용한다 — 메모리 3사 실적의 선행지표.</div>
+  <div class="box" style="overflow-x:auto"><table id="gap_t"></table></div>
   <div class="src" id="spgap_src" style="margin-top:6px"></div>
 
-  <h3>② 선행지표 <span class="note">— 메모리 가격보다 먼저 움직이는 신호 · 전 항목 매일 갱신</span></h3>
-  <div class="grid g2">
-    <div class="box"><table id="lead_t"></table></div>
-    <div class="card"><div class="k">1년 성과 — 수요처(NVDA) vs 공급자(MU)</div><canvas id="c_lead1y"></canvas></div>
-  </div>
-  <div class="box" id="rs_box" style="margin-top:12px;display:none">
-    <div class="k" id="rs_k"></div>
-    <div class="lead" id="rs_note" style="margin-top:6px"></div>
-  </div>
-  <div class="card" style="margin-top:12px"><div class="k">메모리/GPU 상대강도 추이 (MU ÷ NVDA)</div><canvas id="c_rs"></canvas></div>
-
-  <h3>③ 메모리 3사 EPS · PER <span class="note">— PER = 현재가 ÷ EPS 직접 계산</span></h3>
-  <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="val_t"></table></div>
-  <div class="card"><div class="k">PER 비교 (배)</div><canvas id="c_per"></canvas></div>
-
-  <h3>④ 지표 사전 <span class="note">— 의미 · 해석 방법 · 실제 변동 주기</span></h3>
-  <div class="box" style="overflow-x:auto"><table id="meta_t"></table></div>
-  <div class="src" style="margin-top:6px">※ '변동 주기'는 수집 주기가 아니라 값이 실제로 바뀌는 주기다. 계약가처럼 월 1회만 바뀌는 값은 추세선이 계단 모양으로 그려지는 것이 정상이다.</div>
-
-  <h3>⑤ HBM 시장규모 · 수요 증가율</h3>
-  <div class="card"><canvas id="c_hbm_mkt"></canvas><div class="src" id="hbm_mkt_src"></div></div>
-
-  <h3>⑥ HBM ASP 추이 <span class="note">— 서버 매일 2회(06:45·15:45) 자동 누적</span></h3>
-  <div class="grid g2">
-    <div class="box"><table id="asp_t"></table></div>
-    <div class="card"><canvas id="c_asp"></canvas></div>
+  <h3>■ 선행지표 — 메모리 가격보다 먼저 움직이는 신호 <span class="note">전 항목 매일 갱신</span></h3>
+  <div class="box" style="overflow-x:auto"><table id="lead_t"></table></div>
+  <div class="box" id="rs_box" style="margin-top:10px;display:none">
+    <div class="k" id="rs_k" style="padding:10px 12px 0"></div>
+    <div class="lead" id="rs_note" style="margin:6px 12px 10px"></div>
   </div>
 
-  <h3>⑦ HBM 업체별 점유율 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="share_t"></table></div>
-    <div class="card"><canvas id="c_share"></canvas></div>
-  </div>
+  <h3>■ HBM 3사 연도별 EPS · PER 예상치 <span class="note">실측·컨센서스 — 단일 소스 db/hbm_eps.json · PER=현재가÷EPS 매일 재계산</span></h3>
+  <div class="box" style="overflow-x:auto"><table id="val_t"></table></div>
 
-  <h3>⑧ DRAM 현물(스팟) 지수 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="ds_t"></table></div>
-    <div class="card"><canvas id="c_ds"></canvas></div>
-  </div>
-
-  <h3>⑨ DRAM 고정거래(계약) 가격 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="dc_t"></table></div>
-    <div class="card"><canvas id="c_dc"></canvas></div>
-  </div>
-
-  <h3>⑩ NAND 현물(스팟) 가격 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="ns_t"></table></div>
-    <div class="card"><canvas id="c_ns"></canvas></div>
-  </div>
-
-  <h3>⑪ NAND 고정거래(계약) 가격 추이</h3>
-  <div class="grid g2">
-    <div class="box"><table id="nc_t"></table></div>
-    <div class="card"><canvas id="c_nc"></canvas></div>
-  </div>
-
-  <h3>⑫ HBM : DDR5 GB당 단가 격차</h3>
-  <div class="card"><canvas id="c_gap"></canvas><div class="src" id="gap_src"></div></div>
+  <h3>■ 지표 사전 — 의미 · 해석 방법 · 변동 주기</h3>
+  <div class="note" style="margin-bottom:6px">※ '변동 주기'는 수집 주기가 아니라 값이 실제로 바뀌는 주기다. 계약가처럼 월 1회만 바뀌는 값은 추세선이 계단 모양으로 그려지는 것이 정상이다.</div>
+  <div class="box" style="overflow-x:auto"><table id="dict_t"></table></div>
 
   <h2 id="s3110">3.1.10 관세청 수출 잠정치<em>10일 단위 · 🖥 서버 매일 2회</em></h2>
   <div class="grid g2">
