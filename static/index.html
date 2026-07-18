@@ -152,6 +152,10 @@
   @media(min-width:981px){ body.side-open .wrap{padding-right:344px} }
   .side-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:13.5px}
   #scr_glspanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:9px}
+  /* 빈칸 표기 범례 (제목 옆 → 필터설명 패널로 이동) */
+  .glsmiss{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;font-size:11.5px;color:var(--tx2);
+           padding:6px 9px;margin-bottom:7px;background:var(--bg);border:1px solid var(--line);border-radius:6px}
+  .glsmiss b{color:var(--tx);font-size:11.5px;margin-right:2px}
   /* (2026-07-12) 좌우 분할 — 좌: 보고서 아카이브 + DB 인벤토리(컴팩트), 우: 본문 */
 
   .side h2:first-child{margin-top:0}
@@ -632,7 +636,7 @@
   <div class="pane" id="p_screener">
     <main class="mainc">
       <div class="lead" id="scr_asof" style="margin-top:2px">불러오는 중…</div>
-      <h2 style="margin:8px 0 3px">종목 스크리너 <span class="note" style="font-weight:400;font-size:11px">빈칸: <span class="note">—</span> 원래 없음 · <span class="m-wait">⋯</span> 집계 대기 · <span class="m-err">⚠</span> 수집 오류</span></h2><!-- (2026-07-18) 위·아래 여백 축소 -->
+      <h2 style="margin:8px 0 3px">종목 스크리너</h2><!-- (2026-07-26) 빈칸 표기 범례는 '필터설명' 패널로 이동 -->
       <div class="scrtop">
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>
@@ -691,6 +695,13 @@
         <div id="scr_glspanel" style="display:none">
           <!-- (2026-07-18) 제목·닫기 한 줄 — 설명 위 빈 공간 축소 -->
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><b style="font-size:12.5px">필터 설명</b><button class="cp-x" id="gls_close">닫기</button></div>
+          <!-- (2026-07-26) 표 제목 옆에 있던 빈칸 표기 범례를 여기로 이동 -->
+          <div class="glsmiss">
+            <b>표의 빈칸 표기</b>
+            <span><span class="note">—</span> 원래 없음 — 구조적으로 존재하지 않는 값(무배당·적자·애널 미커버 등)</span>
+            <span><span class="m-wait">⋯</span> 집계 대기 — 아직 수집·누적 전(장중 상태·이력 축적 중)</span>
+            <span><span class="m-err">⚠</span> 수집 오류 — 조회를 시도했으나 실패</span>
+          </div>
           <div id="scr_revnote" class="src"></div>
         </div>
       </div>
