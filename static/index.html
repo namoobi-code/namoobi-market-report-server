@@ -64,8 +64,9 @@
   .invlist{background:var(--card);border:1px solid var(--line);border-radius:8px;flex:1 1 auto;min-height:110px;overflow-y:auto}
   .invlist .it{padding:7px 10px;border-top:1px solid var(--line)}
   .invlist .it:first-child{border-top:none}
-  .invlist .l1{font-size:11.5px;display:flex;justify-content:space-between;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .invlist .l1 b{overflow:hidden;text-overflow:ellipsis}
+  /* DB 이름은 생략(...) 없이 전부 표시 — 넘치면 다음 줄로 */
+  .invlist .l1{font-size:11.5px;display:flex;justify-content:space-between;gap:1px 6px;flex-wrap:wrap;line-height:1.35}
+  .invlist .l1 b{white-space:normal;word-break:break-all;flex:1 1 auto;min-width:0}
   .invlist .l1 .m{color:var(--tx2);font-weight:400;flex-shrink:0}
   .invlist .l2{font-size:10.5px;color:var(--tx2);margin-top:2px;line-height:1.35}
   /* 모바일·좁은 창: 앱셸 해제 → 평범한 문서 스크롤 (안드로이드 앱 웹뷰 포함) */
@@ -172,7 +173,24 @@
   .scrgo{background:var(--dark);color:#fff;border-color:var(--dark);font-weight:700}
   .scrgo:hover{color:#fff;opacity:.88}
   .scrgo:disabled{opacity:.55;cursor:default}
-  #scr_rst{margin-left:6px}
+  #scr_colbtn,#scr_rst{margin-left:6px}
+  /* 컬럼 관리 패널 */
+  #scr_colpanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:9px}
+  .cp-h{display:flex;align-items:center;gap:8px;font-size:12.5px}
+  .cp-h .note{font-size:11px}
+  .cp-x{border:1px solid var(--line);background:#fff;border-radius:6px;padding:4px 10px;font-size:11.5px;cursor:pointer;color:var(--tx2)}
+  .cp-x:hover{border-color:var(--dark);color:var(--tx)}
+  #cp_reset{margin-left:auto}
+  .cp-sec{font-size:11px;color:var(--tx2);font-weight:600;margin:9px 0 4px}
+  .cp-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(178px,1fr));gap:4px}
+  .cp-it{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12px;background:#fff}
+  .cp-it label{display:flex;align-items:center;gap:6px;cursor:pointer;min-width:0}
+  .cp-mvs{display:flex;gap:3px;flex-shrink:0}
+  .cp-mv{border:1px solid var(--line);background:#fff;border-radius:4px;font-size:10px;line-height:1;cursor:pointer;padding:3px 5px;color:var(--tx2)}
+  .cp-mv:hover:not(:disabled){border-color:var(--dark);color:var(--tx)}
+  .cp-mv:disabled{opacity:.25;cursor:default}
+  #scr_tbl th.colbtn{cursor:pointer;text-align:center;color:#1f6feb;font-size:15px;width:36px}
+  #scr_tbl th.colbtn:hover{background:#e0e7f2}
   .fltbar{display:flex;gap:8px;flex-wrap:wrap}
   .fchip{position:relative}
   .fchip>button{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 13px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;color:var(--tx)}
@@ -237,7 +255,7 @@
 </head>
 <body><div class="wrap">
   <header>
-    <div><h1>글로벌 시황 대시보드<span>namoobi market report</span></h1></div>
+    <div><h1 id="go_home" title="홈으로" style="cursor:pointer">글로벌 시황 대시보드<span>namoobi market report</span></h1></div>
     <div class="tabs">
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB data<small>누적·버전관리</small></button>
@@ -463,12 +481,14 @@
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>
         <span class="scrcnt" id="scr_cnt">—</span>
         <button class="scrrst scrgo" id="scr_start">▶ START</button>
+        <button class="scrrst" id="scr_colbtn">⊞ 컬럼</button>
         <button class="scrrst" id="scr_rst">초기화</button>
       </div>
       <p class="note" style="margin:8px 0 0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
       <!-- 1단계 -->
       <div id="scr_s1">
         <div class="fltbar" id="scr_fltbar"></div>
+        <div id="scr_colpanel" style="display:none"></div>
         <div class="box" style="overflow:auto;max-height:540px;margin-top:9px"><table id="scr_tbl"></table></div>
         <div id="scr_revnote" class="src" style="margin-top:9px"></div>
       </div>

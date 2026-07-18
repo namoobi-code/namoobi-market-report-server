@@ -717,6 +717,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
 
   // 탭 전환
   const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener'];
+  {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
+   if(hb) hb.addEventListener('click',()=>{
+     document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
+     const sb=document.getElementById('btn_screener'); if(sb) sb.classList.remove('on');
+     panes.forEach(id=>{const el=document.getElementById(id); if(el) el.classList.toggle('on', id==='p_welcome');});
+   });}
   {const wm=document.getElementById('wel_msg');          // 최초 진입 인사 (시간대별)
    if(wm){const h=new Date().getHours();
      wm.textContent = (h>=5&&h<11)?'좋은 아침입니다' : (h>=11&&h<17)?'좋은 점심입니다'
@@ -1177,6 +1183,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
   };
   const KEYS=['cap','tv','px','age','sec','health','opLoss','de','cr','upside','rec','rev','nan','cov','per','pbr','divy','grw','mom','hi','v200','roe','mgrw','ogrw','frgn','payout'];
+  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1196,18 +1203,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         if(k==='cov' && r.tp==null) return false;
         continue; }
       if(f.fin && r.isfin) continue;   // 금융업 면제
-      const _hi=(mkt==='kr'?r.near52:r.hi52);
-      let v=k==='cap'?r.cap:k==='tv'?r.tv:k==='px'?r.px:k==='age'?ageOf(r):k==='de'?r.de:k==='cr'?r.cr:
-            k==='upside'?(r.upside!=null?r.upside*100:null):k==='rec'?r.recn:k==='nan'?r.nan:
-            k==='rev'?(r.rev!=null?r.rev*100:null):
-            k==='per'?(mkt==='kr'?r.fper:r.fpe):k==='pbr'?(mkt==='kr'?r.pbr:r.pb):k==='divy'?r.divy:
-            k==='grw'?(r.g_new!=null?r.g_new*100:null):
-            k==='mom'?(mkt==='kr'?(r.mom!=null?r.mom*100:null):r.w52):
-            k==='hi'?(_hi!=null?_hi*100:null):k==='v200'?(r.vs200!=null?r.vs200*100:null):
-            k==='roe'?(r.roe!=null?(mkt==='kr'?r.roe:r.roe*100):null):
-            k==='mgrw'?(r.revg!=null?r.revg*100:null):
-            k==='ogrw'?((mkt==='kr'?r.opg:r.epsg)!=null?((mkt==='kr'?r.opg:r.epsg)*100):null):
-            k==='frgn'?r.frgn:k==='payout'?(r.payout!=null?r.payout*100:null):null;
+      let v=colVal(r, FK2CK[k]||k);   // 필터키 → 컬럼키 매핑 후 공통 접근자 사용
       if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }  // 데이터 필수 필터: 값 없으면 제외
       if(st.min!=null && v<st.min) return false;
       if(st.max!=null && v>st.max) return false; }
@@ -1255,18 +1251,61 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_fltbar').querySelectorAll('[data-tgl]').forEach(t=>t.onchange=()=>{ F[t.dataset.tgl].on=t.checked; apply(); });
   }
 
-  const COLS={
-    kr:[['n','종목',0],['mk','시장',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['tp','목표주가',1],['upside','상승여력',1],['recn','투자의견',1],['rev','리비전',1],['age','상장',1]],
-    us:[['n','종목명',0],['px','가격',1],['chg','등락',1],['cap','시가총액',1],['tv','거래대금',1],['tp','목표주가',1],['upside','상승여력',1],['recn','투자의견',1],['nan','애널',1],['rev','리비전',1],['age','상장',1]]
+  /* ── 컬럼 레지스트리 (표시 On/OFF + 순서 변경) ── */
+  const CDEF={
+    n:{l:'종목',n:0,m:'both'}, mk:{l:'시장',n:0,m:'kr'}, sector:{l:'섹터',n:0,m:'us'},
+    px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
+    cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
+    tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
+    recn:{l:'투자의견',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'}, rev:{l:'리비전',n:1,m:'both'},
+    per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'},
+    grw:{l:'성장',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
+    revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'영익성장',n:1,m:'both'},
+    mom:{l:'추세',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
+    de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
+    frgn:{l:'외인소진율',n:1,m:'kr'}, payout:{l:'배당성향',n:1,m:'both'},
+    age:{l:'상장',n:1,m:'both'}
   };
+  const CALL=Object.keys(CDEF);
+  const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
+  const CDEFAULT={
+    kr:['n','mk','px','chg','cap','tv','tp','upside','recn','rev','age'],
+    us:['n','px','chg','cap','tv','tp','upside','recn','nan','rev','age']
+  };
+  let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
+  // 컬럼·정렬·필터 공통 값 (모두 '표시 단위'로 통일)
+  function colVal(r,k){
+    switch(k){
+      case 'px': return r.px; case 'chg': return r.chg;
+      case 'cap': return r.cap; case 'tv': return r.tv; case 'age': return ageOf(r);
+      case 'tp': return r.tp;
+      case 'upside': return r.upside!=null?r.upside*100:null;
+      case 'recn': return r.recn; case 'nan': return r.nan;
+      case 'rev': return r.rev!=null?r.rev*100:null;
+      case 'per': return mkt==='kr'?r.fper:r.fpe;
+      case 'pbr': return mkt==='kr'?r.pbr:r.pb;
+      case 'divy': return r.divy;
+      case 'grw': return r.g_new!=null?r.g_new*100:null;
+      case 'roe': return r.roe!=null?(mkt==='kr'?r.roe:r.roe*100):null;
+      case 'revg': return r.revg!=null?r.revg*100:null;
+      case 'opg': {const v=mkt==='kr'?r.opg:r.epsg; return v!=null?v*100:null;}
+      case 'mom': return mkt==='kr'?(r.mom!=null?r.mom*100:null):r.w52;
+      case 'hi': {const v=mkt==='kr'?r.near52:r.hi52; return v!=null?v*100:null;}
+      case 'v200': return r.vs200!=null?r.vs200*100:null;
+      case 'de': return r.de; case 'cr': return r.cr;
+      case 'frgn': return r.frgn;
+      case 'payout': return r.payout!=null?r.payout*100:null;
+    }
+    return null;
+  }
   function cell(r,key){
     if(key==='n') return mkt==='kr'?`<b>${E(r.n)}</b> <span class="note">${E(r.c)}</span>`:`<b>${E(r.c)}</b> <span class="note">${E(r.n)}</span>`;
     if(key==='mk') return E(r.mk||'');
+    if(key==='sector') return `<span class="note">${E(r.sector||'—')}</span>`;
     if(key==='px') return mkt==='kr'?(r.px?Math.round(r.px).toLocaleString()+'원':'—'):'$'+(r.px?(+r.px).toFixed(2):'—');
     if(key==='chg'){const v=r.chg; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(2)}%</span>`;}
     if(key==='cap') return mkt==='kr'?wonF(r.cap):usdF(r.cap);
     if(key==='tv') return mkt==='kr'?wonF(r.tv):usdF(r.tv);
-    if(key==='d200'){const v=r.d200; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
     if(key==='tp'){const v=r.tp; return v==null?'<span class="note">—</span>':(mkt==='kr'?Math.round(v).toLocaleString()+'원':'$'+(+v).toFixed(2));}
     if(key==='upside'){const v=r.upside; return v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
     if(key==='recn'){const v=r.recn; if(v==null)return '<span class="note">—</span>'; const lab=v>=85?'강력매수':v>=65?'매수':v>=45?'중립':'매도'; return `${v.toFixed(0)} <span class="note">${lab}</span>`;}
@@ -1276,9 +1315,59 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const cls=v>0?'up':(v<0?'dn':'note'), tt=t==='up_steady'?'꾸준상승':t==='down_steady'?'꾸준하락':(mkt==='us'?'EPS 추정치 90일 변화':'목표주가 90일 변화');
       return `<span class="${cls}" title="${tt}">${ar} ${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
     if(key==='age'){const a=ageOf(r); return a==null?'—':a+'년';}
+    const v=colVal(r,key); if(v==null) return '<span class="note">—</span>';
+    const sgn=d=>`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
+    switch(key){
+      case 'per': case 'pbr': return v.toFixed(1)+'배';
+      case 'divy': return v.toFixed(2)+'%';
+      case 'de': return v.toFixed(0)+'%';
+      case 'cr': return v.toFixed(1);
+      case 'roe': case 'frgn': return v.toFixed(1)+'%';
+      case 'payout': return v.toFixed(0)+'%';
+      case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
+      case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': return sgn(0);
+    }
     return '';
   }
-  function sortVal(r,k){ return k==='age'?(ageOf(r)??-1):k==='n'?String(r.n||''):(r[k]??-Infinity); }
+  function sortVal(r,k){
+    if(k==='n') return String(r.n||'');
+    if(k==='mk'||k==='sector') return String(r[k]||'');
+    return colVal(r,k)??-Infinity;
+  }
+  /* ── 컬럼 관리 패널 (표시 On/OFF · 순서 변경) ── */
+  function toggleColPanel(force){
+    const p=$('scr_colpanel'); if(!p) return;
+    const open = force!=null ? force : (p.style.display==='none');
+    p.style.display = open?'':'none';
+    if(open) renderColPanel();
+  }
+  function mvCol(k,d){
+    const a=COLST[mkt], i=a.indexOf(k); if(i<0) return;
+    const j=i+d; if(j<0||j>=a.length) return;
+    a.splice(j,0,a.splice(i,1)[0]); applyTable(); renderColPanel();
+  }
+  function renderColPanel(){
+    const p=$('scr_colpanel'); if(!p) return;
+    const cur=COLST[mkt].filter(cAvail);
+    const rest=CALL.filter(k=>cAvail(k)&&cur.indexOf(k)<0);
+    p.innerHTML=
+      `<div class="cp-h"><b>표시 컬럼</b><span class="note">체크로 표시/숨김 · ▲▼로 순서 변경</span>
+         <button class="cp-x" id="cp_reset">기본값</button><button class="cp-x" id="cp_close">닫기</button></div>
+       <div class="cp-sec">표시 중 (${cur.length})</div><div class="cp-list">`+
+      cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-coff="${k}" checked ${k==='n'?'disabled':''}>${E(CDEF[k].l)}</label>
+         <span class="cp-mvs"><button class="cp-mv" data-up="${k}" ${i===0?'disabled':''}>▲</button><button class="cp-mv" data-dn="${k}" ${i===cur.length-1?'disabled':''}>▼</button></span></div>`).join('')+
+      `</div><div class="cp-sec">추가 가능 (${rest.length})</div><div class="cp-list">`+
+      (rest.map(k=>`<div class="cp-it"><label><input type="checkbox" data-con="${k}">${E(CDEF[k].l)}</label></div>`).join('')
+        || '<div class="note" style="padding:4px 2px">모두 표시 중</div>')+`</div>`;
+    p.querySelectorAll('[data-coff]').forEach(c=>c.onchange=()=>{
+      COLST[mkt]=COLST[mkt].filter(x=>x!==c.dataset.coff); applyTable(); renderColPanel(); });
+    p.querySelectorAll('[data-con]').forEach(c=>c.onchange=()=>{
+      COLST[mkt]=COLST[mkt].concat([c.dataset.con]); applyTable(); renderColPanel(); });
+    p.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>mvCol(b.dataset.up,-1));
+    p.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>mvCol(b.dataset.dn, 1));
+    $('cp_reset').onclick=()=>{ COLST[mkt]=CDEFAULT[mkt].slice(); applyTable(); renderColPanel(); };
+    $('cp_close').onclick=()=>toggleColPanel(false);
+  }
   let popCloser=false;
   function applyTable(){
     if(!loaded){ waitScreen(); return; }      // START 전: 대기 화면 유지(빈 표로 덮어쓰지 않음)
@@ -1286,12 +1375,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     rows.sort((a,b)=>{const x=sortVal(a,sort.k),y=sortVal(b,sort.k);
       if(typeof x==='string')return sort.d*x.localeCompare(y); return sort.d*(x-y);});
     $('scr_cnt').innerHTML=`<b>${rows.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`;
-    const cols=COLS[mkt]; const cap=rows.slice(0,400);
-    $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-sort="${c[0]}" class="${sort.k===c[0]?(sort.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
-      cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''}">${cell(r,c[0])}</td>`).join('')+'</tr>').join('')+
-      (rows.length>400?`<tr><td colspan="${cols.length+1}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
+    const cols=COLST[mkt].filter(cAvail); const cap=rows.slice(0,400);
+    $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(CDEF[k].l)}</th>`).join('')
+      +'<th class="colbtn" id="scr_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
+      cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
+      (rows.length>400?`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
     $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
+    {const pl=$('scr_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
     {const rn=$('scr_revnote'); if(rn){
       const g = mkt==='us' ? [
         ['건전성 신호','200일 이동평균 대비 −30% 미만(심각한 하락추세) 종목 제외'],
@@ -1480,7 +1571,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   // ── 스크리너 상태 저장·복원 (새로고침에도 필터 유지) ──
   function saveScr(){ try{
-    sessionStorage.setItem('nmr_scr', JSON.stringify({mkt,stage,topN,topN3,sort,sort2,F_ST,F2_ST,W,ON}));
+    sessionStorage.setItem('nmr_scr', JSON.stringify({mkt,stage,topN,topN3,sort,sort2,F_ST,F2_ST,W,ON,COLST}));
   }catch(e){} }
   function restoreScr(){ try{
     const d=JSON.parse(sessionStorage.getItem('nmr_scr')||'null'); if(!d) return false;
@@ -1489,6 +1580,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(d.sort) sort=d.sort; if(d.sort2) sort2=d.sort2;
     if(d.F_ST) Object.assign(F_ST,d.F_ST); if(d.F2_ST) Object.assign(F2_ST,d.F2_ST);
     if(d.W) W=d.W; if(d.ON) ON=d.ON;
+    if(d.COLST&&d.COLST.kr&&d.COLST.us){        // 저장된 컬럼 구성 복원(알 수 없는 키는 제거)
+      COLST={kr:d.COLST.kr.filter(k=>CDEF[k]), us:d.COLST.us.filter(k=>CDEF[k])};
+      if(!COLST.kr.length) COLST.kr=CDEFAULT.kr.slice();
+      if(!COLST.us.length) COLST.us=CDEFAULT.us.slice();
+    }
     return true;
   }catch(e){ return false; } }
   function applyRestored(){
@@ -1541,6 +1637,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     renderChips(); waitScreen();
   };
   {const gb=$('scr_start'); if(gb) gb.onclick=()=>loadPool(()=>applyRestored());}
+  {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
   // 마켓 토글
   document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
