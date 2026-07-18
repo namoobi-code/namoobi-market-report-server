@@ -65,6 +65,15 @@ def save_my_ips(d: dict):
     except Exception:
         pass
 
+def _sig(ip: str, dev: str = "", br: str = "") -> str:
+    """식별 단위 = IP + 기기 + 브라우저.
+
+    공유기(NAT) 뒤에서는 IP 하나를 여러 사람이 나눠 쓴다. 집 공유기에 내 PC 와
+    가족 아이폰이 함께 물려 있으면 둘 다 같은 IP 로 찍힌다. 그래서 IP 만으로
+    '나'를 판정할 수 없다. 브라우저 버전은 수시로 올라가므로 이름만 쓴다.
+    """
+    return f'{ip}|{dev}|{(br or "").split(" ")[0]}'
+
 def _auto_label(ip: str) -> str:
     """통신사 정보로 회선 성격을 추정해 이름을 붙여둔다 (수정 가능)."""
     try:
@@ -80,13 +89,21 @@ def _auto_label(ip: str) -> str:
         return f'유선 ({g.get("isp","")})'
     return g.get("isp", "")
 
-def remember_my_ip(ip: str):
+def remember_my_ip(ip: str, ua: str = ""):
+    """로그인한 회선·기기를 '나'로 기억한다.
+
+    공유기 뒤에 다른 사람이 있을 수 있으므로 IP 통째가 아니라 기기까지 묶어 저장한다.
+    """
     if not ip or ip in ("?", "127.0.0.1"):
         return
+    u = _ua_parse(ua)
+    key = _sig(ip, u["dev"], u["br"])
     d = load_my_ips()
-    if ip not in d:
-        d[ip] = {"label": _auto_label(ip), "since": datetime.now().strftime("%Y-%m-%d"),
-                 "auto": True}
+    if key not in d:
+        lb = _auto_label(ip)
+        dev = " · ".join(x for x in (u["dev"], u["br"]) if x)
+        d[key] = {"label": f"{lb} · {dev}" if dev else lb,
+                  "since": datetime.now().strftime("%Y-%m-%d"), "auto": True}
         save_my_ips(d)
 
 def _geo_pending(ips) -> int:
@@ -165,7 +182,7 @@ async def auth_login(request: Request, response: Response):
     tok = secrets.token_urlsafe(32)
     SESS[tok] = {"u": user, "exp": now + SESS_TTL, "ip": ip}
     _save_sess(SESS)
-    remember_my_ip(ip)                          # 이 회선은 '나'로 기억한다
+    remember_my_ip(ip, request.headers.get("user-agent", ""))   # 이 회선·기기를 '나'로 기억
     https = (request.headers.get("x-forwarded-proto") == "https"
              or request.url.scheme == "https")
     response.set_cookie("nmr_sess", tok, max_age=SESS_TTL, httponly=True,
@@ -219,7 +236,7 @@ async def auth_setup(request: Request, response: Response):
     tok = secrets.token_urlsafe(32)
     SESS[tok] = {"u": user, "exp": now + SESS_TTL, "ip": ip}
     _save_sess(SESS)
-    remember_my_ip(ip)                          # 이 회선은 '나'로 기억한다
+    remember_my_ip(ip, request.headers.get("user-agent", ""))   # 이 회선·기기를 '나'로 기억
     https = (request.headers.get("x-forwarded-proto") == "https"
              or request.url.scheme == "https")
     response.set_cookie("nmr_sess", tok, max_age=SESS_TTL, httponly=True,
@@ -433,8 +450,11 @@ def build_stats(days: int = 1) -> dict:
             "loc":   " ".join(x for x in (g.get("region", ""), g.get("city", "")) if x),
             "cc":    g.get("cc", ""), "country": g.get("country", ""),
             "relay": relay,
-            "me":    ip in mine,
-            "label": mine.get(ip, {}).get("label", ""),
+            # 기기 단위 등록이 우선. IP 단위 등록은 '이 회선은 통째로 나' 라는 뜻으로 남겨둔다.
+            "sig":   _sig(ip, u["dev"], u["br"]),
+            "me":    (_sig(ip, u["dev"], u["br"]) in mine) or (ip in mine),
+            "label": (mine.get(_sig(ip, u["dev"], u["br"])) or mine.get(ip) or {}).get("label", ""),
+            "ipwide": ip in mine,
             "ref":   next((e[4] for e in ch if e[4] and e[4] != "-"
                            and "141.147.160.13" not in e[4]
                            and "namoobi" not in e[4]), ""),
@@ -526,22 +546,26 @@ async def my_ips_set(request: Request):
         body = await request.json()
     except Exception:
         body = {}
-    ips = body.get("ips") or ([body["ip"]] if body.get("ip") else [])
-    ips = [str(x).strip() for x in ips][:200]
-    bad = [x for x in ips if not re.fullmatch(r"[0-9a-fA-F.:]{3,45}", x)]
-    if bad or not ips:
-        raise HTTPException(400, "IP 형식이 올바르지 않습니다")
+    # keys = "IP|기기|브라우저" (기기 단위) · ips = "IP" (그 회선 통째로)
+    keys = body.get("keys") or body.get("ips") or ([body["ip"]] if body.get("ip") else [])
+    keys = [str(x).strip() for x in keys][:200]
+    ok = re.compile(r"[0-9a-fA-F.:]{3,45}(\|[^|]{0,24}\|[^|]{0,24})?")
+    if not keys or any(not ok.fullmatch(k) for k in keys):
+        raise HTTPException(400, "형식이 올바르지 않습니다")
 
     d = load_my_ips()
     if body.get("remove"):
-        for ip in ips:
-            d.pop(ip, None)
+        for k in keys:
+            d.pop(k, None)
+            if "|" in k:
+                d.pop(k.split("|")[0], None)   # IP 통째 등록도 함께 푼다
     else:
         lb = str(body.get("label", "")).strip()[:40]
-        for ip in ips:
-            d[ip] = {"label": lb or _auto_label(ip),
-                     "since": d.get(ip, {}).get("since", datetime.now().strftime("%Y-%m-%d")),
-                     "auto": not lb}
+        for k in keys:
+            ip = k.split("|")[0]
+            d[k] = {"label": lb or _auto_label(ip),
+                    "since": d.get(k, {}).get("since", datetime.now().strftime("%Y-%m-%d")),
+                    "auto": not lb}
     save_my_ips(d)
     _cache["out"] = None                        # 표시가 바로 반영되게 캐시 비움
     return {"ok": True, "count": len(d), "changed": len(ips)}

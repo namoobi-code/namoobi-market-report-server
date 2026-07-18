@@ -108,6 +108,8 @@
   .vs-me{background:#eef4ff!important}
   .vs-g{display:inline-block;background:#ede9fe;color:#6d28d9;border-radius:4px;
         padding:0 5px;font-size:10px;font-weight:700;margin-left:3px}
+  .vs-w{display:inline-block;background:#fef3c7;color:#92400e;border-radius:4px;
+        padding:0 5px;font-size:9.5px;font-weight:700;margin-left:3px}
   .vs-mk{border:1px solid var(--line);background:#fff;border-radius:5px;padding:2px 7px;
          font-size:10px;cursor:pointer;color:var(--tx2);font-family:inherit;white-space:nowrap}
   .vs-mk:hover{border-color:#2b57d0;color:#2b57d0}
@@ -907,7 +909,7 @@
 <!-- 개발자 로그인 -->
 <div id="lg_ov"><div id="lg_box">
   <h3 id="lg_ttl">개발자 로그인</h3>
-  <div class="sub" id="lg_sub">방문자 통계에는 다른 방문자의 IP가 담긴다. 본인만 열람한다.</div>
+  <div class="sub" id="lg_sub" style="display:none"></div>
   <div id="lg_warn">지금은 <b>암호화되지 않은 연결(http)</b>이다. 주소창의 http를
     <b>https</b>로 바꿔 접속하면 비밀번호가 암호화돼 전송된다.</div>
   <input id="lg_tk" type="text" placeholder="설정 토큰 (서버에서 발급)" style="display:none"
