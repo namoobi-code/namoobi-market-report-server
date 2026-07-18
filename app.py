@@ -1,4 +1,4 @@
-import json, time, urllib.request, os, re, sqlite3
+import json, time, urllib.request, os, re, sqlite3, zlib
 from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
@@ -19,16 +19,22 @@ def load(name: str):
         raise HTTPException(404, f"{name} not found")
     return json.loads(p.read_text(encoding="utf-8"))
 
+_domains_cache = {"sig": None, "out": None}
+
 @app.get("/api/domains")
 def domains():
-    out = []
-    for p in sorted(DB.glob("*.json")):
-        try:
-            d = json.loads(p.read_text(encoding="utf-8"))
-            out.append({"name": p.stem, "as_of": d.get("as_of",""), "marker": d.get("marker","")})
-        except Exception:
-            pass
-    return out
+    files = sorted(DB.glob("*.json"))
+    sig = _db_sig(files)
+    if _domains_cache["sig"] != sig:
+        out = []
+        for p in files:
+            try:
+                d = json.loads(p.read_text(encoding="utf-8"))
+                out.append({"name": p.stem, "as_of": d.get("as_of",""), "marker": d.get("marker","")})
+            except Exception:
+                pass
+        _domains_cache.update(sig=sig, out=out)
+    return _domains_cache["out"]
 
 @app.get("/api/db/{name}")
 def get_db(name: str, request: Request):
@@ -81,28 +87,51 @@ def policyrates():
         raise HTTPException(404, "policyrates 없음")
     return json.loads(p.read_text(encoding="utf-8"))
 
-@app.get("/api/bundle")
-def bundle():
-    """db/ 39개 전체를 한 번에 — 대시보드가 라운드트립 1회로 모두 로드"""
-    out = {}
-    for p in DB.glob("*.json"):
-        try:
-            out[p.stem] = json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
-            pass
-    # 폴링 시계열도 함께
-    poll = {}
+# 대시보드가 참조하지 않는 대용량 DB — 번들 제외(필요 시 /api/db/<name> 로 개별 조회)
+BUNDLE_SKIP = {"screener_pool", "tp_history"}
+_bundle_cache = {"sig": None, "body": None, "etag": None}
+
+def _db_sig(files):
+    parts = []
+    for p in files:
+        st = p.stat()
+        parts.append("%s:%d:%d" % (p.name, st.st_mtime, st.st_size))
     if POLL.exists():
-        try:
-            c = sqlite3.connect(POLL)
-            for m, sym, ts, v in c.execute(
-                "SELECT metric,symbol,ts,value FROM ticks ORDER BY ts"):
-                poll.setdefault(m, {}).setdefault(sym or "_", []).append([ts, v])
-            c.close()
-        except Exception:
-            pass
-    out["_poll"] = poll
-    return out
+        st = POLL.stat()
+        parts.append("poll:%d:%d" % (st.st_mtime, st.st_size))
+    return "|".join(parts)
+
+@app.get("/api/bundle")
+def bundle(request: Request):
+    """db/ 전체를 한 번에 — 변경 없으면 메모리 캐시/304로 즉시 응답."""
+    files = sorted(p for p in DB.glob("*.json") if p.stem not in BUNDLE_SKIP)
+    sig = _db_sig(files)
+    if _bundle_cache["sig"] != sig:
+        out = {}
+        for p in files:
+            try:
+                out[p.stem] = json.loads(p.read_text(encoding="utf-8"))
+            except Exception:
+                pass
+        poll = {}
+        if POLL.exists():
+            try:
+                c = sqlite3.connect(POLL)
+                for m, sym, ts, v in c.execute(
+                    "SELECT metric,symbol,ts,value FROM ticks ORDER BY ts"):
+                    poll.setdefault(m, {}).setdefault(sym or "_", []).append([ts, v])
+                c.close()
+            except Exception:
+                pass
+        out["_poll"] = poll
+        body = json.dumps(out, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        _bundle_cache.update(sig=sig, body=body,
+                             etag='W/"b%x-%x"' % (zlib.crc32(sig.encode()), len(body)))
+    etag = _bundle_cache["etag"]
+    hdr = {"ETag": etag, "Cache-Control": "no-cache"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=hdr)
+    return Response(content=_bundle_cache["body"], media_type="application/json", headers=hdr)
 
 @app.get("/api/reports")
 def reports():

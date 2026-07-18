@@ -1252,20 +1252,27 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
 
   /* ── 컬럼 레지스트리 (표시 On/OFF + 순서 변경) ── */
+  /* l = 표 헤더 라벨(마켓별 객체 가능), pl = 컬럼 패널 라벨(생략 시 l)
+     — 패널 라벨은 위 필터 바 이름과 정확히 일치시켜 매칭이 쉽도록 함 */
   const CDEF={
     n:{l:'종목',n:0,m:'both'}, mk:{l:'시장',n:0,m:'kr'}, sector:{l:'섹터',n:0,m:'us'},
-    px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
+    px:{l:'가격',pl:'저가주(가격)',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
     cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
-    tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
-    recn:{l:'투자의견',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'}, rev:{l:'리비전',n:1,m:'both'},
+    tp:{l:'목표주가',n:1,m:'both'},
+    upside:{l:'상승여력',pl:'목표주가 대비 상승여력',n:1,m:'both'},
+    recn:{l:'투자의견',n:1,m:'both'}, nan:{l:'애널리스트수',n:1,m:'us'}, rev:{l:'리비전',n:1,m:'both'},
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'},
     grw:{l:'성장',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
-    revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'영익성장',n:1,m:'both'},
+    revg:{l:'매출성장',n:1,m:'both'}, opg:{l:{kr:'영익성장',us:'EPS성장'},n:1,m:'both'},
     mom:{l:'추세',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
-    de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
+    de:{l:{kr:'부채비율',us:'D/E'},n:1,m:'both'},
+    cr:{l:{kr:'유동비율(당좌)',us:'유동비율'},n:1,m:'both'},
     frgn:{l:'외인소진율',n:1,m:'kr'}, payout:{l:'배당성향',n:1,m:'both'},
-    age:{l:'상장',n:1,m:'both'}
+    age:{l:'상장기간',n:1,m:'both'}
   };
+  const _lab=v=>typeof v==='string'?v:(v&&v[mkt])||'';
+  const cl =k=>_lab(CDEF[k].l);                 // 표 헤더용
+  const cpl=k=>_lab(CDEF[k].pl||CDEF[k].l);     // 컬럼 패널용(필터 이름과 일치)
   const CALL=Object.keys(CDEF);
   /* '추가 가능' 목록 정렬 = 필터가 없는 컬럼 먼저(종목·시장·섹터·등락·목표주가)
      → 그다음은 위 필터 바(KEYS)와 동일한 순서로 나열 */
@@ -1273,9 +1280,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const CORDER=CALL.filter(k=>!CK2FK[k])
                    .concat(KEYS.map(fk=>FK2CK[fk]||fk).filter(ck=>CDEF[ck]));
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
+  /* 기본 표시 컬럼 = 초기화 상태에서 값이 걸리는 필터들과 일치시킴
+     (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
+     ※ 건전성 신호·3년 영업적자·증권 구분은 값이 아닌 '제외 토글'이라 대응 컬럼 없음 */
   const CDEFAULT={
-    kr:['n','mk','px','chg','cap','tv','tp','upside','recn','rev','age'],
-    us:['n','px','chg','cap','tv','tp','upside','recn','nan','rev','age']
+    kr:['n','mk','px','chg','cap','tv','de','cr','tp','upside','recn','rev','age'],
+    us:['n','px','chg','cap','tv','de','cr','tp','upside','recn','nan','rev','age']
   };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
@@ -1377,10 +1387,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
          <span class="cp-badge">${colsSaved?'💾 이 PC에 저장됨':'기본값 사용 중'}</span>
          <button class="cp-x" id="cp_reset">기본값</button><button class="cp-x" id="cp_close">닫기</button></div>
        <div class="cp-sec">표시 중 (${cur.length})</div><div class="cp-list">`+
-      cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-coff="${k}" checked ${k==='n'?'disabled':''}>${E(CDEF[k].l)}</label>
+      cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-coff="${k}" checked ${k==='n'?'disabled':''}>${E(cpl(k))}</label>
          <span class="cp-mvs"><button class="cp-mv" data-up="${k}" ${i===0?'disabled':''}>▲</button><button class="cp-mv" data-dn="${k}" ${i===cur.length-1?'disabled':''}>▼</button></span></div>`).join('')+
       `</div><div class="cp-sec">추가 가능 (${rest.length})</div><div class="cp-list">`+
-      (rest.map(k=>`<div class="cp-it"><label><input type="checkbox" data-con="${k}">${E(CDEF[k].l)}</label></div>`).join('')
+      (rest.map(k=>`<div class="cp-it"><label><input type="checkbox" data-con="${k}">${E(cpl(k))}</label></div>`).join('')
         || '<div class="note" style="padding:4px 2px">모두 표시 중</div>')+`</div>`;
     p.querySelectorAll('[data-coff]').forEach(c=>c.onchange=()=>{
       COLST[mkt]=COLST[mkt].filter(x=>x!==c.dataset.coff); saveCols(); applyTable(); renderColPanel(); });
@@ -1399,7 +1409,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(typeof x==='string')return sort.d*x.localeCompare(y); return sort.d*(x-y);});
     $('scr_cnt').innerHTML=`<b>${rows.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`;
     const cols=COLST[mkt].filter(cAvail); const cap=rows.slice(0,400);
-    $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(CDEF[k].l)}</th>`).join('')
+    $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(cl(k))}</th>`).join('')
       +'<th class="colbtn" id="scr_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
       cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
       (rows.length>400?`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
