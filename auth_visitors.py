@@ -65,6 +65,53 @@ def save_my_ips(d: dict):
     except Exception:
         pass
 
+# ── '나' 판정 규칙 ─────────────────────────────────────────
+#   규칙 하나 = {필드: 값, ...}. 그 필드가 전부 일치하면 '나'로 본다.
+#   필드를 적게 잡을수록 넓게 걸린다 — IP 만 잡으면 그 회선 전체, IP+기기면 그 기기만.
+#   구체적인 키가 아니라 조건으로 저장하므로, 앞으로 들어올 방문에도 계속 적용된다.
+RULE_F  = ("ip", "isp", "line", "loc", "dev", "br", "app")
+RULE_KO = {"ip": "IP", "isp": "통신사", "line": "회선", "loc": "위치",
+           "dev": "기기", "br": "브라우저", "app": "앱"}
+RULES_F = BASE / "data" / "my_rules.json"
+
+def load_rules() -> list:
+    try:
+        return json.loads(RULES_F.read_text(encoding="utf-8"))
+    except Exception:
+        pass
+    # 예전 my_ips.json (IP 또는 IP|기기|브라우저) 을 규칙으로 옮긴다
+    out, nid = [], 0
+    for k, v in (load_my_ips() or {}).items():
+        p = k.split("|")
+        f = {"ip": p[0]}
+        if len(p) == 3:
+            if p[1]: f["dev"] = p[1]
+            if p[2]: f["br"] = p[2]
+        nid += 1
+        out.append({"id": nid, "f": f, "label": v.get("label", ""),
+                    "since": v.get("since", ""), "auto": v.get("auto", True)})
+    if out:
+        save_rules(out)
+    return out
+
+def save_rules(rules: list):
+    try:
+        RULES_F.parent.mkdir(parents=True, exist_ok=True)
+        RULES_F.write_text(json.dumps(rules, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
+
+def rule_hit(rules: list, row: dict):
+    """이 방문이 어느 규칙에 걸리는지. 걸리면 그 규칙을 돌려준다."""
+    for r in rules:
+        f = r.get("f") or {}
+        if f and all(str(row.get(k, "")) == str(v) for k, v in f.items()):
+            return r
+    return None
+
+def rule_desc(f: dict) -> str:
+    return " · ".join(f'{RULE_KO.get(k, k)}={v}' for k, v in f.items() if v) or "(빈 조건)"
+
 def _sig(ip: str, dev: str = "", br: str = "") -> str:
     """식별 단위 = IP + 기기 + 브라우저.
 
@@ -105,6 +152,19 @@ def remember_my_ip(ip: str, ua: str = ""):
         d[key] = {"label": f"{lb} · {dev}" if dev else lb,
                   "since": datetime.now().strftime("%Y-%m-%d"), "auto": True}
         save_my_ips(d)
+
+    # 규칙에도 같은 조건(IP + 기기 + 브라우저)을 추가한다
+    rules = load_rules()
+    f = {"ip": ip}
+    if u["dev"]: f["dev"] = u["dev"]
+    if u["br"]:  f["br"]  = u["br"].split(" ")[0]
+    if not any((r.get("f") or {}) == f for r in rules):
+        lb = _auto_label(ip)
+        dev = " · ".join(x for x in (u["dev"], u["br"]) if x)
+        rules.append({"id": max([r.get("id", 0) for r in rules] or [0]) + 1,
+                      "f": f, "label": f"{lb} · {dev}" if dev else lb,
+                      "since": datetime.now().strftime("%Y-%m-%d"), "auto": True})
+        save_rules(rules)
 
 def _geo_pending(ips) -> int:
     try:
@@ -423,7 +483,7 @@ def build_stats(days: int = 1) -> dict:
         geo = ipinfo.lookup_many([ip for ip, _ in sessions], budget=60)
     except Exception:
         pass
-    mine = load_my_ips()
+    rules = load_rules()
 
     out = []
     for ip, ch in sessions:
@@ -436,7 +496,7 @@ def build_stats(days: int = 1) -> dict:
         relay = bool(g.get("kind") == "데이터센터"
                      and re.search(r"akamai|cloudflare|fastly", g.get("isp", ""), re.I)
                      and u["br"].startswith("Safari"))
-        out.append({
+        row = {
             "ip": ip,
             "start": ch[0][0].strftime("%m-%d %H:%M:%S"),
             "end":   ch[-1][0].strftime("%m-%d %H:%M:%S"),
@@ -450,17 +510,21 @@ def build_stats(days: int = 1) -> dict:
             "loc":   " ".join(x for x in (g.get("region", ""), g.get("city", "")) if x),
             "cc":    g.get("cc", ""), "country": g.get("country", ""),
             "relay": relay,
-            # 기기 단위 등록이 우선. IP 단위 등록은 '이 회선은 통째로 나' 라는 뜻으로 남겨둔다.
             "sig":   _sig(ip, u["dev"], u["br"]),
-            "me":    (_sig(ip, u["dev"], u["br"]) in mine) or (ip in mine),
-            "label": (mine.get(_sig(ip, u["dev"], u["br"])) or mine.get(ip) or {}).get("label", ""),
-            "ipwide": ip in mine,
             "ref":   next((e[4] for e in ch if e[4] and e[4] != "-"
                            and "141.147.160.13" not in e[4]
                            and "namoobi" not in e[4]), ""),
             "last":  ch[-1][1][:52],
             "pages": len(pages),
-        })
+        }
+        # 규칙은 화면에 보이는 값(br 은 버전 뗀 이름)으로 맞춘다
+        row["br"] = u["br"].split(" ")[0] if u["br"] else ""
+        hit = rule_hit(rules, row)
+        row["br"] = u["br"]
+        row["me"]    = bool(hit)
+        row["rule"]  = hit["id"] if hit else 0
+        row["label"] = (hit or {}).get("label", "")
+        out.append(row)
     out.sort(key=lambda r: r["start"], reverse=True)
 
     # 동일인 추정 — IP 가 달라도 기기·브라우저·통신사가 같으면 같은 사람일 가능성이 높다.
@@ -524,6 +588,60 @@ def build_stats(days: int = 1) -> dict:
                            key=lambda r: -r["n"])[:25],
     }
 
+@router.get("/api/visitors/rules")
+def rules_get(request: Request):
+    require_login(request)
+    rs = load_rules()
+    for r in rs:
+        r["desc"] = rule_desc(r.get("f") or {})
+    return {"rules": rs, "fields": [{"k": k, "t": RULE_KO[k]} for k in RULE_F]}
+
+@router.post("/api/visitors/rules")
+async def rules_set(request: Request):
+    """규칙 추가·삭제.
+
+    add:  [{ip:…, dev:…}, …]  ← 고른 줄에서 뽑아낸 조건들
+    drop: [규칙id, …]  ·  drop_match: [{조건}, …] (조건에 걸리는 규칙 전부 삭제)
+    """
+    require_login(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    rules = load_rules()
+    nid = max([r.get("id", 0) for r in rules] or [0])
+    added = dropped = 0
+
+    for f in (body.get("add") or [])[:200]:
+        f = {k: str(v)[:60] for k, v in (f or {}).items() if k in RULE_F and str(v).strip()}
+        if not f:
+            continue
+        if any((r.get("f") or {}) == f for r in rules):
+            continue
+        nid += 1
+        rules.append({"id": nid, "f": f,
+                      "label": str(body.get("label", "")).strip()[:40] or rule_desc(f),
+                      "since": datetime.now().strftime("%Y-%m-%d"), "auto": False})
+        added += 1
+
+    ids = {int(x) for x in (body.get("drop") or []) if str(x).isdigit()}
+    if ids:
+        before = len(rules)
+        rules = [r for r in rules if r.get("id") not in ids]
+        dropped += before - len(rules)
+
+    # 고른 줄이 걸려 있던 규칙을 통째로 없앤다 ('나 해제')
+    for row in (body.get("drop_match") or [])[:200]:
+        hit = rule_hit(rules, {k: str(v) for k, v in (row or {}).items()})
+        while hit:
+            rules = [r for r in rules if r.get("id") != hit["id"]]
+            dropped += 1
+            hit = rule_hit(rules, {k: str(v) for k, v in (row or {}).items()})
+
+    save_rules(rules)
+    _cache["out"] = None
+    return {"ok": True, "added": added, "dropped": dropped, "count": len(rules)}
+
 @router.get("/api/visitors/myips")
 def my_ips_get(request: Request):
     require_login(request)
@@ -568,7 +686,7 @@ async def my_ips_set(request: Request):
                     "auto": not lb}
     save_my_ips(d)
     _cache["out"] = None                        # 표시가 바로 반영되게 캐시 비움
-    return {"ok": True, "count": len(d), "changed": len(ips)}
+    return {"ok": True, "count": len(d), "changed": len(keys)}
 
 _cache = {"t": 0, "d": 0, "out": None}
 

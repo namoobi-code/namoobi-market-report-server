@@ -90,7 +90,33 @@
   // ── 방문자 통계 렌더 ────────────────────────────────────
   let DATA = null;                  // 마지막 응답 (정렬 시 재조회 없이 다시 그린다)
   let sortK = 'start', sortD = -1;  // 기본: 최근 방문 먼저
-  const sel = new Set();            // 체크한 IP
+  const sel = new Set();            // 체크한 줄 (rid)
+
+  // '나' 판정 조건으로 쓸 수 있는 속성. 적게 고를수록 넓게 걸린다 —
+  // IP 만 고르면 그 회선 전체, IP+기기+브라우저면 그 기기 하나만.
+  const FLD = [
+    {k:'ip',   t:'IP'},     {k:'isp', t:'통신사'}, {k:'line', t:'회선'},
+    {k:'loc',  t:'위치'},   {k:'dev', t:'기기'},   {k:'br',   t:'브라우저'},
+    {k:'app',  t:'앱'},
+  ];
+  const fsel = new Set(['ip','dev','br']);   // 기본값 = 이 회선의 이 기기
+
+  // 고른 줄들에서 조건을 뽑는다. 값이 같은 것끼리는 하나로 합쳐진다.
+  function rulesFrom(rows){
+    const out = new Map();
+    rows.forEach(r=>{
+      const f = {};
+      fsel.forEach(k=>{
+        const v = (k === 'br') ? (r.br || '').split(' ')[0] : (r[k] || '');
+        if(v) f[k] = v;
+      });
+      if(Object.keys(f).length) out.set(JSON.stringify(f), f);
+    });
+    return [...out.values()];
+  }
+  const matches = (rows, rs) => rows.filter(r => rs.some(f =>
+    Object.entries(f).every(([k,v]) =>
+      String((k === 'br') ? (r.br || '').split(' ')[0] : (r[k] || '')) === String(v))));
 
   function render(s){
     DATA = s;
@@ -118,8 +144,11 @@
       return t;
     };
     // ── 정렬 · 선택 ──────────────────────────────────────
-    // 체크 단위는 IP 가 아니라 'IP + 기기'(sig) 다. 공유기 뒤에서는 같은 IP 를
-    // 여러 사람이 나눠 쓰기 때문에, IP 로 묶으면 남의 기기까지 같이 잡힌다.
+    // 체크는 화면에 보이는 '줄' 단위다 (rid = IP + 들어온 시각, 방문마다 유일).
+    // 다만 서버에 저장되는 '나' 표시는 IP + 기기 단위다 — 지난 방문 한 건만
+    // 나로 만들 수는 없기 때문이다. 그래서 적용하면 같은 IP·기기의 다른 방문도
+    // 함께 나로 바뀐다.
+    const rid = r => r.ip + '@' + r.start;
     const COLS = [
       {k:'ip',    t:'IP',            w:'ip'},
       {k:'isp',   t:'통신사 · 회선',  w:'s', v:r=>[r.isp, r.line, r.org].join(' ')},
@@ -153,8 +182,8 @@
     }
 
     const mkRows = list => sorted(list).map(r=>`<tr class="${r.me?'vs-me':''}">
-        <td class="vs-cw"><input type="checkbox" class="vs-ck" data-k="${esc(r.sig)}"${
-            sel.has(r.sig)?' checked':''}></td>
+        <td class="vs-cw"><input type="checkbox" class="vs-ck" data-r="${esc(rid(r))}"
+            data-k="${esc(r.sig)}"${sel.has(rid(r))?' checked':''}></td>
         <td>${esc(r.ip)}${r.me?' <b style="color:#2b57d0">(나)</b>':''}
             ${r.ipwide?'<span class="vs-w" title="이 IP는 기기 구분 없이 통째로 나로 등록돼 있다">회선전체</span>':''}
             ${r.grp?'<span class="vs-g" title="같은 사람으로 추정되는 묶음">#'+r.grp+'</span>':''}</td>
@@ -164,7 +193,7 @@
         <td>${esc(r.start)}</td><td>${esc(r.end)}</td><td>${dur(r.dur)}</td>
         <td>${r.reqs}</td>
         <td style="color:var(--tx2)">${esc(r.last)}</td>
-        <td><button class="vs-mk" data-k="${esc(r.sig)}" data-me="${r.me?1:0}">${
+        <td><button class="vs-mk" data-r1="${esc(rid(r))}" data-me="${r.me?1:0}">${
             r.me ? '나 해제' : '나로 표시'}</button></td></tr>`).join('');
 
     const meRows = mkRows(s.sessions.filter(r=>r.me))
@@ -209,11 +238,17 @@
           <div class="vs-hx">${[0,6,12,18].map(h=>`<span style="flex:6">${h}시</span>`).join('')}</div></div>
       </div>
 
-      <h2 style="margin-top:18px">나 아닌 방문자<em>제목을 누르면 정렬 · 체크는 IP가 아니라 기기 단위</em></h2>
-      <div class="vs-act" id="vs_act"><span id="vs_seln">0개 선택</span>
-        <button class="cp-x" id="vs_bme">선택한 기기를 나로 표시</button>
-        <button class="cp-x" id="vs_bno">나 해제</button>
-        <button class="cp-x" id="vs_bcl">선택 해제</button></div>
+      <h2 style="margin-top:18px">나 아닌 방문자<em>제목을 누르면 정렬 · 30분 이상 끊기면 별도 방문</em></h2>
+      <div class="vs-act" id="vs_act">
+        <div class="vs-r1"><span id="vs_seln">0줄 선택</span>
+          <span class="vs-lb">묶을 기준</span>
+          ${FLD.map(f=>`<button class="vs-fc${fsel.has(f.k)?' on':''}" data-f="${f.k}">${f.t}</button>`).join('')}
+        </div>
+        <div class="vs-r2"><span id="vs_prev"></span>
+          <button class="cp-x" id="vs_bme">이 조건을 모두 나로 표시</button>
+          <button class="cp-x" id="vs_bno">나 해제</button>
+          <button class="cp-x" id="vs_bcl">선택 해제</button></div>
+      </div>
       <div class="box" style="overflow-x:auto"><table>
         <thead>${head()}</thead>
         <tbody>${otRows}</tbody></table></div>
@@ -223,6 +258,12 @@
         <thead><tr><th>묶음</th><th>기기 · 브라우저</th><th>통신사</th><th>IP</th>
           <th>방문</th><th>요청</th><th>위치</th><th>기간</th></tr></thead>
         <tbody>${grows}</tbody></table></div>
+
+      <h2 style="margin-top:18px">나 판정 규칙<em>조건이 하나라도 맞으면 '나'로 본다</em></h2>
+      <div class="box" style="overflow-x:auto"><table>
+        <thead><tr><th>#</th><th>조건</th><th>이름</th><th>등록</th><th>걸리는 방문</th><th></th></tr></thead>
+        <tbody id="vs_rules"><tr><td colspan="6" style="color:var(--tx2);padding:12px">불러오는 중…</td></tr></tbody>
+      </table></div>
 
       <h2 style="margin-top:18px">내 접속<em>로그인한 회선은 자동 등록된다</em></h2>
       <div class="box" style="overflow-x:auto"><table>
@@ -256,39 +297,85 @@
     }));
 
     // ── 선택 ────────────────────────────────────────────
+    const selRows = () => s.sessions.filter(r => sel.has(rid(r)));
+
     function syncSel(){
-      const n = sel.size;
-      $('vs_seln').textContent = n + '대 선택';
-      $('vs_act').classList.toggle('on', n > 0);
-      body.querySelectorAll('.vs-ck').forEach(c => c.checked = sel.has(c.dataset.k));
+      $('vs_seln').textContent = sel.size + '줄 선택';
+      $('vs_act').classList.toggle('on', sel.size > 0);
+      body.querySelectorAll('.vs-ck').forEach(c => c.checked = sel.has(c.dataset.r));
+      body.querySelectorAll('.vs-fc').forEach(b => b.classList.toggle('on', fsel.has(b.dataset.f)));
+
+      const rs = rulesFrom(selRows());
+      const hit = matches(s.sessions, rs);
+      const ips = new Set(hit.map(r => r.ip));
+      $('vs_prev').innerHTML = !rs.length
+        ? '<b style="color:#c0392b">기준을 하나 이상 고르세요</b>'
+        : `조건 <b>${rs.length}개</b> → 이 조건에 걸리는 방문 <b>${hit.length}줄</b> · IP <b>${ips.size}개</b>`;
+      $('vs_bme').disabled = !rs.length;
     }
     body.querySelectorAll('.vs-ck').forEach(c => c.addEventListener('change', ()=>{
-      c.checked ? sel.add(c.dataset.k) : sel.delete(c.dataset.k);
-      syncSel();     // 같은 IP라도 기기가 다르면 따로 잡힌다
+      c.checked ? sel.add(c.dataset.r) : sel.delete(c.dataset.r);
+      syncSel();
     }));
     body.querySelectorAll('.vs-all').forEach(a => a.addEventListener('change', ()=>{
       a.closest('table').querySelectorAll('.vs-ck').forEach(c =>
-        a.checked ? sel.add(c.dataset.k) : sel.delete(c.dataset.k));
+        a.checked ? sel.add(c.dataset.r) : sel.delete(c.dataset.r));
+      syncSel();
+    }));
+    body.querySelectorAll('.vs-fc').forEach(b => b.addEventListener('click', ()=>{
+      fsel.has(b.dataset.f) ? fsel.delete(b.dataset.f) : fsel.add(b.dataset.f);
       syncSel();
     }));
     syncSel();
 
-    async function mark(keys, remove){
-      if(!keys.length) return;
-      const r = await fetch('/api/visitors/myips', {
+    async function send(payload){
+      const r = await fetch('/api/visitors/rules', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({keys, remove})
+        body: JSON.stringify(payload)
       }).catch(()=>null);
       if(r && !r.ok && r.status === 401){ me = null; paint(); open(); return; }
       sel.clear(); load();
     }
-    $('vs_bme').addEventListener('click', ()=> mark([...sel], false));
-    $('vs_bno').addEventListener('click', ()=> mark([...sel], true));
+    $('vs_bme').addEventListener('click', ()=>{
+      const rs = rulesFrom(selRows());
+      if(rs.length) send({add: rs});
+    });
+    $('vs_bno').addEventListener('click', ()=>{
+      // 고른 줄이 걸려 있던 규칙을 통째로 없앤다
+      const rows = selRows().map(r => ({ip:r.ip, isp:r.isp, line:r.line, loc:r.loc,
+                                       dev:r.dev, br:(r.br||'').split(' ')[0], app:r.app}));
+      if(rows.length) send({drop_match: rows});
+    });
     $('vs_bcl').addEventListener('click', ()=>{ sel.clear(); syncSel(); });
 
-    body.querySelectorAll('.vs-mk').forEach(b => b.addEventListener('click', ()=>{
+    // ── 규칙 목록 ───────────────────────────────────────
+    fetch('/api/visitors/rules').then(r=>r.json()).then(d=>{
+      const tb = $('vs_rules'); if(!tb) return;
+      tb.innerHTML = (d.rules||[]).map(r=>{
+        const n = matches(s.sessions, [r.f]).length;
+        return `<tr><td>#${r.id}</td><td>${esc(r.desc)}</td>
+          <td style="color:var(--tx2)">${esc(r.label||'')}</td>
+          <td style="color:var(--tx2)">${esc(r.since||'')}${r.auto?' · 자동':''}</td>
+          <td>${n}줄</td>
+          <td><button class="vs-mk" data-rule="${r.id}">삭제</button></td></tr>`;
+      }).join('') || '<tr><td colspan="6" style="color:var(--tx2);padding:12px">규칙 없음</td></tr>';
+      tb.querySelectorAll('[data-rule]').forEach(b => b.addEventListener('click', ()=>{
+        b.disabled = true; send({drop:[Number(b.dataset.rule)]});
+      }));
+    }).catch(()=>{});
+
+    // 줄 끝의 단독 버튼 — 지금 고른 기준을 그 한 줄에만 적용한다
+    body.querySelectorAll('.vs-mk[data-r1]').forEach(b => b.addEventListener('click', ()=>{
+      const row = s.sessions.find(r => rid(r) === b.dataset.r1);
+      if(!row) return;
       b.disabled = true;
-      mark([b.dataset.k], b.dataset.me === '1');
+      if(b.dataset.me === '1'){
+        send({drop_match:[{ip:row.ip, isp:row.isp, line:row.line, loc:row.loc,
+                           dev:row.dev, br:(row.br||'').split(' ')[0], app:row.app}]});
+      }else{
+        const rs = rulesFrom([row]);
+        if(rs.length) send({add: rs}); else b.disabled = false;
+      }
     }));
   }
 

@@ -64,6 +64,29 @@ def main():
         except PermissionError:
             print("%s 를 읽을 권한이 없다 (adm 그룹 확인)" % f)
 
+    # 규칙(my_rules.json)에도 반영한다 — 판정의 실제 근거는 이쪽이다
+    rules = A.load_rules()
+    nid = max([r.get("id", 0) for r in rules] or [0])
+    radd = []
+    for key, (ip, ua) in found.items():
+        u = A._ua_parse(ua)
+        f = {"ip": ip}
+        if u["dev"]:
+            f["dev"] = u["dev"]
+        if u["br"]:
+            f["br"] = u["br"].split(" ")[0]
+        if any((r.get("f") or {}) == f for r in rules):
+            continue
+        nid += 1
+        rules.append({"id": nid, "f": f, "label": label_for(ip, ua),
+                      "since": datetime.now().strftime("%Y-%m-%d"), "auto": True})
+        radd.append(A.rule_desc(f))
+    if radd:
+        A.save_rules(rules)
+    print("규칙 추가 %d건 (전체 %d건)" % (len(radd), len(rules)))
+    for d_ in radd:
+        print("  + %s" % d_)
+
     try:
         cur = json.loads(OUT.read_text(encoding="utf-8"))
     except Exception:

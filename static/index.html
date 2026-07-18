@@ -117,10 +117,18 @@
   /* 체크박스 · 일괄 처리 막대 */
   #p_vis td.vs-cw,#p_vis th.vs-cw{width:26px;padding-left:9px;padding-right:0}
   #p_vis input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:#2b57d0;margin:0}
-  .vs-act{display:none;align-items:center;gap:8px;margin:0 0 8px;padding:7px 11px;
+  .vs-act{display:none;flex-direction:column;gap:7px;margin:0 0 8px;padding:9px 11px;
           background:#eef4ff;border:1px solid #c7d7fb;border-radius:8px;font-size:11.5px}
   .vs-act.on{display:flex}
-  .vs-act #vs_seln{font-weight:700;color:#2b57d0;margin-right:2px}
+  .vs-act .vs-r1,.vs-act .vs-r2{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .vs-act #vs_seln{font-weight:700;color:#2b57d0;margin-right:2px;white-space:nowrap}
+  .vs-lb{color:var(--tx2);margin:0 2px 0 6px}
+  .vs-fc{border:1px solid #c7d7fb;background:#fff;color:var(--tx2);border-radius:20px;
+         padding:3px 11px;font-size:11px;cursor:pointer;font-family:inherit}
+  .vs-fc:hover{border-color:#2b57d0}
+  .vs-fc.on{background:#2b57d0;border-color:#2b57d0;color:#fff;font-weight:600}
+  #vs_prev{margin-right:auto;color:var(--tx2)}
+  #vs_prev b{color:#2b57d0}
   /* 정렬 가능한 제목 */
   #p_vis th.vs-sh{cursor:pointer;user-select:none}
   #p_vis th.vs-sh:hover{color:#2b57d0}
