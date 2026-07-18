@@ -1848,10 +1848,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let dcode=null;
   function hideDetail(){ const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
   {const b=$('sd_close'); if(b) b.onclick=hideDetail;}
-  /* 차트 소스: tv(TradingView 임베드) / canvas(자체) — PC별 저장. 네이버는 새창(임베드 시 시세 차단) */
-  let chartSrc=(()=>{try{const v=localStorage.getItem('nmr_csrc'); return (v==='canvas'||v==='tv')?v:'canvas';}catch(e){return 'canvas';}})();
+  /* 차트 소스: canvas(자체) / tv(TradingView 임베드). 네이버는 새창(임베드 시 시세 차단)
+     종목을 열면 항상 자체차트로 시작한다 — TradingView 는 그 종목을 보는 동안만 유지(저장 안 함) */
+  let chartSrc='canvas';
   document.querySelectorAll('.csrc').forEach(b=>b.onclick=()=>{
-    chartSrc=b.dataset.s; try{localStorage.setItem('nmr_csrc',chartSrc);}catch(e){}
+    chartSrc=b.dataset.s;
     if(dcode) showDetail(dcode);
   });
   {const nv=$('sd_nvopen'); if(nv) nv.onclick=()=>{ if(!dcode) return;
@@ -1867,6 +1868,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     window.open(`https://finance.yahoo.com/chart/${encodeURIComponent(sym)}`,'nmr_yh','width=1150,height=900'); };}
   async function showDetail(c){
     const r=POOL[mkt].find(x=>x.c===c); if(!r) return;
+    /* 새 종목을 열 때는 항상 자체차트부터. (같은 종목에서 소스 버튼을 누른 경우는 c===dcode 라 유지) */
+    if(c!==dcode) chartSrc='canvas';
     dcode=c;
     $('scr_detail').style.display='';
     $('sd_name').textContent = mkt==='kr'? (r.n||'') : r.c;
