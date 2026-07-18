@@ -1876,7 +1876,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
     $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
-    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
+    const cvs=['sd_main','sd_mainlog','sd_vol','sd_rsi','sd_macd','sd_inv'];
     /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
     const mode = mkt==='kr' ? 'canvas' : chartSrc;
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
@@ -1956,18 +1956,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const UP='#d33', DN='#1f6feb';
     const last=c[c.length-1], prev=c[c.length-2]??last, chg=prev?(last/prev-1)*100:0;
     $('sd_last').innerHTML=`${mkt==='kr'?Math.round(last).toLocaleString()+'원':'$'+(+last).toFixed(2)} <span class="${chg>=0?'up':'dn'}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>`;
-    // ① 메인(캔들+MA+BB+52주고점)
-    {const [x,W,H]=_cvs('sd_main'); const P={l:6,r:52,t:8,b:16};
-     const lo=Math.min(...ll,...bL.filter(y=>y!=null)), hi=Math.max(...hh,...bU.filter(y=>y!=null));
-     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p-lo)/((hi-lo)||1));
+    // ① 메인(캔들+MA+BB+52주고점) — 일반·로그 두 판 (useLog=가격을 log 공간에 매핑, 상승률 기준 균등)
+    const drawMain=(id,useLog)=>{
+     const [x,W,H]=_cvs(id); const P={l:6,r:52,t:8,b:16};
+     const T=useLog?Math.log:(p=>p), IV=useLog?Math.exp:(p=>p);
+     const lo=T(Math.min(...ll,...bL.filter(y=>y!=null))), hi=T(Math.max(...hh,...bU.filter(y=>y!=null)));
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(T(p)-lo)/((hi-lo)||1));
      // BB 밴드
      x.beginPath(); let st=false;
      for(let i=0;i<N;i++){ if(bU[i]==null)continue; st?x.lineTo(X(i),Y(bU[i])):(x.moveTo(X(i),Y(bU[i])),st=true); }
      for(let i=N-1;i>=0;i--){ if(bL[i]==null)continue; x.lineTo(X(i),Y(bL[i])); }
      x.closePath(); x.fillStyle='rgba(130,150,170,.10)'; x.fill();
-     // y 그리드 3줄
+     // y 그리드 3줄 (로그면 log 공간에서 균등 → 라벨은 역변환한 가격)
      x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.strokeStyle='#eceff3';
-     for(let g=0;g<=3;g++){ const p=lo+(hi-lo)*g/3, y=Y(p);
+     for(let g=0;g<=3;g++){ const p=IV(lo+(hi-lo)*g/3), y=Y(p);
        x.beginPath(); x.moveTo(P.l,y); x.lineTo(W-P.r,y); x.stroke();
        x.fillText(mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2), W-P.r+4, y+3); }
      // 52주 최고 점선
@@ -1986,7 +1988,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      // x축 날짜 5틱
      x.fillStyle='#98a2ad';
      for(let g=0;g<5;g++){ const i=Math.floor(N*g/5), d=String(t[i]||'').replace(/-/g,'');
-       x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-4); } }
+       x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-4); }
+     if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 14); }
+    };
+    drawMain('sd_main',false); drawMain('sd_mainlog',true);
     // ② 거래량
     {const [x,W,H]=_cvs('sd_vol'); const P={l:6,r:52,t:2,b:2};
      const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
