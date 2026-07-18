@@ -89,7 +89,7 @@
   #lg_row button#lg_go:hover{background:#1c3fa8;border-color:#1c3fa8}
   #lg_row button#lg_go:disabled{opacity:.5;cursor:default}
   #lg_err{font-size:11.5px;color:#c0392b;min-height:16px;margin-top:8px;line-height:1.45}
-  #lg_warn{font-size:11px;color:#b7791f;background:#fffbeb;border:1px solid #fde68a;
+  #lg_warn{display:none!important;font-size:11px;color:#b7791f;background:#fffbeb;border:1px solid #fde68a;
            border-radius:6px;padding:7px 9px;margin-bottom:12px;line-height:1.5;display:none}
   /* 방문자 탭 */
   .vs-k{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:9px;margin-bottom:14px}
@@ -918,8 +918,8 @@
 <div id="lg_ov"><div id="lg_box">
   <h3 id="lg_ttl">개발자 로그인</h3>
   <div class="sub" id="lg_sub" style="display:none"></div>
-  <div id="lg_warn">지금은 <b>암호화되지 않은 연결(http)</b>이다. 주소창의 http를
-    <b>https</b>로 바꿔 접속하면 비밀번호가 암호화돼 전송된다.</div>
+  <!-- (2026-07-18) http 경고문 제거 — 사용자 요청 -->
+  <div id="lg_warn" style="display:none"></div>
   <input id="lg_tk" type="text" placeholder="설정 토큰 (서버에서 발급)" style="display:none"
          autocomplete="off" spellcheck="false">
   <input id="lg_id" type="text" placeholder="아이디" autocomplete="username">
