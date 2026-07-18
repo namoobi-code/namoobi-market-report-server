@@ -1149,23 +1149,27 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const LNK=t=>t.replace(/(https?:\/\/[^\s<)"']+|(?:[a-z0-9-]+\.)+(?:com|net|org|io)\/[^\s<,)"']+)/g,
     m2=>`<a href="${m2.startsWith('http')?m2:'https://'+m2}" target="_blank" rel="noopener">${m2}</a>`);
   const EL=v=>LNK(E(vtext(v)));
-  /* (4차 2026-07-19) key_reports 는 분석 에이전트가 정리한 대표 리포트 제목 — URL 이 대부분 없다.
-     공식 홈페이지(목록)로 링크하면 제목이 안 보여 오해를 준다. 그래서:
-       · 실제 url 이 있으면 그대로 링크
-       · 없으면 '증권사+제목' 네이버 통합검색으로 링크(🔍) — 실제 리포트를 찾아준다(가짜 직행 링크 금지) */
-  const searchUrl=(broker,title)=>'https://search.naver.com/search.naver?query='
-        + encodeURIComponent((broker||'')+' '+String(title||'').replace(/\([^)]*\)/g,' ').trim());
+  /* (4차 2026-07-19) key_reports 링크 규칙 (사용자 지적 반영):
+     ① rp.url(수집 시 저장한 텔레그램 퍼머링크·홈페이지 게시물 URL) 있으면 그대로 직행 링크
+     ② 없으면 그 증권사의 '출처 채널'(텔레그램 채널 / NH·KB 공개 홈페이지)로 링크 — 웹에 없는
+        내부 발간물이라도 최소한 출처로 연결. 검색해도 안 나오는 가짜 검색링크는 폐지. */
+  const SRCCH={shinhan:'https://t.me/shinhanresearch',kiwoom:'https://t.me/KiwoomResearch',
+    meritz:'https://t.me/meritz_research',hana:'https://t.me/HanaResearch',kyobo:'https://t.me/KyoboRSC',
+    yuanta:'https://t.me/yuantaresearch',hyundai:'https://t.me/hmsecresearch',
+    kb:'https://rc.kbsec.com/today/index.able',nh:'https://m.nhqv.com/research/boardList?rshPprDitCd=02',
+    samsung:'https://www.samsungpop.com/mbw/research.do',miraeasset:'https://securities.miraeasset.com/bbs/board/message/list.do?categoryId=1521',
+    korea_inv:'https://research.truefriend.com'};
   const houses=(obj,names,extras)=>{
     const src=(obj&&obj.firm&&typeof obj.firm==='object')?obj.firm:obj;
     return Object.entries(src||{}).filter(([k,v])=>names[k]&&v&&typeof v==='object')
     .map(([k,v])=>{
-      const bnm=names[k]||k;
+      const ch=SRCCH[k]||''; const tg=ch.includes('t.me');
       const views=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv)
         .map(([kk,vv])=>`<div class="s" style="margin-top:5px;color:#0f766e"><b>${VIEWKO[kk]}</b> — ${EL(vv)}</div>`).join('');
-      const reps=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
-        .map(rp=>rp.url
-          ? `<div class="s" style="margin-top:3px">📄 <a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title||rp.url)}</a>${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`
-          : `<div class="s" style="margin-top:3px">📄 <a href="${esc(searchUrl(bnm,rp.title))}" target="_blank" rel="noopener">${E(rp.title||'')}</a> <span class="note">🔍검색</span>${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`).join('');
+      const kr=(Array.isArray(v.key_reports)?v.key_reports:[]).slice(0,4)
+        .map(rp=>{const u=rp.url||ch;
+          return `<div class="s" style="margin-top:3px">📄 ${u?`<a href="${esc(u)}" target="_blank" rel="noopener">${E(rp.title||'')}</a>${rp.url?'':` <span class="note">${tg?'✈️채널':'↗출처'}</span>`}`:E(rp.title||'')}${rp.date?`<span class="note"> · ${E(rp.date)}</span>`:''}</div>`;}).join('');
+      const reps=kr?`<div class="kr-fallback">${kr}</div>`:'';
       return `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(names[k]||k)}</div>
       ${v.key_message?`<div class="s" style="margin-top:7px"><b>오늘의 메시지</b> — ${EL(v.key_message)}</div>`:''}
       ${views}${reps}
