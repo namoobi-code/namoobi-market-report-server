@@ -173,6 +173,94 @@ def chart_api(mkt: str, code: str):
     except Exception as e:
         raise HTTPException(502, f"chart fetch failed: {e}")
 
+# ── 종목별 투자자 수급 (외국인·기관·개인 누적순매수) ──
+#   1년치: 네이버 frgn.naver 13페이지 (외국인·기관 순매매량만 제공)
+#   최근 30거래일: KIS FHKST01010900 (개인 포함 3주체 실측 — 네이버 값과 일치 검증됨)
+#   병합: KIS 구간은 KIS 우선(개인 실측), 그 이전 개인은 null → 프론트가 −(외인+기관) 추정 점선
+_inv_cache = {}
+
+def _frgn_naver(code: str, pages: int = 13):
+    """finance.naver.com/item/frgn.naver 표 파싱 → [(YYYYMMDD, 기관, 외인)]"""
+    from concurrent.futures import ThreadPoolExecutor
+    def one(p):
+        url = f"https://finance.naver.com/item/frgn.naver?code={code}&page={p}"
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        html = urllib.request.urlopen(req, timeout=12).read().decode("euc-kr", "ignore")
+        out = []
+        for m in re.finditer(r"<tr[^>]*>(.*?)</tr>", html, re.S):
+            cells = [re.sub(r"<[^>]+>", "", c).strip().replace(",", "")
+                     for c in re.findall(r"<td[^>]*>(.*?)</td>", m.group(1), re.S)]
+            # 일별 표만: 날짜·종가·전일비·등락률·거래량·기관·외인·보유주수·보유율(%) = 9칸
+            if len(cells) < 9 or "%" not in cells[8]:
+                continue
+            dm = re.match(r"(\d{4})\.(\d{2})\.(\d{2})", cells[0])
+            if not dm:
+                continue
+            try:
+                org, frg = int(cells[5]), int(cells[6])
+            except ValueError:
+                continue
+            out.append((dm.group(1) + dm.group(2) + dm.group(3), org, frg))
+        return out
+    rows = []
+    with ThreadPoolExecutor(max_workers=6) as ex:
+        for part in ex.map(one, range(1, pages + 1)):
+            rows.extend(part)
+    return rows
+
+def _kis_investor(code: str):
+    """KIS 종목별 투자자매매동향(일별 30행) → {YYYYMMDD: (기관, 외인, 개인)}"""
+    import sys as _s
+    sp = str(BASE / "scripts")
+    if sp not in _s.path:
+        _s.path.insert(0, sp)
+    import kis_api as K
+    c = K._creds(); tok = K._token(c)
+    j = K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-investor", "FHKST01010900",
+               {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code})
+    out = {}
+    for r in (j.get("output") or []):
+        try:
+            out[r["stck_bsop_date"]] = (int(r["orgn_ntby_qty"]), int(r["frgn_ntby_qty"]), int(r["prsn_ntby_qty"]))
+        except (KeyError, ValueError, TypeError):
+            continue
+    return out
+
+@app.get("/api/investor/kr/{code}")
+def investor_api(code: str):
+    if not re.fullmatch(r"\d{6}", code):
+        raise HTTPException(400, "bad code")
+    now = time.time(); hit = _inv_cache.get(code)
+    if hit and now - hit[0] < 1800:      # 30분 캐시
+        return hit[1]
+    data = {}
+    try:
+        for d, org, frg in _frgn_naver(code):
+            data[d] = {"o": org, "f": frg, "p": None}
+    except Exception:
+        pass
+    kis_from = None
+    try:
+        k = _kis_investor(code)
+        for d, (o_, f_, p_) in k.items():
+            data[d] = {"o": o_, "f": f_, "p": p_}
+        if k:
+            kis_from = min(k)
+    except Exception:
+        pass
+    if not data:
+        raise HTTPException(502, "investor fetch failed")
+    ts = sorted(data)
+    out = {"t": ts,
+           "orgn": [data[d]["o"] for d in ts],
+           "frgn": [data[d]["f"] for d in ts],
+           "prsn": [data[d]["p"] for d in ts],
+           "kis_from": kis_from}
+    _inv_cache[code] = (now, out)
+    if len(_inv_cache) > 200:
+        _inv_cache.clear()
+    return out
+
 @app.get("/api/reports")
 def reports():
     out = []

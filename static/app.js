@@ -1876,7 +1876,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
     $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
-    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd'];
+    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
     /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
     const mode = mkt==='kr' ? 'canvas' : chartSrc;
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
@@ -1908,7 +1908,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
         drawAll(D);
-        $('sd_src').textContent=`종가 기준 일봉(최근 1년) · ${mkt==='kr'?'네이버':'Yahoo'} · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)`;
+        $('sd_src').textContent=`종가 기준 일봉(최근 1년) · ${mkt==='kr'?'네이버':'Yahoo'} · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)`
+          +(mkt==='kr'?' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)':'');
+        loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
     }
     $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -2013,6 +2015,54 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); };
      line(macd,'#333'); line(sig,'#f39c12');
      x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('MACD·시그널', W-P.r+4, 12); }
+  }
+  // ⑤ 투자자별 누적순매수 (KR 전용 — 네이버 1년 + KIS 30일 병합)
+  async function loadInv(c){
+    const e=$('sd_inv'); if(!e) return;
+    if(mkt!=='kr'){ e.style.display='none'; return; }   // 투자자 구분은 한국 시장 고유
+    e.style.display='block';
+    try{
+      const J=await (await fetch(`/api/investor/kr/${encodeURIComponent(c)}`)).json();
+      if(dcode!==c) return;
+      drawInv(J);
+    }catch(err){ const [x]=_cvs('sd_inv'); x.font='11px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('수급 데이터 로드 실패',10,22); }
+  }
+  function drawInv(J){
+    const n=(J.t||[]).length; if(!n) return;
+    // 누적합 — 개인 미제공 구간(KIS 이전)은 −(외인+기관) 추정
+    const cf=[],co=[],cp=[],est=[]; let sf=0,so=0,sp=0;
+    for(let i=0;i<n;i++){ sf+=J.frgn[i]||0; so+=J.orgn[i]||0;
+      const isEst=J.prsn[i]==null;
+      sp+= isEst? -((J.frgn[i]||0)+(J.orgn[i]||0)) : J.prsn[i];
+      cf.push(sf); co.push(so); cp.push(sp); est.push(isEst); }
+    const [x,W,H]=_cvs('sd_inv'); const P={l:6,r:52,t:6,b:14};
+    const all=[...cf,...co,...cp]; let mx=Math.max(...all,0), mn=Math.min(...all,0);
+    if(mx===mn){ mx+=1; mn-=1; }
+    const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/n, Y=p=>P.t+(H-P.t-P.b)*(1-(p-mn)/(mx-mn));
+    // 0선 + 상하한 라벨
+    x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke();
+    const fmt=v=>{const a=Math.abs(v);
+      return (a>=1e8?(v/1e8).toFixed(1)+'억':a>=1e4?Math.round(v/1e4).toLocaleString()+'만':String(Math.round(v)))+'주';};
+    x.font='10px sans-serif'; x.fillStyle='#98a2ad';
+    x.fillText(fmt(mx),W-P.r+4,Y(mx)+8); x.fillText(fmt(mn),W-P.r+4,Y(mn)-2);
+    // 선 그리기 (from~to 구간, 점선 여부)
+    const seg=(a,col,i0,i1,dash)=>{ if(i1<=i0) return;
+      x.strokeStyle=col; x.lineWidth=1.5; x.setLineDash(dash?[3,3]:[]);
+      x.beginPath(); x.moveTo(X(i0),Y(a[i0]));
+      for(let i=i0+1;i<=i1;i++) x.lineTo(X(i),Y(a[i]));
+      x.stroke(); x.setLineDash([]); x.lineWidth=1; };
+    const F='#d33', O='#1f6feb', PP='#27ae60';   // 외국인 빨강 · 기관 파랑 · 개인 초록 (3.2.1 배색)
+    seg(cf,F,0,n-1,false); seg(co,O,0,n-1,false);
+    let cut=est.indexOf(false); if(cut<0) cut=n;                 // 개인: 추정(점선) → 실측(실선)
+    seg(cp,PP,0,Math.min(cut,n-1),true); if(cut<n) seg(cp,PP,Math.max(cut-1,0),n-1,false);
+    // x축 날짜 3틱 + 범례
+    x.fillStyle='#98a2ad';
+    for(let g=0;g<3;g++){ const i=Math.floor(n*g/3), d=String(J.t[i]||'');
+      x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-3); }
+    x.font='bold 10px sans-serif';
+    x.fillStyle=F; x.fillText('외국인',P.l+4,14); x.fillStyle=O; x.fillText('기관',P.l+40,14);
+    x.fillStyle=PP; x.fillText('개인',P.l+68,14);
+    x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('누적순매수',P.l+96,14);
   }
 
   // ── 2단계 z-score 랭킹 ──
