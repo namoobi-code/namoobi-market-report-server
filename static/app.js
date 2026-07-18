@@ -1715,7 +1715,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     p.innerHTML=
       `<div class="cp-h"><b>표시 컬럼</b><span class="note">체크로 표시/숨김 · ▲▼로 순서 변경</span>
          <span class="cp-badge">${colsSaved?'💾 이 PC에 저장됨':'기본값 사용 중'}</span>
-         <button class="cp-x" id="cp_reset">컬럼 초기화(default)</button><button class="cp-x" id="cp_all">전부체크</button><button class="cp-x" id="cp_close">닫기</button></div>
+         <button class="cp-x" id="cp_reset">컬럼 초기화(default)</button><button class="cp-x" id="cp_all">전부체크</button><button class="cp-x" id="cp_none">전부해제</button><button class="cp-x" id="cp_close">닫기</button></div>
        <div class="cp-sec">표시 중 (${cur.length})</div><div class="cp-list">`+
       cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-coff="${k}" checked ${k==='n'?'disabled':''}>${E(cpl(k))}</label>
          <span class="cp-mvs"><button class="cp-mv" data-up="${k}" ${i===0?'disabled':''}>▲</button><button class="cp-mv" data-dn="${k}" ${i===cur.length-1?'disabled':''}>▼</button></span></div>`).join('')+
@@ -1732,6 +1732,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     /* 전부체크 — 현재 순서는 보존하고 '추가 가능' 전부를 뒤에 붙인다 */
     $('cp_all').onclick=()=>{ const c=COLST[mkt].filter(cAvail);
       COLST[mkt]=c.concat(CORDER.filter(k=>cAvail(k)&&c.indexOf(k)<0)); saveCols(); applyTable(); renderColPanel(); };
+    /* 전부해제 — 종목(n)은 행 식별자라 남긴다(체크박스도 disabled) */
+    $('cp_none').onclick=()=>{ COLST[mkt]=['n']; saveCols(); applyTable(); renderColPanel(); };
     $('cp_close').onclick=()=>toggleColPanel(false);
   }
   let popCloser=false;
