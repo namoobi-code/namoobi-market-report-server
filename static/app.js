@@ -1466,6 +1466,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
     {const pl=$('scr_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
     $('scr_tbl').querySelectorAll('tr[data-c]').forEach(tr=>tr.onclick=()=>showDetail(tr.dataset.c));
+    renderLegend();
+  }
+  /* 필터 설명 — applyTable과 무관하게 단독 렌더 가능(START 전 '? 필터설명' 클릭 대응) */
+  function renderLegend(){
     {const rn=$('scr_revnote'); if(rn){
       const g = mkt==='us' ? [
         ['시장·섹터','거래소·업종 분류(Technology·Financial 등)'],
@@ -1924,7 +1928,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   {const gb=$('scr_start'); if(gb) gb.onclick=()=>loadPool(()=>applyRestored());}
   {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
-   if(gb&&gp) gb.onclick=()=>{ gp.style.display = gp.style.display==='none'?'':'none'; };
+   if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더
    if(gx&&gp) gx.onclick=()=>{ gp.style.display='none'; };}
   /* 우측 자료 서랍(보고서·APK·DB 인벤토리) 토글 */
   {const t=document.getElementById('side_tgl'), sd=document.querySelector('aside.side'), x=document.getElementById('side_x');
