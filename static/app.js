@@ -1469,9 +1469,22 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function placeBtns(){ if(!BTNS_GRP) return;
     const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
     if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP); }
+  /* ── 종목 찾기 칩 (돋보기 → 입력창, 입력 즉시 필터) ── */
+  let findQ='', findOpen=false, findCaret=null;
+  function findHit(r){
+    if(!findQ) return true;
+    const q=findQ.toLowerCase();
+    return String(r.n||'').toLowerCase().includes(q) || String(r.c||'').toLowerCase().includes(q);
+  }
+  function findChipHTML(){
+    return findOpen
+      ? `<div class="fchip"><span class="findbox">🔎<input id="find_in" placeholder="종목명 · 코드" value="${E(findQ)}"
+           autocomplete="off" spellcheck="false"><button id="find_x" title="찾기 해제">✕</button></span></div>`
+      : `<div class="fchip"><button class="${findQ?'act':''}" id="find_btn" title="종목명·코드로 찾기">🔎 종목: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
+  }
   function renderChips(){
     const d=DEF[mkt];
-    $('scr_fltbar').innerHTML=KEYS.map(k=>{
+    const parts=KEYS.map(k=>{
       const f=d[k];
       if(!f) return '';
       if(f.fixed!==undefined) return `<div class="fchip"><button disabled style="opacity:.75;cursor:default">${chipLabel(k)}</button></div>`;
@@ -1494,7 +1507,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         (f.min?'':`${f.maxOnly?'':'<span>~</span>'}<input type="number" placeholder="${f.maxOnly?'N년이상':'최대'}" data-man="${k}" data-mm="max" value="${st.max??''}">`)+`</div>`;
       }
       return `<div class="fchip"><button class="${active?'act':''}" data-chip="${k}">${chipLabel(k)}</button><div class="fpop" id="pop_${k}">${pop}</div></div>`;
-    }).join('');
+    });
+    // 종목 찾기 칩 — 시장(또는 섹터) 칩 바로 뒤에 끼워 넣는다
+    {const ai=parts.findIndex(h=>h!==''); parts.splice(ai<0?0:ai+1, 0, findChipHTML());}
+    $('scr_fltbar').innerHTML=parts.join('');
     // 이벤트
     $('scr_fltbar').querySelectorAll('[data-chip]').forEach(b=>b.onclick=e=>{
       e.stopPropagation(); const k=b.dataset.chip; const p=$('pop_'+k); const wasOpen=p.classList.contains('open');
@@ -1509,6 +1525,22 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_fltbar').querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{
       F[b.dataset.cat].v = b.dataset.v||null; apply(); });
     $('scr_fltbar').querySelectorAll('[data-tgl]').forEach(t=>t.onchange=()=>{ F[t.dataset.tgl].on=t.checked; apply(); });
+    /* 종목 찾기 — 돋보기 클릭 시 입력창으로 전환, 입력할 때마다 즉시 필터 */
+    {const b=$('find_btn'); if(b) b.onclick=e=>{ e.stopPropagation();
+      document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open'));
+      findOpen=true; findCaret=null; renderChips(); };}
+    {const x=$('find_x'); if(x) x.onclick=e=>{ e.stopPropagation(); findQ=''; findOpen=false; apply(); };}
+    {const fi=$('find_in'); if(fi){
+      fi.onclick=e=>e.stopPropagation();
+      fi.oninput=()=>{ findQ=fi.value.trim(); findCaret=fi.selectionStart; apply(); };
+      fi.onkeydown=e=>{ e.stopPropagation();
+        if(e.key==='Escape'){ findQ=''; findOpen=false; apply(); }
+        if(e.key==='Enter'){ const t=$('scr_tbl').querySelector('tr[data-c]'); if(t) showDetail(t.dataset.c); } };
+      /* 표 자동갱신으로 칩이 다시 그려져도 입력 위치를 유지 (다른 입력창 사용 중이면 양보) */
+      const ae=document.activeElement;
+      if(!(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)&&ae.id!=='find_in')){
+        fi.focus(); if(findCaret!=null) fi.setSelectionRange(findCaret,findCaret); }
+    }}
     placeBtns();   // innerHTML 재작성 후 버튼 그룹 재부착
   }
 
@@ -1701,14 +1733,19 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let popCloser=false;
   function applyTable(){
     if(!loaded){ waitScreen(); return; }      // START 전: 대기 화면 유지(빈 표로 덮어쓰지 않음)
-    const rows=POOL[mkt].filter(pass);
+    const base=POOL[mkt].filter(pass);            // 하드컷 통과 (2·3단계는 이 집합을 그대로 쓴다)
+    const rows=findQ? base.filter(findHit) : base; // 종목 찾기는 1단계 표에만 적용
     rows.sort((a,b)=>{const x=sortVal(a,sort.k),y=sortVal(b,sort.k);
       if(typeof x==='string')return sort.d*x.localeCompare(y); return sort.d*(x-y);});
-    $('scr_cnt').innerHTML=`<b>${rows.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`;
+    $('scr_cnt').innerHTML=`<b>${base.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`
+      +(findQ?` <span class="findtag">🔎 “${E(findQ)}” ${rows.length.toLocaleString()}종</span>`:'');
     const cols=COLST[mkt].filter(cAvail); const cap=rows.slice(0,400);
     $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(cl(k))}</th>`).join('')
       +'<th class="colbtn" id="scr_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
       cap.map((r,i)=>`<tr data-c="${E(r.c)}"><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
+      (rows.length?'':`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center;padding:16px">`+
+        (findQ?`“${E(findQ)}” — 찾는 종목이 없습니다 <span style="opacity:.6">(하드컷을 통과한 ${base.length.toLocaleString()}종 안에서만 찾습니다)</span>`
+             :'조건을 통과한 종목이 없습니다')+`</td></tr>`)+
       (rows.length>400?`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종 — 필터를 좁히세요)</td></tr>`:'');
     $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });

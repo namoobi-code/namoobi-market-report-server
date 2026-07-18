@@ -303,6 +303,15 @@
   .fchip>button:hover{border-color:var(--dark)}
   .fchip>button.act{border-color:#1f6feb;background:#eef4ff}
   .fchip>button .cv{color:#1f6feb;font-weight:700;margin-left:3px}
+  /* 종목 찾기 칩 — 돋보기 버튼 ↔ 인라인 입력창 */
+  .findbox{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1.5px solid #1f6feb;
+           border-radius:8px;padding:7px 11px;font-size:12.5px;font-weight:600;white-space:nowrap}
+  .findbox input{border:0;outline:0;background:transparent;font:inherit;font-weight:500;color:var(--tx);
+                 width:132px;padding:0}
+  .findbox input::placeholder{color:var(--tx2);font-weight:400;opacity:.7}
+  .findbox button{border:0;background:transparent;cursor:pointer;color:var(--tx2);font-size:12px;line-height:1;padding:0}
+  .findbox button:hover{color:#d33}
+  .findtag{margin-left:8px;color:#1f6feb;font-weight:700}
   .fpop{position:absolute;top:calc(100% + 6px);left:0;z-index:60;background:#fff;border:1px solid var(--line);border-radius:11px;box-shadow:0 8px 28px rgba(0,0,0,.16);padding:11px;min-width:215px;display:none}
   .fpop.open{display:block}
   .fpop .pl{font-size:11px;color:var(--tx2);margin:0 0 6px}
