@@ -78,8 +78,46 @@ def _enrich_kr(kr, d0s):
         try:
             S=(date.today()-timedelta(days=400)).strftime("%Y%m%d"); E=date.today().strftime("%Y%m%d")
             dch=T.jget(f"https://api.stock.naver.com/chart/domestic/item/{r['c']}/day?startDateTime={S}&endDateTime={E}",timeout=12)
-            cl=[x["closePrice"] for x in dch if x.get("closePrice")]
+            rows=[x for x in dch if x.get("closePrice")]
+            cl=[x["closePrice"] for x in rows]
             if len(cl)>=100: o["ma200"]=cl[-1]/(sum(cl[-200:])/min(200,len(cl)))-1
+            # (2026-07-18) 일봉 기술지표 — 같은 시리즈로 추가 계산(네트워크 비용 0). DB(screener_pool)에 저장돼
+            # 1일 2회 cron 때만 갱신되는 스냅샷이다. 학습 프레임: 일봉=방향 필터(이평배열·RSI·거래량·MACD·볼린저).
+            n=len(cl)
+            if n>=60:
+                c=cl[-1]
+                ma20=sum(cl[-20:])/20; ma50=sum(cl[-50:])/50; ma200v=sum(cl[-200:])/min(200,n)
+                o["v20"]=c/ma20-1; o["v50"]=c/ma50-1
+                o["align"]="정배열" if ma20>ma50>ma200v else ("역배열" if ma20<ma50<ma200v else "혼조")
+                # RSI(14) — Wilder 평활(시리즈 전체)
+                g=l=None
+                for i in range(1,n):
+                    d1=cl[i]-cl[i-1]; up=max(d1,0.0); dn=max(-d1,0.0)
+                    if i<14: g=(g or 0)+up; l=(l or 0)+dn
+                    elif i==14: g=(g+up)/14; l=(l+dn)/14
+                    else: g=(g*13+up)/14; l=(l*13+dn)/14
+                if n>14 and (g is not None):
+                    o["rsi"]=round(100.0 if l==0 else 100-100/(1+g/l),1)
+                # MACD(12,26,9) — EMA 시리즈 + 시그널, 상태코드
+                e12=e26=None; macds=[]
+                for i,p in enumerate(cl):
+                    e12=p if e12 is None else (p*2/13+e12*11/13)
+                    e26=p if e26 is None else (p*2/27+e26*25/27)
+                    if i>=25: macds.append(e12-e26)
+                if len(macds)>=10:
+                    sig=None
+                    for m0 in macds: sig=m0 if sig is None else (m0*2/10+sig*8/10)
+                    mv=macds[-1]
+                    o["macd"]=("골든↑" if mv>sig and mv>0 else "골든↓" if mv>sig else
+                               "데드↓" if mv<=sig and mv<0 else "데드↑")
+                # 볼린저(20,2) %b
+                sd=(sum((x-ma20)**2 for x in cl[-20:])/20)**0.5
+                if sd>0: o["bb"]=round((c-(ma20-2*sd))/(4*sd)*100,1)   # 0=하단, 100=상단
+                # 거래량 배수 = 최근 거래일 ÷ 직전 20일 평균
+                vol=[x.get("accumulatedTradingVolume") or 0 for x in rows]
+                if len(vol)>=21:
+                    va=sum(vol[-21:-1])/20
+                    if va>0: o["volx"]=round(vol[-1]/va,2)
         except Exception: pass
         return o
     enr=T.pmap(fetch, kr, workers=16)
@@ -116,7 +154,9 @@ def _enrich_kr(kr, d0s):
                  roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
                  op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), oploss=_neg_streak(op3),
                  isfin=_isfin(r.get("n")), vs200=r.get("ma200"),
-                 tp=tp, rec=rec, upside=upside, recn=recn, frgn=frgn, payout=payout)
+                 tp=tp, rec=rec, upside=upside, recn=recn, frgn=frgn, payout=payout,
+                 v20=r.get("v20"), v50=r.get("v50"), align=r.get("align"),
+                 rsi=r.get("rsi"), macd=r.get("macd"), bb=r.get("bb"), volx=r.get("volx"))
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
         r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); kr[i]=r
@@ -141,6 +181,7 @@ def _enrich_us(us):
         r["divy"]=q.get("dividendYield")
         r["w52"]=q.get("fiftyTwoWeekChangePercent"); r["hi52"]=q.get("fiftyTwoWeekHighChangePercent")
         r["vs200"]=q.get("twoHundredDayAverageChangePercent")
+        r["v50"]=q.get("fiftyDayAverageChangePercent")   # (2026-07-18) US 50일선 필터용
     op,crumb=T.yahoo_opener()
     import urllib.parse as _up
     _p2=int(time.time()); _p1=_p2-5*365*24*3600
