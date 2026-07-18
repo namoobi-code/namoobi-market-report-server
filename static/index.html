@@ -55,6 +55,20 @@
   .rpt:first-child{border-top:none}
   .dl{font-size:11.5px;background:var(--dark);color:#fff!important;padding:5px 12px;border-radius:5px}
   .box{background:var(--card);border:1px solid var(--line);border-radius:8px}
+  /* (2026-07-18) 재배치 — SCREENER=탭줄 · 사이드바=우측 슬라이드 서랍(기본 숨김) · 본문 전체폭 */
+  .tabs .scrtab{background:#2b57d0;border-color:#2b57d0;color:#fff}
+  .tabs .scrtab small{color:#dbe4ff}
+  .tabs .scrtab.on,.tabs .scrtab:hover{background:#1c3fa8;border-color:#1c3fa8;color:#fff}
+  .hdr-r{display:flex;align-items:center;gap:9px}
+  .hbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;color:var(--tx2);font-weight:600;white-space:nowrap}
+  .hbtn:hover{border-color:var(--dark);color:var(--tx)}
+  .shell{grid-template-columns:minmax(0,1fr) !important;gap:0 !important}
+  .side{position:fixed;top:0;right:0;bottom:0;width:332px;z-index:460;background:var(--bg);
+        border-left:1px solid var(--line);box-shadow:-10px 0 26px rgba(0,0,0,.12);
+        padding:14px 12px;transform:translateX(105%);transition:transform .22s ease;overflow-y:auto !important}
+  .side.open{transform:none}
+  .side-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:13.5px}
+  #scr_glspanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:9px}
   /* (2026-07-12) 좌우 분할 — 좌: 보고서 아카이브 + DB 인벤토리(컴팩트), 우: 본문 */
 
   .side h2:first-child{margin-top:0}
@@ -275,6 +289,7 @@
   <header>
     <div><h1 id="go_home" title="홈으로" style="cursor:pointer">글로벌 시황 대시보드<span>namoobi market report</span></h1></div>
     <div class="tabs">
+      <button id="btn_screener" class="tab scrtab">🔍 SCREENER<small>종목 스크리너</small></button>
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB data<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
@@ -282,13 +297,14 @@
       <button class="tab"    data-pane="p_auto">자동매매<small>KIS · 선정종목 집행</small></button>
       <button class="tab off" data-pane="p_fire" disabled title="준비 중">경제적 자유<small>퇴사 시뮬레이터</small></button>
     </div>
-    <div class="meta" id="meta">불러오는 중…</div>
+    <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
+      <div class="meta" id="meta">불러오는 중…</div></div>
   </header>
 
   <div class="shell">
   <aside class="side">
-  <button id="btn_screener" class="scrbtn">🔍 SCREENER<small>종목 스크리너 · 유니버스·필터·통과종목</small></button>
-  <h2 id="srpt">보고서 아카이브<em>최신 3건</em></h2>
+  <div class="side-h"><b>📚 자료</b><button class="cp-x" id="side_x">닫기</button></div>
+  <h2 id="srpt" style="margin-top:0">보고서 아카이브<em>최신 3건</em></h2>
   <div class="box" id="reports"></div>
 
   <h2 id="sapk">안드로이드 앱<em>APK · 최신판</em></h2>
@@ -500,6 +516,7 @@
         <span class="scrcnt" id="scr_cnt">—</span>
         <button class="scrrst scrgo" id="scr_start">▶ START</button>
         <button class="scrrst" id="scr_colbtn">⊞ 컬럼</button>
+        <button class="scrrst" id="scr_glsbtn">? 필터설명</button>
         <button class="scrrst" id="scr_rst">초기화</button>
       </div>
       <p class="note" style="margin:8px 0 0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
@@ -537,7 +554,10 @@
             <div class="box" id="sd_sum" style="padding:10px 12px"></div>
           </div>
         </div>
-        <div id="scr_revnote" class="src" style="margin-top:9px"></div>
+        <div id="scr_glspanel" style="display:none">
+          <div style="display:flex;justify-content:flex-end"><button class="cp-x" id="gls_close">닫기</button></div>
+          <div id="scr_revnote" class="src"></div>
+        </div>
       </div>
       <!-- 2단계 z랭킹 -->
       <div id="scr_s2" style="display:none">

@@ -298,7 +298,7 @@ def _enrich_us(us):
         chunks=[codes[i:i+20] for i in range(0,len(codes),20)]
         closes={}
         for res in T.pmap(_spark_batch, chunks, workers=6): closes.update(res)
-        ok_ta=0
+        ok_ta=0; sts_us={}   # 장중(intraday_us) 증분용 상태
         for r in us:
             q=qmap.get(r["c"]) or {}
             vol,va3=q.get("regularMarketVolume"),q.get("averageDailyVolume3Month")
@@ -331,6 +331,12 @@ def _enrich_us(us):
                            "데드↓" if mv<=sig and mv<0 else "데드↑")
             sd=(sum((x-ma20)**2 for x in cl[-20:])/20)**0.5
             if sd>0: r["bb"]=round((c-(ma20-2*sd))/(4*sd)*100,1)
+            # 장중(intraday_us) 증분 상태 — RSI·MACD·볼린저·20일선용 (이평50/200·거래량평균은 quotes가 매회 제공)
+            stu={"pc":c,"s19":sum(cl[-19:]),"q19":sum(x*x for x in cl[-19:])}
+            if n>14 and (g is not None): stu["g"]=g; stu["l"]=l
+            if e12 is not None: stu["e12"]=e12; stu["e26"]=e26
+            if len(macds)>=10: stu["sig"]=sig
+            sts_us[r["c"]]=stu
             ok_ta+=1
         # spark 누락 종목은 직전 풀 값 이월
         cfta=0
@@ -340,6 +346,8 @@ def _enrich_us(us):
                 for k in ("v20","align","rsi","macd","bb","volx"):
                     if r.get(k) is None and p.get(k) is not None: r[k]=p[k]
                 if r.get("rsi") is not None: cfta+=1
+        try: T.save_db("ta_state_us", {"st": sts_us})
+        except Exception as e: print("[pool] ta_state_us 저장 실패:", repr(e)[:60])
         print(f"[pool] US 기술지표(spark) {ok_ta}/{len(us)} (+이월 {cfta})")
     except Exception as e:
         print("[pool] US spark 실패:", repr(e)[:80])

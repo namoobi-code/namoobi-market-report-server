@@ -1923,6 +1923,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   };
   {const gb=$('scr_start'); if(gb) gb.onclick=()=>loadPool(()=>applyRestored());}
   {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
+  {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
+   if(gb&&gp) gb.onclick=()=>{ gp.style.display = gp.style.display==='none'?'':'none'; };
+   if(gx&&gp) gx.onclick=()=>{ gp.style.display='none'; };}
+  /* 우측 자료 서랍(보고서·APK·DB 인벤토리) 토글 */
+  {const t=document.getElementById('side_tgl'), sd=document.querySelector('aside.side'), x=document.getElementById('side_x');
+   if(t&&sd) t.onclick=()=>sd.classList.toggle('open');
+   if(x&&sd) x.onclick=()=>sd.classList.remove('open');}
   /* 장중 LIVE: 서버가 5분 증분 갱신한 풀을 자동 재조회(ETag 304면 무비용) */
   setInterval(()=>{
     if(!loaded) return;
