@@ -1124,10 +1124,31 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
     shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
     yuanta:'유안타증권',hyundai:'현대차증권'});
+  /* (req12 2026-07-18) 증권사별 대표 리포트 + 링크 — 서버가 네이버 리서치에서 매일 2회 수집 */
+  fetch('/api/db/broker_reports').then(r=>r.json()).then(br=>{
+    const el=$$('d_sec_rpt'); if(!el) return;
+    el.innerHTML=(br.firms||[]).map(f=>`<div class="card">
+      <div class="k" style="font-size:12.5px;font-weight:650;color:var(--tx)">${E(f.broker)}
+        ${f.official?` <a href="${esc(f.official)}" target="_blank" rel="noopener" class="note">공식 리서치↗</a>`:''}</div>
+      <table style="border:none;margin-top:5px">${(f.reports||[]).map(rp=>
+        `<tr><td><a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title)}</a>
+          <span class="note">${E(rp.cat)}${rp.stock?' · '+E(rp.stock):''}</span></td>
+        <td style="width:44px;text-align:right">${rp.pdf?`<a href="${esc(rp.pdf)}" target="_blank" rel="noopener" class="note">PDF</a>`:''}</td></tr>`).join('')}</table></div>`).join('')
+      +`<div class="note" style="grid-column:1/-1">🖥 ${E(br.desc||'')} · ${E(br.as_of||'')}</div>`;
+  }).catch(()=>{});
   const CT=(R.securities||{}).common_themes;
   $$('d_sec_c').innerHTML=Array.isArray(CT)?CT.map(t=>`• ${E(typeof t==='string'?t:(t.theme||JSON.stringify(t)))}`).join('<br>'):E(CT||'');
   $$('d_gsec').innerHTML=houses(R.global_securities,{ubs:'UBS',goldman:'Goldman Sachs',jpmorgan:'J.P. Morgan',
     morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'});
+  /* (req13 2026-07-18) IB 대표 발간물 + 링크 — 보고서 실행이 rep_pubs 를 채우면 표시.
+     (IB 리서치는 로그인 장벽·비정형 포털이라 서버 자동수집 불가 — 보고서 조사 시 수집) */
+  {const IBN={ubs:'UBS',goldman:'Goldman Sachs',jpmorgan:'J.P. Morgan',morgan_stanley:'Morgan Stanley',blackrock:'BlackRock'};
+   const cards=Object.entries(R.global_securities||{}).filter(([k,v])=>IBN[k]&&v&&Array.isArray(v.rep_pubs)&&v.rep_pubs.length)
+     .map(([k,v])=>`<div class="card"><div class="k" style="font-size:12.5px;font-weight:650">${IBN[k]} 대표 발간물</div>
+       ${v.rep_pubs.map(pb=>`<div class="s" style="margin-top:5px">${pb.url?`<a href="${esc(pb.url)}" target="_blank" rel="noopener">${E(pb.title||pb.url)}</a>`:E(pb.title||'')}
+         ${pb.date?`<span class="note"> · ${E(pb.date)}</span>`:''}</div>`).join('')}</div>`);
+   const el=$$('d_gsec_pub');
+   if(el) el.innerHTML=cards.join('')||'<div class="note" style="grid-column:1/-1">대표 발간물 링크는 다음 보고서 실행부터 수집됩니다 (rep_pubs)</div>';}
   const GC=(R.global_securities||{}).wall_street_consensus, GT=(R.global_securities||{}).common_themes;
   $$('d_gsec_c').innerHTML=(Array.isArray(GT)?GT.map(t=>`• ${E(typeof t==='string'?t:JSON.stringify(t))}`).join('<br>'):'')+
     (GC?`<div style="margin-top:8px"><b>월가 컨센서스</b> — ${E(typeof GC==='string'?GC:JSON.stringify(GC))}</div>`:'');
