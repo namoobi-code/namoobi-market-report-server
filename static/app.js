@@ -1148,6 +1148,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
+      v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
+      v50:{label:'50일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−10% ↑',-10],['+10% ↑',10]],def:[null,null]},
+      align:{label:'이평배열',cat:1},
+      rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
+      volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
+      macd:{label:'MACD',cat:1},
+      bb:{label:'볼린저%b',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
@@ -1177,6 +1184,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
+      v20:{label:'20일선',fixed:'— (US 2차)'},
+      v50:{label:'50일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−10% ↑',-10],['+10% ↑',10]],def:[null,null]},
+      align:{label:'이평배열',fixed:'— (US 2차)'},
+      rsi:{label:'RSI(14)',fixed:'— (US 2차)'},
+      volx:{label:'거래량배수',fixed:'— (US 2차)'},
+      macd:{label:'MACD',fixed:'— (US 2차)'},
+      bb:{label:'볼린저%b',fixed:'— (US 2차)'},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
@@ -1186,6 +1200,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
   const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age','v200',
+              'v20','v50','align','rsi','volx','macd','bb',
               'mom','hi','frgn','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','per','pbr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
@@ -1284,6 +1299,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
     oploss:{l:'영업적자',n:1,m:'both'},
     age:{l:'상장기간',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
+    v20:{l:'20일선',n:1,m:'kr'}, v50:{l:'50일선',n:1,m:'both'}, align:{l:'이평배열',n:0,m:'kr'},
+    rsi:{l:'RSI',n:1,m:'kr'}, volx:{l:'거래량배수',n:1,m:'kr'}, macd:{l:'MACD',n:0,m:'kr'}, bb:{l:'볼린저%b',n:1,m:'kr'},
     mom:{l:'추세',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
@@ -1304,8 +1321,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
      ※ 증권 구분만 고정값이라 대응 컬럼 없음 */
   const CDEFAULT={
-    kr:['n','px','cap','tv','de','cr','oploss','age','v200'],
-    us:['n','px','cap','tv','de','cr','oploss','age','v200']
+    kr:['n','mk','px','chg','cap','tv','de','cr','oploss','age','v200'],
+    us:['n','sector','px','chg','cap','tv','de','cr','oploss','age','v200']
   };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
@@ -1344,6 +1361,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'mom': return mkt==='kr'?(r.mom!=null?r.mom*100:null):r.w52;
       case 'hi': {const v=mkt==='kr'?r.near52:r.hi52; return v!=null?v*100:null;}
       case 'v200': return r.vs200!=null?r.vs200*100:null;
+      case 'v20': return r.v20!=null?r.v20*100:null;
+      case 'v50': return r.v50!=null?r.v50*100:null;
+      case 'align': return r.align??null; case 'macd': return r.macd??null;
+      case 'rsi': return r.rsi; case 'volx': return r.volx; case 'bb': return r.bb;
       case 'de': return r.de; case 'cr': return r.cr;
       case 'oploss': return r.oploss!=null?r.oploss:(r.op3neg?3:null);
       case 'frgn': return r.frgn;
@@ -1379,7 +1400,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'payout': return v.toFixed(0)+'%';
       case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
-      case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': return sgn(0);
+      case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': case 'v20': case 'v50': return sgn(0);
+      case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
+      case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(v)}</span>`;
+      case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
+      case 'volx': return `<span class="${v>=1.5?'up':'note'}">${(+v).toFixed(1)}배</span>`;
+      case 'bb': return (+v).toFixed(0);
     }
     return '';
   }
