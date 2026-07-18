@@ -67,6 +67,9 @@
         border-left:1px solid var(--line);box-shadow:-10px 0 26px rgba(0,0,0,.12);
         padding:14px 12px;transform:translateX(105%);transition:transform .22s ease;overflow-y:auto !important}
   .side.open{transform:none}
+  /* (2026-07-18) 자료 서랍 열림 → 본문을 서랍 폭만큼 동적 축소(오버레이 대신 리플로우) */
+  .wrap{transition:padding-right .22s ease}
+  @media(min-width:981px){ body.side-open .wrap{padding-right:344px} }
   .side-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:13.5px}
   #scr_glspanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:9px}
   /* (2026-07-12) 좌우 분할 — 좌: 보고서 아카이브 + DB 인벤토리(컴팩트), 우: 본문 */
