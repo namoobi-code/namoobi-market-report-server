@@ -1546,8 +1546,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   });
   {const nv=$('sd_nvopen'); if(nv) nv.onclick=()=>{ if(!dcode) return;
     const url = mkt==='kr' ? `https://finance.naver.com/item/fchart.naver?code=${encodeURIComponent(dcode)}`
-                           : `https://finance.yahoo.com/chart/${encodeURIComponent(dcode)}`;
-    window.open(url,'nmr_chart','width=1150,height=900'); };}
+                           : `https://search.naver.com/search.naver?query=${encodeURIComponent(dcode+' 주가')}`; // 해외는 네이버 증권 카드로
+    window.open(url,'nmr_nv','width=1150,height=900'); };}
+  {const yh=$('sd_yhopen'); if(yh) yh.onclick=()=>{ if(!dcode) return;
+    let sym=dcode;
+    if(mkt==='kr'){ const r=POOL.kr.find(x=>x.c===dcode); sym=dcode+(r&&r.mk==='KOSDAQ'?'.KQ':'.KS'); } // 야후 한국 심볼
+    window.open(`https://finance.yahoo.com/chart/${encodeURIComponent(sym)}`,'nmr_yh','width=1150,height=900'); };}
   async function showDetail(c){
     const r=POOL[mkt].find(x=>x.c===c); if(!r) return;
     dcode=c;
