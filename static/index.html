@@ -44,6 +44,9 @@
   td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
   .up{color:var(--up)}.dn{color:var(--dn)}
   .note{font-size:11px;color:var(--tx2)}
+  /* (2026-07-19) 스크리너 빈칸 3-구분 */
+  .m-wait{color:#c77d0a;font-weight:700;cursor:help}
+  .m-err{color:#d64545;font-weight:700;cursor:help}
   /* Chart.js 무한 성장 방지 — 캔버스 높이를 못박는다(max-height 만으론 부족) */
   canvas{height:200px!important;max-height:200px!important;width:100%!important}
   .cbox{position:relative}
@@ -375,7 +378,7 @@
 </head>
 <body><div class="wrap">
   <header>
-    <div><h1 id="go_home" title="홈으로" style="cursor:pointer">투자 인텔리전스<span>namoobi · market · screener · AI agents · auto-trading</span></h1></div>
+    <div><h1 id="go_home" title="홈으로" style="cursor:pointer">투자 인텔리전스<span>namoobi · 시황 리포트 · 종목 스크리너 · AI 분석 · 자동매매</span></h1></div>
     <div class="tabs">
       <button id="btn_screener" class="tab scrtab">🔍 SCREENER<small>종목 스크리너</small></button>
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
@@ -620,7 +623,7 @@
   <div class="pane" id="p_screener">
     <main class="mainc">
       <div class="lead" id="scr_asof" style="margin-top:2px">불러오는 중…</div>
-      <h2 style="margin:8px 0 3px">종목 스크리너</h2><!-- (2026-07-18) 위·아래 여백 축소 -->
+      <h2 style="margin:8px 0 3px">종목 스크리너 <span class="note" style="font-weight:400;font-size:11px">빈칸: <span class="note">—</span> 원래 없음 · <span class="m-wait">⋯</span> 집계 대기 · <span class="m-err">⚠</span> 수집 오류</span></h2><!-- (2026-07-18) 위·아래 여백 축소 -->
       <div class="scrtop">
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>

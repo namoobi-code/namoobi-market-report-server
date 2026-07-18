@@ -1598,6 +1598,26 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
     return null;
   }
+  /* (2026-07-19) 빈칸 3-구분 — 왜 '—' 인지 행 데이터로 판별.
+     na  : 원래 존재하지 않음(구조적) — 회색 —
+     wait: 아직 수집 전/집계 대기      — 주황 ⋯
+     err : 수집 시도했으나 오류         — 빨강 ⚠  (수집기가 r._err 에 필드명을 담을 때만) */
+  const COV=['tp','upside','tp_rev','tp_trend','rev','rec','recn','nan'];
+  const TECH=['v20','v50','align','rsi','volx','macd','bb','near52','vs200','v200','z_val','z_mom','z_qual'];
+  function missKind(r,key){
+    if(Array.isArray(r._err)&&r._err.includes(key)) return 'err';
+    if(COV.includes(key)) return (r.nan||r.recn!=null||r.tp!=null)?'wait':'na';  // 애널 커버리지 없음
+    if(key==='divy'||key==='payout') return 'na';                    // 무배당
+    if(key==='per'||key==='fper'||key==='pbr') return 'na';          // 적자·자본잠식
+    if(key==='cr') return /은행|보험|증권|금융|지주|캐피탈|카드/.test(r.sector||'')?'na':'wait';
+    if(TECH.includes(key)) return 'wait';                            // 장중 상태·이력 누적 대기
+    if(['gr','rg','opg','og','mgrw','ogrw','revg'].includes(key)) return 'na'; // 성장률 계산 불가(전년 적자 등)
+    return 'na';
+  }
+  const MISS={na:'<span class="note" title="원래 없음 — 구조적으로 존재하지 않는 값(예: 무배당·적자·애널 미커버)">—</span>',
+    wait:'<span class="m-wait" title="집계 대기 — 아직 수집/누적 전(장중 상태·이력 축적 중)">⋯</span>',
+    err:'<span class="m-err" title="수집 오류 — 조회를 시도했으나 실패">⚠</span>'};
+  const dash=(r,key)=>MISS[missKind(r,key)];
   function cell(r,key){
     if(key==='n') return mkt==='kr'?`<b>${E(r.n)}</b> <span class="note">${E(r.c)}</span>`:`<b>${E(r.c)}</b> <span class="note">${E(r.n)}</span>`;
     if(key==='mk') return E(r.mk||'');
@@ -1606,16 +1626,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(key==='chg'){const v=r.chg; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(2)}%</span>`;}
     if(key==='cap') return mkt==='kr'?wonF(r.cap):usdF(r.cap);
     if(key==='tv') return mkt==='kr'?wonF(r.tv):usdF(r.tv);
-    if(key==='tp'){const v=r.tp; return v==null?'<span class="note">—</span>':(mkt==='kr'?Math.round(v).toLocaleString()+'원':'$'+(+v).toFixed(2));}
-    if(key==='upside'){const v=r.upside; return v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
-    if(key==='recn'){const v=r.recn; if(v==null)return '<span class="note">—</span>'; const lab=v>=85?'강력매수':v>=65?'매수':v>=45?'중립':'매도'; return `${v.toFixed(0)} <span class="note">${lab}</span>`;}
-    if(key==='nan'){const v=r.nan; return v==null?'<span class="note">—</span>':v.toFixed(0)+'명';}
-    if(key==='rev'){const v=r.rev; if(v==null) return mkt==='kr'?'<span class="note">누적중</span>':'<span class="note">—</span>';
+    if(key==='tp'){const v=r.tp; return v==null?dash(r,key):(mkt==='kr'?Math.round(v).toLocaleString()+'원':'$'+(+v).toFixed(2));}
+    if(key==='upside'){const v=r.upside; return v==null?dash(r,key):`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(0)}%</span>`;}
+    if(key==='recn'){const v=r.recn; if(v==null)return dash(r,key); const lab=v>=85?'강력매수':v>=65?'매수':v>=45?'중립':'매도'; return `${v.toFixed(0)} <span class="note">${lab}</span>`;}
+    if(key==='nan'){const v=r.nan; return v==null?dash(r,key):v.toFixed(0)+'명';}
+    if(key==='rev'){const v=r.rev; if(v==null) return dash(r,key);
       const t=r.tp_trend, ar=t==='up_steady'?'⇈':t==='down_steady'?'⇊':(v>0?'↑':v<0?'↓':'→');
       const cls=v>0?'up':(v<0?'dn':'note'), tt=t==='up_steady'?'꾸준상승':t==='down_steady'?'꾸준하락':(mkt==='us'?'EPS 추정치 90일 변화':'목표주가 90일 변화');
       return `<span class="${cls}" title="${tt}">${ar} ${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
-    if(key==='age'){const a=ageOf(r); return a==null?'—':a+'년';}
-    const v=colVal(r,key); if(v==null) return '<span class="note">—</span>';
+    if(key==='age'){const a=ageOf(r); return a==null?dash(r,key):a+'년';}
+    const v=colVal(r,key); if(v==null) return dash(r,key);
     const sgn=d=>`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
     switch(key){
       case 'per': case 'pbr': return v.toFixed(1)+'배';

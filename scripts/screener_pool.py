@@ -56,13 +56,19 @@ def _enrich_kr(kr, d0s):
         for mkt in ("stk","ksq"):
             _,rows=T.krx_day_back(d0-timedelta(days=days),mkt)
             anchors[lbl][mkt]={r["ISU_CD"]:r for r in rows}
+    # (2026-07-19) 빈칸 3-구분 — 아래 fetch 가 '예외'로 실패한 필드만 오류(_err)로 태그.
+    #   API 는 성공했는데 값이 없으면(무배당·미커버 등) N/A 이지 오류가 아니다.
+    ERRG={"fund":["per","fper","pbr","divy","payout","tp","rec","upside","recn","frgn"],
+          "fin":["revg","opg","roe","de","cr","growth","oploss"],
+          "tech":["v20","v50","align","rsi","macd","bb","volx","vs200"]}
     def fetch(r):
-        o={**r}
+        o={**r}; eg=set()
         try:
             j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/integration",timeout=10)
             o["tot"]={x["code"]:x.get("value") for x in j.get("totalInfos",[])}
             o["cons"]=j.get("consensusInfo") or {}
-        except Exception: pass
+        except Exception: eg.add("fund")
+        o["_eg"]=eg
         try:
             j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/finance/annual",timeout=10)
             fi=j.get("financeInfo") or {}
@@ -74,7 +80,7 @@ def _enrich_kr(kr, d0s):
                 fin[tt]=[rd.get(tt,{}).get(k) for k in actual]
                 if cons: fin[tt+"_E"]=rd.get(tt,{}).get(cons[0])
             o["fin"]=fin
-        except Exception: pass
+        except Exception: o["_eg"].add("fin")
         try:
             S=(date.today()-timedelta(days=400)).strftime("%Y%m%d"); E=date.today().strftime("%Y%m%d")
             dch=T.jget(f"https://api.stock.naver.com/chart/domestic/item/{r['c']}/day?startDateTime={S}&endDateTime={E}",timeout=12)
@@ -130,7 +136,7 @@ def _enrich_kr(kr, d0s):
                 if m>0: st["s199"]=sum(cl[-m:]); st["m199"]=m
                 if len(vol)>=20: st["va"]=sum(vol[-20:])/20
                 o["_st"]=st
-        except Exception: pass
+        except Exception: o["_eg"].add("tech")
         return o
     enr=T.pmap(fetch, kr, workers=16)
     for i,r in enumerate(enr):
@@ -172,7 +178,11 @@ def _enrich_kr(kr, d0s):
         r["growth"]=r.get("g_new")
         r["code"]=r["c"]; r["name"]=r["n"]; r["mkt"]=r.get("mk"); r["close"]=r.get("px"); r["mcap"]=r.get("cap")
         if isinstance(r.get("_st"),dict) and hi52: r["_st"]["hi52"]=hi52   # 52주고점 상태 포함
-        r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); kr[i]=r
+        # (2026-07-19) 예외로 실패한 그룹의 필드 중 실제로 값이 빈 것만 오류(_err)로 표시
+        eg=r.get("_eg") or set()
+        err=[k for g in eg for k in ERRG.get(g,[]) if r.get(k) is None]
+        if err: r["_err"]=err
+        r.pop("tot",None); r.pop("fin",None); r.pop("cons",None); r.pop("_eg",None); kr[i]=r
     # 장중 증분용 상태 DB 저장(풀 행에서는 제거)
     try: T.save_db("ta_state", {"st": {r["c"]: r.pop("_st") for r in kr if isinstance(r.get("_st"),dict)}})
     except Exception as e: print("[pool] ta_state 저장 실패:", repr(e)[:70])
