@@ -1166,33 +1166,29 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
     shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
     yuanta:'유안타증권',hyundai:'현대차증권'});
-  /* (req12 2026-07-18) 증권사별 대표 리포트 + 링크 — 서버가 네이버 리서치에서 매일 2회 수집 */
+  /* (4차 2026-07-18) 서버 수집 리포트를 위쪽 증권사 카드 스타일로 통합 —
+     별도 '대표 리포트'·'네이버 모음' 섹션 폐지. 기존 카드(12사)엔 이어붙이고,
+     보고서에 없는 증권사는 같은 스타일의 카드를 새로 만든다. */
   fetch('/api/db/broker_reports').then(r=>r.json()).then(br=>{
-    const el=$$('d_sec_rpt'); if(!el) return;
-    el.innerHTML=(br.firms||[]).map(f=>`<div class="card">
-      <div class="k" style="font-size:12.5px;font-weight:650;color:var(--tx)">${E(f.broker)}
-        ${f.official?` <a href="${esc(f.official)}" target="_blank" rel="noopener" class="note">공식 리서치↗</a>`:''}</div>
-      <table style="border:none;margin-top:5px">${(f.reports||[]).map(rp=>
-        `<tr><td><a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title)}</a>
-          <span class="note">${E(rp.cat)}${rp.stock?' · '+E(rp.stock):''}${rp.date?' · '+E(rp.date.slice(5)):''}</span></td>
-        <td style="width:44px;text-align:right">${rp.pdf?`<a href="${esc(rp.pdf)}" target="_blank" rel="noopener" class="note">PDF</a>`:''}</td></tr>`).join('')}</table></div>`).join('')
-      +`<div class="note" style="grid-column:1/-1">🖥 ${E(br.desc||'')} · ${E(br.as_of||'')}</div>`;
-    /* (2차 req9) 대표 리포트에 작성일 표시 */
-    el.querySelectorAll('table tr td:first-child a').forEach(()=>{});
-    /* (2차 req10) 네이버 금융리서치 모음 — 최근 2일 · 테마별 표 */
-    const nv=$$('d_sec_nv');
-    if(nv&&br.recent){
-      nv.innerHTML=Object.entries(br.recent).filter(([,arr])=>arr&&arr.length).map(([cat,arr])=>
-        `<h4 style="margin:14px 0 6px">${E(cat)} <span class="note">${arr.length}건</span></h4>
-        <div class="box" style="overflow-x:auto"><table>
-          <tr><th>작성일</th><th>증권사</th><th>제목${cat==='종목분석'||cat==='산업분석'?' · 대상':''}</th><th>요약</th><th></th></tr>
-          ${arr.map(it=>`<tr><td class="note">${E((it.date||'').slice(5))}</td>
-            <td>${E(it.broker)}</td>
-            <td><a href="${esc(it.url)}" target="_blank" rel="noopener">${E(it.title)}</a>${it.stock?` <span class="note">${E(it.stock)}</span>`:''}</td>
-            <td class="note">${E((it.summary||'').slice(0,70))}</td>
-            <td style="width:40px;text-align:right">${it.pdf?`<a href="${esc(it.pdf)}" target="_blank" rel="noopener" class="note">PDF</a>`:''}</td></tr>`).join('')}
-        </table></div>`).join('');
-    }
+    const wrap=$$('d_sec'); if(!wrap||!Array.isArray(br.firms)) return;
+    const byName={};
+    wrap.querySelectorAll('.card > .k').forEach(k=>byName[k.textContent.trim()]=k.parentElement);
+    const repHtml=f=>`<div class="s" style="margin-top:6px"><b>공식 리서치</b> — ${
+        f.official?`<a href="${esc(f.official)}" target="_blank" rel="noopener">${E(f.broker)} 리서치 센터↗</a> · `:''}<a href="${esc(f.naver||'https://finance.naver.com/research/')}" target="_blank" rel="noopener">네이버 금융리서치↗</a></div>`+
+      (f.reports||[]).slice(0,4).map(rp=>`<div class="s" style="margin-top:3px">📄 <a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title)}</a>
+        <span class="note">${E(rp.cat)}${rp.date?' · '+E(rp.date.slice(5)):''}</span>${
+        rp.pdf?` <a href="${esc(rp.pdf)}" target="_blank" rel="noopener" class="note">[PDF]</a>`:''}</div>`).join('');
+    br.firms.forEach(f=>{
+      const c=byName[f.broker];
+      if(c){ c.insertAdjacentHTML('beforeend', repHtml(f)); }
+      else if((f.reports||[]).length){
+        wrap.insertAdjacentHTML('beforeend',
+          `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(f.broker)}</div>${repHtml(f)}
+           <div class="src">🖥 서버 수집 — 네이버 금융리서치 최신 리포트</div></div>`);
+      }
+    });
+    wrap.insertAdjacentHTML('beforeend',
+      `<div class="note" style="grid-column:1/-1">🖥 ${E(br.desc||'')} · ${E(br.as_of||'')}</div>`);
   }).catch(()=>{});
   const CT=(R.securities||{}).common_themes;
   $$('d_sec_c').innerHTML=Array.isArray(CT)?CT.map(t=>`• ${E(typeof t==='string'?t:(t.theme||JSON.stringify(t)))}`).join('<br>'):E(CT||'');
