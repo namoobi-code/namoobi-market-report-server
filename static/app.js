@@ -799,8 +799,40 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     calc();
   }
 
+  // (2026-07-26) 캘린더 페인 — calendar.html 과 같은 데이터(/api/db/events_calendar)를 대시보드 안에서 렌더
+  let calLoaded=false;
+  function renderCalPane(){
+    if(calLoaded) return; calLoaded=true;
+    const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const impC=s=>String(s||'').includes('★★★')?'cal-imp3':(String(s||'').includes('★★')?'cal-imp2':'cal-imp1');
+    const wd=d0=>{try{return ['일','월','화','수','목','금','토'][new Date(d0+'T00:00:00').getDay()]}catch(e){return ''}};
+    const dd=d0=>{try{const t=new Date();t.setHours(0,0,0,0);const n=Math.round((new Date(d0+'T00:00:00')-t)/86400000);
+      if(n===0)return '<span class="cal-dday today">TODAY</span>';
+      if(n>0&&n<=3)return `<span class="cal-dday soon">D-${n}</span>`;
+      if(n>0)return `<span class="cal-dday">D-${n}</span>`;
+      return '';}catch(e){return ''}};
+    const row=r=>`<tr><td><b>${esc((r.date||'').slice(5))}</b><span class="note">(${wd(r.date)})</span> ${dd(r.date)}</td>
+      <td><span class="cal-region">${esc(r.region||'-')}</span></td><td>${esc(r.event||'')}</td>
+      <td class="${impC(r.importance)}">${esc(r.importance||'')}</td><td class="note" style="font-size:11px">${esc(r.source||'')}</td></tr>`;
+    fetch('/api/db/events_calendar').then(r=>r.json()).then(d=>{
+      const g=i=>document.getElementById(i);
+      g('cal_asof').textContent='갱신: '+(d.as_of||'');
+      const today=new Date().toISOString().slice(0,10);
+      const up=(d.upcoming||[]).filter(r=>r.date>=today);
+      g('cal_up').insertAdjacentHTML('beforeend', up.map(row).join('')||'<tr><td colspan="5" class="note">데이터 없음</td></tr>');
+      g('cal_lt').insertAdjacentHTML('beforeend', (d.longterm||[]).map(row).join('')||'<tr><td colspan="5" class="note">데이터 없음</td></tr>');
+      const wk=new Date(Date.now()-7*86400000).toISOString().slice(0,10); const seen=new Set();
+      const past=[...(d.past||[]),...(d.upcoming||[])].filter(r=>r.date&&r.date<today&&r.date>=wk)
+        .filter(r=>{const k=r.date+'|'+r.event; if(seen.has(k))return false; seen.add(k); return true;})
+        .sort((a,b)=>b.date<a.date?-1:1);
+      g('cal_past').insertAdjacentHTML('beforeend',
+        past.map(r=>`<tr><td style="white-space:nowrap"><b>${esc((r.date||'').slice(5))}</b><span class="note">(${wd(r.date)})</span></td>
+          <td>${esc(r.event||'')} <span class="cal-region">${esc(r.region||'-')}</span></td></tr>`).join('')
+        ||'<tr><td colspan="2" class="note">최근 1주 지난 이벤트 없음 — 내일 갱신부터 쌓입니다</td></tr>');
+    }).catch(e=>{const a=document.getElementById('cal_asof'); if(a)a.textContent='로드 실패';});
+  }
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal'];
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -817,6 +849,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     panes.forEach(id=>{const el=document.getElementById(id);
       if(el) el.classList.toggle('on', id===b.dataset.pane);});
     const sb=document.getElementById('btn_screener'); if(sb) sb.classList.remove('on');
+    if(b.dataset.pane==='p_cal') renderCalPane();
   }));
   // 사이드바 SCREENER 버튼 → p_screener 페인 (상단 탭과 독립)
   const sbtn=document.getElementById('btn_screener');
@@ -1554,12 +1587,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        ? 필터설명은 2단계에서도 필요(V·G·M·Q 설명) — 패널을 현재 단계 pane 으로 옮긴다 */
     BTNS_GRP.style.display = stage===1?'':'none';
     {const rb=document.querySelector('.scrbtns-r'); if(rb) rb.style.display = stage<=2?'':'none';}
+    {const gb=$('scr_glsbtn'); if(gb) gb.style.display = stage<=2?'':'none';}   // 3단계: 필터설명도 제거
     {const rs=$('scr_rst');  if(rs) rs.style.display = stage===1?'':'none';}
     {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';}
     {const gp=$('scr_glspanel');
-     if(gp){ const tgt2 = stage===2 ? $('scr_s2') : $('scr_s1');
-       if(tgt2 && gp.parentElement!==tgt2){
-         if(stage===2) tgt2.insertBefore(gp, tgt2.firstChild); else tgt2.appendChild(gp); }
+     if(gp){
+       if(stage===2){ const s2=$('scr_s2');
+         if(s2 && gp.parentElement!==s2) s2.insertBefore(gp, s2.firstChild); }
+       else {         // (2026-07-26) 1단계: 필터설명 버튼과 필터 바 사이(= 필터 바 바로 위)
+         const fb=$('scr_fltbar');
+         if(fb && gp.nextElementSibling!==fb) fb.parentElement.insertBefore(gp, fb); }
        if(gp.style.display!=='none') renderLegend();   // 단계 전환 시 열린 설명 갱신
      }} }
   /* ── 종목 찾기 칩 (돋보기 → 입력창, 입력 즉시 필터) ── */
@@ -1927,13 +1964,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['매출성장','매출 전년동기比 성장률'],
         ['이익성장','EPS 전년동기比 성장률'],
         ['ROE','자기자본이익률(순이익÷자기자본)'],
-        ['수익률 12-1M','52주 주가 변화율(모멘텀)'],
-        ['수익률 1M·3M·6M·1Y','해당 기간 주가 수익률'],
+        ['수익률 12-1M','미국은 52주 주가 변화율로 대용(모멘텀) — 한국의 12−1개월과 산식이 다름'],
+        ['수익률 1M·3M·6M·1Y','해당 기간 주가 수익률 (1Y = 52주 변화율)'],
         ['변동성(20일)','최근 20일 일간수익률 표준편차 — 낮을수록 안정'],
-        ['회전율','거래대금 ÷ 시가총액 — 시총 대비 유동성'],
-        ['영업이익률','영업이익 ÷ 매출'],
-        ['PEG','PER ÷ 이익성장률 — 1 이하면 성장 대비 저평가'],
-        ['PSR','시가총액 ÷ 매출 — 적자 성장주 밸류에이션'],
+        ['회전율','거래대금(3개월 평균) ÷ 시가총액 — 시총 대비 유동성'],
+        ['영업이익률','operating margin(TTM, Yahoo)'],
+        ['PEG','forward PE ÷ EPS 성장률 — 1 이하면 성장 대비 저평가'],
+        ['PSR','P/S(TTM) — 적자 성장주 밸류에이션'],
+        ['흑자전환·수급','미국 미제공 — 연간 영업이익 배열·투자자별 수급 데이터 없음'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
         ['20일선·50일선','해당 이동평균 대비 현재가 위치'],
@@ -1968,9 +2006,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['수익률 1M·3M·6M·1Y','해당 기간 주가 수익률'],
         ['변동성(20일)','최근 20일 일간수익률 표준편차 — 낮을수록 안정'],
         ['회전율','거래대금 ÷ 시가총액 — 시총 대비 유동성'],
-        ['영업이익률','영업이익 ÷ 매출'],
-        ['PEG','PER ÷ 이익성장률 — 1 이하면 성장 대비 저평가'],
-        ['PSR','시가총액 ÷ 매출 — 적자 성장주 밸류에이션'],
+        ['영업이익률','영업이익 ÷ 매출액 (최근 연간 실적, 네이버)'],
+        ['PEG','PER ÷ 영업이익 성장률 — 1 이하면 성장 대비 저평가 (미국은 EPS 성장률 기준)'],
+        ['PSR','시가총액 ÷ 매출액(최근 연간) — 적자 성장주 밸류에이션'],
         ['흑자전환','직전 연도 영업적자 → 최근 연도 흑자로 전환'],
         ['외인·기관수급(20일)','KIS 종목별 투자자 — 최근 20거래일 누적 순매수 금액(억원)'],
         ['외인·기관연속매수','최근 며칠 연속 순매수 중인가(일)'],
@@ -1991,7 +2029,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['배당','배당수익률'],
         ['증권 구분','보통주만 — 고정']
       ];
-      rn.innerHTML=g.map(x=>`<b>${x[0]}</b> = ${E(x[1])}`).join('<br>');   // 제목은 패널 헤더로 이동
+      // (2026-07-26) 항목이 많아 다단 배열로 — 폭에 따라 자동 2~3열, 항목 중간 끊김 방지
+      rn.innerHTML=`<div class="lgcols">`+g.map(x=>`<div class="lgit"><b>${x[0]}</b> = ${E(x[1])}</div>`).join('')+`</div>`;
     }}
   }
   function apply(){ applyTable(); renderChips(); }
@@ -2277,7 +2316,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_fltbar2').querySelectorAll('[data-man2]').forEach(inp=>inp.oninput=()=>{const k=inp.dataset.man2;const f=DEF2[mkt][k];F2[k].v=inp.value===''?null:(+inp.value)*f.u;
       const bt=$('scr_fltbar2').querySelector(`[data-chip2="${k}"]`); if(bt){bt.innerHTML=chipLabel2(k);bt.classList.toggle('act',F2[k].v!=null);} rankTbl();});
   }
-  function renderS2(){ renderWPanel(); rankTbl(); }   /* 원자료 하드컷은 1단계로 이동 */
+  function renderS2(){ renderWPanel(); rankTbl(); renderLegend(); }   /* KR↔US 전환 시 VGMQ 설명도 갱신 */
   const zClass=z=>z==null?'':(z>=1.5?'zc2':z>=0.5?'zc1':z<=-1.5?'zn2':z<=-0.5?'zn1':'');
   const zFmt=z=>z==null?'—':(z>0?'+':'')+z.toFixed(2);
   function renderWPanel(){
@@ -2505,7 +2544,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
     mkt=b.dataset.mkt; loadF(); loadF2(); hideDetail();
-    if(loaded) refresh(); else { renderChips(); waitScreen(); } });   // 원복 안함 — 마켓별 선택 유지
+    if(loaded) refresh(); else { renderChips(); waitScreen(); } renderLegend(); });   // 원복 안함 — 마켓별 선택 유지 · 설명도 시장 따라 갱신
   // 스테이지 토글 (1단계/2단계)
   document.querySelectorAll('.stgseg .stg').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',x===b));
@@ -2514,7 +2553,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_s2').style.display = stage===2?'':'none';
     $('scr_s3').style.display = stage===3?'':'none';
     placeBtns();
-    if(!loaded){ renderChips(); waitScreen(); return; }   // START 전에는 대기 화면 유지
+    if(!loaded){ renderChips(); waitScreen(); renderLegend(); return; }   // START 전에는 대기 화면 유지(설명은 갱신)
     if(stage===2) loadS2(()=>renderS2());
     else if(stage===3) loadS3(()=>renderS3());
     else apply();

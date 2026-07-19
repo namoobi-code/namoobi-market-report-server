@@ -151,7 +151,10 @@
   .wrap{transition:padding-right .22s ease}
   @media(min-width:981px){ body.side-open .wrap{padding-right:344px} }
   .side-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:13.5px}
-  #scr_glspanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-top:9px}
+  #scr_glspanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:9px 0}
+  /* (2026-07-26) 1단계 필터설명 다단 배열 — 폭 따라 자동 2~3열 */
+  .lgcols{columns:3 340px;column-gap:22px;font-size:12px;line-height:1.55}
+  .lgit{break-inside:avoid;margin-bottom:3px}
   /* 빈칸 표기 범례 (제목 옆 → 필터설명 패널로 이동) */
   .glsmiss{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;font-size:11.5px;color:var(--tx2);
            padding:6px 9px;margin-bottom:7px;background:var(--bg);border:1px solid var(--line);border-radius:6px}
@@ -199,6 +202,16 @@
   .tab small{display:block;font-size:9.5px;font-weight:400;opacity:.65;margin-top:1px}
   .pane{display:none;flex:1;min-height:0;flex-direction:column}
   .pane.on{display:flex}
+  /* (2026-07-26) 캘린더 페인 */
+  .callay{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .calmain{flex:1;min-width:min(560px,100%)}
+  .calpast{flex:0 0 300px;max-width:100%}
+  .calh{font-size:14px;margin:12px 0 6px;color:#0e7490}
+  .cal-dday{display:inline-block;min-width:40px;text-align:center;padding:1px 6px;border-radius:999px;font-size:11px;font-weight:700;background:#e0f2fe;color:#075985}
+  .cal-dday.today{background:#dc2626;color:#fff}
+  .cal-dday.soon{background:#f59e0b;color:#fff}
+  .cal-imp3{color:#dc2626;font-weight:700}.cal-imp2{color:#d97706;font-weight:600}.cal-imp1{color:var(--tx2)}
+  .cal-region{display:inline-block;padding:1px 7px;border-radius:6px;background:#f1f5f9;font-size:11px;color:#334155}
   /* 최초 진입 인사 화면 */
   #p_welcome{background:#0b0d10;border-radius:10px;overflow:hidden}
   #p_welcome .wel{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
@@ -397,7 +410,8 @@
     <div><h1 id="go_home" title="홈으로" style="cursor:pointer">투자 인텔리전스<span>namoobi · 시황 리포트 · 종목 스크리너 · AI 분석 · 자동매매</span></h1></div>
     <div class="tabs">
       <button id="btn_screener" class="tab scrtab">🔍 SCREENER<small>종목 스크리너</small></button>
-      <button id="btn_calendar" class="tab" onclick="location.href='calendar.html'" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 캘린더<small style="color:#cffafe">주요 이벤트</small></button>
+      <!-- (2026-07-26) 전체 페이지 이동 → 대시보드 내 페인(p_cal)으로 전환 -->
+      <button id="btn_calendar" class="tab" data-pane="p_cal" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 캘린더<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB data<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
@@ -435,6 +449,24 @@
 
   <!-- ⓪ 최초 진입 인사 화면 -->
   <div class="pane on" id="p_welcome"><div class="wel"><div id="wel_msg"></div></div></div>
+
+  <!-- (2026-07-26) 캘린더 페인 — calendar.html 전체 페이지 대신 대시보드 안에서 표시 -->
+  <div class="pane" id="p_cal" style="overflow:auto">
+    <h2 style="margin:8px 0 3px">📅 주요 이벤트 캘린더 <span class="note" id="cal_asof" style="font-weight:400"></span></h2>
+    <p class="note" style="margin:2px 0 8px">🖥 서버 자동 갱신(매일 05:45·16:05) — FRED 발표일정(실측) + FOMC DB + 중앙은행 회의 + 만기 규칙 + 직전 보고서 검증 이벤트 · <a href="calendar.html" style="color:#0e7490">전용 페이지 ↗</a></p>
+    <div class="callay">
+      <div class="calmain">
+        <h3 class="calh">다가오는 이벤트</h3>
+        <div class="box" style="overflow:auto"><table id="cal_up"><tr><th style="width:118px">날짜</th><th style="width:64px">지역</th><th>이벤트</th><th style="width:64px">중요도</th><th style="width:180px">출처</th></tr></table></div>
+        <h3 class="calh">중장기 (★★★만)</h3>
+        <div class="box" style="overflow:auto"><table id="cal_lt"><tr><th style="width:118px">날짜</th><th style="width:64px">지역</th><th>이벤트</th><th style="width:64px">중요도</th><th style="width:180px">출처</th></tr></table></div>
+      </div>
+      <div class="calpast">
+        <h3 class="calh" style="color:var(--tx2)">지난 이벤트 <span class="note">(최근 1주)</span></h3>
+        <div class="box" style="overflow:auto"><table id="cal_past"><tr><th style="width:76px">날짜</th><th>이벤트</th></tr></table></div>
+      </div>
+    </div>
+  </div>
 
 
   <!-- ① daily 조사 data (향후 개발) -->
