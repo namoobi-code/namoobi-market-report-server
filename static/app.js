@@ -2068,13 +2068,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   function renderSum(r){
-    const G=[['시세',['px','chg','cap','tv']],
-             ['기술적 지표',['mom','hi','v200','v50','v20','align','rsi','macd','bb','volx']],
+    const G=[['시세',['px','chg','cap','tv','turn']],
+             ['기간수익률',['r1m','r3m','r6m','r1y','mom']],
+             ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
              ['컨센서스',['tp','upside','recn','rev','nan']],
-             ['밸류·수익성',['per','pbr','divy','payout','roe']],
-             ['성장',['grw','revg','opg']],
+             ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
+             ['성장',['grw','revg','opg','tob']],
+             ['수급',['fnb20','onb20','fst','ost','frgn']],
              ['건전성',['de','cr','oploss']],
-             ['기타',['frgn','age']]];
+             ['기타',['age']]];
     $('sd_sum').innerHTML=G.map(([t,ks])=>{
       const items=ks.filter(k=>CDEF[k]&&cAvail(k)).map(k=>`<div class="si"><span>${E(cl(k))}</span><b>${cell(r,k)}</b></div>`).join('');
       return items?`<div class="sg"><div class="sgt">${t}</div>${items}</div>`:'';
