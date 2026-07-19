@@ -397,6 +397,7 @@
     <div><h1 id="go_home" title="홈으로" style="cursor:pointer">투자 인텔리전스<span>namoobi · 시황 리포트 · 종목 스크리너 · AI 분석 · 자동매매</span></h1></div>
     <div class="tabs">
       <button id="btn_screener" class="tab scrtab">🔍 SCREENER<small>종목 스크리너</small></button>
+      <button id="btn_calendar" class="tab" onclick="location.href='calendar.html'" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 캘린더<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB data<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
@@ -658,8 +659,9 @@
           </div>
         </div>
       </div>
-      <div style="display:flex;align-items:flex-end;gap:8px">
-        <p class="note" style="margin:2px 0 0;flex:1;min-width:0">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
+      <!-- (2026-07-26) flex-wrap + min-width — 모바일에서 안내문이 1글자 폭 세로쓰기로 짜부라지던 문제 -->
+      <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap">
+        <p class="note" style="margin:2px 0 0;flex:1;min-width:240px">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
         <div class="scrbtns-r" style="flex:0 0 auto">
           <button class="scrrst" id="scr_glsbtn">? 필터설명</button>
           <button class="scrrst" id="scr_rst">↺ 필터 선택 초기화(default)</button>

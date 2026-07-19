@@ -36,7 +36,11 @@ NEWS_TOPICS = [
     ("중국·아시아", "중국 증시 상하이 홍콩 항셍 일본 닛케이"),
     ("유럽",        "유럽 증시 ECB 유로존 독일 DAX"),
     ("지정학",      "중동 이란 호르무즈 지정학 원유 공급"),
+    # (2026-07-19 서버화 6) 부록B AI 트렌드용 — NewsBerkAgent 가 이 풀에서 선별(웹서치 최소화)
+    ("AI 산업",     "AI 인공지능 오픈AI 앤스로픽 엔비디아 LLM 모델"),
 ]
+# (2026-07-19) 주제별 보존시간 오버라이드 — AI 산업은 24시간만 보유(사용자 규칙)
+TOPIC_KEEP_DAYS = {"AI 산업": 1}
 
 def save(name, obj):
     obj["as_of"] = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -107,9 +111,11 @@ def news_pool():
     topics = {}
     for cat, q in NEWS_TOPICS:
         keep = {}                # 제목정규화 → item (중복 제거)
-        # 기존 풀 중 '처음 담은 날(seen)'이 3일 이내인 것만 유지
+        # 기존 풀 중 보존기간 이내만 유지 — 주제별 오버라이드(예: AI 산업=1일) 우선
+        cat_cut = ((datetime.now() - timedelta(days=TOPIC_KEEP_DAYS.get(cat, NEWS_KEEP_DAYS)))
+                   .strftime("%Y-%m-%d"))
         for it in (prev.get(cat) or []):
-            if (it.get("seen") or it.get("date") or "") >= cutoff:
+            if (it.get("seen") or it.get("date") or "") >= cat_cut:
                 keep[re.sub(r"\s+", "", it.get("title", ""))] = it
         try:
             u = ("https://news.google.com/rss/search?q=" + urllib.parse.quote(q)
