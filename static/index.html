@@ -155,6 +155,7 @@
   /* (2026-07-26) 1단계 필터설명 다단 배열 — 폭 따라 자동 2~3열 */
   .lgcols{columns:3 340px;column-gap:22px;font-size:12px;line-height:1.55}
   .lgit{break-inside:avoid;margin-bottom:3px}
+  .lgcat{font-size:10.5px;color:#1f6feb;background:#eef4ff;border-radius:4px;padding:0 5px;font-weight:600}
   /* 빈칸 표기 범례 (제목 옆 → 필터설명 패널로 이동) */
   .glsmiss{display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;font-size:11.5px;color:var(--tx2);
            padding:6px 9px;margin-bottom:7px;background:var(--bg);border:1px solid var(--line);border-radius:6px}
@@ -514,7 +515,7 @@
               <button class="cp-x" id="ed_nvopen" title="네이버/야후 새창">외부 ↗</button>
               <button class="cp-x" id="ed_close">닫기</button></span>
           </div>
-          <canvas id="ed_main"></canvas><canvas id="ed_vol"></canvas>
+          <canvas id="ed_main"></canvas><canvas id="ed_vol"></canvas><canvas id="ed_rsi"></canvas><canvas id="ed_macd"></canvas>
           <div class="src" id="ed_src" style="margin-top:6px"></div>
         </div>
         <div class="box" id="ed_sum" style="padding:10px 12px"></div>
@@ -1078,8 +1079,10 @@
 #etf_tbl th:hover{background:#e0e7f2}
 #etf_tbl tr[data-c]{cursor:pointer}
 #etf_tbl tr[data-c]:hover td{background:#f2f6fc}
-#ed_main{width:100%;height:340px!important;max-height:none!important;display:block}
+#ed_main{width:100%;height:360px!important;max-height:none!important;display:block}
 #ed_vol{width:100%;height:70px!important;max-height:none!important;display:block;margin-top:2px}
+#ed_rsi{width:100%;height:70px!important;max-height:none!important;display:block;margin-top:2px}
+#ed_macd{width:100%;height:90px!important;max-height:none!important;display:block;margin-top:2px}
 #ed_sum .si{display:flex;justify-content:space-between;gap:8px;padding:3px 0;font-size:12.5px;border-bottom:1px solid var(--line)}
 #ed_sum .si b{font-variant-numeric:tabular-nums}
 #ed_sum .sgt{font-size:11px;font-weight:700;color:var(--tx2);margin:9px 0 3px}</style>

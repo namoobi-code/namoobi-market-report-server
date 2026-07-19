@@ -298,33 +298,76 @@
   /* ── 종목 상세 (좌 차트 · 우 정보) ── */
   let dcode=null;
   const _sma=(a,n)=>a.map((_,i)=>{ if(i<n-1) return null; let s=0; for(let j=i-n+1;j<=i;j++){ if(a[j]==null) return null; s+=a[j]; } return s/n; });
+  const _ema=(a,n)=>{ const k=2/(n+1); let e=null; return a.map(x=>{ if(x==null) return e; e=e==null?x:x*k+e*(1-k); return e; }); };
+  function _rsiArr(c,n){ n=n||14; const out=Array(c.length).fill(null); let ag=0,al=0,g=0,l=0;
+    for(let i=1;i<c.length;i++){ const d=(c[i]??c[i-1])-(c[i-1]??c[i]);
+      if(i<=n){ g+=Math.max(d,0); l+=Math.max(-d,0); if(i===n){ ag=g/n; al=l/n; out[i]=100-100/(1+ag/(al||1e-9)); } }
+      else { ag=(ag*(n-1)+Math.max(d,0))/n; al=(al*(n-1)+Math.max(-d,0))/n; out[i]=100-100/(1+ag/(al||1e-9)); } }
+    return out; }
   function _cvs(id){ const cv=$(id); const w=cv.clientWidth||760,h=cv.clientHeight||80; cv.width=w; cv.height=h; const x=cv.getContext('2d'); x.clearRect(0,0,w,h); return [x,w,h]; }
   function drawChart(D){
     const c=(D.c||[]).map((v,i)=>v==null?(D.c[i-1]??null):v);
     const N=Math.min(260,c.length), off=c.length-N;
-    const cl=c.slice(off), o=(D.o||[]).slice(off), hh=(D.h||[]).slice(off), ll=(D.l||[]).slice(off), v=(D.v||[]).slice(off).map(x=>x||0), t=(D.t||[]).slice(off);
-    const ma20=_sma(c,20).slice(off), ma60=_sma(c,60).slice(off);
+    const sl=a=>(a||[]).slice(off);
+    const cl=sl(c), o=sl(D.o), hh=sl(D.h), ll=sl(D.l), v=sl(D.v).map(x=>x||0), t=sl(D.t);
+    const ma20f=_sma(c,20), ma60f=_sma(c,60), ma120f=_sma(c,120);
+    const ma20=sl(ma20f), ma60=sl(ma60f), ma120=sl(ma120f);
+    // 볼린저(20,2)
+    const bm=_sma(c,20), bsd=c.map((x,i)=>{ if(i<19||bm[i]==null) return null; let s=0; for(let j=i-19;j<=i;j++) s+=(c[j]-bm[i])**2; return Math.sqrt(s/20); });
+    const bU=sl(bm.map((m,i)=>m==null?null:m+2*bsd[i])), bL=sl(bm.map((m,i)=>m==null?null:m-2*bsd[i]));
+    const rsi=sl(_rsiArr(c,14));
+    const e12=_ema(c,12), e26=_ema(c,26);
+    const macdF=c.map((_,i)=>(e12[i]!=null&&e26[i]!=null)?e12[i]-e26[i]:null);
+    const sigF=_ema(macdF,9);
+    const macd=sl(macdF), sig=sl(sigF), hist=macd.map((x,i)=>(x!=null&&sig[i]!=null)?x-sig[i]:null);
     const UP='#d33',DN='#1f6feb';
-    // ① 캔들 + MA20/60
+    // ① 캔들 + MA20/60/120 + 볼린저 + 52주 고점선
     {const [x,W,H]=_cvs('ed_main'); const P={l:6,r:54,t:8,b:16};
-     const lo=Math.min(...ll.filter(y=>y!=null)), hi=Math.max(...hh.filter(y=>y!=null));
+     const lo=Math.min(...ll.filter(y=>y!=null),...bL.filter(y=>y!=null)), hi=Math.max(...hh.filter(y=>y!=null),...bU.filter(y=>y!=null));
      const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p-lo)/((hi-lo)||1));
+     x.beginPath(); let st=false;
+     for(let i=0;i<N;i++){ if(bU[i]==null)continue; st?x.lineTo(X(i),Y(bU[i])):(x.moveTo(X(i),Y(bU[i])),st=true); }
+     for(let i=N-1;i>=0;i--){ if(bL[i]==null)continue; x.lineTo(X(i),Y(bL[i])); }
+     x.closePath(); x.fillStyle='rgba(130,150,170,.10)'; x.fill();
      x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.strokeStyle='#eceff3';
      for(let g=0;g<=3;g++){ const p=lo+(hi-lo)*g/3,y=Y(p); x.beginPath();x.moveTo(P.l,y);x.lineTo(W-P.r,y);x.stroke();
        x.fillText(mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2),W-P.r+4,y+3); }
+     const mx=Math.max(...hh.filter(y=>y!=null)); x.setLineDash([4,3]); x.strokeStyle='#b7b0a6';
+     x.beginPath(); x.moveTo(P.l,Y(mx)); x.lineTo(W-P.r,Y(mx)); x.stroke(); x.setLineDash([]);
      const bw=Math.max(1,(W-P.l-P.r)/N*0.6);
      for(let i=0;i<N;i++){ if(cl[i]==null)continue; const up=cl[i]>=(o[i]??cl[i]); x.strokeStyle=x.fillStyle=up?UP:DN;
        x.beginPath(); x.moveTo(X(i),Y(hh[i]??cl[i])); x.lineTo(X(i),Y(ll[i]??cl[i])); x.stroke();
        const y1=Y(Math.max(o[i]??cl[i],cl[i])),y2=Y(Math.min(o[i]??cl[i],cl[i])); x.fillRect(X(i)-bw/2,y1,bw,Math.max(1,y2-y1)); }
      const line=(a,col)=>{ x.strokeStyle=col;x.lineWidth=1.4;x.beginPath();let s=false;
        for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true);} x.stroke();x.lineWidth=1; };
-     line(ma20,'#f39c12'); line(ma60,'#27ae60');
+     line(ma20,'#f39c12'); line(ma60,'#27ae60'); line(ma120,'#8e44ad');
      x.fillStyle='#98a2ad'; for(let g=0;g<5;g++){ const i=Math.floor(N*g/5),d=String(t[i]||'').replace(/-/g,''); x.fillText(d.slice(2,4)+'.'+d.slice(4,6),X(i)-10,H-4); } }
-    // ② 거래량
+    // ② 거래량 + 20일 평균선
     {const [x,W,H]=_cvs('ed_vol'); const P={l:6,r:54,t:2,b:2};
      const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
      for(let i=0;i<N;i++){ x.fillStyle=(cl[i]>=(o[i]??cl[i]))?'rgba(221,51,51,.45)':'rgba(31,111,235,.45)'; const h2=(H-P.t-P.b)*v[i]/vm; x.fillRect(X(i)-bw/2,H-P.b-h2,bw,h2); }
-     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('VOL',W-P.r+4,12); }
+     const va=_sma(v,20); x.strokeStyle='#666'; x.beginPath(); let s=false;
+     for(let i=0;i<N;i++){ if(va[i]==null)continue; const y=H-P.b-(H-P.t-P.b)*va[i]/vm; s?x.lineTo(X(i),y):(x.moveTo(X(i),y),s=true); } x.stroke();
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('VOL·20평균',W-P.r+4,12); }
+    // ③ RSI(14)
+    {const [x,W,H]=_cvs('ed_rsi'); const P={l:6,r:54,t:4,b:4};
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-p/100);
+     x.strokeStyle='#eceff3'; [30,50,70].forEach(g=>{ x.beginPath();x.moveTo(P.l,Y(g));x.lineTo(W-P.r,Y(g));x.stroke(); });
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('RSI 70',W-P.r+4,Y(70)+3); x.fillText('30',W-P.r+4,Y(30)+3);
+     x.strokeStyle='#555'; x.beginPath(); let s=false;
+     for(let i=0;i<N;i++){ if(rsi[i]==null)continue; s?x.lineTo(X(i),Y(rsi[i])):(x.moveTo(X(i),Y(rsi[i])),s=true); } x.stroke(); }
+    // ④ MACD(12,26,9)
+    {const [x,W,H]=_cvs('ed_macd'); const P={l:6,r:54,t:4,b:4};
+     const vals=[...macd,...sig,...hist].filter(y=>y!=null); const mx=Math.max(...vals.map(Math.abs))||1;
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p+mx)/(2*mx));
+     x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke();
+     const bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ if(hist[i]==null)continue; x.fillStyle=hist[i]>=0?'rgba(221,51,51,.5)':'rgba(31,111,235,.5)';
+       const y0=Y(0),y1=Y(hist[i]); x.fillRect(X(i)-bw/2,Math.min(y0,y1),bw,Math.max(1,Math.abs(y1-y0))); }
+     const line=(a,col)=>{ x.strokeStyle=col;x.beginPath();let s=false;
+       for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true);} x.stroke(); };
+     line(macd,'#333'); line(sig,'#f39c12');
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('MACD·시그널',W-P.r+4,12); }
   }
   function infoRows(r){
     const pctS=v=>v==null?'—':`<b class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${(v*100).toFixed(1)}%</b>`;
@@ -343,7 +386,7 @@
     $('ed_code').textContent = mkt==='kr'?r.c:(r.n||'');
     $('ed_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     $('ed_sum').innerHTML = infoRows(r);
-    $('ed_src').textContent='종가 기준 일봉(최근 1년) · '+(mkt==='kr'?'네이버':'Yahoo')+' · MA20 주황 · MA60 초록';
+    $('ed_src').textContent='종가 기준 일봉(최근 1년) · '+(mkt==='kr'?'네이버':'Yahoo')+' · MA20 주황·MA60 초록·MA120 보라 · 볼린저(20,2) · RSI(14) · MACD(12,26,9)';
     fetch(`/api/chart/${mkt}/${encodeURIComponent(r.c)}`).then(x=>x.json()).then(D=>{
       if(dcode!==r.c) return; drawChart(D);
     }).catch(()=>{ $('ed_src').textContent='차트 로드 실패'; });
