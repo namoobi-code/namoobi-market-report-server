@@ -1586,7 +1586,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     /* (2026-07-26) 컬럼설정·START·초기화·전부전체 = 1단계 전용.
        ? 필터설명은 2단계에서도 필요(V·G·M·Q 설명) — 패널을 현재 단계 pane 으로 옮긴다 */
     BTNS_GRP.style.display = stage===1?'':'none';
-    {const rb=document.querySelector('.scrbtns-r'); if(rb) rb.style.display = stage<=2?'':'none';}
+    /* (2026-07-26) START 소실 근본 원인 수정 — .scrbtns-r 이 문서에 2개(필터설명 행 + START 래퍼).
+       3단계에서 BTNS_GRP 가 .scrtop 으로 이동하면 문서 순서가 바뀌어 querySelector 가
+       START 래퍼를 잡아 none 처리했었다 → 필터설명 행은 id(scr_glsrow)로 정확히 지정,
+       START 래퍼는 항상 표시로 복구 */
+    {const inner=BTNS_GRP.querySelector('.scrbtns-r'); if(inner) inner.style.display='';}
+    {const rb=document.getElementById('scr_glsrow'); if(rb) rb.style.display = stage<=2?'':'none';}
     {const gb=$('scr_glsbtn'); if(gb) gb.style.display = stage<=2?'':'none';}   // 3단계: 필터설명도 제거
     {const rs=$('scr_rst');  if(rs) rs.style.display = stage===1?'':'none';}
     {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';}
