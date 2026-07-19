@@ -101,7 +101,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('meta').innerHTML=`최신 리포트 <b>${esc(rs[0]?.datetime||'—')}</b>`;
   // (2026-07-12) 앱셸 — 헤더·좌측(아카이브·APK·DB인벤토리)·nav 는 고정, 본문(.mainc)만 스크롤.
   //   좌측 항목(보고서·DB)은 항상 보이므로 nav 에서 뺀다 — nav 는 본문 섹션 점프 전용.
-  $('nav').innerHTML=[['slive','실시간 시세'],
+  $('nav').innerHTML=[['slive','실시간 시세'],['s2','2 캘린더'],
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['d316','3.1.6 FactSet'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
     ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],
@@ -588,7 +588,23 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     memory:'메모리(DRAM·NAND·HBM) 가격·시장 스냅샷 (3.1.9)',
     kr_liquidity:'국내 유동성·레버리지 — 예탁금·미수금·반대매매·신용잔고(코스피/코스닥)·M2 (3.1.14, 원본=data/kr_liquidity.db)',
     oecd_cli:'OECD 경기선행지수(CLI) 주요국 월별 (3.1.4)',
-    policy_rates:'주요 6개국 정책금리 현재값·비고 (3.1.1 카드)',
+    policy_rates:'주요 6개국 정책금리 daily 실측 — 美FRED·韓ECOS·유로존FRED·영일중 global-rates, monthly 이력 자동 upsert (3.1.1)',
+    events_calendar:'경제 이벤트 캘린더 뼈대 — FRED 발표일정(실측)+FOMC+중앙은행 회의+만기 규칙+직전 보고서 검증분 (2장·📅 calendar.html)',
+    cb_meetings:'중앙은행 회의 일정 시드 — ECB·BOJ·BOE·한은·LPR (events_calendar 입력)',
+    brokers3:'한국투자 한눈에 투데이 모닝브리프 본문(직전 영업일 자동) — 7장 Chrome 대체',
+    ism_pmi:'ISM 제조/서비스 최신 공표치 — PRNewswire 헤드라인 실측 파싱 (3.1.3)',
+    ib_insights:'글로벌 IB 5사 관련 최신 보도 풀(24시간 보존) — 8장 GlobalSecurities 1차 소스',
+    rebalance_news:'지수변경 헤드라인 모니터 — change_marker 불변이면 리밸런싱 에이전트 미발행 (3.3.2 게이트)',
+    factset_insight:'FactSet Insight RSS 최신 글 목록 — 3.1.6 최신 블로그 판별(Chrome 대체)',
+    news_pool:'구글뉴스 헤드라인 풀 10주제(48h 보존, AI 산업만 24h) — 1장 Top10·부록B 선별 소스',
+    broker_reports:'네이버 금융리서치 6게시판 — 증권사별 최신 리포트+최근 2일 요약(PDF 추출) (7.8)',
+    ipo_news:'대형 IPO·지수편입 헤드라인 (3.3.2 패스트엔트리 후보 판정)',
+    m7_estimates:'M7 EPS·매출 컨센서스+리비전·목표가·투자의견 (3.1.7 기초)',
+    etf_quotes:'미국 주요 ETF 56종 시세·기간수익률 스냅샷 (3.3.1 기초·폴백)',
+    crypto_overview:'암호화폐 시장 개요 — 시총·거래대금·도미넌스 (6.1)',
+    crypto_movers:'암호화폐 Top Gainers/Losers 각 10종 (6.4)',
+    crypto_fng:'크립토 공포·탐욕 지수 1년 이력 (6.2)',
+    kimp_series:'김치프리미엄 10분 시계열(BTC·ETH·XRP·SOL, 1년 백필) (6.3)',
     semi_cycle:'반도체 사이클→코스피 점검판 3대 신호 (3.1.11)',
     series_curve_10_2:'미국 장단기 금리차 10Y−2Y 일별 시계열 (3.1.1 차트)',
     series_emp_gdp:'미국 실질 GDP 성장률(연율) 분기 시계열 (3.1.3 차트)',
@@ -636,6 +652,13 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   // (2026-07-17) 수집 주체 — 🖥 서버 cron 자체 수집(리포트 실행과 무관하게 최신) vs 📄 리포트 실행 시 수집
   const SRV={customs:'06:35·15:35',leading:'06:35·15:35',series_leading:'06:35·15:35',krx_brief:'06:35·15:35',
     series_hy_oas:'06:35·15:35',memory:'06:45·15:45',kr_liquidity:'06:35·14:10·16:10',
+    // (2026-07-19 서버화 2차) market_prefetch2(05:45·16:05)·report_prefetch·개별 크론
+    policy_rates:'05:45·16:05',events_calendar:'05:45·16:05',cb_meetings:'05:45·16:05',brokers3:'05:45·16:05',
+    ism_pmi:'05:45·16:05',ib_insights:'05:45·16:05',rebalance_news:'05:45·16:05',factset_insight:'05:45·16:05',
+    news_pool:'매시:10+05:55',broker_reports:'05:50·07:10·16:10',m7_estimates:'05:50·15:50',etf_quotes:'05:50·15:50',
+    ipo_news:'07:20',employment:'07:40',series_emp_nfp:'07:40',series_emp_unemp:'07:40',series_emp_retail:'07:40',
+    series_emp_gdp:'07:40',series_emp_jobless:'07:40',
+    crypto_overview:'매시',crypto_movers:'매시',crypto_fng:'매시',kimp_series:'10분',
     series_mem_dram_spot:'06:45·15:45',series_mem_dram_contract:'06:45·15:45',series_mem_nand_spot:'06:45·15:45',
     series_mem_nand_contract:'06:45·15:45',series_mem_hbm_asp:'06:45·15:45',series_mem_hbm_share:'06:45·15:45',
     series_mem_hbm_ddr5_gap:'06:45·15:45',series_mem_leading_px:'06:45·15:45',series_mem_mem_vs_gpu:'06:45·15:45',
@@ -838,7 +861,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
-  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d2','2 캘린더'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
+  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
     ['d33','3.3 미국'],['d331','3.3.1 美ETF'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
     ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d7','7 증권사'],['d8','8 글로벌IB'],
     ['dB','부록B AI'],['dC','부록C 밸류체인'],['dD','부록D 관계도']]
@@ -858,8 +881,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     `<span style="color:var(--warn)">${E(e.importance||'')}</span>`,
     `<span class="note">${E(e.expected_impact||'')}</span>`,LK(e.source||'—',e.source_url)];
   const EH=['날짜','지역','이벤트','중요도','예상 영향','출처'];
-  T('d_ev', EH, ((R.news||{}).events_calendar||[]).map(EV));
-  T('d_evl',EH, ((R.news||{}).events_calendar_longterm||[]).map(EV));
+  // (2026-07-19) 2.1/2.2 = 서버 events_calendar DB 1순위(매일 05:45·16:05 자동), 실패 시 리포트분 폴백
+  const _evFallback=()=>{ T('d_ev', EH, ((R.news||{}).events_calendar||[]).map(EV));
+    T('d_evl',EH, ((R.news||{}).events_calendar_longterm||[]).map(EV)); };
+  fetch('/api/db/events_calendar').then(r=>r.json()).then(ec=>{
+    const today=new Date().toISOString().slice(0,10);
+    const up=(ec.upcoming||[]).filter(e=>e.date>=today), lt=(ec.longterm||[]);
+    if(up.length) T('d_ev', EH, up.map(EV)); else T('d_ev', EH, ((R.news||{}).events_calendar||[]).map(EV));
+    if(lt.length) T('d_evl',EH, lt.map(EV)); else T('d_evl',EH, ((R.news||{}).events_calendar_longterm||[]).map(EV));
+  }).catch(_evFallback);
   T('d_evb',['날짜','이벤트','중요도','예상 영향','출처'],((R.news||{}).bigtech_events||[]).map(e=>
     [E(e.date),`<b>${E(e.event)}</b>`,`<span style="color:var(--warn)">${E(e.importance||'')}</span>`,
      `<span class="note">${E(e.expected_impact||'')}</span>`,LK(e.source||'—',e.source_url)]));
