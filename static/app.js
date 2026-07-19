@@ -1181,9 +1181,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       ${views}${reps}
       ${(extras&&extras[k])||''}
       ${v.strength?`<div class="src">강점: ${E(v.strength)}</div>`:''}</div>`;}).join('');};
-  $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',miraeasset:'미래에셋증권',korea_inv:'한국투자증권',
-    shinhan:'신한투자증권',kiwoom:'키움증권',meritz:'메리츠증권',hana:'하나증권',kyobo:'교보증권',
-    yuanta:'유안타증권',hyundai:'현대차증권'});
+  /* (5차 2026-07-19 docx 신구조 미러) 7.1~7.6 핵심 6사만 풀 카드 — 기타 6사는 7.7 요약 표로 분리 */
+  $$('d_sec').innerHTML=houses(R.securities,{kb:'KB증권',nh:'NH투자증권',samsung:'삼성증권',
+    miraeasset:'미래에셋증권',korea_inv:'한국투자증권',meritz:'메리츠증권'});
+  /* 7.7 기타 증권사 요약 (텔레그램 기반 6사) — 증권사명 아래 텔레그램 링크 */
+  {const REST={shinhan:'신한투자증권',kiwoom:'키움증권',hana:'하나증권',kyobo:'교보증권',yuanta:'유안타증권',hyundai:'현대차증권'};
+   const srcS=(R.securities&&R.securities.firm&&typeof R.securities.firm==='object')?R.securities.firm:(R.securities||{});
+   const el=$$('d_sec_rest');
+   if(el){ el.innerHTML=`<tr><th>증권사</th><th>핵심 메시지</th><th>시각 · 대표 리포트</th></tr>`+
+     Object.entries(REST).map(([k,nm])=>{const v=srcS[k]||{}; const tg=SRCCH[k]||'';
+       const vw=Object.entries(v).filter(([kk,vv])=>VIEWKO[kk]&&vv).map(([kk,vv])=>`<b>${VIEWKO[kk]}</b> — ${E(vtext(vv)).slice(0,140)}`).join('<br>');
+       const rp=(Array.isArray(v.key_reports)&&v.key_reports[0])?('📄 '+E(String(v.key_reports[0].title||v.key_reports[0]||'').slice(0,50))):'';
+       return `<tr><td style="white-space:nowrap"><b>${nm}</b><br><a href="${esc(tg)}" target="_blank" rel="noopener" class="note">✈️ ${E(tg.replace('https://',''))}</a></td>
+         <td class="note">${E(vtext(v.key_message||'')).slice(0,220)||'—'}</td>
+         <td class="note">${[vw,rp].filter(Boolean).join('<br>')||'—'}</td></tr>`;}).join(''); }}
   /* (4차 2026-07-18) 서버 수집 리포트를 위쪽 증권사 카드 스타일로 통합 —
      별도 '대표 리포트'·'네이버 모음' 섹션 폐지. 기존 카드(12사)엔 이어붙이고,
      보고서에 없는 증권사는 같은 스타일의 카드를 새로 만든다. */
@@ -1196,14 +1207,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       (f.reports||[]).slice(0,4).map(rp=>`<div class="s" style="margin-top:3px">📄 <a href="${esc(rp.url)}" target="_blank" rel="noopener">${E(rp.title)}</a>
         <span class="note">${E(rp.cat)}${rp.date?' · '+E(rp.date.slice(5)):''}</span>${
         rp.pdf?` <a href="${esc(rp.pdf)}" target="_blank" rel="noopener" class="note">[PDF]</a>`:''}</div>`).join('');
+    /* (5차 2026-07-19) 핵심 6사 카드에만 서버 수집 리포트를 이어붙인다 —
+       그 외 증권사 리포트는 7.8 네이버 금융리서치 모음 표에서 전부 보이므로 별도 카드 생성 폐지. */
     br.firms.forEach(f=>{
       const c=byName[f.broker];
       if(c){ c.insertAdjacentHTML('beforeend', repHtml(f)); }
-      else if((f.reports||[]).length){
-        wrap.insertAdjacentHTML('beforeend',
-          `<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${E(f.broker)}</div>${repHtml(f)}
-           <div class="src">🖥 서버 수집 — 네이버 금융리서치 최신 리포트</div></div>`);
-      }
     });
     /* (4차 2026-07-19) 링크 없는 리포트 제목 링크화 — 서버 수집분에서 제목 유사 매칭,
        못 찾으면 그 증권사 공식 리서치 페이지로 연결 */
@@ -1225,7 +1233,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     wrap.insertAdjacentHTML('beforeend',
       `<div class="note" style="grid-column:1/-1">🖥 ${E(br.desc||'')} · ${E(br.as_of||'')}</div>`);
 
-    /* (4차 2026-07-19) 7.7 네이버 금융리서치 모음 — 최근 2일 · 테마별 표(제목·링크·작성사·작성일·요약) */
+    /* (5차 2026-07-19) 7.8 네이버 금융리서치 모음 — 최근 2일 · 테마별 표(제목·링크·작성사·작성일·요약) · 서버 자동 갱신 */
     const nv=$$('d_sec_nv');
     if(nv&&br.recent){
       nv.innerHTML=Object.entries(br.recent).filter(([,arr])=>arr&&arr.length).map(([cat,arr])=>
