@@ -124,6 +124,13 @@ def _enrich_kr(kr, d0s):
                 if len(vol)>=21:
                     va=sum(vol[-21:-1])/20
                     if va>0: o["volx"]=round(vol[-1]/va,2)
+                # (2026-07-26) 기간수익률·변동성 — 같은 일봉 시리즈(네트워크 비용 0), fraction 저장
+                for lbl,dd in (("r1m",21),("r3m",63),("r6m",126),("r1y",250)):
+                    if n>dd and cl[-dd-1]: o[lbl]=round(cl[-1]/cl[-dd-1]-1,4)
+                rets=[cl[i]/cl[i-1]-1 for i in range(max(1,n-20),n) if cl[i-1]]
+                if len(rets)>=10:
+                    mu=sum(rets)/len(rets)
+                    o["vol20"]=round((sum((x-mu)**2 for x in rets)/len(rets))**0.5*100,2)
                 # (2026-07-18) 장중 증분 재계산용 상태 스냅샷 — 마지막 완결봉 기준.
                 # intraday_kr.py가 '상태 + 당일가' O(1) 갱신으로 전종목 지표를 5분마다 실시간화한다.
                 st={"pc":c,"n":n,
@@ -168,6 +175,14 @@ def _enrich_kr(kr, d0s):
         gg=[min(x,3.0) for x in (revg,opg,rf) if x is not None]
         roe=_last(fn.get("ROE")); de=_last(fn.get("부채비율")); cr=_last(fn.get("당좌비율"))
         op3=[v for v in (fn.get("영업이익") or []) if v is not None]
+        # (2026-07-26) 1차 필터: PEG·영업이익률·PSR·회전율·흑자전환 (기존 수집값으로 산출)
+        opl=_last(fn.get("영업이익"))
+        opm=(opl/la) if (opl is not None and la and la>0) else None            # 매출액 대비 (fraction)
+        psr=(r["cap"]/(la*1e8)) if (la and la>0 and r.get("cap")) else None    # 시총(원) / 매출(억원→원)
+        peg=(fper/(opg*100)) if (fper and opg and opg>0) else None             # PER / 이익성장률(%)
+        turn=(r["tv"]/r["cap"]) if (r.get("tv") and r.get("cap")) else None    # fraction
+        tob=bool(len(op3)>=2 and op3[-1]>0 and op3[-2]<0)                      # 적자→흑자 전환
+        r.update(opm=opm,psr=psr,peg=peg,turn=turn,tob=tob)
         r.update(fper=fper,per=per,pbr=pbr,divy=divy,mom=mom,near52=near52,
                  roe=roe,de=de,cr=cr,revg=revg,opg=opg,g_new=(sum(gg)/len(gg) if gg else None),
                  op3neg=(len(op3)>=3 and all(v<0 for v in op3[-3:])), oploss=_neg_streak(op3),
@@ -243,7 +258,9 @@ def _enrich_us(us):
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
                 fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{}); sd=fd.get("summaryDetail",{})
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
-                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),"de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
+                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),
+                        "opm":v(fdd.get("operatingMargins")),"psr":v(sd.get("priceToSalesTrailing12Months")),
+                        "de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
                         "roe":v(fdd.get("returnOnEquity")),"revg":v(fdd.get("revenueGrowth")),
                         "epsg":v(fdd.get("earningsGrowth")),"fcf":v(fdd.get("freeCashflow")),
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
@@ -264,7 +281,7 @@ def _enrich_us(us):
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
-    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev")
+    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev","opm","psr")
     cf=0
     for c in by:
         if "sector" not in by[c] and c in prev:
@@ -285,6 +302,12 @@ def _enrich_us(us):
         r["recn"]=((5-rec)/4*100) if rec is not None else None
         r["rev"]=r.get("eps_rev")            # US 리비전 = EPS 추정치 변화율(즉시)
         r["op3neg"]=((r.get("oploss") or 0)>=3)   # 3년 연속 영업적자(파생)
+        # (2026-07-26) 1차 필터: PEG(=PER/EPS성장%)·회전율·1Y수익률(52주 변화율, %→fraction)
+        fpe1,eg1=r.get("fpe"),r.get("epsg")
+        r["peg"]=(fpe1/(eg1*100)) if (fpe1 and eg1 and eg1>0) else None
+        r["turn"]=(r["tv"]/r["cap"]) if (r.get("tv") and r.get("cap")) else None
+        r["r1y"]=(r["w52"]/100) if r.get("w52") is not None else None
+        r["tob"]=None                        # US: 연도별 영업이익 배열 미보유
         r.pop("fcf",None)
         r["sym"]=r["c"]; r["name"]=r["n"]; r["px"]=r.get("px"); r["mcap"]=r.get("cap")
         us[i]=r
@@ -341,6 +364,13 @@ def _enrich_us(us):
                            "데드↓" if mv<=sig and mv<0 else "데드↑")
             sd=(sum((x-ma20)**2 for x in cl[-20:])/20)**0.5
             if sd>0: r["bb"]=round((c-(ma20-2*sd))/(4*sd)*100,1)
+            # (2026-07-26) US 기간수익률·변동성 — spark 6mo 시리즈(126봉)
+            for lbl,dd in (("r1m",21),("r3m",63),("r6m",120)):   # spark 6mo ≈125봉 — 125는 성립 안 함
+                if n>dd and cl[-dd-1]: r[lbl]=round(c/cl[-dd-1]-1,4)
+            rets=[cl[i2]/cl[i2-1]-1 for i2 in range(max(1,n-20),n) if cl[i2-1]]
+            if len(rets)>=10:
+                mu=sum(rets)/len(rets)
+                r["vol20"]=round((sum((x-mu)**2 for x in rets)/len(rets))**0.5*100,2)
             # 장중(intraday_us) 증분 상태 — RSI·MACD·볼린저·20일선용 (이평50/200·거래량평균은 quotes가 매회 제공)
             stu={"pc":c,"s19":sum(cl[-19:]),"q19":sum(x*x for x in cl[-19:])}
             if n>14 and (g is not None): stu["g"]=g; stu["l"]=l
@@ -408,6 +438,42 @@ def _tp_history(rows):
         r["rev"]=r["tp_rev"]                    # KR 리비전 = 목표주가 변화율
     T.save_db("tp_history",{"hist":hist})
 
+def _kis_flow(kr):
+    """(2026-07-26) KR 전종목 외인·기관 수급 — KIS 종목별 투자자(최근 30거래일).
+       fnb20/onb20 = 20거래일 누적 순매수 금액(억원, pbmn 백만원/100 — 실측 검증)
+       fst/ost     = 최근 연속 순매수일 수(수량 기준)
+       레이트리밋: workers 4 × sleep 0.05 ≈ 초당 15콜 미만 (KIS 한도 20/s)"""
+    import kis_api as K
+    c=K._creds(); tok=K._token(c)
+    ok=[0]
+    def one(r):
+        try:
+            time.sleep(0.05)
+            j=K._get(c,tok,"/uapi/domestic-stock/v1/quotations/inquire-investor","FHKST01010900",
+                     {"FID_COND_MRKT_DIV_CODE":"J","FID_INPUT_ISCD":r["c"]},tries=2)
+            rows=j.get("output") or []          # 최신→과거
+            if not rows: return r
+            fa=[T.num(x.get("frgn_ntby_tr_pbmn")) for x in rows]
+            oa=[T.num(x.get("orgn_ntby_tr_pbmn")) for x in rows]
+            fq=[T.num(x.get("frgn_ntby_qty")) for x in rows]
+            oq=[T.num(x.get("orgn_ntby_qty")) for x in rows]
+            def s(a,nn):
+                v=[x for x in a[:nn] if x is not None]
+                return round(sum(v)/100,1) if v else None   # 백만원 → 억원
+            def streak(a):
+                k=0
+                for x in a:
+                    if x is not None and x>0: k+=1
+                    else: break
+                return k
+            r["fnb20"]=s(fa,20); r["onb20"]=s(oa,20)
+            r["fst"]=streak(fq); r["ost"]=streak(oq)
+            ok[0]+=1
+        except Exception: pass
+        return r
+    T.pmap(one, kr, workers=4)
+    print(f"[pool] KR 수급(KIS) {ok[0]}/{len(kr)}")
+
 def build():
     today=date.today()
     d0s,_=T.krx_day_back(today,"stk"); T.krx_day_back(today,"ksq")
@@ -466,6 +532,8 @@ def build():
     # ── 전종목 z-score enrichment (2단계 랭킹용) ──
     try: _enrich_kr(kr, d0s)
     except Exception as e: print("[pool] KR enrich 실패:", repr(e)[:80])
+    try: _kis_flow(kr)
+    except Exception as e: print("[pool] KR 수급(KIS) 실패:", repr(e)[:80])
     try: _enrich_us(us)
     except Exception as e: print("[pool] US enrich 실패:", repr(e)[:80])
     try: _tp_history(kr); _score(kr,"c",KR_AXDEF)   # KR만 누적→rev(tp_rev) 세팅 후 M축 재채점

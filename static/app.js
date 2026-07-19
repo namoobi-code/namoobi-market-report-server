@@ -1378,7 +1378,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       pbr:{label:'PBR',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['1배 ↓',null,1],['2배 ↓',null,2],['3배 ↓',null,3]],def:[null,null]},
       divy:{label:'배당',fmt:v=>v.toFixed(1)+'%',min:1,presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]],def:[null,null]},
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
-      mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      mom:{label:'수익률 12-1M',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      r1m:{label:'수익률 1M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20]],def:[null,null]},
+      r3m:{label:'수익률 3M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50]],def:[null,null]},
+      r6m:{label:'수익률 6M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['30% ↑',30],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      r1y:{label:'수익률 1Y',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      vol20:{label:'변동성(20일)',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['2% ↓(안정)',null,2],['3% ↓',null,3],['5% ↑(고변동)',5,null]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
@@ -1386,11 +1391,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조']},
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
+      turn:{label:'회전율',fmt:v=>v.toFixed(2)+'%',min:1,reqData:1,presets:[['전체',null],['0.1% ↑',0.1],['0.5% ↑',0.5],['1% ↑',1]],def:[null,null]},
       macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓']},
       bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      tob:{label:'흑자전환',tgl:1,def:false,tglLabel:'적자→흑자 전환 종목만'},
+      opm:{label:'영업이익률',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['5% ↑',5],['10% ↑',10],['20% ↑',20]],def:[null,null]},
+      peg:{label:'PEG',fmt:v=>v.toFixed(1),reqData:1,presets:[['전체',null,null],['1 ↓',null,1],['1.5 ↓',null,1.5],['2 ↓',null,2]],def:[null,null]},
+      psr:{label:'PSR',fmt:v=>v.toFixed(1)+'배',reqData:1,presets:[['전체',null,null],['1배 ↓',null,1],['3배 ↓',null,3],['5배 ↓',null,5]],def:[null,null]},
+      fnb20:{label:'외인수급(20일)',fmt:v=>(v>0?'+':'')+Math.round(v).toLocaleString()+'억',reqData:1,presets:[['전체',null,null],['순매수(0 ↑)',0,null],['100억 ↑',100,null],['500억 ↑',500,null],['순매도(0 ↓)',null,0]],def:[null,null]},
+      onb20:{label:'기관수급(20일)',fmt:v=>(v>0?'+':'')+Math.round(v).toLocaleString()+'억',reqData:1,presets:[['전체',null,null],['순매수(0 ↑)',0,null],['100억 ↑',100,null],['500억 ↑',500,null],['순매도(0 ↓)',null,0]],def:[null,null]},
+      fst:{label:'외인연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
+      ost:{label:'기관연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     },
@@ -1414,7 +1428,21 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       pbr:{label:'PBR',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['1배 ↓',null,1],['2배 ↓',null,2],['3배 ↓',null,3]],def:[null,null]},
       divy:{label:'배당',fmt:v=>v.toFixed(1)+'%',min:1,presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]],def:[null,null]},
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
-      mom:{label:'추세',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      mom:{label:'수익률 12-1M',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      r1m:{label:'수익률 1M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20]],def:[null,null]},
+      r3m:{label:'수익률 3M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50]],def:[null,null]},
+      r6m:{label:'수익률 6M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['30% ↑',30],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      r1y:{label:'수익률 1Y',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
+      vol20:{label:'변동성(20일)',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['2% ↓(안정)',null,2],['3% ↓',null,3],['5% ↑(고변동)',5,null]],def:[null,null]},
+      turn:{label:'회전율',fmt:v=>v.toFixed(2)+'%',min:1,reqData:1,presets:[['전체',null],['0.1% ↑',0.1],['0.5% ↑',0.5],['1% ↑',1]],def:[null,null]},
+      tob:{label:'흑자전환',fixed:'— (US 미제공)'},
+      opm:{label:'영업이익률',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['5% ↑',5],['10% ↑',10],['20% ↑',20]],def:[null,null]},
+      peg:{label:'PEG',fmt:v=>v.toFixed(1),reqData:1,presets:[['전체',null,null],['1 ↓',null,1],['1.5 ↓',null,1.5],['2 ↓',null,2]],def:[null,null]},
+      psr:{label:'PSR',fmt:v=>v.toFixed(1)+'배',reqData:1,presets:[['전체',null,null],['1배 ↓',null,1],['3배 ↓',null,3],['5배 ↓',null,5]],def:[null,null]},
+      fnb20:{label:'외인수급(20일)',fixed:'— (US 미제공)'},
+      onb20:{label:'기관수급(20일)',fixed:'— (US 미제공)'},
+      fst:{label:'외인연속매수',fixed:'— (US 미제공)'},
+      ost:{label:'기관연속매수',fixed:'— (US 미제공)'},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
@@ -1433,9 +1461,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
   const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age','v200',
-              'v20','v50','align','rsi','volx','macd','bb',
-              'mom','hi','frgn','cov','upside','rec','rev','nan',
-              'grw','mgrw','ogrw','per','pbr','roe','payout','divy','sec'];
+              'v20','v50','align','rsi','volx','turn','macd','bb',
+              'mom','r1m','r3m','r6m','r1y','vol20','hi','frgn','fnb20','onb20','fst','ost',
+              'cov','upside','rec','rev','nan',
+              'grw','mgrw','ogrw','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
@@ -1461,6 +1490,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     for(const k in F){ const f=d[k], st=F[k];
       if(f.tgl){ if(!st.on) continue;
         if(k==='cov' && r.tp==null) return false;
+        if(k==='tob' && !r.tob) return false;
         continue; }
       if(f.cat){ if(st.v!=null && String(r[k]||'')!==st.v) return false; continue; }
       if(f.fin && r.isfin) continue;   // 금융업 면제
@@ -1490,7 +1520,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function placeBtns(){ if(!BTNS_GRP) return;
     const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
     if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP);
-    /* 전부전체는 1단계 필터 전용 — 2·3단계(가중치 화면)에선 의미가 없어 숨긴다 */
+    /* (2026-07-26) 버튼들은 전부 1단계 전용 — 2·3단계에선 그룹째 숨긴다
+       (컬럼설정·START = 1단계 표, 필터설명·초기화·전부전체 = 1단계 필터) */
+    BTNS_GRP.style.display = stage===1?'':'none';
+    {const rb=document.querySelector('.scrbtns-r'); if(rb) rb.style.display = stage===1?'':'none';}
     {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';} }
   /* ── 종목 찾기 칩 (돋보기 → 입력창, 입력 즉시 필터) ── */
   let findQ='', findOpen=false, findCaret=null, findIME=false;
@@ -1585,8 +1618,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     oploss:{l:'영업적자',n:1,m:'both'},
     age:{l:'상장기간',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
     v20:{l:'20일선',n:1,m:'both'}, v50:{l:'50일선',n:1,m:'both'}, align:{l:'이평배열',n:0,m:'both'},
-    rsi:{l:'RSI',n:1,m:'both'}, volx:{l:'거래량배수',n:1,m:'both'}, macd:{l:'MACD',n:0,m:'both'}, bb:{l:'볼린저밴드',n:1,m:'both'},
-    mom:{l:'추세',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
+    rsi:{l:'RSI',n:1,m:'both'}, volx:{l:'거래량배수',n:1,m:'both'}, turn:{l:'회전율',n:1,m:'both'},
+    macd:{l:'MACD',n:0,m:'both'}, bb:{l:'볼린저밴드',n:1,m:'both'},
+    mom:{l:'수익률 12-1M',n:1,m:'both'},
+    r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
+    r6m:{l:'수익률 6M',n:1,m:'both'}, r1y:{l:'수익률 1Y',n:1,m:'both'},
+    vol20:{l:'변동성(20일)',n:1,m:'both'},
+    hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
+    fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
+    fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
+    tob:{l:'흑자전환',n:0,m:'kr'}, opm:{l:'영업이익률',n:1,m:'both'},
+    peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'},
@@ -1654,6 +1696,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'oploss': return r.oploss!=null?r.oploss:(r.op3neg?3:null);
       case 'frgn': return r.frgn;
       case 'payout': return r.payout!=null?r.payout*100:null;
+      // (2026-07-26) 1차 필터 추가분 — 서버는 소수(fraction)로 저장, 표시·필터는 %
+      case 'r1m': return r.r1m!=null?r.r1m*100:null;
+      case 'r3m': return r.r3m!=null?r.r3m*100:null;
+      case 'r6m': return r.r6m!=null?r.r6m*100:null;
+      case 'r1y': return r.r1y!=null?r.r1y*100:null;
+      case 'vol20': return r.vol20;                       // 이미 % 값
+      case 'opm': return r.opm!=null?r.opm*100:null;
+      case 'turn': return r.turn!=null?r.turn*100:null;
+      case 'peg': return r.peg; case 'psr': return r.psr;
+      case 'tob': return r.tob?1:0;
+      case 'fnb20': return r.fnb20; case 'onb20': return r.onb20;   // 억원
+      case 'fst': return r.fst; case 'ost': return r.ost;           // 연속일
     }
     return null;
   }
@@ -1706,6 +1760,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
       case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': case 'v20': case 'v50': return sgn(0);
+      case 'r1m': case 'r3m': case 'r6m': case 'r1y': case 'opm': return sgn(1);
+      case 'vol20': return v.toFixed(1)+'%';
+      case 'turn': return v.toFixed(2)+'%';
+      case 'peg': case 'psr': return v.toFixed(2);
+      case 'tob': return v?'<span class="up">전환</span>':'<span class="note">—</span>';
+      case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
+      case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
@@ -1804,7 +1865,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['매출성장','매출 전년동기比 성장률'],
         ['이익성장','EPS 전년동기比 성장률'],
         ['ROE','자기자본이익률(순이익÷자기자본)'],
-        ['추세','52주 주가 변화율(모멘텀)'],
+        ['수익률 12-1M','52주 주가 변화율(모멘텀)'],
+        ['수익률 1M·3M·6M·1Y','해당 기간 주가 수익률'],
+        ['변동성(20일)','최근 20일 일간수익률 표준편차 — 낮을수록 안정'],
+        ['회전율','거래대금 ÷ 시가총액 — 시총 대비 유동성'],
+        ['영업이익률','영업이익 ÷ 매출'],
+        ['PEG','PER ÷ 이익성장률 — 1 이하면 성장 대비 저평가'],
+        ['PSR','시가총액 ÷ 매출 — 적자 성장주 밸류에이션'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
         ['20일선·50일선','해당 이동평균 대비 현재가 위치'],
@@ -1835,7 +1902,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['거래량배수','최근 거래일 거래량 ÷ 직전 20일 평균 — 1.5배↑ 급증 = 추세 전환/돌파 확인 신호'],
         ['MACD','(12,26,9) 상태 — 골든↑=시그널 상향돌파+0선 위(강한 상승), 골든↓=0선 아래 반등, 데드↑/↓=하향 전환'],
         ['볼린저밴드','볼린저밴드(20,2) 내 위치(%b) — 0=하단(과매도권), 50=중심선, 100 이상=상단 돌파(거래량 동반 시 추세가속)'],
-        ['추세','12−1개월 주가 모멘텀'],
+        ['수익률 12-1M','12−1개월 주가 모멘텀'],
+        ['수익률 1M·3M·6M·1Y','해당 기간 주가 수익률'],
+        ['변동성(20일)','최근 20일 일간수익률 표준편차 — 낮을수록 안정'],
+        ['회전율','거래대금 ÷ 시가총액 — 시총 대비 유동성'],
+        ['영업이익률','영업이익 ÷ 매출'],
+        ['PEG','PER ÷ 이익성장률 — 1 이하면 성장 대비 저평가'],
+        ['PSR','시가총액 ÷ 매출 — 적자 성장주 밸류에이션'],
+        ['흑자전환','직전 연도 영업적자 → 최근 연도 흑자로 전환'],
+        ['외인·기관수급(20일)','KIS 종목별 투자자 — 최근 20거래일 누적 순매수 금액(억원)'],
+        ['외인·기관연속매수','최근 며칠 연속 순매수 중인가(일)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['외인보유비중','외국인 보유 비중'],
         ['목표주가','애널리스트 컨센서스 목표주가. 필터는 \'있는 종목만\' 토글'],
