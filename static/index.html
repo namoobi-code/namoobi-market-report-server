@@ -213,6 +213,18 @@
   .cal-dday.cal-soon{background:#f59e0b;color:#fff}
   .cal-imp3{color:#dc2626;font-weight:700}.cal-imp2{color:#d97706;font-weight:600}.cal-imp1{color:var(--tx2)}
   .cal-region{display:inline-block;padding:1px 7px;border-radius:6px;background:#f1f5f9;font-size:11px;color:#334155}
+  /* (2026-07-26) 종목별 월간 달력 (구글캘린더식) */
+  .mcal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+  .mc-wd{text-align:center;font-size:11.5px;font-weight:700;color:var(--tx2);padding:3px 0}
+  .mc-wd.sun{color:#d64545}.mc-wd.sat{color:#1f6feb}
+  .mc-cell{background:var(--card);border:1px solid var(--line);border-radius:7px;min-height:92px;padding:4px 5px;overflow:hidden}
+  .mc-cell.out{opacity:.38}
+  .mc-cell.tdy{border:2px solid #1f6feb;background:#f0f6ff}
+  .mc-d{font-size:11.5px;font-weight:700;color:var(--tx2);margin-bottom:3px}
+  .mc-d.sun{color:#d64545}.mc-d.sat{color:#1f6feb}
+  .mc-chip{display:block;font-size:11px;line-height:1.5;background:#eef4ff;border-radius:4px;padding:0 5px;margin-bottom:2px;
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1e3a8a;cursor:default}
+  .mc-more{font-size:10.5px;color:var(--tx2)}
   /* 최초 진입 인사 화면 */
   #p_welcome{background:#0b0d10;border-radius:10px;overflow:hidden}
   #p_welcome .wel{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 20px}
@@ -351,10 +363,11 @@
   /* (2026-07-26) 전역 canvas{height:200px!important}(Chart.js 성장 방지)가 ID 규칙을 눌러
      지금까지 300/400/520 변경이 전부 무효였다 — 자체차트는 Chart.js 가 아니므로 !important 로 탈출 */
   #sd_main{width:100%;height:400px!important;max-height:none!important;display:block}
-  #sd_vol{width:100%;height:60px!important;max-height:none!important;display:block;margin-top:2px}
-  #sd_rsi{width:100%;height:60px!important;max-height:none!important;display:block;margin-top:2px}
-  #sd_macd{width:100%;height:76px!important;max-height:none!important;display:block;margin-top:2px}
-  #sd_inv{width:100%;height:96px!important;max-height:none!important;display:block;margin-top:2px}  /* 투자자별 누적순매수 (KR 전용) */
+  /* (2026-07-26) 보조 차트 2배 확대 — 60/60/76/96 → 120/120/150/190 (가독성) */
+  #sd_vol{width:100%;height:120px!important;max-height:none!important;display:block;margin-top:2px}
+  #sd_rsi{width:100%;height:120px!important;max-height:none!important;display:block;margin-top:2px}
+  #sd_macd{width:100%;height:150px!important;max-height:none!important;display:block;margin-top:2px}
+  #sd_inv{width:100%;height:190px!important;max-height:none!important;display:block;margin-top:2px}  /* 투자자별 누적순매수 (KR 전용) */
   .csrc.on{background:var(--dark);color:#fff;border-color:var(--dark)}
   .sg{margin-bottom:10px}
   .sgt{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;border-bottom:1px solid var(--line);padding-bottom:3px}
@@ -411,6 +424,8 @@
     <div><h1 id="go_home" title="홈으로" style="cursor:pointer">투자 인텔리전스<span>namoobi · 시황 리포트 · 종목 스크리너 · AI 분석 · 자동매매</span></h1></div>
     <div class="tabs">
       <button id="btn_screener" class="tab scrtab">🔍 SCREENER<small>종목 스크리너</small></button>
+      <!-- (2026-07-26) ETF 스크리너 — UI 골격 (필터 구성은 협의 후) -->
+      <button id="btn_etf" class="tab" data-pane="p_etf">📦 ETF<small>ETF 스크리너</small></button>
       <!-- (2026-07-26) 전체 페이지 이동 → 대시보드 내 페인(p_cal)으로 전환 -->
       <button id="btn_calendar" class="tab" data-pane="p_cal" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 캘린더<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_daily">daily 조사<small>매 실행 신규 수집</small></button>
@@ -451,10 +466,38 @@
   <!-- ⓪ 최초 진입 인사 화면 -->
   <div class="pane on" id="p_welcome"><div class="wel"><div id="wel_msg"></div></div></div>
 
+  <!-- (2026-07-26) ETF 스크리너 페인 — UI 골격 (1단계 하드컷만, 필터 구성은 협의 중) -->
+  <div class="pane" id="p_etf" style="overflow:auto">
+    <h2 style="margin:8px 0 3px">📦 ETF 스크리너 <span class="note" style="font-weight:400">1단계 하드컷 전용 · 준비 중</span></h2>
+    <div class="mktseg" style="margin:6px 0 10px">
+      <button class="mkt on" data-emkt="kr">🇰🇷 한국</button>
+      <button class="mkt" data-emkt="us">🇺🇸 미국</button>
+    </div>
+    <div class="box" style="padding:14px 16px">
+      <p class="note" style="margin:0 0 8px"><b>UI 골격입니다.</b> 전종목 풀(ETF 제외)과 별도로 ETF 전용 풀을 수집해
+        아래 후보 필터로 하드컷을 걸 예정입니다. 필터 구성 확정 후 활성화합니다.</p>
+      <div id="etf_prev" class="note" style="line-height:1.7"></div>
+    </div>
+  </div>
+
   <!-- (2026-07-26) 캘린더 페인 — calendar.html 전체 페이지 대신 대시보드 안에서 표시 -->
   <div class="pane" id="p_cal" style="overflow:auto">
     <h2 style="margin:8px 0 3px">📅 주요 이벤트 캘린더 <span class="note" id="cal_asof" style="font-weight:400"></span></h2>
     <p class="note" style="margin:2px 0 8px">🖥 서버 자동 갱신(매일 05:45·16:05) — FRED 발표일정(실측) + FOMC DB + 중앙은행 회의 + 만기 규칙 + 직전 보고서 검증 이벤트</p>
+    <!-- (2026-07-26) 3뷰: 주요 이벤트 / 한국 종목별(월간 달력) / 미국 종목별(월간 달력) -->
+    <div class="mktseg" style="margin-bottom:9px">
+      <button class="mkt cvw on" data-v="ev">📋 주요 이벤트</button>
+      <button class="mkt cvw" data-v="kr">🇰🇷 한국 종목별</button>
+      <button class="mkt cvw" data-v="us">🇺🇸 미국 종목별</button>
+    </div>
+    <div id="cal_v_stock" style="display:none">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:7px">
+        <button class="cp-x" id="mc_prev">◀ 이전달</button><b id="mc_title" style="font-size:15px"></b><button class="cp-x" id="mc_next">다음달 ▶</button>
+        <span class="note" id="mc_note"></span>
+      </div>
+      <div class="mcal-grid" id="mc_grid"></div>
+    </div>
+    <div id="cal_v_ev">
     <div class="callay">
       <div class="calmain">
         <h3 class="calh">다가오는 이벤트</h3>
@@ -467,6 +510,7 @@
         <div class="box" style="overflow:auto"><table id="cal_past"><tr><th style="width:76px">날짜</th><th>이벤트</th></tr></table></div>
       </div>
     </div>
+    </div><!-- /cal_v_ev -->
   </div>
 
 

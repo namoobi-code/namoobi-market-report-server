@@ -831,8 +831,60 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         ||'<tr><td colspan="2" class="note">최근 1주 지난 이벤트 없음 — 내일 갱신부터 쌓입니다</td></tr>');
     }).catch(e=>{const a=document.getElementById('cal_asof'); if(a)a.textContent='로드 실패';});
   }
+  // (2026-07-26) 종목별 어닝 월간 달력 (구글캘린더식) — 풀 DB의 ed(실적발표일) 사용
+  let calView='ev', mcY=new Date().getFullYear(), mcM=new Date().getMonth(); // 0-based month
+  function renderMonthCal(mk){
+    const grid=document.getElementById('mc_grid'); if(!grid) return;
+    const done=pool=>{
+      const evs={};
+      for(const r of (pool[mk]||[])) if(r.ed) (evs[r.ed]=evs[r.ed]||[]).push(r);
+      for(const d in evs) evs[d].sort((a,b)=>(b.cap||0)-(a.cap||0));
+      const first=new Date(mcY,mcM,1), off=first.getDay(), dim=new Date(mcY,mcM+1,0).getDate();
+      const tds=new Date(); tds.setHours(0,0,0,0);
+      const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+      let h=['일','월','화','수','목','금','토'].map((w,i)=>`<div class="mc-wd ${i===0?'sun':i===6?'sat':''}">${w}</div>`).join('');
+      const cells=Math.ceil((off+dim)/7)*7;
+      let cnt=0;
+      for(let i=0;i<cells;i++){
+        const dnum=i-off+1, inM=dnum>=1&&dnum<=dim;
+        const dt=new Date(mcY,mcM,dnum);
+        const key=inM?`${mcY}-${String(mcM+1).padStart(2,'0')}-${String(dnum).padStart(2,'0')}`:null;
+        const list=key?(evs[key]||[]):[];
+        cnt+=list.length;
+        const isT=inM&&dt.getTime()===tds.getTime();
+        const wd=i%7;
+        const chips=list.slice(0,4).map(r=>`<span class="mc-chip" title="${esc(r.n)} (${esc(r.c)}) 실적발표">${esc(mk==='kr'?r.n:r.c)}</span>`).join('')
+          +(list.length>4?`<span class="mc-more">+${list.length-4}종 더</span>`:'');
+        h+=`<div class="mc-cell ${inM?'':'out'} ${isT?'tdy':''}"><div class="mc-d ${wd===0?'sun':wd===6?'sat':''}">${inM?dnum:''}</div>${inM?chips:''}</div>`;
+      }
+      grid.innerHTML=h;
+      document.getElementById('mc_title').textContent=`${mcY}년 ${mcM+1}월`;
+      document.getElementById('mc_note').textContent=
+        (mk==='kr'?'네이버 IR 일정(대형주 위주)':'Yahoo earnings date')+` · 이 달 실적발표 ${cnt}건 · 셀당 최대 4종(시총순)`;
+    };
+    if(window.nmrPool) window.nmrPool(done);
+    else grid.innerHTML='<div class="note" style="grid-column:1/-1;padding:12px">풀 데이터 로드 중…</div>';
+  }
+  function calSwitch(v){
+    calView=v;
+    document.querySelectorAll('#p_cal .cvw').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+    document.getElementById('cal_v_ev').style.display = v==='ev'?'':'none';
+    document.getElementById('cal_v_stock').style.display = v==='ev'?'none':'';
+    if(v!=='ev') renderMonthCal(v);
+  }
+  document.querySelectorAll('#p_cal .cvw').forEach(b=>b.addEventListener('click',()=>calSwitch(b.dataset.v)));
+  {const p=document.getElementById('mc_prev'), n=document.getElementById('mc_next');
+   if(p) p.onclick=()=>{ mcM--; if(mcM<0){mcM=11;mcY--;} renderMonthCal(calView); };
+   if(n) n.onclick=()=>{ mcM++; if(mcM>11){mcM=0;mcY++;} renderMonthCal(calView); };}
+  // (2026-07-26) ETF 스크리너 골격 — 필터 후보 미리보기
+  {const ep=document.getElementById('etf_prev');
+   if(ep) ep.innerHTML=[
+     '<b>공통 후보</b>: 운용자산(AUM) · 거래대금 · 총보수(TER) · 상장기간 · 기간수익률(1M/3M/6M/1Y) · 변동성 · 200일선 · 고점比 · 배당(분배금)수익률',
+     '<b>한국 전용 후보</b>: 괴리율(시장가−iNAV) · 추적오차 · 자산군(주식/채권/원자재/커버드콜…) · 운용사 · 레버리지/인버스 구분 · 분배금 주기(월배당 등)',
+     '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
+   ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf'];
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -1468,6 +1520,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       onb20:{label:'기관수급(20일)',fmt:v=>(v>0?'+':'')+Math.round(v).toLocaleString()+'억',reqData:1,presets:[['전체',null,null],['순매수(0 ↑)',0,null],['100억 ↑',100,null],['500억 ↑',500,null],['순매도(0 ↓)',null,0]],def:[null,null]},
       fst:{label:'외인연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
       ost:{label:'기관연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
+      sr:{label:'공매도비중',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['1% ↓(약함)',null,1],['3% ↓',null,3],['5% ↑(과열)',5,null],['10% ↑',10,null]],def:[null,null]},
+      ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     },
@@ -1506,6 +1560,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       onb20:{label:'기관수급(20일)',fixed:'— (US 미제공)'},
       fst:{label:'외인연속매수',fixed:'— (US 미제공)'},
       ost:{label:'기관연속매수',fixed:'— (US 미제공)'},
+      sr:{label:'공매도비중',fixed:'— (US 미제공)'},
+      ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
@@ -1525,8 +1581,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
   const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age','v200',
               'v20','v50','align','rsi','volx','turn','macd','bb',
-              'mom','r1m','r3m','r6m','r1y','vol20','hi','frgn','fnb20','onb20','fst','ost',
-              'cov','upside','rec','rev','nan',
+              'mom','r1m','r3m','r6m','r1y','vol20','hi','frgn','fnb20','onb20','fst','ost','sr',
+              'ern','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
@@ -1710,6 +1766,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
+    sr:{l:'공매도비중',n:1,m:'kr'}, ern:{l:'어닝일',n:1,m:'both'},
     tob:{l:'흑자전환',n:0,m:'kr'}, opm:{l:'영업이익률',n:1,m:'both'},
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
@@ -1791,6 +1848,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'tob': return r.tob?1:0;
       case 'fnb20': return r.fnb20; case 'onb20': return r.onb20;   // 억원
       case 'fst': return r.fst; case 'ost': return r.ost;           // 연속일
+      case 'sr': return r.sr;                                       // 공매도 비중(%)
+      case 'ern': {                                                 // 어닝까지 D-day (지난 발표는 제외)
+        if(!r.ed) return null;
+        const t=new Date(); t.setHours(0,0,0,0);
+        const d=Math.round((new Date(r.ed+'T00:00:00')-t)/86400000);
+        return d>=0?d:null; }
     }
     return null;
   }
@@ -1831,6 +1894,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const cls=v>0?'up':(v<0?'dn':'note'), tt=t==='up_steady'?'꾸준상승':t==='down_steady'?'꾸준하락':(mkt==='us'?'EPS 추정치 90일 변화':'목표주가 90일 변화');
       return `<span class="${cls}" title="${tt}">${ar} ${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
     if(key==='age'){const a=ageOf(r); return a==null?dash(r,key):a+'년';}
+    if(key==='ern'){const v=colVal(r,'ern'); if(v==null) return dash(r,key);
+      return `<span class="${v<=7?'up':''}">${v===0?'오늘':'D-'+v}</span> <span class="note">${E((r.ed||'').slice(5))}</span>`;}
     const v=colVal(r,key); if(v==null) return dash(r,key);
     const sgn=d=>`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
     switch(key){
@@ -1850,6 +1915,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'tob': return v?'<span class="up">전환</span>':'<span class="note">—</span>';
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
+      case 'sr': return `<span class="${v>=5?'dn':''}">${v.toFixed(1)}%</span>`;
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
@@ -1980,7 +2046,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['영업이익률','operating margin(TTM, Yahoo)'],
         ['PEG','forward PE ÷ EPS 성장률 — 1 이하면 성장 대비 저평가'],
         ['PSR','P/S(TTM) — 적자 성장주 밸류에이션'],
-        ['흑자전환·수급','미국 미제공 — 연간 영업이익 배열·투자자별 수급 데이터 없음'],
+        ['흑자전환·수급·공매도','미국 미제공 — 연간 영업이익 배열·투자자별 수급·공매도 데이터 없음'],
+        ['어닝임박','다음 실적발표일까지 D-day (Yahoo earnings date)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
         ['20일선·50일선','해당 이동평균 대비 현재가 위치'],
@@ -2021,6 +2088,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['흑자전환','직전 연도 영업적자 → 최근 연도 흑자로 전환'],
         ['외인·기관수급(20일)','KIS 종목별 투자자 — 최근 20거래일 누적 순매수 금액(억원)'],
         ['외인·기관연속매수','최근 며칠 연속 순매수 중인가(일)'],
+        ['공매도비중','최근 거래일 공매도 거래량 ÷ 전체 거래량(%) — 5%↑ 과열 경계 (KIS)'],
+        ['어닝임박','다음 실적발표일까지 D-day (네이버 IR 일정 — 대형주 위주 제공)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['외인보유비중','외국인 보유 비중'],
         ['목표주가','애널리스트 컨센서스 목표주가. 필터는 \'있는 종목만\' 토글'],
@@ -2119,10 +2188,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const G=[['시세',['px','chg','cap','tv','turn']],
              ['기간수익률',['r1m','r3m','r6m','r1y','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
-             ['컨센서스',['tp','upside','recn','rev','nan']],
+             ['컨센서스',['ern','tp','upside','recn','rev','nan']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
-             ['수급',['fnb20','onb20','fst','ost','frgn']],
+             ['수급',['fnb20','onb20','fst','ost','sr','frgn']],
              ['건전성',['de','cr','oploss']],
              ['기타',['age']]];
     $('sd_sum').innerHTML=G.map(([t,ks])=>{
@@ -2389,6 +2458,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_tbl2').querySelectorAll('[data-s2]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.s2; if(sort2.k===k)sort2.d*=-1; else{sort2.k=k;sort2.d=-1;} rankTbl(); });
   }
+  /* (2026-07-26) 캘린더(다른 IIFE)에서 풀 데이터 접근용 브리지 — 어닝 월간 달력 */
+  window.nmrPool=cb=>loadS2(()=>cb(POOL));
   function loadS2(cb){
     if(s2loaded){cb&&cb();return;}
     // 2단계도 1단계와 같은 전종목 풀(z점수 포함)을 쓴다 — 1단계 필터를 거친 뒤 랭킹(퍼널).

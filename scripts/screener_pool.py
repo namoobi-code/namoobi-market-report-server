@@ -67,6 +67,9 @@ def _enrich_kr(kr, d0s):
             j=T.jget(f"https://m.stock.naver.com/api/stock/{r['c']}/integration",timeout=10)
             o["tot"]={x["code"]:x.get("value") for x in j.get("totalInfos",[])}
             o["cons"]=j.get("consensusInfo") or {}
+            # (2026-07-26) 2차: 실적발표(IR) 예정일 — 같은 응답이라 추가 콜 0. 대형주 위주 제공
+            ir=j.get("irScheduleInfo") or {}
+            if ir.get("irScheduleDate"): o["ed"]=ir["irScheduleDate"]
         except Exception: eg.add("fund")
         o["_eg"]=eg
         try:
@@ -470,9 +473,24 @@ def _kis_flow(kr):
             r["fst"]=streak(fq); r["ost"]=streak(oq)
             ok[0]+=1
         except Exception: pass
+        # (2026-07-26) 2차: 공매도 비중 — KIS 공매도 일별추이(같은 워커에서 순차 호출)
+        #   sr = 최근 거래일 공매도 거래량 비중(%) · sr5 = 최근 5일 평균
+        try:
+            time.sleep(0.05)
+            j2=K._get(c,tok,"/uapi/domestic-stock/v1/quotations/daily-short-sale","FHPST04830000",
+                      {"FID_COND_MRKT_DIV_CODE":"J","FID_INPUT_ISCD":r["c"],
+                       "FID_INPUT_DATE_1":"","FID_INPUT_DATE_2":""},tries=2)
+            rows2=j2.get("output2") or []          # 최신→과거
+            rl=[T.num(x.get("ssts_vol_rlim")) for x in rows2]
+            if rl and rl[0] is not None: r["sr"]=round(rl[0],2)
+            v5=[x for x in rl[:5] if x is not None]
+            if v5: r["sr5"]=round(sum(v5)/len(v5),2)
+            ok2[0]+=1
+        except Exception: pass
         return r
+    ok2=[0]
     T.pmap(one, kr, workers=4)
-    print(f"[pool] KR 수급(KIS) {ok[0]}/{len(kr)}")
+    print(f"[pool] KR 수급(KIS) {ok[0]}/{len(kr)} · 공매도 {ok2[0]}/{len(kr)}")
 
 def build():
     today=date.today()
@@ -525,9 +543,14 @@ def build():
             yr=None
             try: yr=datetime.utcfromtimestamp(ft/1000).year if ft else None
             except Exception: pass
+            ed=None   # (2026-07-26) 2차: 다음 어닝일 — quotes.earningsTimestamp(추가 콜 0)
+            try:
+                ets=q.get("earningsTimestamp")
+                if ets: ed=datetime.utcfromtimestamp(ets).strftime("%Y-%m-%d")
+            except Exception: pass
             us.append({"c":q["symbol"],"n":(q.get("longName") or q.get("shortName") or "")[:44],
                        "px":px,"chg":q.get("regularMarketChangePercent"),"cap":cap,
-                       "tv":round(v3*px) if v3 else None,"yr":yr,
+                       "tv":round(v3*px) if v3 else None,"yr":yr,"ed":ed,
                        "d200":q.get("twoHundredDayAverageChangePercent")})
     # ── 전종목 z-score enrichment (2단계 랭킹용) ──
     try: _enrich_kr(kr, d0s)
