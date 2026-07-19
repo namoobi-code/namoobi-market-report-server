@@ -199,8 +199,24 @@ def calendar():
             continue
         seen.add(k)
         ded.append(r)
-    save("events_calendar", {"upcoming": ded[:40], "longterm": lt[:12],
-                             "desc": "FRED 발표일정(실측)+FOMC DB+중앙은행 회의 시드+만기 규칙+직전 보고서 검증 이벤트"})
+    # (2026-07-26) 지난 이벤트 보존(최근 7일) — 직전 DB의 upcoming·past 를 이월.
+    #   생성 로직이 미래만 만들기 때문에, 어제까지 '다가오는'에 있던 것이 오늘 지난 이벤트가 된다.
+    #   캘린더 우측 '지난 이벤트' 패널(자동 반영 확인용)의 데이터 원천.
+    prev = load("events_calendar", {})
+    tds = NOW.strftime("%Y-%m-%d")
+    cutoff = (NOW.date() - timedelta(days=7)).isoformat()
+    pseen, past = set(), []
+    for r in sorted((prev.get("past") or []) + (prev.get("upcoming") or []), key=lambda x: str(x.get("date", ""))):
+        dt = str(r.get("date", ""))[:10]
+        if not (cutoff <= dt < tds) or not r.get("event"):
+            continue
+        k = (dt, re.sub(r"\s", "", str(r.get("event", "")))[:10])
+        if k in pseen:
+            continue
+        pseen.add(k)
+        past.append(r)
+    save("events_calendar", {"upcoming": ded[:40], "longterm": lt[:12], "past": past[-40:],
+                             "desc": "FRED 발표일정(실측)+FOMC DB+중앙은행 회의 시드+만기 규칙+직전 보고서 검증 이벤트 · past=지난 7일 이월"})
 
 
 # ── 3) 정책금리 6개국 ──

@@ -8,7 +8,14 @@
   :root{--bg:#f6f7f9;--tx:#0f172a;--tx2:#475569;--line:#e2e8f0;--blue:#1e40af;--teal:#0e7490}
   html,body{margin:0;padding:0;background:var(--bg);color:var(--tx);
     font-family:'Pretendard','Noto Sans KR','Malgun Gothic',sans-serif;font-size:14px}
-  .wrap{max-width:980px;margin:0 auto;padding:18px 14px 60px}
+  .wrap{max-width:1280px;margin:0 auto;padding:18px 14px 60px}
+  /* (2026-07-26) 지난 이벤트(최근 1주) 우측 패널 — 자동 반영 확인용 */
+  .layout{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+  .main{flex:1;min-width:min(560px,100%)}
+  .past{flex:0 0 300px;max-width:100%}
+  .past h2{color:#64748b;margin-top:0}
+  .past td{color:#64748b}
+  .past .pd{white-space:nowrap;font-weight:700;color:#94a3b8}
   header{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px}
   h1{font-size:20px;margin:0}
   a.back{font-size:12.5px;padding:6px 13px;border-radius:999px;background:#fff;border:1px solid var(--line);
@@ -37,11 +44,19 @@
   </header>
   <div class="note">🖥 서버 자동 갱신(매일 05:45·16:05) — FRED 공식 발표일정(실측) + FOMC DB + 중앙은행 회의 + 만기 규칙 + 직전 보고서 검증 이벤트</div>
 
-  <h2>다가오는 이벤트</h2>
-  <table id="t_up"><tr><th style="width:120px">날짜</th><th style="width:70px">지역</th><th>이벤트</th><th style="width:70px">중요도</th><th style="width:190px">출처</th></tr></table>
+  <div class="layout">
+    <div class="main">
+      <h2>다가오는 이벤트</h2>
+      <table id="t_up"><tr><th style="width:120px">날짜</th><th style="width:70px">지역</th><th>이벤트</th><th style="width:70px">중요도</th><th style="width:190px">출처</th></tr></table>
 
-  <h2>중장기 (★★★만)</h2>
-  <table id="t_lt"><tr><th style="width:120px">날짜</th><th style="width:70px">지역</th><th>이벤트</th><th style="width:70px">중요도</th><th style="width:190px">출처</th></tr></table>
+      <h2>중장기 (★★★만)</h2>
+      <table id="t_lt"><tr><th style="width:120px">날짜</th><th style="width:70px">지역</th><th>이벤트</th><th style="width:70px">중요도</th><th style="width:190px">출처</th></tr></table>
+    </div>
+    <div class="past">
+      <h2>지난 이벤트 <span class="note">(최근 1주 — 자동 반영 확인용)</span></h2>
+      <table id="t_past"><tr><th style="width:78px">날짜</th><th>이벤트</th></tr></table>
+    </div>
+  </div>
 </div>
 <script>
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -68,6 +83,18 @@ fetch('/api/db/events_calendar').then(r=>r.json()).then(d=>{
   document.getElementById('t_up').insertAdjacentHTML('beforeend', up.map(row).join('')||'<tr><td colspan="5" class="note">데이터 없음</td></tr>');
   const lt=(d.longterm||[]);
   document.getElementById('t_lt').insertAdjacentHTML('beforeend', lt.map(row).join('')||'<tr><td colspan="5" class="note">데이터 없음</td></tr>');
+  // 지난 이벤트 (최근 7일) — 서버가 이월 보존한 d.past + 혹시 남은 지난 upcoming 병합, 최신순
+  const wk=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const seen=new Set();
+  const past=[...(d.past||[]),...(d.upcoming||[]),...(d.longterm||[])]
+    .filter(r=>r.date&&r.date<today&&r.date>=wk)
+    .filter(r=>{const k=r.date+'|'+r.event; if(seen.has(k))return false; seen.add(k); return true;})
+    .sort((a,b)=>b.date<a.date?-1:1);
+  const wd2=d0=>{try{return ['일','월','화','수','목','금','토'][new Date(d0+'T00:00:00').getDay()]}catch(e){return ''}};
+  document.getElementById('t_past').insertAdjacentHTML('beforeend',
+    past.map(r=>`<tr><td class="pd">${esc((r.date||'').slice(5))}<span class="note">(${wd2(r.date)})</span></td>
+      <td>${esc(r.event||'')} <span class="region">${esc(r.region||'-')}</span></td></tr>`).join('')
+    ||'<tr><td colspan="2" class="note">최근 1주 지난 이벤트 없음</td></tr>');
 }).catch(e=>{document.getElementById('asof').textContent='로드 실패: '+e;});
 </script>
 </body>

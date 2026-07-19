@@ -1520,11 +1520,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function placeBtns(){ if(!BTNS_GRP) return;
     const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
     if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP);
-    /* (2026-07-26) 버튼들은 전부 1단계 전용 — 2·3단계에선 그룹째 숨긴다
-       (컬럼설정·START = 1단계 표, 필터설명·초기화·전부전체 = 1단계 필터) */
+    /* (2026-07-26) 컬럼설정·START·초기화·전부전체 = 1단계 전용.
+       ? 필터설명은 2단계에서도 필요(V·G·M·Q 설명) — 패널을 현재 단계 pane 으로 옮긴다 */
     BTNS_GRP.style.display = stage===1?'':'none';
-    {const rb=document.querySelector('.scrbtns-r'); if(rb) rb.style.display = stage===1?'':'none';}
-    {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';} }
+    {const rb=document.querySelector('.scrbtns-r'); if(rb) rb.style.display = stage<=2?'':'none';}
+    {const rs=$('scr_rst');  if(rs) rs.style.display = stage===1?'':'none';}
+    {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';}
+    {const gp=$('scr_glspanel');
+     if(gp){ const tgt2 = stage===2 ? $('scr_s2') : $('scr_s1');
+       if(tgt2 && gp.parentElement!==tgt2){
+         if(stage===2) tgt2.insertBefore(gp, tgt2.firstChild); else tgt2.appendChild(gp); }
+       if(gp.style.display!=='none') renderLegend();   // 단계 전환 시 열린 설명 갱신
+     }} }
   /* ── 종목 찾기 칩 (돋보기 → 입력창, 입력 즉시 필터) ── */
   let findQ='', findOpen=false, findCaret=null, findIME=false;
   function findHit(r){
@@ -1843,8 +1850,33 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_tbl').querySelectorAll('tr[data-c]').forEach(tr=>tr.onclick=()=>showDetail(tr.dataset.c));
     renderLegend();
   }
+  /* (2026-07-26) 2단계 필터설명 = V·G·M·Q 축의 의미와 계산 방법 */
+  function axisLegendHTML(){
+    const KR=mkt==='kr';
+    const G=[
+      ['V — 밸류 (얼마나 싼가)',
+       KR?'−forward PER · −PBR · +배당수익률':'−forward PE · −P/B · +배당수익률',
+       'PER·PBR이 낮을수록, 배당이 높을수록 +점수. 부호를 뒤집어(−) "쌀수록 좋다"로 통일.'],
+      ['G — 성장 (이익이 자라는가)',
+       KR?'매출 YoY · 영업이익 YoY · 컨센서스 매출 증가율의 평균 (각 +300% 상한)':'매출성장 · EPS성장의 평균 (각 +300% 상한)',
+       '최근 연간 실적 기준. 상한을 둬 일회성 폭증이 랭킹을 왜곡하지 않게 한다.'],
+      ['M — 모멘텀 (주가·심리가 위로 향하는가)',
+       KR?'수익률 12-1M · 52주고점比 · 200일선 이격 · 리비전(목표주가 90일 변화)':'52주 수익률 · 52주고점比 · 200일선 이격 · 리비전(EPS 추정 90일 변화)',
+       '최근 1개월을 뺀 12개월 수익률(단기 반전 소음 제거) + 고점 근접·장기추세 위 여부 + 애널리스트 상향세.'],
+      ['Q — 수익성 (돈을 잘 버는 체질인가)',
+       KR?'ROE · −부채비율 (금융업은 부채비율 면제)':'ROE · FCF수익률 · −부채비율 (금융업 면제)',
+       '자기자본 수익성이 높고 빚이 적을수록 +점수.']];
+    return `<div class="note" style="margin-bottom:8px;line-height:1.6">
+      1단계 하드컷을 통과한 전 종목을 4개 팩터 축으로 점수화해 랭킹한다.<br>
+      <b>z-score</b> = (지표값 − 전종목 평균) ÷ 표준편차 — <b>0=평균, +1≈상위 16%, −1≈하위 16%</b>.
+      축 점수 = 구성 지표들의 z 평균(없는 지표는 제외), <b>종합</b> = 켠 축들의 가중평균(슬라이더 가중치 · 유효 축 최소 3개).
+      표의 지표 컬럼들이 각 축 계산에 실제 들어가는 원자료다.</div>`
+      +G.map(([t,c,d])=>`<div style="margin-bottom:7px"><b style="font-size:12px">${t}</b><br>
+        <span style="font-size:12px">구성: ${c}</span><br><span class="note">${d}</span></div>`).join('');
+  }
   /* 필터 설명 — applyTable과 무관하게 단독 렌더 가능(START 전 '? 필터설명' 클릭 대응) */
   function renderLegend(){
+    if(stage===2){ const rn=$('scr_revnote'); if(rn) rn.innerHTML=axisLegendHTML(); return; }
     {const rn=$('scr_revnote'); if(rn){
       const g = mkt==='us' ? [
         ['시장·섹터','거래소·업종 분류(Technology·Financial 등)'],
@@ -2230,8 +2262,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const tn=$('scr_topn'); if(tn) tn.oninput=()=>{ topN=Math.max(0,Math.min(600,+tn.value||0)); rankTbl(); };
   }
   const COL2={
-    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['g_new','성장',1],['mom','추세',1],['near52','고점比',1]],
-    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['g_new','성장',1],['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1]]
+    /* (2026-07-26) 각 축 계산에 실제 쓰이는 지표를 전부 컬럼으로 노출
+       V=PER·PBR·배당 / G=성장 / M=12-1M·고점比·200일선·리비전 / Q=ROE·부채비율(·FCF) */
+    kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
+        ['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['g_new','성장',1],
+        ['mom','12-1M',1],['near52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
+        ['roe','ROE',1],['de','부채비율',1]],
+    us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
+        ['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['g_new','성장',1],
+        ['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
+        ['roe','ROE',1],['fcfy','FCF%',1],['de','부채비율',1]]
   };
   function cell2(r,c){const k=c[0];
     if(k==='n') return mkt==='kr'?`<b>${E(r.name)}</b> <span class="note">${E(r.code)}</span>`:`<b>${E(r.sym)}</b> <span class="note">${E(r.name)}</span>`;
@@ -2242,6 +2282,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(k==='w52'){const v=r.w52; return v==null?'—':(+v).toFixed(0)+'%';}
     if(k==='near52'||k==='hi52'){const v=r[k]; return v==null?'—':'고점 '+(v*100).toFixed(0)+'%';}
     if(k==='vs200'){const v=r.vs200; return v==null?'—':(v>=0?'+':'')+(v*100).toFixed(0)+'%';}
+    if(k==='rev'){const v=r.rev; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
+    if(k==='roe'){const v=r.roe; return v==null?'—':(mkt==='kr'?(+v).toFixed(1):(v*100).toFixed(1))+'%';}
+    if(k==='de'){const v=r.de; return v==null?'—':(+v).toFixed(0)+'%';}
+    if(k==='fcfy'){const v=r.fcfy; return v==null?'—':(v*100).toFixed(1)+'%';}
     const v=r[k]; return v==null?'—':(+v).toFixed(1);
   }
   function rankTbl(){
