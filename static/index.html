@@ -334,12 +334,14 @@
   .dgrid{display:grid;grid-template-columns:3fr 2fr;gap:9px}
   @media(max-width:980px){ .dgrid{grid-template-columns:1fr} }
   .dhead{display:flex;align-items:center;gap:6px;margin-bottom:6px;font-size:14px}
-  #sd_main{width:100%;height:520px;display:block}  /* (2026-07-26) 300→400→520 — 캔들 가독성 */
-  #sd_mainlog{width:100%;height:340px;display:block;margin-top:2px}  /* 로그 스케일 판 — 일반 밑에 함께 표시 */
-  #sd_vol{width:100%;height:60px;display:block;margin-top:2px}
-  #sd_rsi{width:100%;height:60px;display:block;margin-top:2px}
-  #sd_macd{width:100%;height:76px;display:block;margin-top:2px}
-  #sd_inv{width:100%;height:96px;display:block;margin-top:2px}  /* 투자자별 누적순매수 (KR 전용) */
+  /* (2026-07-26) 전역 canvas{height:200px!important}(Chart.js 성장 방지)가 ID 규칙을 눌러
+     지금까지 300/400/520 변경이 전부 무효였다 — 자체차트는 Chart.js 가 아니므로 !important 로 탈출 */
+  #sd_main{width:100%;height:520px!important;max-height:none!important;display:block}
+  #sd_mainlog{width:100%;height:340px!important;max-height:none!important;display:block;margin-top:2px}  /* 로그 스케일 판 */
+  #sd_vol{width:100%;height:60px!important;max-height:none!important;display:block;margin-top:2px}
+  #sd_rsi{width:100%;height:60px!important;max-height:none!important;display:block;margin-top:2px}
+  #sd_macd{width:100%;height:76px!important;max-height:none!important;display:block;margin-top:2px}
+  #sd_inv{width:100%;height:96px!important;max-height:none!important;display:block;margin-top:2px}  /* 투자자별 누적순매수 (KR 전용) */
   .csrc.on{background:var(--dark);color:#fff;border-color:var(--dark)}
   .sg{margin-bottom:10px}
   .sgt{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;border-bottom:1px solid var(--line);padding-bottom:3px}
