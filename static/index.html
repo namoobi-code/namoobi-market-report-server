@@ -203,6 +203,9 @@
   .pane{display:none;flex:1;min-height:0;flex-direction:column}
   .pane.on{display:flex}
   /* (2026-07-26) 캘린더 페인 */
+  /* .pane(세로 flex)의 직계 자식이 flex-shrink 로 높이 1px 까지 압축되던 문제 — 뷰 버튼·헤더 고정 */
+  #p_cal>.mktseg,#p_etf>.mktseg,#p_cal>h2,#p_cal>p,#p_etf>h2{flex:0 0 auto}
+  #p_cal>.mktseg .mkt,#p_etf>.mktseg .mkt{padding:8px 16px;font-size:13.5px}
   .callay{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
   .calmain{flex:1;min-width:min(560px,100%)}
   .calpast{flex:0 0 300px;max-width:100%}

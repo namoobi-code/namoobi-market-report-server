@@ -2518,7 +2518,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     return true;
   }catch(e){ return false; } }
   function applyRestored(){
-    document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x.dataset.mkt===mkt));
+    document.querySelectorAll('#p_screener .mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x.dataset.mkt===mkt));
     document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',+x.dataset.stg===stage));
     $('scr_s1').style.display = stage===1?'':'none';
     $('scr_s2').style.display = stage===2?'':'none';
@@ -2588,7 +2588,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(!prepped){ prepped=true;
       if(!restoreScr()) resetF();
       loadF(); loadF2();
-      document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x.dataset.mkt===mkt));
+      document.querySelectorAll('#p_screener .mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x.dataset.mkt===mkt));
       document.querySelectorAll('.stgseg .stg').forEach(x=>x.classList.toggle('on',+x.dataset.stg===stage));
       $('scr_s1').style.display = stage===1?'':'none';   // 복원된 단계 pane 표시
       $('scr_s2').style.display = stage===2?'':'none';
@@ -2620,8 +2620,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }, 300000);
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
   // 마켓 토글
-  document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
-    document.querySelectorAll('.mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('#p_screener .mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{
+    document.querySelectorAll('#p_screener .mktseg:not(.stgseg) .mkt').forEach(x=>x.classList.toggle('on',x===b));
     mkt=b.dataset.mkt; loadF(); loadF2(); hideDetail();
     if(loaded) refresh(); else { renderChips(); waitScreen(); } renderLegend(); });   // 원복 안함 — 마켓별 선택 유지 · 설명도 시장 따라 갱신
   // 스테이지 토글 (1단계/2단계)
