@@ -1,5 +1,38 @@
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+
+/* ══════════════════════════════════════════════════════════════════
+   대시보드 자동 새로고침 — 켜둔 화면에 서버 갱신(cron·장중 증분)을 자동 반영. (2026-07-17 도입 → 07-19 재구성 때 유실 → 07-26 복원)
+   무작정 reload 하면 조작을 끊으므로: 탭 보이는 중 + 최근 60초 무조작 + 필터 팝오버 안 열림 일 때만.
+   스크리너·ETF·수급 패널은 자체 5분/10분 폴링으로 이미 실시간 → 그 화면에선 reload 생략(조작 보호).
+   활성 탭/화면은 sessionStorage 로 저장·복원. ══════════════════════════════════════════════════════════════════ */
+(function(){
+  const REFRESH_MIN=10, IDLE_MS=60*1000;
+  let lastAct=Date.now();
+  ['mousemove','keydown','click','scroll','touchstart','input'].forEach(ev=>
+    document.addEventListener(ev,()=>{lastAct=Date.now();},{passive:true,capture:true}));
+  // 복원
+  try{ const v=sessionStorage.getItem('nmr_view');
+    if(v){ sessionStorage.removeItem('nmr_view');
+      setTimeout(()=>{ if(v==='screener'){const b=document.getElementById('btn_screener'); if(b)b.click();}
+        else{const t=document.querySelector('.tab[data-pane="'+v+'"]'); if(t)t.click();} },500); }
+  }catch(e){}
+  function curView(){
+    const sb=document.getElementById('btn_screener');
+    if(sb&&sb.classList.contains('on')) return 'screener';
+    const t=document.querySelector('.tab.on'); return (t&&t.dataset.pane)||'p_db';
+  }
+  setInterval(()=>{
+    if(document.visibilityState!=='visible') return;          // 백그라운드 탭
+    if(Date.now()-lastAct<IDLE_MS) return;                    // 조작 중
+    if(document.querySelector('.fpop.open, .fpop.open, #scr_colpanel[style*="block"], #etf_colpanel:not([style*="none"])')) return; // 패널 조작 중
+    const v=curView();
+    // 스크리너·ETF 는 자체 폴링으로 실시간 → 전체 reload 생략(필터·정렬·컬럼 보존)
+    if(v==='screener'||v==='p_etf') return;
+    try{ sessionStorage.setItem('nmr_view',v); }catch(e){}
+    location.reload();
+  }, REFRESH_MIN*60*1000);
+})();
 const C={r:'#d64545',b:'#2f6fd0',g:'#1e9e6a',o:'#e08c1a',p:'#8358c4',k:'#16191d',gy:'#9aa3ad'};
 // 17개국용 서로 다른 색
 const PAL=['#d64545','#2f6fd0','#1e9e6a','#e08c1a','#8358c4','#0d9488','#be185d','#65a30d',

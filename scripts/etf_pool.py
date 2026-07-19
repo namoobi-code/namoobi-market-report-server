@@ -21,21 +21,27 @@ LEV_RE = re.compile(r"레버리지|인버스|(?<![A-Za-z])[23]X|X[23](?![A-Za-z]
 
 
 def _series_stats(cl):
-    """일봉 종가열 → 기간수익률·변동성·200일선·52주 고점比."""
+    """일봉 종가열 → 기간수익률·변동성·200일선·52주 고점比.
+       (2026-07-26) 장중 5분 재계산용 앵커도 함께 저장 — a1m/a3m/a6m/a1y(과거 종가),
+       ma200(200일 이평), hi52(52주 최고가). etf_intraday 가 현재가로 O(1) 재계산."""
     o = {}
     n = len(cl)
-    for lbl, dd in (("r1m", 21), ("r3m", 63), ("r6m", 126), ("r1y", 250)):
+    for lbl, albl, dd in (("r1m", "a1m", 21), ("r3m", "a3m", 63), ("r6m", "a6m", 126), ("r1y", "a1y", 250)):
         if n > dd and cl[-dd-1]:
             o[lbl] = round(cl[-1]/cl[-dd-1]-1, 4)
+            o[albl] = cl[-dd-1]
     if n >= 21:
         rets = [cl[i]/cl[i-1]-1 for i in range(n-20, n) if cl[i-1]]
         if len(rets) >= 10:
             mu = sum(rets)/len(rets)
             o["vol20"] = round((sum((x-mu)**2 for x in rets)/len(rets))**0.5*100, 2)
     if n >= 100:
-        o["v200"] = round(cl[-1]/(sum(cl[-200:])/min(200, n))-1, 4)
+        ma200 = sum(cl[-200:])/min(200, n)
+        o["ma200a"] = ma200
+        o["v200"] = round(cl[-1]/ma200-1, 4)
     hi = max(cl[-250:]) if n else None
     if hi:
+        o["hi52a"] = hi
         o["hi"] = round(cl[-1]/hi-1, 4)
     return o
 
@@ -177,7 +183,7 @@ def us_collect():
                 continue
             st = _series_stats(cl)
             for k, v in st.items():
-                if k in ("r1m", "r3m", "r6m", "vol20"):
+                if k in ("r1m", "r3m", "r6m", "vol20", "a1m", "a3m", "a6m", "ma200a", "hi52a"):
                     r.setdefault(k, v)
             ok2 += 1
     print(f"[etf] US {len(rows)}종 · spark {ok2}종")

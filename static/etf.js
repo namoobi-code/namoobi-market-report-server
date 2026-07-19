@@ -293,14 +293,27 @@
   }
   function apply(){ applyTable(); renderChips(); }
 
+  function statusText(d){ return `기준 ${d.asof||''}${d.live_at?' · 🟢 '+d.live_at:''} · KR ${(d.kr||[]).length}종 · US ${(d.us||[]).length}종 <span class="note">· 장중 자동갱신 KR 1분·US 3분(시간외 포함)</span>`; }
   function start(){
     const st=$('etf_status'); if(st) st.textContent='ETF 풀 불러오는 중…';
     fetch('/api/db/etf_pool').then(r=>r.json()).then(d=>{
       POOL={kr:d.kr||[],us:d.us||[]}; loaded=true;
-      if(st) st.textContent=`기준 ${d.asof||''} · KR ${POOL.kr.length}종 · US ${POOL.us.length}종`;
+      if(st) st.innerHTML=statusText(d);
       apply();
     }).catch(e=>{ if(st) st.textContent='ETF 풀 로드 실패 — 수집이 아직 안 됐을 수 있습니다: '+e; });
   }
+  /* (2026-07-26) 장중 LIVE: 서버 증분(KR 1분·US 3분) 갱신 풀을 1분마다 자동 재조회 (탭 열림·화면 보일 때만) */
+  setInterval(()=>{
+    if(!loaded) return;
+    const p=document.getElementById('p_etf');
+    if(!p||!p.classList.contains('on')||document.visibilityState!=='visible') return;
+    fetch('/api/db/etf_pool').then(r=>r.json()).then(d=>{
+      if(!d||!d.kr) return;
+      POOL={kr:d.kr||[],us:d.us||[]};
+      const st=$('etf_status'); if(st) st.innerHTML=statusText(d);
+      apply();
+    }).catch(()=>{});
+  }, 60000);
   /* 시장 토글 */
   document.querySelectorAll('#p_etf .mkt[data-emkt]').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#p_etf .mkt[data-emkt]').forEach(x=>x.classList.toggle('on',x===b));
