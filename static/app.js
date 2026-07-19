@@ -101,7 +101,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('meta').innerHTML=`최신 리포트 <b>${esc(rs[0]?.datetime||'—')}</b>`;
   // (2026-07-12) 앱셸 — 헤더·좌측(아카이브·APK·DB인벤토리)·nav 는 고정, 본문(.mainc)만 스크롤.
   //   좌측 항목(보고서·DB)은 항상 보이므로 nav 에서 뺀다 — nav 는 본문 섹션 점프 전용.
-  $('nav').innerHTML=[['slive','실시간 시세'],['s2','2 캘린더'],
+  $('nav').innerHTML=[['slive','실시간 시세'],
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['d316','3.1.6 FactSet'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
     ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],['s78','7.8 네이버'],
@@ -818,9 +818,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const g=i=>document.getElementById(i);
       g('cal_asof').textContent='갱신: '+(d.as_of||'');
       const today=new Date().toISOString().slice(0,10);
-      const up=(d.upcoming||[]).filter(r=>r.date>=today);
-      g('cal_up').insertAdjacentHTML('beforeend', up.map(row).join('')||'<tr><td colspan="5" class="note">데이터 없음</td></tr>');
-      g('cal_lt').insertAdjacentHTML('beforeend', (d.longterm||[]).map(row).join('')||'<tr><td colspan="5" class="note">데이터 없음</td></tr>');
+      // (2026-07-26) 다가오는/중장기 자체 표 삭제 — 2.1/2.2/2.3(d_ev·d_evl·d_evb, 이동해 옴)이 대체.
+      //   여기서는 '지난 이벤트(최근 1주)'만 렌더한다.
       const wk=new Date(Date.now()-7*86400000).toISOString().slice(0,10); const seen=new Set();
       const past=[...(d.past||[]),...(d.upcoming||[])].filter(r=>r.date&&r.date<today&&r.date>=wk)
         .filter(r=>{const k=r.date+'|'+r.event; if(seen.has(k))return false; seen.add(k); return true;})
@@ -946,7 +945,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   $$('d_asof').innerHTML=`<b>기준 ${E(R.report_date)}</b> · ${E((R.metadata||{}).generated_at||'')}
     <span class="note">— 매 실행 새로 조사되는 값. DB로 누적하지 않는 그날의 스냅샷이다.</span>`;
-  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d23','2.3 빅테크'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
+  $$('nav_d').innerHTML=[['d1','1 뉴스'],['d317','3.1.7 M7'],['d3112','3.1.12 심리'],['d32','3.2 한국'],['d321','3.2.1 수급'],['d322','3.2.2 종목수급'],['d323','3.2.3 테마'],['d323s','반도체·AI 종목'],['d323e','반도체·AI ETF'],['s32','3.2.4·5 KRX브리프'],
     ['d33','3.3 미국'],['d331','3.3.1 美ETF'],['d34','3.4 아시아'],['d35','3.5 유럽'],['d36','3.6 북미·중남미'],['d37','3.7 호주·중동'],
     ['d41','4.1 에너지'],['d42','4.2 금속'],['d43','4.3 농산물'],['d44','4.4 비철금속'],['d5','5 환율'],['d7','7 증권사'],['d8','8 글로벌IB'],
     ['dB','부록B AI'],['dC','부록C 밸류체인'],['dD','부록D 관계도']]
