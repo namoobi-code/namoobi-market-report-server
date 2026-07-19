@@ -287,10 +287,73 @@
       cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
       (rows.length?'':`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center;padding:16px">조건을 통과한 ETF 가 없습니다</td></tr>`)+
       (rows.length>400?`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종)</td></tr>`:'');
-    $('etf_tbl').querySelectorAll('[data-es]').forEach(th=>th.onclick=()=>{
+    // (2026-07-26) 행에 data-c(코드) 부여 + 클릭 → 상세
+    $('etf_tbl').querySelectorAll('tr').forEach((tr,i)=>{ if(i===0) return;
+      const r=cap[i-1]; if(!r) return; tr.setAttribute('data-c',r.c); tr.onclick=()=>showDetail(r); });
+    $('etf_tbl').querySelectorAll('[data-es]').forEach(th=>th.onclick=e=>{ e.stopPropagation();
       const k=th.dataset.es; if(sort.k===k)sort.d*=-1; else{sort.k=k;sort.d=(CDEF[k].n)?-1:1;} applyTable();});
-    {const pl=$('etf_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
+    {const pl=$('etf_colplus'); if(pl) pl.onclick=e=>{e.stopPropagation(); toggleColPanel();};}
   }
+
+  /* ── 종목 상세 (좌 차트 · 우 정보) ── */
+  let dcode=null;
+  const _sma=(a,n)=>a.map((_,i)=>{ if(i<n-1) return null; let s=0; for(let j=i-n+1;j<=i;j++){ if(a[j]==null) return null; s+=a[j]; } return s/n; });
+  function _cvs(id){ const cv=$(id); const w=cv.clientWidth||760,h=cv.clientHeight||80; cv.width=w; cv.height=h; const x=cv.getContext('2d'); x.clearRect(0,0,w,h); return [x,w,h]; }
+  function drawChart(D){
+    const c=(D.c||[]).map((v,i)=>v==null?(D.c[i-1]??null):v);
+    const N=Math.min(260,c.length), off=c.length-N;
+    const cl=c.slice(off), o=(D.o||[]).slice(off), hh=(D.h||[]).slice(off), ll=(D.l||[]).slice(off), v=(D.v||[]).slice(off).map(x=>x||0), t=(D.t||[]).slice(off);
+    const ma20=_sma(c,20).slice(off), ma60=_sma(c,60).slice(off);
+    const UP='#d33',DN='#1f6feb';
+    // ① 캔들 + MA20/60
+    {const [x,W,H]=_cvs('ed_main'); const P={l:6,r:54,t:8,b:16};
+     const lo=Math.min(...ll.filter(y=>y!=null)), hi=Math.max(...hh.filter(y=>y!=null));
+     const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p-lo)/((hi-lo)||1));
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.strokeStyle='#eceff3';
+     for(let g=0;g<=3;g++){ const p=lo+(hi-lo)*g/3,y=Y(p); x.beginPath();x.moveTo(P.l,y);x.lineTo(W-P.r,y);x.stroke();
+       x.fillText(mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2),W-P.r+4,y+3); }
+     const bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ if(cl[i]==null)continue; const up=cl[i]>=(o[i]??cl[i]); x.strokeStyle=x.fillStyle=up?UP:DN;
+       x.beginPath(); x.moveTo(X(i),Y(hh[i]??cl[i])); x.lineTo(X(i),Y(ll[i]??cl[i])); x.stroke();
+       const y1=Y(Math.max(o[i]??cl[i],cl[i])),y2=Y(Math.min(o[i]??cl[i],cl[i])); x.fillRect(X(i)-bw/2,y1,bw,Math.max(1,y2-y1)); }
+     const line=(a,col)=>{ x.strokeStyle=col;x.lineWidth=1.4;x.beginPath();let s=false;
+       for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true);} x.stroke();x.lineWidth=1; };
+     line(ma20,'#f39c12'); line(ma60,'#27ae60');
+     x.fillStyle='#98a2ad'; for(let g=0;g<5;g++){ const i=Math.floor(N*g/5),d=String(t[i]||'').replace(/-/g,''); x.fillText(d.slice(2,4)+'.'+d.slice(4,6),X(i)-10,H-4); } }
+    // ② 거래량
+    {const [x,W,H]=_cvs('ed_vol'); const P={l:6,r:54,t:2,b:2};
+     const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ x.fillStyle=(cl[i]>=(o[i]??cl[i]))?'rgba(221,51,51,.45)':'rgba(31,111,235,.45)'; const h2=(H-P.t-P.b)*v[i]/vm; x.fillRect(X(i)-bw/2,H-P.b-h2,bw,h2); }
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('VOL',W-P.r+4,12); }
+  }
+  function infoRows(r){
+    const pctS=v=>v==null?'—':`<b class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${(v*100).toFixed(1)}%</b>`;
+    const G=[['시세',[['가격',cell(r,'px')],['등락',cell(r,'chg')],['AUM',cell(r,'cap')],['거래대금',cell(r,'tv')]]],
+      ['기간수익률',[['1M',pctS(r.r1m)],['3M',pctS(r.r3m)],['6M',pctS(r.r6m)],['1Y',pctS(r.r1y)]]],
+      ['기술',[['변동성(20일)',r.vol20!=null?r.vol20.toFixed(1)+'%':'—'],['200일선',pctS(r.v200)],['고점比',r.hi!=null?(r.hi*100).toFixed(0)+'%':'—']]],
+      ['ETF 정보',[[(mkt==='kr'?'자산군':'거래소'),cell(r,'asset')],['총보수',cell(r,'fee')],['분배율',cell(r,'divy')]
+        ].concat(mkt==='kr'?[['괴리율',cell(r,'dev')],['운용사',r.issuer?`<b>${E(r.issuer)}</b>`:'—'],['월배당',r.md?'<b class="up">월배당</b>':'—']]:[])
+        .concat([['레버리지·인버스',r.lev?'<b class="dn">예</b>':'아니오'],['상장기간',cell(r,'yr')]]) ]];
+    return G.map(([t,its])=>`<div class="sgt">${t}</div>`+its.map(it=>`<div class="si"><span class="note">${it[0]}</span>${it[1]}</div>`).join('')).join('');
+  }
+  function showDetail(r){
+    dcode=r.c;
+    $('etf_detail').style.display='';
+    $('ed_name').textContent = mkt==='kr'?r.n:r.c;
+    $('ed_code').textContent = mkt==='kr'?r.c:(r.n||'');
+    $('ed_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
+    $('ed_sum').innerHTML = infoRows(r);
+    $('ed_src').textContent='종가 기준 일봉(최근 1년) · '+(mkt==='kr'?'네이버':'Yahoo')+' · MA20 주황 · MA60 초록';
+    fetch(`/api/chart/${mkt}/${encodeURIComponent(r.c)}`).then(x=>x.json()).then(D=>{
+      if(dcode!==r.c) return; drawChart(D);
+    }).catch(()=>{ $('ed_src').textContent='차트 로드 실패'; });
+    $('etf_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
+  }
+  {const cb=$('ed_close'); if(cb) cb.onclick=()=>{ $('etf_detail').style.display='none'; dcode=null; };}
+  {const nv=$('ed_nvopen'); if(nv) nv.onclick=()=>{ if(!dcode) return;
+    const url = mkt==='kr' ? `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(dcode)}`
+                           : `https://finance.yahoo.com/quote/${encodeURIComponent(dcode)}`;
+    window.open(url,'etf_ext','width=1150,height=900'); };}
   function apply(){ applyTable(); renderChips(); }
 
   function statusText(d){ return `기준 ${d.asof||''}${d.live_at?' · 🟢 '+d.live_at:''} · KR ${(d.kr||[]).length}종 · US ${(d.us||[]).length}종 <span class="note">· 장중 자동갱신 KR 1분·US 3분(시간외 포함)</span>`; }
