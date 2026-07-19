@@ -74,6 +74,37 @@ def summary_of(read_url):
     except Exception:
         return ""
 
+def pdf_summary(pdf_url):
+    """(req6 2026-07-19) PDF 1페이지에서 핵심 1줄 추출 — 상세페이지 본문이 빈 리포트용 폴백.
+    pdftotext(poppler) 사용, 실패 시 ""(비차단). 보일러플레이트(날짜·증권사명·URL 등) 줄은 건너뛴다."""
+    import subprocess, tempfile, os, urllib.request
+    if not pdf_url:
+        return ""
+    try:
+        req = urllib.request.Request(pdf_url, headers={"User-Agent": "Mozilla/5.0"})
+        data = urllib.request.urlopen(req, timeout=12).read(3 * 1024 * 1024)
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            f.write(data); tmp = f.name
+        try:
+            r = subprocess.run(["pdftotext", "-f", "1", "-l", "1", tmp, "-"],
+                               capture_output=True, text=True, timeout=15)
+            txt = r.stdout or ""
+        finally:
+            os.unlink(tmp)
+        out = []
+        for ln in txt.splitlines():
+            s = re.sub(r"\s+", " ", ln).strip()
+            if len(s) < 12:
+                continue
+            if re.search(r"(https?://|@|리서치센터|Research|Compliance|투자의견 및|20\d{2}[-./]\s?\d{1,2}[-./]\s?\d{1,2}\s*$)", s):
+                continue
+            out.append(s)
+            if sum(len(x) for x in out) > 90:
+                break
+        return " ".join(out)[:110]
+    except Exception:
+        return ""
+
 def main():
     per, recent = {}, {c: [] for c, _ in LISTS}
     d2 = (datetime.now() - timedelta(days=2)).strftime("%y.%m.%d")
@@ -100,12 +131,12 @@ def main():
                 if dt >= d2:
                     recent[cat].append(item)
 
-    # 최근 2일치엔 간단요약 (예산 내)
+    # 최근 2일치엔 간단요약 (예산 내) — (req6 2026-07-19) 상세페이지 빈 본문이면 PDF 1페이지 추출 폴백
     for cat in recent:
         for it in recent[cat]:
             if fetch_budget <= 0:
                 break
-            it["summary"] = summary_of(it["url"])
+            it["summary"] = summary_of(it["url"]) or pdf_summary(it.get("pdf"))
             fetch_budget -= 1
 
     firms = [{"broker": b, "official": OFFICIAL.get(b, ""), "naver": NV,

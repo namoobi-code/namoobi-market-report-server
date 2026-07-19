@@ -188,6 +188,12 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     {n:'Core PCE',d:V(ipc),c:C.g},{n:'PPI',d:V(ippi),c:C.gy}],{legend:true});
   const bei=S(b,'series_infl_exp');
   mk($('c_bei'),L(bei),[{n:'BEI',d:V(bei),c:C.p}]);
+  /* (req7 2026-07-19) BEI 현재값 텍스트 표시 — 차트 컨테이너 바로 위에 최신값·기준일 캡션 */
+  try{ const bv=V(bei), bl=L(bei), be=$('c_bei');
+    if(be&&bv&&bv.length){ let cap=document.getElementById('bei_now');
+      if(!cap){ cap=document.createElement('div'); cap.id='bei_now'; cap.className='note';
+        cap.style.cssText='margin:2px 0 4px;font-weight:600'; be.parentNode.insertBefore(cap,be); }
+      cap.innerHTML=`현재 <b>${(+bv[bv.length-1]).toFixed(2)}%</b> <span style="font-weight:400">(${esc(bl[bl.length-1]||'')} 기준 · 10Y BEI 실시간)</span>`; } }catch(e){}
 
   /* ── 3.1.3 고용 ── (req3 2026-07-18) docx 표와 동일 컬럼: 지표·최신수치·기준·발표일자·의미·시장영향·예상영향 */
   $('emp').innerHTML=`<tr><th>지표</th><th style="text-align:right">최신 수치</th><th>기준</th><th>발표일자</th>
