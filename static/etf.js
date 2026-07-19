@@ -175,9 +175,18 @@
       ['월배당','월분배(월배당) ETF 만 필터']);
     else g.push(['괴리율·월배당','미국 미제공 (Yahoo 데이터에 iNAV·분배주기 없음)'],
       ['레버리지·인버스','이름 기반 판별 (3X·Inverse 등, 토글로 제외)']);
+    // (2026-07-26) 항목 라벨 옆 카테고리 배지 (종목 스크리너와 동일 방식)
     return `<div class="note" style="margin-bottom:8px">ETF 전종목(${KR?'네이버':'Yahoo'})을 필터로 실시간 압축한다. 1단계 하드컷 방식(2·3단계 없음).</div>`
-      +`<div class="lgcols">`+g.map(x=>`<div class="lgit"><b>${x[0]}</b> = ${E(x[1])}</div>`).join('')+`</div>`;
+      +`<div class="lgcols">`+g.map(x=>{const c=etfCat(x[0]); return `<div class="lgit"><b>${x[0]}</b>${c?` <span class="lgcat">[${c}]</span>`:''} = ${E(x[1])}</div>`;}).join('')+`</div>`;
   }
+  /* 필터설명 라벨 → 카테고리 (ETF 상세 요약 그룹과 동일 분류) */
+  const ETFCAT={
+    '종목찾기':'시세','자산군':'시세','거래소':'시세','가격':'시세','등락':'시세','AUM':'시세','거래대금':'시세',
+    '수익률 1M·3M·6M·1Y':'기간수익률','변동성(20일)':'기간수익률',
+    '200일선':'기술적 지표','고점比':'기술적 지표',
+    '총보수':'ETF 정보','분배율':'ETF 정보','괴리율':'ETF 정보','괴리율·월배당':'ETF 정보','운용사':'ETF 정보',
+    '레버리지·인버스':'ETF 정보','월배당':'ETF 정보','상장기간':'기타'};
+  function etfCat(label){ return ETFCAT[label] || null; }
   let legOpen=false;
   function toggleLegend(f){ legOpen=f!=null?f:!legOpen;
     const p=$('etf_glspanel'); if(p){ p.style.display=legOpen?'':'none'; if(legOpen) p.querySelector('.lgbody').innerHTML=legendHTML(); } }
