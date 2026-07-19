@@ -1876,7 +1876,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
     $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
-    const cvs=['sd_main','sd_mainlog','sd_vol','sd_rsi','sd_macd','sd_inv'];
+    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
     /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
     const mode = mkt==='kr' ? 'canvas' : chartSrc;
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
@@ -1991,7 +1991,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-4); }
      if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 14); }
     };
-    drawMain('sd_main',false); drawMain('sd_mainlog',true);
+    drawMain('sd_main',false);   // 로그 판은 (2026-07-26) 제거 — drawMain 의 useLog 경로는 남겨둠
     // ② 거래량
     {const [x,W,H]=_cvs('sd_vol'); const P={l:6,r:52,t:2,b:2};
      const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
