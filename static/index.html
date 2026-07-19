@@ -483,18 +483,22 @@
   <!-- ⓪ 최초 진입 인사 화면 -->
   <div class="pane on" id="p_welcome"><div class="wel"><div id="wel_msg"></div></div></div>
 
-  <!-- (2026-07-26) ETF 스크리너 페인 — UI 골격 (1단계 하드컷만, 필터 구성은 협의 중) -->
+  <!-- (2026-07-26) ETF 스크리너 — 1단계 하드컷 (etf.js · /api/db/etf_pool) -->
   <div class="pane" id="p_etf" style="overflow:auto">
-    <h2 style="margin:8px 0 3px">📦 ETF 스크리너 <span class="note" style="font-weight:400">1단계 하드컷 전용 · 준비 중</span></h2>
-    <div class="mktseg" style="margin:6px 0 10px">
-      <button class="mkt on" data-emkt="kr">🇰🇷 한국</button>
-      <button class="mkt" data-emkt="us">🇺🇸 미국</button>
+    <h2 style="margin:8px 0 3px">📦 ETF 스크리너 <span class="note" id="etf_status" style="font-weight:400">START 를 누르면 ETF 풀을 불러옵니다</span></h2>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 8px">
+      <div class="mktseg">
+        <button class="mkt on" data-emkt="kr">🇰🇷 한국</button>
+        <button class="mkt" data-emkt="us">🇺🇸 미국</button>
+      </div>
+      <span class="scrcnt" id="etf_cnt">—</span>
+      <div style="margin-left:auto;display:flex;gap:7px">
+        <button class="scrrst" id="etf_rst">↺ 필터 초기화</button>
+        <button class="scrrst scrgo" id="etf_start">▶ START</button>
+      </div>
     </div>
-    <div class="box" style="padding:14px 16px">
-      <p class="note" style="margin:0 0 8px"><b>UI 골격입니다.</b> 전종목 풀(ETF 제외)과 별도로 ETF 전용 풀을 수집해
-        아래 후보 필터로 하드컷을 걸 예정입니다. 필터 구성 확정 후 활성화합니다.</p>
-      <div id="etf_prev" class="note" style="line-height:1.7"></div>
-    </div>
+    <div class="fltbar" id="etf_fltbar" style="margin-bottom:9px"></div>
+    <div class="box" style="overflow:auto"><table id="etf_tbl"><tr><td class="note" style="padding:14px;text-align:center">필터를 설정한 뒤 ▶ START 를 누르세요. (KR: 괴리율·총보수·분배율 = 네이버 / US: AUM·expense = Yahoo)</td></tr></table></div>
   </div>
 
   <!-- (2026-07-26) 캘린더 페인 — calendar.html 전체 페이지 대신 대시보드 안에서 표시 -->
@@ -1053,6 +1057,12 @@
   <div id="lg_err"></div>
 </div></div>
 <script src="/app.js"></script>
+<script src="/etf.js"></script><!-- (2026-07-26) ETF 스크리너 -->
+<style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
+.etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
+#etf_tbl th{position:sticky;top:0;z-index:2;background:#eef2f7;cursor:pointer;white-space:nowrap;user-select:none}
+#etf_tbl th.dn::after{content:" \25be";color:#1f6feb} #etf_tbl th.up::after{content:" \25b4";color:#1f6feb}
+#p_etf>div,#p_etf>h2{flex:0 0 auto}</style>
 <script src="/ta.js"></script>
 <script src="/visitors.js"></script>
 </body></html>

@@ -989,7 +989,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     T('d_evl',EH, ((R.news||{}).events_calendar_longterm||[]).map(EV)); };
   fetch('/api/db/events_calendar').then(r=>r.json()).then(ec=>{
     const today=new Date().toISOString().slice(0,10);
-    const up=(ec.upcoming||[]).filter(e=>e.date>=today), lt=(ec.longterm||[]);
+    // (2026-07-26) 빅테크는 2.3 전용 — 2.1 에서 제외(중복 표시 방지)
+    const up=(ec.upcoming||[]).filter(e=>e.date>=today && e.region!=='빅테크'), lt=(ec.longterm||[]);
     if(up.length) T('d_ev', EH, up.map(EV)); else T('d_ev', EH, ((R.news||{}).events_calendar||[]).map(EV));
     if(lt.length) T('d_evl',EH, lt.map(EV)); else T('d_evl',EH, ((R.news||{}).events_calendar_longterm||[]).map(EV));
   }).catch(_evFallback);

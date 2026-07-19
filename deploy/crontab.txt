@@ -38,7 +38,11 @@
 58 15 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_perf.py >> /home/ubuntu/namoobi/ta_perf.log 2>&1
 58 6 * * * cd /home/ubuntu/namoobi && python3 scripts/ta_perf.py >> /home/ubuntu/namoobi/ta_perf.log 2>&1
 52 15 * * * cd /home/ubuntu/namoobi && python3 scripts/screener_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
+# (2026-07-26) ETF 풀 — screener_pool 종료 후
+35 16 * * * cd /home/ubuntu/namoobi && python3 scripts/etf_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
 52 6  * * * cd /home/ubuntu/namoobi && python3 scripts/screener_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
+# (2026-07-26) ETF 풀 — screener_pool 종료 후
+35 7 * * * cd /home/ubuntu/namoobi && python3 scripts/etf_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
 */5 9-15 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/intraday_kr.py >> /home/ubuntu/namoobi/intraday.log 2>&1
 */5 22-23 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/intraday_us.py >> /home/ubuntu/namoobi/intraday_us.log 2>&1
 */5 0-6 * * 2-6 cd /home/ubuntu/namoobi && python3 scripts/intraday_us.py >> /home/ubuntu/namoobi/intraday_us.log 2>&1
