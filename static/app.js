@@ -589,7 +589,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     kr_liquidity:'국내 유동성·레버리지 — 예탁금·미수금·반대매매·신용잔고(코스피/코스닥)·M2 (3.1.14, 원본=data/kr_liquidity.db)',
     oecd_cli:'OECD 경기선행지수(CLI) 주요국 월별 (3.1.4)',
     policy_rates:'주요 6개국 정책금리 daily 실측 — 美FRED·韓ECOS·유로존FRED·영일중 global-rates, monthly 이력 자동 upsert (3.1.1)',
-    events_calendar:'경제 이벤트 캘린더 뼈대 — FRED 발표일정(실측)+FOMC+중앙은행 회의+만기 규칙+직전 보고서 검증분 (2장·📅 calendar.html)',
+    events_calendar:'경제 이벤트 캘린더 뼈대 — FRED 발표일정(실측)+FOMC+중앙은행 회의+만기 규칙+직전 보고서 검증분 (2장·📅 캘린더 탭)',
     cb_meetings:'중앙은행 회의 일정 시드 — ECB·BOJ·BOE·한은·LPR (events_calendar 입력)',
     brokers3:'한국투자 한눈에 투데이 모닝브리프 본문(직전 영업일 자동) — 7장 Chrome 대체',
     ism_pmi:'ISM 제조/서비스 최신 공표치 — PRNewswire 헤드라인 실측 파싱 (3.1.3)',
