@@ -853,10 +853,29 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const isT=inM&&dt.getTime()===tds.getTime();
         const wd=i%7;
         const chips=list.slice(0,4).map(r=>`<span class="mc-chip" title="${esc(r.n)} (${esc(r.c)}) 실적발표">${esc(mk==='kr'?r.n:r.c)}</span>`).join('')
-          +(list.length>4?`<span class="mc-more">+${list.length-4}종 더</span>`:'');
-        h+=`<div class="mc-cell ${inM?'':'out'} ${isT?'tdy':''}"><div class="mc-d ${wd===0?'sun':wd===6?'sat':''}">${inM?dnum:''}</div>${inM?chips:''}</div>`;
+          +(list.length>4?`<span class="mc-more">+${list.length-4}종 더 보기</span>`:'');
+        h+=`<div class="mc-cell ${inM?'':'out'} ${isT?'tdy':''} ${list.length?'has':''}" ${list.length?`data-k="${key}"`:''}
+             title="${list.length?'클릭하면 이날 전체 '+list.length+'종 표시':''}"><div class="mc-d ${wd===0?'sun':wd===6?'sat':''}">${inM?dnum:''}</div>${inM?chips:''}</div>`;
       }
       grid.innerHTML=h;
+      /* (2026-07-26) 날짜 칸 클릭 → 그날 전체 종목 팝업 (많아서 잘린 날 대응) */
+      grid.querySelectorAll('.mc-cell.has').forEach(cell=>cell.onclick=()=>{
+        const key=cell.dataset.k, list=evs[key]||[];
+        const wdn=['일','월','화','수','목','금','토'][new Date(key+'T00:00:00').getDay()];
+        const old=document.querySelector('.mc-pop'); if(old) old.remove();
+        const pop=document.createElement('div'); pop.className='mc-pop';
+        pop.innerHTML=`<div class="mc-pop-in"><div class="mc-pop-h">
+            <b>📅 ${key} (${wdn}) 실적발표 — ${list.length}종</b>
+            <span class="note" style="margin-left:auto">시가총액순</span>
+            <button class="cp-x" id="mcp_x">닫기 ✕</button></div>
+          <div class="mc-pop-list">${list.map((r,i)=>
+            `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> <b>${esc(mk==='kr'?r.n:r.c)}</b> <span class="note">${esc(mk==='kr'?r.c:r.n)}</span></div>`).join('')}
+          </div></div>`;
+        pop.onclick=e=>{ if(e.target===pop) pop.remove(); };
+        pop.querySelector('#mcp_x').onclick=()=>pop.remove();
+        document.addEventListener('keydown',function esc0(e){ if(e.key==='Escape'){ pop.remove(); document.removeEventListener('keydown',esc0); } });
+        document.body.appendChild(pop);
+      });
       document.getElementById('mc_title').textContent=`${mcY}년 ${mcM+1}월`;
       document.getElementById('mc_note').textContent=
         (mk==='kr'?'네이버 IR 일정(대형주 위주)':'Yahoo earnings date')+` · 이 달 실적발표 ${cnt}건 · 셀당 최대 4종(시총순)`;
