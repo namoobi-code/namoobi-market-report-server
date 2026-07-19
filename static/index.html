@@ -208,8 +208,9 @@
   .calpast{flex:0 0 300px;max-width:100%}
   .calh{font-size:14px;margin:12px 0 6px;color:#0e7490}
   .cal-dday{display:inline-block;min-width:40px;text-align:center;padding:1px 6px;border-radius:999px;font-size:11px;font-weight:700;background:#e0f2fe;color:#075985}
-  .cal-dday.today{background:#dc2626;color:#fff}
-  .cal-dday.soon{background:#f59e0b;color:#fff}
+  /* 기존 .soon(준비중 화면)·.today 와 충돌 방지 — cal- 접두어로 완전 분리 */
+  .cal-dday.cal-today{background:#dc2626;color:#fff}
+  .cal-dday.cal-soon{background:#f59e0b;color:#fff}
   .cal-imp3{color:#dc2626;font-weight:700}.cal-imp2{color:#d97706;font-weight:600}.cal-imp1{color:var(--tx2)}
   .cal-region{display:inline-block;padding:1px 7px;border-radius:6px;background:#f1f5f9;font-size:11px;color:#334155}
   /* 최초 진입 인사 화면 */

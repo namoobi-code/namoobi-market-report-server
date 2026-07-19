@@ -807,8 +807,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const impC=s=>String(s||'').includes('★★★')?'cal-imp3':(String(s||'').includes('★★')?'cal-imp2':'cal-imp1');
     const wd=d0=>{try{return ['일','월','화','수','목','금','토'][new Date(d0+'T00:00:00').getDay()]}catch(e){return ''}};
     const dd=d0=>{try{const t=new Date();t.setHours(0,0,0,0);const n=Math.round((new Date(d0+'T00:00:00')-t)/86400000);
-      if(n===0)return '<span class="cal-dday today">TODAY</span>';
-      if(n>0&&n<=3)return `<span class="cal-dday soon">D-${n}</span>`;
+      if(n===0)return '<span class="cal-dday cal-today">TODAY</span>';
+      if(n>0&&n<=3)return `<span class="cal-dday cal-soon">D-${n}</span>`;
       if(n>0)return `<span class="cal-dday">D-${n}</span>`;
       return '';}catch(e){return ''}};
     const row=r=>`<tr><td><b>${esc((r.date||'').slice(5))}</b><span class="note">(${wd(r.date)})</span> ${dd(r.date)}</td>
@@ -1642,6 +1642,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     });
     parts.unshift(findChipHTML());   // 종목 찾기 칩 = 필터 바 맨 앞(시장 왼쪽)
     $('scr_fltbar').innerHTML=parts.join('');
+    /* (2026-07-26) innerHTML 로 BTNS_GRP(START·컬럼설정)가 분리된 직후 아래 배선에서
+       예외가 나면 placeBtns 재부착을 못 해 START 가 사라진다 — finally 로 봉쇄 */
+    try{
     // 이벤트
     $('scr_fltbar').querySelectorAll('[data-chip]').forEach(b=>b.onclick=e=>{
       e.stopPropagation(); const k=b.dataset.chip; const p=$('pop_'+k); const wasOpen=p.classList.contains('open');
@@ -1675,7 +1678,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(!(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)&&ae.id!=='find_in')){
         fi.focus(); if(findCaret!=null) fi.setSelectionRange(findCaret,findCaret); }
     }}
-    placeBtns();   // innerHTML 재작성 후 버튼 그룹 재부착
+    }catch(err){ console.error('[renderChips] 배선 오류:', err); }
+    finally{ placeBtns(); }   // innerHTML 재작성 후 버튼 그룹 재부착 — 예외가 나도 반드시
   }
 
   /* ── 컬럼 레지스트리 (표시 On/OFF + 순서 변경) ── */
