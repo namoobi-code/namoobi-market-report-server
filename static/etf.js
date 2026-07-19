@@ -95,6 +95,93 @@
     return true;
   }
 
+  /* ── 전부전체 (모든 필터를 '전체'로) ── */
+  function clearF(){ const o={},d=DEF[mkt];
+    for(const k of KEYS){const f=d[k]; if(!f||f.fixed!==undefined)continue;
+      if(f.tgl)o[k]={on:false}; else if(f.cat)o[k]={v:null}; else o[k]={min:null,max:null};}
+    return o;}
+
+  /* ── 컬럼 관리 (종목 스크리너와 동일 UX, localStorage 저장) ── */
+  const CDEF={  // 표 컬럼 정의 (라벨·숫자여부·시장) — 모든 필터가 컬럼이 되도록 전체 수록
+    n:{l:'종목',n:0,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
+    px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'}, cap:{l:'AUM',n:1,m:'both'},
+    tv:{l:'거래대금',n:1,m:'both'}, fee:{l:'총보수',n:1,m:'both'}, dev:{l:'괴리율',n:1,m:'kr'},
+    divy:{l:'분배율',n:1,m:'both'}, r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
+    r6m:{l:'수익률 6M',n:1,m:'both'}, r1y:{l:'수익률 1Y',n:1,m:'both'}, vol20:{l:'변동성(20일)',n:1,m:'both'},
+    v200:{l:'200일선',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, yr:{l:'상장기간',n:1,m:'both'},
+    lev:{l:'레버리지',n:0,m:'both'}, md:{l:'월배당',n:0,m:'kr'}
+  };
+  const CORDER=['n','asset','exch','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr','lev','md'];
+  const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
+  const CDEFAULT={
+    kr:['n','asset','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr'],
+    us:['n','exch','px','chg','cap','tv','fee','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr']
+  };
+  let COLST={kr:CDEFAULT.kr.slice(),us:CDEFAULT.us.slice()};
+  const CKEY='nmr_etfcols_v1'; let colsSaved=false;
+  const saveCols=()=>{try{localStorage.setItem(CKEY,JSON.stringify(COLST));colsSaved=true;}catch(e){}};
+  const clearCols=()=>{try{localStorage.removeItem(CKEY);}catch(e){}colsSaved=false;};
+  (function loadCols(){try{const raw=localStorage.getItem(CKEY); if(!raw)return;
+    const d=JSON.parse(raw); if(!d||!Array.isArray(d.kr)||!Array.isArray(d.us))return;
+    const kr=d.kr.filter(k=>CDEF[k]),us=d.us.filter(k=>CDEF[k]);
+    if(kr.length&&us.length){COLST={kr,us};colsSaved=true;}}catch(e){}})();
+  let colOpen=false;
+  function toggleColPanel(f){ colOpen = f!=null?f:!colOpen;
+    const p=$('etf_colpanel'); if(p) p.style.display=colOpen?'':'none'; if(colOpen) renderColPanel(); }
+  function mvCol(k,d){const a=COLST[mkt],i=a.indexOf(k),j=i+d; if(i<0||j<0||j>=a.length)return;
+    a.splice(j,0,a.splice(i,1)[0]); saveCols(); applyTable(); renderColPanel();}
+  function renderColPanel(){
+    const p=$('etf_colpanel'); if(!p) return;
+    const cur=COLST[mkt].filter(cAvail);
+    const rest=CORDER.filter(k=>cAvail(k)&&cur.indexOf(k)<0);
+    p.innerHTML=`<div class="cp-h"><b>표시 컬럼</b><span class="note">체크로 표시/숨김 · ▲▼로 순서</span>
+        <span class="cp-badge">${colsSaved?'💾 저장됨':'기본값'}</span>
+        <button class="cp-x" id="ecp_reset">컬럼 초기화(default)</button><button class="cp-x" id="ecp_all">전부체크</button><button class="cp-x" id="ecp_none">전부해제</button><button class="cp-x" id="ecp_close">닫기</button></div>
+      <div class="cp-sec">표시 중 (${cur.length})</div><div class="cp-list">`+
+      cur.map((k,i)=>`<div class="cp-it"><label><input type="checkbox" data-ecoff="${k}" checked ${k==='n'?'disabled':''}>${E(CDEF[k].l)}</label>
+        <span class="cp-mvs"><button class="cp-mv" data-eup="${k}" ${i===0?'disabled':''}>▲</button><button class="cp-mv" data-edn="${k}" ${i===cur.length-1?'disabled':''}>▼</button></span></div>`).join('')+
+      `</div><div class="cp-sec">추가 가능 (${rest.length})</div><div class="cp-list">`+
+      (rest.map(k=>`<div class="cp-it"><label><input type="checkbox" data-econ="${k}">${E(CDEF[k].l)}</label></div>`).join('')||'<div class="note" style="padding:4px 2px">모두 표시 중</div>')+`</div>`;
+    p.querySelectorAll('[data-ecoff]').forEach(c=>c.onchange=()=>{COLST[mkt]=COLST[mkt].filter(x=>x!==c.dataset.ecoff);saveCols();applyTable();renderColPanel();});
+    p.querySelectorAll('[data-econ]').forEach(c=>c.onchange=()=>{COLST[mkt]=COLST[mkt].concat([c.dataset.econ]);saveCols();applyTable();renderColPanel();});
+    p.querySelectorAll('[data-eup]').forEach(b=>b.onclick=()=>mvCol(b.dataset.eup,-1));
+    p.querySelectorAll('[data-edn]').forEach(b=>b.onclick=()=>mvCol(b.dataset.edn,1));
+    $('ecp_reset').onclick=()=>{COLST={kr:CDEFAULT.kr.slice(),us:CDEFAULT.us.slice()};clearCols();applyTable();renderColPanel();};
+    $('ecp_all').onclick=()=>{const c=COLST[mkt].filter(cAvail);COLST[mkt]=c.concat(CORDER.filter(k=>cAvail(k)&&c.indexOf(k)<0));saveCols();applyTable();renderColPanel();};
+    $('ecp_none').onclick=()=>{COLST[mkt]=['n'];saveCols();applyTable();renderColPanel();};
+    $('ecp_close').onclick=()=>toggleColPanel(false);
+  }
+
+  /* ── 필터 설명 ── */
+  function legendHTML(){
+    const KR=mkt==='kr';
+    const g=[
+      ['종목찾기','종목명·코드 부분일치 (표 안에서 특정 ETF 찾기)'],
+      [KR?'자산군':'거래소', KR?'국내지수·업종테마·파생·해외주식·원자재·채권·기타(네이버 탭 분류)':'상장 거래소(NYSE Arca·Nasdaq 등)'],
+      ['가격','현재가'], ['등락','전일 대비 등락률'],
+      ['AUM','순자산총액(운용 규모) — 클수록 유동성·안정성'],
+      ['거래대금',KR?'최근 거래대금(백만원 환산)':'3개월 평균 거래대금'],
+      ['총보수','연 운용보수(TER) — 낮을수록 장기 유리'],
+      ['상장기간','상장 후 경과 연수'],
+      ['수익률 1M·3M·6M·1Y','해당 기간 가격 수익률'],
+      ['변동성(20일)','최근 20일 일간수익률 표준편차 — 낮을수록 안정'],
+      ['200일선','200일 이동평균 대비 현재가'],
+      ['고점比','52주 최고가 대비 현재가 (−5% = 고점 근접)'],
+      ['분배율','분배금(배당) 수익률 TTM'],
+    ];
+    if(KR) g.push(
+      ['괴리율','시장가 vs 실시간 NAV(iNAV) — +면 비싸게(고평가) 사는 것. ±0.5% 이내가 정상'],
+      ['레버리지·인버스','2X·인버스 등 파생 ETF (토글로 제외 가능)'],
+      ['월배당','월분배(월배당) ETF 만 필터']);
+    else g.push(['괴리율·월배당','미국 미제공 (Yahoo 데이터에 iNAV·분배주기 없음)'],
+      ['레버리지·인버스','이름 기반 판별 (3X·Inverse 등, 토글로 제외)']);
+    return `<div class="note" style="margin-bottom:8px">ETF 전종목(${KR?'네이버':'Yahoo'})을 필터로 실시간 압축한다. 1단계 하드컷 방식(2·3단계 없음).</div>`
+      +`<div class="lgcols">`+g.map(x=>`<div class="lgit"><b>${x[0]}</b> = ${E(x[1])}</div>`).join('')+`</div>`;
+  }
+  let legOpen=false;
+  function toggleLegend(f){ legOpen=f!=null?f:!legOpen;
+    const p=$('etf_glspanel'); if(p){ p.style.display=legOpen?'':'none'; if(legOpen) p.querySelector('.lgbody').innerHTML=legendHTML(); } }
+
   /* ── 칩 렌더 ── */
   const chipLabel=k=>{const f=DEF[mkt][k],st=F[k]||{};
     if(f.fixed!==undefined) return `${f.label}: <span class="cv">${E(f.fixed)}</span>`;
@@ -161,23 +248,16 @@
   }
   document.addEventListener('click',()=>document.querySelectorAll('#p_etf .fpop').forEach(x=>x.classList.remove('open')));
 
-  /* ── 표 ── */
-  const COLS=()=> mkt==='kr'
-    ? [['n','종목',0],['asset','자산군',0],['px','가격',1],['chg','등락',1],['cap','AUM',1],['tv','거래대금',1],
-       ['fee','총보수',1],['dev','괴리율',1],['divy','분배율',1],
-       ['r1m','1M',1],['r3m','3M',1],['r6m','6M',1],['r1y','1Y',1],
-       ['vol20','변동성',1],['v200','200일선',1],['hi','고점比',1],['yr','상장',1]]
-    : [['n','종목',0],['asset','거래소',0],['px','가격',1],['chg','등락',1],['cap','AUM',1],['tv','거래대금',1],
-       ['fee','총보수',1],['divy','분배율',1],
-       ['r1m','1M',1],['r3m','3M',1],['r6m','6M',1],['r1y','1Y',1],
-       ['vol20','변동성',1],['v200','200일선',1],['hi','고점比',1],['yr','상장',1]];
+  /* ── 표 (컬럼 = COLST 사용자 설정) ── */
   const sgn=(v,d)=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
   function cell(r,k){
     const v=val(r,k);
     switch(k){
       case 'n': return `<b>${E(mkt==='kr'?r.n:r.c)}</b> <span class="note">${E(mkt==='kr'?r.c:(r.n||'').slice(0,26))}</span>`
         +(r.lev?' <span class="etflev">L</span>':'')+(r.md?' <span class="etfmd">월</span>':'');
-      case 'asset': return `<span class="note">${E(v||'—')}</span>`;
+      case 'lev': return r.lev?'<span class="etflev">레버·인버스</span>':'<span class="note">—</span>';
+      case 'md': return r.md?'<span class="etfmd">월배당</span>':'<span class="note">—</span>';
+      case 'asset': case 'exch': return `<span class="note">${E(v||'—')}</span>`;
       case 'px': return v==null?'—':(mkt==='kr'?Math.round(v).toLocaleString()+'원':'$'+(+v).toFixed(2));
       case 'chg': return sgn(v,2);
       case 'cap': return mkt==='kr'?wonF(v):usdF(v);
@@ -201,13 +281,15 @@
       return sort.d*(x-y);});
     $('etf_cnt').innerHTML=`<b>${rows.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`
       +(findQ?` <span class="findtag">🔎 "${E(findQ)}"</span>`:'');
-    const cols=COLS(), cap=rows.slice(0,400);
-    $('etf_tbl').innerHTML='<tr><th>#</th>'+cols.map(c=>`<th data-es="${c[0]}" class="${sort.k===c[0]?(sort.d<0?'dn':'up'):''}">${E(c[1])}</th>`).join('')+'</tr>'+
-      cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(c=>`<td class="${c[2]?'num':''}">${cell(r,c[0])}</td>`).join('')+'</tr>').join('')+
-      (rows.length?'':`<tr><td colspan="${cols.length+1}" class="note" style="text-align:center;padding:16px">조건을 통과한 ETF 가 없습니다</td></tr>`)+
-      (rows.length>400?`<tr><td colspan="${cols.length+1}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종)</td></tr>`:'');
+    const cols=COLST[mkt].filter(cAvail), cap=rows.slice(0,400);
+    $('etf_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-es="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(CDEF[k].l)}</th>`).join('')
+      +'<th class="colbtn" id="etf_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
+      cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
+      (rows.length?'':`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center;padding:16px">조건을 통과한 ETF 가 없습니다</td></tr>`)+
+      (rows.length>400?`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center">상위 400종 표시 (전체 ${rows.length.toLocaleString()}종)</td></tr>`:'');
     $('etf_tbl').querySelectorAll('[data-es]').forEach(th=>th.onclick=()=>{
-      const k=th.dataset.es; if(sort.k===k)sort.d*=-1; else{sort.k=k;sort.d=(k==='n'||k==='asset')?1:-1;} applyTable();});
+      const k=th.dataset.es; if(sort.k===k)sort.d*=-1; else{sort.k=k;sort.d=(CDEF[k].n)?-1:1;} applyTable();});
+    {const pl=$('etf_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
   }
   function apply(){ applyTable(); renderChips(); }
 
@@ -227,5 +309,9 @@
   });
   {const gb=$('etf_start'); if(gb) gb.onclick=()=>{ if(!loaded) start(); else apply(); };}
   {const rb=$('etf_rst'); if(rb) rb.onclick=()=>{ F_ST[mkt]=buildF(); F=F_ST[mkt]; findQ=''; findOpen=false; apply(); };}
+  {const ab=$('etf_allf'); if(ab) ab.onclick=()=>{ F_ST[mkt]=clearF(); F=F_ST[mkt]; findQ=''; findOpen=false; apply(); };}
+  {const cb=$('etf_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
+  {const lb=$('etf_glsbtn'); if(lb) lb.onclick=()=>toggleLegend();}
+  {const lx=$('etf_glsx'); if(lx) lx.onclick=()=>toggleLegend(false);}
   loadF(); renderChips();
 })();

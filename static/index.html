@@ -492,12 +492,17 @@
         <button class="mkt" data-emkt="us">🇺🇸 미국</button>
       </div>
       <span class="scrcnt" id="etf_cnt">—</span>
-      <div style="margin-left:auto;display:flex;gap:7px">
-        <button class="scrrst" id="etf_rst">↺ 필터 초기화</button>
+      <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap;justify-content:flex-end">
+        <button class="scrrst" id="etf_glsbtn">? 필터설명</button>
+        <button class="scrrst" id="etf_rst">↺ 필터 선택 초기화(default)</button>
+        <button class="scrrst" id="etf_allf">⊘ 전부전체</button>
+        <button class="scrrst" id="etf_colbtn">⊞ 컬럼설정</button>
         <button class="scrrst scrgo" id="etf_start">▶ START</button>
       </div>
     </div>
+    <div id="etf_glspanel" style="display:none"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><b style="font-size:12.5px">필터 설명</b><button class="cp-x" id="etf_glsx">닫기</button></div><div class="lgbody"></div></div>
     <div class="fltbar" id="etf_fltbar" style="margin-bottom:9px"></div>
+    <div id="etf_colpanel" style="display:none;margin-bottom:9px"></div>
     <div class="box" style="overflow:auto"><table id="etf_tbl"><tr><td class="note" style="padding:14px;text-align:center">필터를 설정한 뒤 ▶ START 를 누르세요. (KR: 괴리율·총보수·분배율 = 네이버 / US: AUM·expense = Yahoo)</td></tr></table></div>
   </div>
 
@@ -1048,7 +1053,10 @@
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:2;background:#eef2f7;cursor:pointer;white-space:nowrap;user-select:none}
 #etf_tbl th.dn::after{content:" \25be";color:#1f6feb} #etf_tbl th.up::after{content:" \25b4";color:#1f6feb}
-#p_etf>div,#p_etf>h2{flex:0 0 auto}</style>
+#p_etf>div,#p_etf>h2{flex:0 0 auto}
+#etf_glspanel,#etf_colpanel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+#etf_tbl th.colbtn{cursor:pointer;text-align:center;color:#1f6feb;font-size:15px;width:36px}
+#etf_tbl th.colbtn:hover{background:#e0e7f2}</style>
 <script src="/ta.js"></script>
 <script src="/visitors.js"></script>
 </body></html>
