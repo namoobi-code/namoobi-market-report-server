@@ -120,7 +120,7 @@ def policyrates():
     return json.loads(p.read_text(encoding="utf-8"))
 
 # 대시보드가 참조하지 않는 대용량 DB — 번들 제외(필요 시 /api/db/<name> 로 개별 조회)
-BUNDLE_SKIP = {"screener_pool", "tp_history"}
+BUNDLE_SKIP = {"screener_pool", "tp_history", "us_krname"}
 _bundle_cache = {"sig": None, "body": None, "etag": None}
 
 def _db_sig(files):

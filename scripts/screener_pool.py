@@ -581,3 +581,9 @@ if __name__=="__main__":
         fetch_lending.build()
     except Exception as e:
         print("[pool] fetch_lending 실패:", repr(e)[:80])
+    # (2026-07-20) 미국 종목 한글명(kn) 재패치 — 재빌드 때마다 지워지므로 대차잔고와 동일하게 복원
+    try:
+        import fetch_us_krname
+        fetch_us_krname.patch_pool()
+    except Exception as e:
+        print("[pool] us_krname 패치 실패:", repr(e)[:80])

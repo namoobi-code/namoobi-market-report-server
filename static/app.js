@@ -906,7 +906,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         cnt+=list.length;
         const isT=inM&&dt.getTime()===tds.getTime();
         const wd=i%7;
-        const chips=list.slice(0,4).map(r=>`<span class="mc-chip" title="${esc(r.n)} (${esc(r.c)}) 실적발표">${esc(mk==='kr'?r.n:r.c)}</span>`).join('')
+        const chips=list.slice(0,4).map(r=>`<span class="mc-chip" title="${esc(mk==='kr'?r.n:((r.kn?r.kn+' · ':'')+r.n))} (${esc(r.c)}) 실적발표">${esc(mk==='kr'?r.n:(r.kn||r.c))}</span>`).join('')
           +(list.length>4?`<span class="mc-more">+${list.length-4}종 더 보기</span>`:'');
         h+=`<div class="mc-cell ${inM?'':'out'} ${isT?'tdy':''} ${list.length?'has':''}" ${list.length?`data-k="${key}"`:''}
              title="${list.length?'클릭하면 이날 전체 '+list.length+'종 표시':''}"><div class="mc-d ${wd===0?'sun':wd===6?'sat':''}">${inM?dnum:''}</div>${inM?chips:''}</div>`;
@@ -923,7 +923,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             <span class="note" style="margin-left:auto">시가총액순</span>
             <button class="cp-x" id="mcp_x">닫기 ✕</button></div>
           <div class="mc-pop-list">${list.map((r,i)=>
-            `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> <b>${esc(mk==='kr'?r.n:r.c)}</b> <span class="note">${esc(mk==='kr'?r.c:r.n)}</span></div>`).join('')}
+            `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> <b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span></div>`).join('')}
           </div></div>`;
         pop.onclick=e=>{ if(e.target===pop) pop.remove(); };
         pop.querySelector('#mcp_x').onclick=()=>pop.remove();
@@ -1959,7 +1959,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     err:'<span class="m-err" title="수집 오류 — 조회를 시도했으나 실패">⚠</span>'};
   const dash=(r,key)=>MISS[missKind(r,key)];
   function cell(r,key){
-    if(key==='n') return mkt==='kr'?`<b>${E(r.n)}</b> <span class="note">${E(r.c)}</span>`:`<b>${E(r.c)}</b> <span class="note">${E(r.n)}</span>`;
+    // (2026-07-20) 미국 종목은 한글명(kn, KIS 해외 마스터)을 티커 옆에 병기 — 없으면 영문명만
+    if(key==='n') return mkt==='kr'?`<b>${E(r.n)}</b> <span class="note">${E(r.c)}</span>`
+      :`<b>${E(r.c)}</b> ${r.kn?`<b class="uskn">${E(r.kn)}</b> `:''}<span class="note">${E(r.n)}</span>`;
     if(key==='mk') return E(r.mk||'');
     if(key==='sector') return `<span class="note">${E(r.sector||'—')}</span>`;
     if(key==='px') return mkt==='kr'?(r.px?Math.round(r.px).toLocaleString()+'원':'—'):'$'+(r.px?(+r.px).toFixed(2):'—');
@@ -2249,7 +2251,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(c!==dcode) chartSrc='canvas';
     dcode=c;
     $('scr_detail').style.display='';
-    $('sd_name').textContent = mkt==='kr'? (r.n||'') : r.c;
+    $('sd_name').textContent = mkt==='kr'? (r.n||'') : (r.kn? `${r.c} ${r.kn}` : r.c);
     $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
     $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
