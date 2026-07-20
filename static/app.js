@@ -1718,12 +1718,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let findQ='', findOpen=false, findCaret=null, findIME=false;
   function findHit(r){
     if(!findQ) return true;
-    const q=findQ.toLowerCase();
-    return String(r.n||'').toLowerCase().includes(q) || String(r.c||'').toLowerCase().includes(q);
+    // (2026-07-20) "화장품|뷰티"=OR, "삼성&전자"=AND. | 로 그룹 분리(OR), 그룹 안 & 로 모두 요구(AND)
+    const groups=findQ.toLowerCase().split('|').map(g=>g.split('&').map(s=>s.trim()).filter(Boolean)).filter(g=>g.length);
+    if(!groups.length) return true;
+    const n=String(r.n||'').toLowerCase(), c=String(r.c||'').toLowerCase();
+    return groups.some(g=>g.every(t=>n.includes(t)||c.includes(t)));
   }
   function findChipHTML(){
     return findOpen
-      ? `<div class="fchip"><span class="findbox">🔎<input id="find_in" placeholder="종목명 · 코드" value="${E(findQ)}"
+      ? `<div class="fchip"><span class="findbox">🔎<input id="find_in" placeholder="종목명·코드  (예: 화장품|뷰티, 삼성&전자)" value="${E(findQ)}"
            autocomplete="off" spellcheck="false"><button id="find_x" title="찾기 해제">✕</button></span></div>`
       : `<div class="fchip"><button class="${findQ?'act':''}" id="find_btn" title="종목명·코드로 찾기">🔎 종목: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }

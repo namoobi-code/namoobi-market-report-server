@@ -82,8 +82,12 @@
     return r[k];
   }
   function pass(r){ const d=DEF[mkt];
-    if(findQ){ const q=findQ.toLowerCase();
-      if(!String(r.n||'').toLowerCase().includes(q)&&!String(r.c||'').toLowerCase().includes(q)) return false; }
+    if(findQ){ // (2026-07-20) "화장품|뷰티"=OR, "삼성&전자"=AND. | 로 그룹 분리(OR), 그룹 안 & 로 모두 요구(AND)
+      const groups=findQ.toLowerCase().split('|').map(g=>g.split('&').map(s=>s.trim()).filter(Boolean)).filter(g=>g.length);
+      if(groups.length){
+        const n=String(r.n||'').toLowerCase(), c=String(r.c||'').toLowerCase();
+        if(!groups.some(g=>g.every(t=>n.includes(t)||c.includes(t)))) return false;
+      } }
     for(const k in F){ const f=d[k], st=F[k]; if(!f) continue;
       if(f.tgl){ if(!st.on) continue;
         if(k==='lev' && r.lev) return false;
@@ -206,7 +210,7 @@
     return ['',...[...s].sort()];};
   function findChipHTML(){
     return findOpen
-      ? `<div class="fchip"><span class="findbox">🔎<input id="efind_in" placeholder="종목명 · 코드" value="${E(findQ)}" autocomplete="off" spellcheck="false"><button id="efind_x">✕</button></span></div>`
+      ? `<div class="fchip"><span class="findbox">🔎<input id="efind_in" placeholder="이름·코드  (예: 화장품|뷰티, 삼성&전자)" value="${E(findQ)}" autocomplete="off" spellcheck="false"><button id="efind_x">✕</button></span></div>`
       : `<div class="fchip"><button class="${findQ?'act':''}" id="efind_btn">🔎 종목: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }
   function renderChips(){
