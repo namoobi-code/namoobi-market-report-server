@@ -128,8 +128,17 @@ def main():
                         "date": "20" + dt.replace(".", "-"),
                         "broker": broker}
                 per.setdefault(broker, []).append(item)
-                if dt >= d2:
-                    recent[cat].append(item)
+                item["_dt"] = dt
+                recent[cat].append(item)
+
+    # (req6-fix 2026-07-19) '최근 2일' 창이 주말·휴장일엔 0건이 되는 문제 — 최신 리포트 일자까지 창을 내려서
+    #   항상 '가장 최근 발행일 이후' 리포트는 포함한다(예: 일요일 실행 → 목요일(7/16) 발행분 유지).
+    _all_dt = [it["_dt"] for arr in recent.values() for it in arr]
+    cutoff = min(d2, max(_all_dt)) if _all_dt else d2
+    for cat in recent:
+        recent[cat] = [it for it in recent[cat] if it["_dt"] >= cutoff]
+        for it in recent[cat]:
+            it.pop("_dt", None)
 
     # 최근 2일치엔 간단요약 (예산 내) — (req6 2026-07-19) 상세페이지 빈 본문이면 PDF 1페이지 추출 폴백
     for cat in recent:
