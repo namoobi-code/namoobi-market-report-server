@@ -518,9 +518,9 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       </table></div>`).join('');
   }
 
-  /* ── 3.1.13 파생 포지셔닝 ── */
-  const dv=M.deriv_positioning;
-  if(dv){
+  /* ── 3.1.13 파생 포지셔닝 ── (2026-07-20) report_data(하루1회)와 분리 — /api/deriv 라이브 폴링(장중 5분) */
+  function renderDeriv(dv){
+    if(!dv||!$('deriv_t')) return;
     $('deriv_idx').innerHTML=(dv.index||[]).map(x=>`<div class="card">
       <div class="k">${esc(x.name)}</div><div class="v" style="font-size:18px">${esc(x.close)}</div>
       <div class="s"><span class="${String(x.ret1).startsWith('+')?'up':'dn'}">1일 ${esc(x.ret1)}</span> ·
@@ -534,18 +534,20 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         if(!hasV) return `<td class="num note" colspan="2" style="text-align:center">N/A</td>`;
         return `<td class="num">${esc(c.v)}</td><td class="num ${hot?(z>0?'up':'dn'):'note'}" ${hot?'style="font-weight:800"':''}>${z!=null?z.toFixed(2):'<span class="note" style="font-style:italic">making</span>'}</td>`;
       }).join('')}</tr>`).join('')+
-      `<tr><td colspan="${1+names.length*2}" class="note">${esc(dv.asof||'')}</td></tr>`+
+      `<tr><td colspan="${1+names.length*2}" class="note">${esc(dv.asof||'')}${dv.built_at?` · <b>🔄 마지막 취득 ${esc(dv.built_at)} KST</b>`:''}</td></tr>`+
+      (dv.cadence?`<tr><td colspan="${1+names.length*2}" class="note">갱신주기 — ${esc(dv.cadence)}</td></tr>`:'')+
       `<tr><td colspan="${1+names.length*2}" class="note">※ z 공란(—) 안내 — 풋콜비율·IV 스큐·딜러 감마(GEX)는 옵션 체인 과거 스냅샷이 공개 소스에 없어 2026-07-11 수집 개시분부터 자체 누적 중이며, 롤링 60거래일이 쌓이는 2026년 10월경부터 z가 자동 산출됩니다(그때까지 현재값 + 'making'(누적 진행 중) 표시). 한국 외국인·기관 수급 z도 주간 이력 누적 후 순차 산출. N/A = 해당 지수에서 조사 불가 항목(KOSPI200 옵션 지표는 VKOSPI로 대체, VKOSPI는 한국 전용 — 미국은 VIX).</td></tr>`;
     $('dv_us').textContent=dv.market_us||'—';
     $('dv_kr').textContent=dv.market_kr||'—';
     $('dv_syn').textContent=dv.synthesis||'';
     // (req7 2026-07-18) ③ 활성 신호 |z|≥1.5 — docx와 동일하게, 빨간 박스로 강조
     const sg=dv.signals||dv.active_signals||[];
-    if(sg.length){
-      $('dv_sig').style.display='block';
-      $('dv_sig_list').innerHTML=sg.map(s2=>'• '+esc(s2)).join('<br>');
-    }
+    if($('dv_sig')) $('dv_sig').style.display=sg.length?'block':'none';
+    if(sg.length&&$('dv_sig_list')) $('dv_sig_list').innerHTML=sg.map(s2=>'• '+esc(s2)).join('<br>');
   }
+  renderDeriv(M.deriv_positioning);
+  {let dvTimer=null; const dvPull=()=>fetch('/api/deriv',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.rows)renderDeriv(d);}).catch(()=>{});
+   dvPull(); if(!window.__dvTimer) window.__dvTimer=setInterval(dvPull,300000);}
 
   /* ── KRX ── */
   const kx=b.krx_brief?.data;

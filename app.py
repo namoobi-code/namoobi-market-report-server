@@ -79,6 +79,26 @@ def report_data():
         raise HTTPException(404, "report_data 없음")
     return json.loads(p.read_text(encoding="utf-8"))
 
+@app.get("/api/deriv")
+def deriv_live():
+    """3.1.13 파생 포지셔닝 — 서버가 장중·마감 갱신하는 deriv_snapshot.json 라이브 제공.
+       report_data(하루 1회 병합)와 분리해 프론트가 장중 폴링으로 최신값을 본다.
+       built_at = 스냅샷 파일 갱신시각(KST) — 실제 마지막 취득 시각."""
+    p = BASE / "data" / "deriv_snapshot.json"
+    if not p.exists():
+        raise HTTPException(404, "deriv_snapshot 없음")
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(500, f"deriv_snapshot 파싱 실패: {e}")
+    from datetime import timezone, timedelta
+    kst = timezone(timedelta(hours=9))
+    d["built_at"] = datetime.fromtimestamp(p.stat().st_mtime, kst).strftime("%Y-%m-%d %H:%M:%S")
+    d["cadence"] = ("장중 5분 자동취득(정규장·장전·시간외·야간 中 데이터 제공 구간) · "
+                    "옵션 PCR·IV스큐·GEX는 장중 1시간+장마감 캡처 · 매일 새벽 정산치로 z 재계산")
+    return Response(content=json.dumps(d, ensure_ascii=False),
+                    media_type="application/json", headers={"Cache-Control": "no-store"})
+
 @app.get("/api/policyrates")
 def policyrates():
     """주요 6개국 정책금리 월별 시계열"""
