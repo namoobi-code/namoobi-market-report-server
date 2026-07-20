@@ -109,7 +109,7 @@
 
   /* ── 컬럼 관리 (종목 스크리너와 동일 UX, localStorage 저장) ── */
   const CDEF={  // 표 컬럼 정의 (라벨·숫자여부·시장) — 모든 필터가 컬럼이 되도록 전체 수록
-    n:{l:'종목',n:0,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
+    n:{l:'ETF',n:0,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'}, cap:{l:'AUM',n:1,m:'both'},
     tv:{l:'거래대금',n:1,m:'both'}, fee:{l:'총보수',n:1,m:'both'}, dev:{l:'괴리율',n:1,m:'kr'},
     divy:{l:'분배율',n:1,m:'both'}, r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
@@ -162,7 +162,7 @@
   function legendHTML(){
     const KR=mkt==='kr';
     const g=[
-      ['종목찾기','종목명·코드 부분일치 (표 안에서 특정 ETF 찾기)'],
+      ['ETF찾기','ETF명·코드 부분일치 (표 안에서 특정 ETF 찾기)'],
       [KR?'자산군':'거래소', KR?'국내지수·업종테마·파생·해외주식·원자재·채권·기타(네이버 탭 분류)':'상장 거래소(NYSE Arca·Nasdaq 등)'],
       ['가격','현재가'], ['등락','전일 대비 등락률'],
       ['AUM','순자산총액(운용 규모) — 클수록 유동성·안정성'],
@@ -187,7 +187,7 @@
   }
   /* 필터설명 라벨 → 카테고리 (ETF 상세 요약 그룹과 동일 분류) */
   const ETFCAT={
-    '종목찾기':'시세','자산군':'시세','거래소':'시세','가격':'시세','등락':'시세','AUM':'시세','거래대금':'시세',
+    'ETF찾기':'시세','자산군':'시세','거래소':'시세','가격':'시세','등락':'시세','AUM':'시세','거래대금':'시세',
     '수익률 1M·3M·6M·1Y':'기간수익률','변동성(20일)':'기간수익률',
     '200일선':'기술적 지표','고점比':'기술적 지표',
     '총보수':'ETF 정보','분배율':'ETF 정보','괴리율':'ETF 정보','괴리율·월배당':'ETF 정보','운용사':'ETF 정보',
@@ -211,7 +211,7 @@
   function findChipHTML(){
     return findOpen
       ? `<div class="fchip"><span class="findbox">🔎<input id="efind_in" placeholder="이름·코드  (예: 화장품|뷰티, 삼성&전자)" value="${E(findQ)}" autocomplete="off" spellcheck="false"><button id="efind_x">✕</button></span></div>`
-      : `<div class="fchip"><button class="${findQ?'act':''}" id="efind_btn">🔎 종목: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
+      : `<div class="fchip"><button class="${findQ?'act':''}" id="efind_btn">🔎 ETF: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }
   function renderChips(){
     if(findOpen&&findIME) return;
