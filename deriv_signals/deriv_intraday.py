@@ -117,6 +117,29 @@ def light(con, now, us_on=True):
     return n
 
 
+def osample(con, now):
+    """장중 5분 — 좁은창(ATM±8%) KIS 옵션 샘플 스캔으로 IV스큐·GEX만 T+0 갱신.
+       PCR 은 좁은창에서 외가격 꼬리를 빼먹어 편향되므로 갱신하지 않는다(장중 1H 전체스캔이 담당).
+       IV스큐(25델타)·GEX(ATM 집중)는 좁은창으로도 정확 → 5분 라이브에 적합."""
+    try:
+        import kis_api
+        oc = kis_api.option_chain(window=0.08, max_calls=80, time_budget=45)
+    except Exception as e:
+        print("[deriv-live] osample 실패:", repr(e)[:70]); return
+    if not oc:
+        print("[deriv-live] osample: 옵션 응답 없음(장 종료?)"); return
+    d = oc.get("asof") or now.date().isoformat()
+    sk, gx = oc.get("iv_skew"), oc.get("gex")
+    if sk is not None:
+        con.execute("INSERT INTO kr_derivatives_daily(id,date,iv_skew_25d) VALUES(?,?,?) "
+                    "ON CONFLICT(id,date) DO UPDATE SET iv_skew_25d=excluded.iv_skew_25d", (KID, d, sk))
+    if gx is not None:
+        con.execute("INSERT INTO kr_derivatives_daily(id,date,gex) VALUES(?,?,?) "
+                    "ON CONFLICT(id,date) DO UPDATE SET gex=excluded.gex", (KID, d, gx))
+    con.commit()
+    print(f"[deriv-live] osample {d} · IV스큐 {sk} · GEX {gx} (ATM±8% 샘플, {oc.get('scanned')}행사가)")
+
+
 def heavy(now):
     """KIS 옵션체인(PCR/IV스큐/GEX/OI) 캡처 — kis_close_capture 재사용(시간가드 --force)."""
     cap = os.path.join(BASE, "scripts", "kis_close_capture.py")
@@ -133,17 +156,20 @@ def heavy(now):
 def main():
     force = "--force" in sys.argv
     mode_heavy = "--heavy" in sys.argv
+    mode_osample = "--osample" in sys.argv
     now = datetime.datetime.now(KST)
     if not force and not (_kr_live(now) or _us_live(now)):
         print("[deriv-live] %s 장외 — skip" % now.strftime("%m-%d %H:%M"))
         return
 
     if mode_heavy:
-        heavy(now)                     # 자체 커넥션으로 DB 기록
+        heavy(now)                     # 자체 커넥션으로 DB 기록(전체 스캔)
 
     import db
     from analyze import run_analysis
     con = db.connect()
+    if mode_osample and not mode_heavy:
+        osample(con, now)              # 좁은창 샘플 → IV스큐·GEX 만
     light(con, now, us_on=(force or _us_live(now)))
     run_analysis(con)
     con.close()
@@ -154,7 +180,8 @@ def main():
                        cwd=HERE, env={**os.environ}, timeout=60)
     except Exception as e:
         print("[deriv-live] export skip:", repr(e)[:80])
-    print("[deriv-live] ✓ %s (%s)" % (now.strftime("%m-%d %H:%M"), "heavy" if mode_heavy else "light"))
+    _mode = "heavy" if mode_heavy else ("osample" if mode_osample else "light")
+    print("[deriv-live] ✓ %s (%s)" % (now.strftime("%m-%d %H:%M"), _mode))
 
 
 if __name__ == "__main__":

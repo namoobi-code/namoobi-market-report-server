@@ -65,7 +65,11 @@
 # ── (2026-07-20) 3.1.13 파생 패널 장중 취득 — 라이브 /api/deriv 가 읽는 deriv_snapshot.json 갱신 ──
 #   경량 5분: 네이버 T+0(KR 현물·선물·베이시스)+VKOSPI(CNBC)+US지수(세션시) → z재계산 → export
 #   옵션(PCR·IV스큐·GEX) 무거운 캡처: 정규장 매시(10~15) + 마감 15:48 · flock 로 5분경량과 직렬화
-*/5 * * * 1-6 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --light >> /home/ubuntu/namoobi/deriv_live.log 2>&1
+
+# ── (2026-07-20 개정) 3.1.13 파생 장중 취득: 옵션세션 샘플5분(스큐·GEX)/비세션 경량 + 전체스캔 매시·마감 ──
+*/5 9-15 * * 1-5 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --osample >> /home/ubuntu/namoobi/deriv_live.log 2>&1
+*/5 0-8,16-23 * * 1-5 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --light >> /home/ubuntu/namoobi/deriv_live.log 2>&1
+*/5 0-8 * * 6 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --light >> /home/ubuntu/namoobi/deriv_live.log 2>&1
 0 10-15 * * 1-5 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --heavy >> /home/ubuntu/namoobi/deriv_live.log 2>&1
 48 15 * * 1-5 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --heavy >> /home/ubuntu/namoobi/deriv_live.log 2>&1
 40 6 * * 2-6 cd /home/ubuntu/namoobi/deriv_signals && DERIV_DB=/home/ubuntu/namoobi/data/deriv_signals.db /home/ubuntu/namoobi/venv/bin/python us_options_capture.py >> /home/ubuntu/namoobi/deriv_live.log 2>&1
