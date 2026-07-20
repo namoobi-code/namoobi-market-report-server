@@ -173,6 +173,77 @@ def chart_api(mkt: str, code: str):
     except Exception as e:
         raise HTTPException(502, f"chart fetch failed: {e}")
 
+# ── ETF 주요 구성종목·비중 (상세 열 때 온디맨드) ──
+#   KR: 네이버 모바일 etfAnalysis → etfTop10MajorConstituentAssets (Top10 종목·비중)
+#   US: Yahoo quoteSummary topHoldings (crumb 인증 필요 → ta_screen.yahoo_opener 재사용)
+#   6시간 메모리 캐시. 실패해도 200 + 빈 holdings (프론트가 '정보 없음' 표기).
+_hold_cache = {}
+_yop = {"op": None, "crumb": None, "ts": 0.0}
+
+def _pctnum(s):
+    if s is None:
+        return None
+    if isinstance(s, (int, float)):
+        return float(s)
+    m = re.search(r"-?[\d.]+", str(s).replace(",", ""))
+    return float(m.group(0)) if m else None
+
+def _yahoo_oc():
+    import sys as _sys
+    if _yop["op"] and time.time() - _yop["ts"] < 1800:
+        return _yop["op"], _yop["crumb"]
+    _sys.path.insert(0, str(BASE / "scripts"))
+    import ta_screen as _T
+    op, crumb = _T.yahoo_opener()
+    _yop.update(op=op, crumb=crumb, ts=time.time())
+    return op, crumb
+
+@app.get("/api/etf/holdings/{mkt}/{code}")
+def etf_holdings(mkt: str, code: str):
+    if mkt not in ("kr", "us") or not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
+        raise HTTPException(400, "bad params")
+    key = f"{mkt}:{code}"; now = time.time()
+    hit = _hold_cache.get(key)
+    if hit and now - hit[0] < 6 * 3600:
+        return hit[1]
+    out = {"mkt": mkt, "code": code, "holdings": []}
+    try:
+        if mkt == "kr":
+            url = f"https://m.stock.naver.com/api/stock/{code}/etfAnalysis"
+            req = urllib.request.Request(url, headers={
+                "User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/"})
+            d = json.loads(urllib.request.urlopen(req, timeout=12).read().decode("utf-8", "ignore"))
+            for x in (d.get("etfTop10MajorConstituentAssets") or []):
+                nm = x.get("itemName")
+                if not nm:
+                    continue
+                out["holdings"].append({"n": nm, "c": x.get("itemCode") or "",
+                                        "w": _pctnum(x.get("etfWeight"))})
+        else:
+            import sys as _sys
+            _sys.path.insert(0, str(BASE / "scripts"))
+            import ta_screen as _T
+            op, crumb = _yahoo_oc()
+            url = ("https://query1.finance.yahoo.com/v10/finance/quoteSummary/%s"
+                   "?modules=topHoldings&crumb=%s"
+                   % (urllib.parse.quote(code), urllib.parse.quote(crumb)))
+            j = _T.jget(url, opener=op, timeout=15)
+            th = ((j.get("quoteSummary", {}).get("result") or [{}])[0] or {}).get("topHoldings", {}) or {}
+            for h in (th.get("holdings") or []):
+                nm = h.get("holdingName") or h.get("symbol")
+                if not nm:
+                    continue
+                hp = h.get("holdingPercent") or {}
+                w = hp.get("raw")
+                w = round(w * 100, 2) if isinstance(w, (int, float)) else _pctnum(hp.get("fmt"))
+                out["holdings"].append({"n": nm, "c": h.get("symbol") or "", "w": w})
+    except Exception as e:
+        out["err"] = str(e)[:120]
+    _hold_cache[key] = (now, out)
+    if len(_hold_cache) > 600:
+        _hold_cache.clear()
+    return out
+
 # ── 종목별 투자자 수급 (외국인·기관·개인 누적순매수) ──
 #   1년치: 네이버 frgn.naver 13페이지 (외국인·기관 순매매량만 제공)
 #   최근 30거래일: KIS FHKST01010900 (개인 포함 3주체 실측 — 네이버 값과 일치 검증됨)

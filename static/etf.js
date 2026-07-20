@@ -394,6 +394,18 @@
         .concat([['레버리지·인버스',r.lev?'<b class="dn">예</b>':'아니오'],['상장기간',cell(r,'yr')]]) ]];
     return G.map(([t,its])=>`<div class="sgt">${t}</div>`+its.map(it=>`<div class="si"><span class="note">${it[0]}</span>${it[1]}</div>`).join('')).join('');
   }
+  // (2026-07-20) 보유비중 Top — 상세 우측 하단. KR 네이버·US Yahoo 온디맨드.
+  const HOLD_COLORS=['#4a6fd4','#3aa6a0','#5cb85c','#d4b24a','#e08e3c','#d9534f','#5b9bd5','#6b7a99','#c74bbf','#8a5cd4'];
+  function holdingsHTML(data){
+    const hs=(data&&data.holdings)||[];
+    if(!hs.length) return `<div class="sgt hold-t">보유비중 Top</div><div class="hold-empty">구성종목 정보 없음</div>`;
+    const sum=hs.reduce((a,h)=>a+(h.w||0),0), rest=Math.max(0,100-sum);
+    const seg=hs.map((h,i)=>`<span class="hbar-seg" style="width:${Math.max(h.w||0,0)}%;background:${HOLD_COLORS[i%HOLD_COLORS.length]}" title="${E(h.n)} ${(h.w||0).toFixed(2)}%"></span>`).join('')
+      +(rest>0.3?`<span class="hbar-seg" style="width:${rest}%;background:var(--line)" title="기타 ${rest.toFixed(2)}%"></span>`:'');
+    const rows=hs.map((h,i)=>`<div class="hrow"><span class="hdot" style="background:${HOLD_COLORS[i%HOLD_COLORS.length]}"></span><span class="hnm">${E(h.n)}</span><span class="hw">${h.w!=null?h.w.toFixed(2):'—'}%</span></div>`).join('');
+    return `<div class="sgt hold-t">보유비중 Top <span class="note" style="font-weight:400">· 상위 ${hs.length}</span></div>`
+      +`<div class="hbar">${seg}</div><div class="hlist">${rows}</div>`;
+  }
   function showDetail(r){
     dcode=r.c;
     $('etf_detail').style.display='';
@@ -401,6 +413,13 @@
     $('ed_code').textContent = mkt==='kr'?r.c:(r.n||'');
     $('ed_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     $('ed_sum').innerHTML = infoRows(r);
+    // 보유비중 Top (온디맨드) — 우측 정보 하단에 덧붙임
+    {const hc=r.c, hm=mkt, hw=document.createElement('div'); hw.className='hold-wrap';
+     hw.innerHTML='<div class="sgt hold-t">보유비중 Top</div><div class="hold-empty">불러오는 중…</div>';
+     $('ed_sum').appendChild(hw);
+     fetch(`/api/etf/holdings/${hm}/${encodeURIComponent(hc)}`).then(x=>x.json()).then(D=>{
+       if(dcode!==hc) return; hw.innerHTML=holdingsHTML(D);
+     }).catch(()=>{ if(dcode===hc) hw.innerHTML='<div class="sgt hold-t">보유비중 Top</div><div class="hold-empty">불러오기 실패</div>'; }); }
     $('ed_src').textContent='종가 기준 일봉(최근 1년) · '+(mkt==='kr'?'네이버':'Yahoo')+' · MA20 주황·MA60 초록·MA120 보라 · 볼린저(20,2) · RSI(14) · MACD(12,26,9)';
     fetch(`/api/chart/${mkt}/${encodeURIComponent(r.c)}`).then(x=>x.json()).then(D=>{
       if(dcode!==r.c) return; drawChart(D);
