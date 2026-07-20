@@ -100,6 +100,14 @@
       case 'r1m': case 'r3m': case 'r6m': case 'r1y': case 'v200': case 'hi':
         return r[k]!=null?r[k]*100:null;
       case 'vol20': return r.vol20;
+      /* (2026-07-20) 보유종목 정렬 = 보유비중(%) — 종목 검색 중이면 매칭 종목 비중, 아니면 최대(Top1) 비중 */
+      case 'hold': {
+        const tbl=(HOLD&&HOLD[mkt])||{}, hs=tbl[r.c];
+        if(!hs||!hs.length) return null;
+        const hit=holdQ?holdHit(r.c):null;
+        const ws=(hit||hs).map(h=>h[2]).filter(v=>typeof v==='number');
+        return ws.length?Math.max(...ws):null;
+      }
       case 'asset': return mkt==='kr'?r.asset:r.exch;
     }
     return r[k];
@@ -134,7 +142,8 @@
 
   /* ── 컬럼 관리 (종목 스크리너와 동일 UX, localStorage 저장) ── */
   const CDEF={  // 표 컬럼 정의 (라벨·숫자여부·시장) — 모든 필터가 컬럼이 되도록 전체 수록
-    n:{l:'ETF',n:0,m:'both'}, hold:{l:'보유종목',n:0,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
+    // hold: 표시는 텍스트(좌측정렬)라 n:0, 정렬만 숫자(보유비중)로 → sn:1
+    n:{l:'ETF',n:0,m:'both'}, hold:{l:'보유종목',n:0,sn:1,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'}, cap:{l:'AUM',n:1,m:'both'},
     tv:{l:'거래대금',n:1,m:'both'}, fee:{l:'총보수',n:1,m:'both'}, dev:{l:'괴리율',n:1,m:'kr'},
     divy:{l:'분배율',n:1,m:'both'}, r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
@@ -360,7 +369,7 @@
     $('etf_tbl').querySelectorAll('tr').forEach((tr,i)=>{ if(i===0) return;
       const r=cap[i-1]; if(!r) return; tr.setAttribute('data-c',r.c); tr.onclick=()=>showDetail(r); });
     $('etf_tbl').querySelectorAll('[data-es]').forEach(th=>th.onclick=e=>{ e.stopPropagation();
-      const k=th.dataset.es; if(sort.k===k)sort.d*=-1; else{sort.k=k;sort.d=(CDEF[k].n)?-1:1;} applyTable();});
+      const k=th.dataset.es; if(sort.k===k)sort.d*=-1; else{sort.k=k;sort.d=(CDEF[k].n||CDEF[k].sn)?-1:1;} applyTable();});
     {const pl=$('etf_colplus'); if(pl) pl.onclick=e=>{e.stopPropagation(); toggleColPanel();};}
   }
 
