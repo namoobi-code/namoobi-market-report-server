@@ -62,6 +62,10 @@
   .tabs .scrtab{background:#2b57d0;border-color:#2b57d0;color:#fff}
   .tabs .scrtab small{color:#dbe4ff}
   .tabs .scrtab.on,.tabs .scrtab:hover{background:#1c3fa8;border-color:#1c3fa8;color:#fff}
+  /* ETF 스크리너 — 종목 스크리너와 같은 파랑 계열(한 톤 밝게 구분) */
+  .tabs .etftab{background:#2f80ed;border-color:#2f80ed;color:#fff}
+  .tabs .etftab small{color:#dbeafe}
+  .tabs .etftab.on,.tabs .etftab:hover{background:#1f5fbf;border-color:#1f5fbf;color:#fff}
   .hdr-r{display:flex;align-items:center;gap:9px}
   .hbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;color:var(--tx2);font-weight:600;white-space:nowrap}
   .hbtn:hover{border-color:var(--dark);color:var(--tx)}
@@ -443,7 +447,7 @@
     <div class="tabs">
       <button id="btn_screener" class="tab scrtab">🔍 SCREENER<small>종목 스크리너</small></button>
       <!-- (2026-07-26) ETF 스크리너 — UI 골격 (필터 구성은 협의 후) -->
-      <button id="btn_etf" class="tab" data-pane="p_etf">📦 ETF<small>ETF 스크리너</small></button>
+      <button id="btn_etf" class="tab etftab" data-pane="p_etf">📦 ETF<small>ETF 스크리너</small></button>
       <!-- (2026-07-26) 전체 페이지 이동 → 대시보드 내 페인(p_cal)으로 전환 -->
       <button id="btn_calendar" class="tab" data-pane="p_cal" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 캘린더<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_daily">AI Daily 조사<small>매 실행 신규 수집</small></button>
@@ -980,10 +984,15 @@
   <h3>값 · z-score 매트릭스 <span class="note">|z| ≥ 1.5 강조</span></h3>
   <div class="box" style="margin-bottom:12px;overflow-x:auto"><table id="deriv_t"></table></div>
   <!-- (req7 2026-07-18) ③ 활성 신호 — 가장 중요한 정보라 빨간 강조 -->
-  <div id="dv_sig" style="display:none;border:2px solid #d64545;background:#fff5f5;border-radius:10px;
+  <div id="dv_sig" style="display:none;border:2px solid #cbd5e1;background:#f8fafc;border-radius:10px;
        padding:12px 16px;margin-bottom:12px">
-    <div style="font-weight:800;color:#c0392b;font-size:13.5px;margin-bottom:6px">③ 활성 신호 (|z|≥1.5)</div>
-    <div id="dv_sig_list" style="color:#b02a2a;font-size:13px;line-height:1.7;font-weight:600"></div>
+    <div style="font-weight:800;color:#334155;font-size:13.5px;margin-bottom:2px">③ 활성 신호 (|z|≥1.5)</div>
+    <div class="note" style="font-size:11.5px;margin-bottom:7px">
+      <span style="color:#c0392b;font-weight:700">■ 빨강 = 주식에 우호</span> ·
+      <span style="color:#1e6fd6;font-weight:700">■ 파랑 = 비우호</span> ·
+      <span style="color:#b45309;font-weight:700">■ 주황 = 조건부</span>(가격 방향과 함께 판단)
+    </div>
+    <div id="dv_sig_list" style="font-size:13px;line-height:1.8;font-weight:600"></div>
   </div>
   <div class="grid g2">
     <div class="card"><div class="k">미국 시장 해석</div><div class="s" id="dv_us"></div></div>
@@ -1003,6 +1012,14 @@
   table.dvguide th{background:var(--bg2,#f6f7f9);font-weight:700;white-space:nowrap}
   table.dvguide td:first-child{white-space:nowrap;font-weight:700}
   table.dvguide .up{color:#c0392b}table.dvguide .dn{color:#1e6fd6}
+  /* 활성 신호 — 부호 정규화(z+=주식 우호) 기준 색상 */
+  #dv_sig_list .sig-up{color:#c0392b}
+  #dv_sig_list .sig-dn{color:#1e6fd6}
+  #dv_sig_list .sig-neu{color:#b45309}
+  #dv_sig_list .sigbadge{font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:9px;margin-left:7px;vertical-align:1px}
+  #dv_sig_list .sig-up .sigbadge{background:#fdeaea;color:#c0392b}
+  #dv_sig_list .sig-dn .sigbadge{background:#e9f1fd;color:#1e6fd6}
+  #dv_sig_list .sig-neu .sigbadge{background:#fdf3e3;color:#b45309}
   </style>
   <details id="deriv_guide" open>
     <summary>📖 지표 해석 가이드 — 값과 z 읽는 법 (지표별 의미·해석)</summary>

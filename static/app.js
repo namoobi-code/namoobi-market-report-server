@@ -552,7 +552,17 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     // (req7 2026-07-18) ③ 활성 신호 |z|≥1.5 — docx와 동일하게, 빨간 박스로 강조
     const sg=dv.signals||dv.active_signals||[];
     if($('dv_sig')) $('dv_sig').style.display=sg.length?'block':'none';
-    if(sg.length&&$('dv_sig_list')) $('dv_sig_list').innerHTML=sg.map(s2=>'• '+esc(s2)).join('<br>');
+    // (2026-07-20) 부호 정규화 후: z(+)=주식 우호(빨강) / z(−)=비우호(파랑).
+    //   단 '선물 OI 변화'는 가격 방향과 함께 봐야 하는 조건부라 주황(중립)으로 뺀다.
+    //   ⚠ 로 시작하는 stale 경고 줄은 색 없이 회색 처리.
+    if(sg.length&&$('dv_sig_list')) $('dv_sig_list').innerHTML=sg.map(s2=>{
+      const t=String(s2);
+      if(/^\s*⚠/.test(t)) return `<div class="note" style="font-weight:600">${esc(t)}</div>`;
+      const m=t.match(/z=([+-])/), cond=/OI/.test(t);
+      const cls=cond?'sig-neu':(m&&m[1]==='+'?'sig-up':'sig-dn');
+      const bdg=cond?'조건부':(cls==='sig-up'?'▲ 주식 우호':'▼ 비우호');
+      return `<div class="${cls}">• ${esc(t)}<span class="sigbadge">${bdg}</span></div>`;
+    }).join('');
   }
   renderDeriv(M.deriv_positioning);
   {let dvTimer=null; const dvPull=()=>fetch('/api/deriv',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(d=>{if(d&&d.rows)renderDeriv(d);}).catch(()=>{});
