@@ -411,6 +411,38 @@ try:
 except Exception as _e:
     print(f"[app] auth_visitors 로드 실패: {_e}")
 
+# ── (2026-07-20) 관리자 수동 즉시 갱신 — 로그인 사용자만. START 재클릭 시 1분/3분 안 기다리고 강제 refresh ──
+#   단일 워커라 동기 실행은 사이트를 멈춘다 → 백그라운드 subprocess + flock 로 중복 방지. 프론트가 풀 live_at 변화를 재폴링.
+import subprocess as _sp
+_REFRESH_MODS = {"screener": ("intraday_kr", "intraday_us"), "etf": ("etf_intraday",)}
+
+@app.post("/api/admin/refresh/{which}")
+def admin_refresh(which: str, request: Request):
+    from auth_visitors import current_user
+    if not current_user(request):
+        raise HTTPException(401, "관리자 로그인이 필요합니다")
+    mods = _REFRESH_MODS.get(which)
+    if not mods:
+        raise HTTPException(400, "대상이 올바르지 않습니다")
+    lock = f"/tmp/refresh_{which}.lock"
+    # 이미 실행 중이면(락 점유) 스킵 안내 — 그 실행이 곧 풀을 갱신한다
+    import fcntl
+    try:
+        _lf = open(lock, "w")
+        fcntl.flock(_lf, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(_lf, fcntl.LOCK_UN); _lf.close()
+    except BlockingIOError:
+        return {"busy": True, "which": which}
+    code = "import sys; sys.path.insert(0,'scripts'); " + \
+           "; ".join(f"import {m}; {m}.main(force=True)" for m in mods)
+    try:
+        _sp.Popen(["/usr/bin/flock", "-n", lock, "python3", "-c", code],
+                  cwd=str(BASE), stdout=_sp.DEVNULL, stderr=_sp.DEVNULL,
+                  start_new_session=True)
+    except Exception as e:
+        raise HTTPException(500, f"갱신 실행 실패: {e}")
+    return {"started": True, "which": which}
+
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
 CHARTS = BASE / "data" / "charts"

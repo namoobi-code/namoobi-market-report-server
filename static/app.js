@@ -2681,7 +2681,31 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
     renderChips(); waitScreen();
   };
-  {const gb=$('scr_start'); if(gb) gb.onclick=()=>loadPool(()=>applyRestored());}
+  /* (2026-07-20) 관리자 수동 즉시 갱신 — 로그인 상태에서 로드 후 START 재클릭 시 서버 강제 refresh */
+  let scrAdmin=false, scrRefreshing=false;
+  fetch('/api/auth/me').then(r=>r.json()).then(d=>{ scrAdmin=!!(d&&d.ok); }).catch(()=>{});
+  async function scrForceRefresh(){
+    if(scrRefreshing) return; scrRefreshing=true;
+    const gb=$('scr_start');
+    let prevLive=null; try{ const d0=await (await fetch('/api/db/screener_pool')).json(); prevLive=d0.live_at||null; }catch(e){}
+    if(gb){ gb.disabled=true; gb.textContent='⏳ 갱신 요청…'; }
+    let r; try{ r=await (await fetch('/api/admin/refresh/screener',{method:'POST'})).json(); }catch(e){ r=null; }
+    if(!r || (!r.started && !r.busy)){ if(gb){gb.disabled=false; gb.textContent='▶ START';} scrRefreshing=false; return; }
+    if(gb) gb.textContent='⏳ 갱신 중…';
+    for(let i=0;i<20;i++){
+      await new Promise(x=>setTimeout(x,2000));
+      try{ const d=await (await fetch('/api/db/screener_pool')).json();
+        if(d && d.live_at && d.live_at!==prevLive){
+          POOL={kr:d.kr||[],us:d.us||[]}; if(s2loaded) S2=POOL; $('scr_asof').innerHTML=poolMeta(d); refresh(); break; }
+      }catch(e){}
+    }
+    if(gb){ gb.disabled=false; gb.textContent='▶ START'; }
+    scrRefreshing=false;
+  }
+  {const gb=$('scr_start'); if(gb) gb.onclick=()=>{
+     if(!loaded){ loadPool(()=>applyRestored()); return; }
+     if(scrAdmin){ scrForceRefresh(); } else { refresh(); }   // 비관리자: 필터 재적용(기존 동작)
+   };}
   {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
    if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더

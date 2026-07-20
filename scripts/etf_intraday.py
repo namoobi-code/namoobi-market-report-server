@@ -131,12 +131,15 @@ def update_us(pool):
     return n
 
 
-def main():
+def main(force=False):
     now = datetime.now(KST)
     kr_on, us_on = _kr_session(now), _us_session(now)
     # (2026-07-26) 1분 주기 — KR 은 매분(네이버 1콜, 부담 0).
     #   US 는 5,221종÷50 ≈ 105콜/실행이라 매분이면 Yahoo 차단 위험 → 3분마다만 실행.
+    #   (2026-07-20) force=True(관리자 수동 갱신)면 시간·주기 무시하고 양시장 즉시 갱신.
     us_run = us_on and (now.minute % 3 == 0)
+    if force:
+        kr_on = us_run = True
     if not (kr_on or us_run):
         print("장외/스킵"); return
     pool = T.load_db("etf_pool")
@@ -144,6 +147,7 @@ def main():
         print("etf_pool 없음 — skip"); return
     nk = update_kr(pool) if kr_on else 0
     nu = update_us(pool) if us_run else 0
+    _ = force  # (force 는 위 게이트에서만 사용)
     pool["live_at"] = now.strftime("%m-%d %H:%M") + " 장중"
     T.save_db("etf_pool", pool)
     print(f"[etf-live] {pool['live_at']} · KR {nk} · US {nu}")

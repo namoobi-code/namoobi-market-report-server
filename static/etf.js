@@ -11,6 +11,8 @@
 
   let POOL={kr:[],us:[]}, loaded=false, mkt='kr', sort={k:'cap',d:-1};
   let findQ='', findOpen=false, findCaret=null, findIME=false;
+  let isAdmin=false, refreshing=false;   // (2026-07-20) 관리자 수동 즉시 갱신
+  fetch('/api/auth/me').then(r=>r.json()).then(d=>{ isAdmin=!!(d&&d.ok); }).catch(()=>{});
 
   /* ── 필터 정의 (min/max 는 표시 단위) ── */
   const pct0=v=>(v>=0?'+':'')+v.toFixed(0)+'%';
@@ -435,7 +437,30 @@
     mkt=b.dataset.emkt; loadF(); findQ=''; findOpen=false; sort={k:'cap',d:-1};
     if(loaded) apply(); else renderChips();
   });
-  {const gb=$('etf_start'); if(gb) gb.onclick=()=>{ if(!loaded) start(); else apply(); };}
+  /* (2026-07-20) 관리자 수동 즉시 갱신 — 로그인 상태에서 로드 후 START 재클릭 시
+     서버에 강제 refresh 요청하고 풀 live_at 변화를 재폴링(1분/3분 안 기다림).
+     연속 클릭 방어: refreshing 플래그로 버튼 잠금 + 서버 flock 중복방지. */
+  async function forceRefresh(){
+    if(refreshing) return; refreshing=true;
+    const gb=$('etf_start'); const before=(POOL.kr&&POOL.kr.length)?null:null;
+    let prevLive=null; try{ const d0=await (await fetch('/api/db/etf_pool')).json(); prevLive=d0.live_at||null; }catch(e){}
+    if(gb){ gb.disabled=true; gb.textContent='⏳ 갱신 요청…'; }
+    let r; try{ r=await (await fetch('/api/admin/refresh/etf',{method:'POST'})).json(); }catch(e){ r=null; }
+    if(!r || (!r.started && !r.busy)){ if(gb){gb.disabled=false; gb.textContent='▶ START';} refreshing=false; return; }
+    if(gb) gb.textContent='⏳ 갱신 중…';
+    // live_at 이 바뀔 때까지 최대 ~40초 폴링(2초 간격)
+    for(let i=0;i<20;i++){
+      await new Promise(x=>setTimeout(x,2000));
+      try{ const d=await (await fetch('/api/db/etf_pool')).json();
+        if(d && d.live_at && d.live_at!==prevLive){
+          POOL={kr:d.kr||[],us:d.us||[]}; const st=$('etf_status'); if(st) st.innerHTML=statusText(d); apply(); break; }
+      }catch(e){}
+    }
+    if(gb){ gb.disabled=false; gb.textContent='▶ START'; }
+    refreshing=false;
+  }
+  {const gb=$('etf_start'); if(gb) gb.onclick=()=>{ if(!loaded){ start(); return; }
+    if(isAdmin){ forceRefresh(); } else { apply(); } };}
   {const rb=$('etf_rst'); if(rb) rb.onclick=()=>{ F_ST[mkt]=buildF(); F=F_ST[mkt]; findQ=''; findOpen=false; apply(); };}
   {const ab=$('etf_allf'); if(ab) ab.onclick=()=>{ F_ST[mkt]=clearF(); F=F_ST[mkt]; findQ=''; findOpen=false; apply(); };}
   {const cb=$('etf_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
