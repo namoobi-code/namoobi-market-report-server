@@ -11,6 +11,29 @@
 
   let POOL={kr:[],us:[]}, loaded=false, mkt='kr', sort={k:'cap',d:-1};
   let findQ='', findOpen=false, findCaret=null, findIME=false;
+  /* (2026-07-20) 종목 역검색 상태 — HOLD={kr:{etf코드:[[종목명,코드,비중],..]},us:{...}} 지연 로드 */
+  let holdQ='', holdOpen=false, holdCaret=null, holdIME=false, HOLD=null, holdLoading=false;
+  function loadHold(cb){
+    if(HOLD||holdLoading){ if(HOLD&&cb)cb(); return; }
+    holdLoading=true;
+    fetch('/api/db/etf_holdings').then(r=>r.ok?r.json():null).then(d=>{
+      HOLD=d||{kr:{},us:{}}; holdLoading=false; if(cb)cb();
+    }).catch(()=>{ HOLD={kr:{},us:{}}; holdLoading=false; if(cb)cb(); });
+  }
+  /* 보유종목 매칭 — 종목명/티커 부분일치(| OR, & AND). 매칭된 [종목명,비중] 반환(없으면 null) */
+  function holdHit(code){
+    if(!holdQ) return null;
+    const tbl=(HOLD&&HOLD[mkt])||{}, hs=tbl[code];
+    if(!hs||!hs.length) return null;
+    const groups=holdQ.toLowerCase().split('|').map(g=>g.split('&').map(s=>s.trim()).filter(Boolean)).filter(g=>g.length);
+    if(!groups.length) return null;
+    const found=[];
+    for(const g of groups){
+      const hit=g.map(t=>hs.find(h=>String(h[0]||'').toLowerCase().includes(t)||String(h[1]||'').toLowerCase().includes(t)));
+      if(hit.every(Boolean)) hit.forEach(h=>{ if(!found.includes(h)) found.push(h); });
+    }
+    return found.length?found:null;
+  }
   let isAdmin=false, refreshing=false;   // (2026-07-20) 관리자 수동 즉시 갱신
   fetch('/api/auth/me').then(r=>r.json()).then(d=>{ isAdmin=!!(d&&d.ok); }).catch(()=>{});
 
@@ -82,6 +105,8 @@
     return r[k];
   }
   function pass(r){ const d=DEF[mkt];
+    // (2026-07-20) 종목 역검색 — 입력 종목을 Top10 보유에 담은 ETF 만 통과
+    if(holdQ){ if(!HOLD) return false; if(!holdHit(r.c)) return false; }
     if(findQ){ // (2026-07-20) "화장품|뷰티"=OR, "삼성&전자"=AND. | 로 그룹 분리(OR), 그룹 안 & 로 모두 요구(AND)
       const groups=findQ.toLowerCase().split('|').map(g=>g.split('&').map(s=>s.trim()).filter(Boolean)).filter(g=>g.length);
       if(groups.length){
@@ -109,7 +134,7 @@
 
   /* ── 컬럼 관리 (종목 스크리너와 동일 UX, localStorage 저장) ── */
   const CDEF={  // 표 컬럼 정의 (라벨·숫자여부·시장) — 모든 필터가 컬럼이 되도록 전체 수록
-    n:{l:'ETF',n:0,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
+    n:{l:'ETF',n:0,m:'both'}, hold:{l:'보유종목',n:0,m:'both'}, asset:{l:'자산군',n:0,m:'kr'}, exch:{l:'거래소',n:0,m:'us'},
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'}, cap:{l:'AUM',n:1,m:'both'},
     tv:{l:'거래대금',n:1,m:'both'}, fee:{l:'총보수',n:1,m:'both'}, dev:{l:'괴리율',n:1,m:'kr'},
     divy:{l:'분배율',n:1,m:'both'}, r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
@@ -213,8 +238,15 @@
       ? `<div class="fchip"><span class="findbox">🔎<input id="efind_in" placeholder="이름·코드  (예: 화장품|뷰티, 삼성&전자)" value="${E(findQ)}" autocomplete="off" spellcheck="false"><button id="efind_x">✕</button></span></div>`
       : `<div class="fchip"><button class="${findQ?'act':''}" id="efind_btn">🔎 ETF: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }
+  /* (2026-07-20) 종목 역검색 — "이 종목을 담은 ETF" 찾기. db/etf_holdings.json(전 ETF Top10) 지연 로드. */
+  function holdChipHTML(){
+    const busy = holdQ && !HOLD;
+    return holdOpen
+      ? `<div class="fchip"><span class="findbox">🔎<input id="ehold_in" placeholder="종목명·티커 (예: 삼성전자, NVDA)" value="${E(holdQ)}" autocomplete="off" spellcheck="false"><button id="ehold_x">✕</button></span></div>`
+      : `<div class="fchip"><button class="${holdQ?'act':''}" id="ehold_btn" title="입력한 종목을 보유한 ETF만 표시">🔎 종목: <span class="cv">${holdQ?E(holdQ)+(busy?' …':''):'전체'}</span></button></div>`;
+  }
   function renderChips(){
-    if(findOpen&&findIME) return;
+    if((findOpen&&findIME)||(holdOpen&&holdIME)) return;
     const d=DEF[mkt];
     const parts=KEYS.map(k=>{const f=d[k]; if(!f) return '';
       if(f.fixed!==undefined) return `<div class="fchip"><button disabled style="opacity:.75;cursor:default">${chipLabel(k)}</button></div>`;
@@ -230,7 +262,7 @@
         `<div class="man"><span>직접</span><input type="number" placeholder="최소" data-eman="${k}" data-mm="min" value="${st.min??''}">`+
         `<span>~</span><input type="number" placeholder="최대" data-eman="${k}" data-mm="max" value="${st.max??''}"></div>`; }
       return `<div class="fchip"><button class="${active?'act':''}" data-echip="${k}">${chipLabel(k)}</button><div class="fpop" id="epop_${k}">${pop}</div></div>`;});
-    parts.unshift(findChipHTML());
+    parts.unshift(findChipHTML(), holdChipHTML());
     const bar=$('etf_fltbar'); if(!bar) return;
     bar.innerHTML=parts.join('');
     try{
@@ -259,6 +291,20 @@
         const ae=document.activeElement;
         if(!(ae&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)&&ae.id!=='efind_in')){
           fi.focus(); if(findCaret!=null) fi.setSelectionRange(findCaret,findCaret);} }}
+      /* (2026-07-20) 종목 역검색 칩 — 열 때 보유종목 DB 지연 로드 */
+      {const b=$('ehold_btn'); if(b) b.onclick=e=>{e.stopPropagation();
+        document.querySelectorAll('#p_etf .fpop').forEach(x=>x.classList.remove('open'));
+        holdOpen=true; holdCaret=null; loadHold(()=>{ if(holdQ) apply(); else renderChips(); }); renderChips();};}
+      {const x=$('ehold_x'); if(x) x.onclick=e=>{e.stopPropagation(); holdIME=false; holdQ=''; holdOpen=false; apply();};}
+      {const hi=$('ehold_in'); if(hi){
+        hi.onclick=e=>e.stopPropagation();
+        hi.oncompositionstart=()=>{holdIME=true;};
+        hi.oncompositionend=()=>{holdIME=false; holdQ=hi.value.trim(); holdCaret=hi.selectionStart; loadHold(()=>applyTable());};
+        hi.oninput=()=>{holdQ=hi.value.trim(); holdCaret=hi.selectionStart; loadHold(()=>applyTable());};
+        hi.onkeydown=e=>{e.stopPropagation(); if(e.key==='Escape'){holdIME=false;holdQ='';holdOpen=false;apply();}};
+        const ae2=document.activeElement;
+        if(!(ae2&&/^(INPUT|SELECT|TEXTAREA)$/.test(ae2.tagName)&&ae2.id!=='ehold_in')){
+          hi.focus(); if(holdCaret!=null) hi.setSelectionRange(holdCaret,holdCaret);} }}
     }catch(err){ console.error('[etf] 칩 배선 오류:',err); }
   }
   document.addEventListener('click',()=>document.querySelectorAll('#p_etf .fpop').forEach(x=>x.classList.remove('open')));
@@ -270,6 +316,14 @@
     switch(k){
       case 'n': return `<b>${E(mkt==='kr'?r.n:r.c)}</b> <span class="note">${E(mkt==='kr'?r.c:(r.n||'').slice(0,26))}</span>`
         +(r.lev?' <span class="etflev">L</span>':'')+(r.md?' <span class="etfmd">월</span>':'');
+      /* (2026-07-20) 보유종목 — 종목 검색 중이면 매칭 종목·비중, 아니면 Top3 요약 */
+      case 'hold': {
+        const tbl=(HOLD&&HOLD[mkt])||{}, hs=tbl[r.c];
+        if(!hs||!hs.length) return `<span class="note">${HOLD?'—':'…'}</span>`;
+        const hit=holdQ?holdHit(r.c):null;
+        const src=hit||hs.slice(0,3);
+        return src.map(h=>`<span class="${hit?'holdhit':'note'}">${E(h[0])}${h[2]!=null?` ${(+h[2]).toFixed(1)}%`:''}</span>`).join(hit?' · ':'<span class="note"> · </span>');
+      }
       case 'lev': return r.lev?'<span class="etflev">레버·인버스</span>':'<span class="note">—</span>';
       case 'md': return r.md?'<span class="etfmd">월배당</span>':'<span class="note">—</span>';
       case 'asset': case 'exch': return `<span class="note">${E(v||'—')}</span>`;

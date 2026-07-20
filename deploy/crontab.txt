@@ -74,3 +74,6 @@
 */5 0-8 * * 6 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --light >> /home/ubuntu/namoobi/deriv_live.log 2>&1
 0 10-15 * * 1-5 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --heavy >> /home/ubuntu/namoobi/deriv_live.log 2>&1
 48 15 * * 1-5 /usr/bin/flock -n /tmp/deriv_live.lock /home/ubuntu/namoobi/venv/bin/python /home/ubuntu/namoobi/deriv_signals/deriv_intraday.py --heavy >> /home/ubuntu/namoobi/deriv_live.log 2>&1
+
+# (2026-07-20) ETF 보유종목 벌크 수집 — ETF 스크리너 '종목 역검색'용 (etf_pool 빌드 직후)
+45 16 * * * cd /home/ubuntu/namoobi && python3 scripts/etf_holdings.py >> /home/ubuntu/namoobi/pool.log 2>&1
