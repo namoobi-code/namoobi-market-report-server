@@ -1505,7 +1505,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   {const dc=(A.meta||{}).disclaimer, el=$$('a_disc');
    if(el) el.innerHTML=(dc?E(dc)+'<br><br>':'')+
      '<b>출처</b> — 시세·지표: 네이버증권 · Yahoo Finance · FRED · KRX · CoinGecko · Upbit/Binance · alternative.me / '+
-     '리서치 요약: 각 증권사·IB 공개 발간물 / 자체 수집: namoobi 서버 DB (DB data 탭에서 원본 확인 가능)';}
+     '리서치 요약: 각 증권사·IB 공개 발간물 / 자체 수집: 서버 DB (DB data 탭에서 원본 확인 가능)';}
 
   document.querySelectorAll('nav a[data-go2]').forEach(a=>a.addEventListener('click',e=>{
     const el=document.getElementById(a.dataset.go2);
@@ -1573,6 +1573,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       fst:{label:'외인연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
       ost:{label:'기관연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
       sr:{label:'공매도비중',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['1% ↓(약함)',null,1],['3% ↓',null,3],['5% ↑(과열)',5,null],['10% ↑',10,null]],def:[null,null]},
+      lbr:{label:'대차잔고비율',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['5% ↓',null,5],['10% ↓',null,10],['10% ↑(부담)',10,null],['20% ↑',20,null]],def:[null,null]},
       ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
@@ -1613,6 +1614,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       fst:{label:'외인연속매수',fixed:'— (US 미제공)'},
       ost:{label:'기관연속매수',fixed:'— (US 미제공)'},
       sr:{label:'공매도비중',fixed:'— (US 미제공)'},
+      lbr:{label:'대차잔고비율',fixed:'— (US 미제공)'},
       ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
@@ -1633,7 +1635,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
   const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age','v200',
               'v20','v50','align','rsi','volx','turn','macd','bb',
-              'mom','r1m','r3m','r6m','r1y','vol20','hi','frgn','fnb20','onb20','fst','ost','sr',
+              'mom','r1m','r3m','r6m','r1y','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
               'ern','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
@@ -1818,7 +1820,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
-    sr:{l:'공매도비중',n:1,m:'kr'}, ern:{l:'어닝일',n:1,m:'both'},
+    sr:{l:'공매도비중',n:1,m:'kr'}, lb:{l:'대차잔고',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
+    ern:{l:'어닝일',n:1,m:'both'},
     tob:{l:'흑자전환',n:0,m:'kr'}, opm:{l:'영업이익률',n:1,m:'both'},
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
@@ -1901,6 +1904,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'fnb20': return r.fnb20; case 'onb20': return r.onb20;   // 억원
       case 'fst': return r.fst; case 'ost': return r.ost;           // 연속일
       case 'sr': return r.sr;                                       // 공매도 비중(%)
+      case 'lb': return r.lb;                                        // 대차잔고 금액(억원)
+      case 'lbr': return r.lbr;                                      // 대차잔고비율(%)
       case 'ern': {                                                 // 어닝까지 D-day (지난 발표는 제외)
         if(!r.ed) return null;
         const t=new Date(); t.setHours(0,0,0,0);
@@ -1968,6 +1973,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
       case 'sr': return `<span class="${v>=5?'dn':''}">${v.toFixed(1)}%</span>`;
+      case 'lb': return v==null?'—':wonF(v*1e8);
+      case 'lbr': return `<span class="${v>=10?'dn':''}">${v.toFixed(2)}%</span>`;
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
@@ -2098,7 +2105,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['영업이익률','operating margin(TTM, Yahoo)'],
         ['PEG','forward PE ÷ EPS 성장률 — 1 이하면 성장 대비 저평가'],
         ['PSR','P/S(TTM) — 적자 성장주 밸류에이션'],
-        ['흑자전환·수급·공매도','미국 미제공 — 연간 영업이익 배열·투자자별 수급·공매도 데이터 없음'],
+        ['흑자전환·수급·공매도·대차잔고','미국 미제공 — 연간 영업이익 배열·투자자별 수급·공매도·대차잔고 데이터 없음'],
         ['어닝임박','다음 실적발표일까지 D-day (Yahoo earnings date)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
@@ -2141,6 +2148,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['외인·기관수급(20일)','KIS 종목별 투자자 — 최근 20거래일 누적 순매수 금액(억원)'],
         ['외인·기관연속매수','최근 며칠 연속 순매수 중인가(일)'],
         ['공매도비중','최근 거래일 공매도 거래량 ÷ 전체 거래량(%) — 5%↑ 과열 경계 (KIS)'],
+        ['대차잔고비율','대차잔여주식수 ÷ 상장주식수(%) — 공매도 대기물량 프록시, 높을수록 하락배팅 부담 (금융위 주식대차정보 · 기준일 +1영업일 13시 갱신)'],
         ['어닝임박','다음 실적발표일까지 D-day (네이버 IR 일정 — 대형주 위주 제공)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['외인보유비중','외국인 보유 비중'],
@@ -2172,7 +2180,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
-    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','frgn']],
+    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
   const _catByLabel=(()=>{ const m={};
     for(const [cat,ks] of GCAT) for(const k of ks){ const c=CDEF[k]; if(c) m[c.l]=cat; }
@@ -2183,7 +2191,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝임박':'컨센서스',
       'PER':'밸류·수익성','PEG':'밸류·수익성','PBR':'밸류·수익성','PSR':'밸류·수익성','ROE':'밸류·수익성','배당성향':'밸류·수익성','배당':'밸류·수익성','영업이익률':'밸류·수익성',
       '성장':'성장','매출성장':'성장','이익성장':'성장','흑자전환':'성장',
-      '외인·기관수급(20일)':'수급','외인·기관연속매수':'수급','공매도비중':'수급','외인보유비중':'수급',
+      '외인·기관수급(20일)':'수급','외인·기관연속매수':'수급','공매도비중':'수급','대차잔고비율':'수급','대차잔고':'수급','흑자전환·수급·공매도·대차잔고':'수급','외인보유비중':'수급',
       '부채비율':'건전성','유동비율':'건전성','영업적자':'건전성','상장기간':'기타','증권 구분':'기타' });
     return m; })();
   function legendCat(label){ return _catByLabel[label] || null; }
@@ -2267,7 +2275,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
-             ['수급',['fnb20','onb20','fst','ost','sr','frgn']],
+             ['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn']],
              ['건전성',['de','cr','oploss']],
              ['기타',['age']]];
     $('sd_sum').innerHTML=G.map(([t,ks])=>{
@@ -2615,7 +2623,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const E2=s=>E(s==null?'':s);
     let tail;
     if(d.live_at){
-      tail = ` · <b style="color:#1f6feb">⚡LIVE ${E2(d.live_at)}</b>`;
+      tail = ` · <b style="color:#1f6feb">⚡LIVE ${E2(d.live_at)}</b> <span class="note">· 장중 자동갱신 KR 1분·US 3분(시간외 포함)</span>`;
     }else{
       // 브라우저 시간대와 무관하게 KST 로 환산해 판단
       const k=new Date(Date.now()+(9*60+new Date().getTimezoneOffset())*60000);
@@ -2683,7 +2691,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
    const sync=()=>document.body.classList.toggle('side-open', sd.classList.contains('open')); // 본문 동적 축소 연동
    if(t&&sd) t.onclick=()=>{ sd.classList.toggle('open'); sync(); };
    if(x&&sd) x.onclick=()=>{ sd.classList.remove('open'); sync(); };}
-  /* 장중 LIVE: 서버가 5분 증분 갱신한 풀을 자동 재조회(ETag 304면 무비용) */
+  /* 장중 LIVE: 서버 증분(KR 1분·US 3분) 갱신 풀을 1분마다 자동 재조회(ETag 304면 무비용) */
   setInterval(()=>{
     if(!loaded) return;
     const p=document.getElementById('p_screener');
@@ -2694,7 +2702,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       $('scr_asof').innerHTML=poolMeta(d);
       refresh();
     }).catch(()=>{});
-  }, 300000);
+  }, 60000);
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
   // 마켓 토글
   document.querySelectorAll('#p_screener .mktseg:not(.stgseg) .mkt').forEach(b=>b.onclick=()=>{

@@ -557,6 +557,10 @@ def build():
     except Exception as e: print("[pool] KR enrich 실패:", repr(e)[:80])
     try: _kis_flow(kr)
     except Exception as e: print("[pool] KR 수급(KIS) 실패:", repr(e)[:80])
+    # (2026-07-20) KR 대차잔고(lb)·대차잔고비율(lbr) — 금융위 주식대차정보(일괄 rank, 1일 1콜)
+    try:
+        import lend_borrow; lend_borrow.enrich(kr)
+    except Exception as e: print("[pool] KR 대차잔고 실패:", repr(e)[:80])
     try: _enrich_us(us)
     except Exception as e: print("[pool] US enrich 실패:", repr(e)[:80])
     try: _tp_history(kr); _score(kr,"c",KR_AXDEF)   # KR만 누적→rev(tp_rev) 세팅 후 M축 재채점
@@ -571,3 +575,9 @@ def build():
 
 if __name__=="__main__":
     build()
+    # (2026-07-20) 재빌드 직후 대차잔고 재패치 — 안 하면 lb/lbr 가 매 빌드 때 지워진다
+    try:
+        import fetch_lending
+        fetch_lending.build()
+    except Exception as e:
+        print("[pool] fetch_lending 실패:", repr(e)[:80])
