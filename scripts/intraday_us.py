@@ -58,7 +58,22 @@ def main(force=False):
         print(f"벌크 quote 부족({len(Q)}) — skip"); return
     hm = now.hour*60 + now.minute
     open_m = 9*60+30
-    frac = 1.0 if hm >= 16*60 else (max(0.05, (hm-open_m)/390.0) if hm > open_m else 0.05)
+    # (2026-07-20) 거래량 하루치 환산 — 종전 선형(경과시간 비례)은 장 초반을 최대 2배까지 과대추정했다.
+    #   미국 주식 일중 거래량은 개장·마감에 몰리는 U자형이라 '경과시간=누적거래량비율' 가정이 틀린다.
+    #   (실측 예: 개장 5% 시점의 실제 누적은 약 10% → 선형환산 시 배수가 2배로 부풀려짐)
+    #   → 경험적 누적거래량 곡선으로 보간해 환산한다.
+    _t = 1.0 if hm >= 16*60 else (max(0.0, (hm-open_m)/390.0) if hm > open_m else 0.0)
+    _VPROF = [(0.0,0.0),(0.05,0.10),(0.10,0.16),(0.15,0.21),(0.20,0.26),(0.30,0.34),(0.40,0.42),
+              (0.50,0.50),(0.60,0.58),(0.70,0.66),(0.80,0.75),(0.90,0.86),(0.95,0.92),(1.0,1.0)]
+    def _cumvol(t):
+        if t <= 0: return 0.05
+        if t >= 1: return 1.0
+        for i in range(1, len(_VPROF)):
+            x0, y0 = _VPROF[i-1]; x1, y1 = _VPROF[i]
+            if t <= x1:
+                return max(0.05, y0 + (y1-y0)*((t-x0)/(x1-x0)))
+        return 1.0
+    frac = _cumvol(_t)
     upd = st_upd = 0
     for r in us:
         q = Q.get(r["c"])
