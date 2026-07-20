@@ -2291,7 +2291,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           +(mkt==='kr'?' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)':'')
           /* (2026-07-20) 장중엔 마지막 봉이 '아직 안 끝난 하루'라 20일 평균선과 직접 비교하면 과소해 보인다.
              표의 거래량배수는 하루치로 환산한 값이라 서로 달라 보이는 것 — 그 차이를 각주로 명시. */
-          +' · ⚠ 장중에는 맨 오른쪽 봉이 진행 중(미완성)이라 거래량이 실제보다 작게 보입니다 — 표의 거래량배수는 하루치로 환산한 값이라 값이 다를 수 있습니다';
+          +(()=>{ const g=window.__volProg;
+             if(!g) return '';
+             const u=n=>n>=1e8?(n/1e8).toFixed(1)+'억':n>=1e4?Math.round(n/1e4).toLocaleString()+'만':Math.round(n).toLocaleString();
+             const x1=g.ma63?(g.now/g.ma63).toFixed(2):'—', x2=g.ma63?(g.proj/g.ma63).toFixed(2):'—';
+             return ` · ⚠ 맨 오른쪽 봉은 아직 진행 중 — 장 ${Math.round(g.f*100)}% 경과 시점의 ${u(g.now)}주(빗금)이며 평균선과 비교하면 ${x1}배로 보입니다.`
+                  + ` 점선은 이 페이스로 마감까지 갔을 때의 예상치 ${u(g.proj)}주(${x2}배)로, 표의 거래량배수가 이 값입니다.`; })();
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
     }
@@ -2378,9 +2383,53 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     drawMain('sd_main',false);   // 로그 판은 (2026-07-26) 제거 — drawMain 의 useLog 경로는 남겨둠
     // ② 거래량
     {const [x,W,H]=_cvs('sd_vol'); const P={l:6,r:52,t:2,b:2};
-     const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
-     for(let i=0;i<N;i++){ x.fillStyle=(c[i]>=o[i])?'rgba(221,51,51,.45)':'rgba(31,111,235,.45)';
-       const h2=(H-P.t-P.b)*v[i]/vm; x.fillRect(X(i)-bw/2, H-P.b-h2, bw, h2); }
+     /* (2026-07-20) 장중 '진행 중' 마지막 봉 처리 —
+        반나절치 봉을 온종일 평균선과 비교하면 거래량이 안 터진 것처럼 보인다(실제 문의 사례).
+        ① 진행 중 봉은 반투명+빗금으로 미완성임을 표시,
+        ② 하루치로 환산한 '예상 높이'를 점선 테두리로 겹쳐 그려 표의 거래량배수와 눈으로 대조되게 한다.
+        환산 곡선은 서버(intraday_us.py)와 동일한 U자형 누적거래량 프로필. */
+     const _VPROF=[[0,0],[.05,.10],[.10,.16],[.15,.21],[.20,.26],[.30,.34],[.40,.42],[.50,.50],
+                   [.60,.58],[.70,.66],[.80,.75],[.90,.86],[.95,.92],[1,1]];
+     const _cumVol=t=>{ if(t<=0)return .05; if(t>=1)return 1;
+       for(let i=1;i<_VPROF.length;i++){ const a=_VPROF[i-1],b=_VPROF[i];
+         if(t<=b[0]) return Math.max(.05, a[1]+(b[1]-a[1])*((t-a[0])/(b[0]-a[0]))); } return 1; };
+     const _sess=()=>{ try{
+         const tz = mkt==='kr' ? 'Asia/Seoul' : 'America/New_York';
+         const pp={}; new Intl.DateTimeFormat('en-CA',{timeZone:tz,year:'numeric',month:'2-digit',
+           day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false,weekday:'short'})
+           .formatToParts(new Date()).forEach(z=>pp[z.type]=z.value);
+         if(pp.weekday==='Sat'||pp.weekday==='Sun') return null;
+         const hm=+pp.hour*60 + +pp.minute;
+         const op = mkt==='kr' ? 9*60 : 9*60+30, cl = mkt==='kr' ? 15*60+30 : 16*60;
+         if(hm<=op||hm>=cl) return null;
+         return {f:(hm-op)/(cl-op), d:pp.year+pp.month+pp.day};
+       }catch(e){ return null; } };
+     const _sf=_sess();
+     const _inProg = !!(_sf && String(t[N-1]||'').replace(/-/g,'')===_sf.d && v[N-1]);
+     const _projV = _inProg ? v[N-1]/_cumVol(_sf.f) : 0;
+     const vm=Math.max(Math.max(...v), _projV)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
+     for(let i=0;i<N;i++){ const prog=_inProg&&i===N-1, up=c[i]>=o[i];
+       x.fillStyle=up?`rgba(221,51,51,${prog?.20:.45})`:`rgba(31,111,235,${prog?.20:.45})`;
+       const h2=(H-P.t-P.b)*v[i]/vm, bx=X(i)-bw/2; x.fillRect(bx, H-P.b-h2, bw, h2);
+       if(prog){
+         const col=up?'#dd3333':'#1f6feb';
+         x.save(); x.beginPath(); x.rect(bx,H-P.b-h2,bw,h2); x.clip();   // 진행분에 빗금
+         x.strokeStyle=col; x.globalAlpha=.55; x.lineWidth=1;
+         for(let g=-h2;g<bw+h2;g+=3){ x.beginPath(); x.moveTo(bx+g,H-P.b); x.lineTo(bx+g+h2,H-P.b-h2); x.stroke(); }
+         x.restore();
+         /* 봉 폭이 4px 안팎이라 테두리만으론 잘 안 보인다 →
+            ①현재 높이~예상 높이 구간을 옅은 고스트로 채우고 ②예상 높이에 점선 캡을 좌우로 길게 긋는다. */
+         const hp=(H-P.t-P.b)*_projV/vm, yTop=H-P.b-hp;
+         x.save();
+         x.fillStyle=up?'rgba(221,51,51,.10)':'rgba(31,111,235,.10)';
+         x.fillRect(bx, yTop, bw, (H-P.b-h2)-yTop);
+         x.setLineDash([3,2]); x.strokeStyle=col; x.lineWidth=1.2; x.globalAlpha=.9;
+         x.beginPath(); x.moveTo(bx-3, yTop); x.lineTo(bx+bw+3, yTop); x.stroke();   // 예상 높이 캡
+         x.setLineDash([2,2]); x.globalAlpha=.45;
+         x.beginPath(); x.moveTo(bx, yTop); x.lineTo(bx, H-P.b-h2);
+         x.moveTo(bx+bw, yTop); x.lineTo(bx+bw, H-P.b-h2); x.stroke();
+         x.restore();
+       } }
      /* (2026-07-20) 거래량 평균선 2종.
         20일 = 최근 거래량 변화에 빠르게 반응(급증 포착용).
         63일(3개월) = 표의 '거래량배수' 분모(미국 quotes 의 3개월 평균)와 같은 기준 → 표·차트 정합성. */
@@ -2390,8 +2439,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      vline(_sma(v,20),'#666');
      vline(_sma(v,63),'#d98c1a',[4,3]);
      x.font='10px sans-serif';
+     /* 우측 여백(P.r=52)은 다른 패널과 x축을 맞추려 고정 — 라벨은 9px로 줄여 잘리지 않게 한다. */
+     x.font='9px sans-serif';
      x.fillStyle='#98a2ad'; x.fillText('VOL·20일', W-P.r+4, 12);
-     x.fillStyle='#d98c1a'; x.fillText('3개월(배수기준)', W-P.r+4, 24); }
+     x.fillStyle='#d98c1a'; x.fillText('3개월평균', W-P.r+4, 24);
+     if(_inProg){ x.fillStyle='#c0392b';
+       x.fillText(`진행 ${Math.round(_sf.f*100)}%`, W-P.r+4, 38);
+       x.fillText('▨=현재', W-P.r+4, 50);
+       x.fillText('┈=예상', W-P.r+4, 62); }
+     /* 상세 설명은 폭이 넉넉한 차트 하단 각주로 넘긴다(캔버스 우측은 52px뿐). */
+     window.__volProg = _inProg ? {f:_sf.f, now:v[N-1], proj:_projV,
+                                   ma63:(_sma(v,63)[N-1]||null)} : null; }
     // ③ RSI(14)
     {const [x,W,H]=_cvs('sd_rsi'); const P={l:6,r:52,t:4,b:4};
      const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-p/100);
