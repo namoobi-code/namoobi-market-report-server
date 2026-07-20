@@ -96,6 +96,18 @@ def deriv_live():
     d["built_at"] = datetime.fromtimestamp(p.stat().st_mtime, kst).strftime("%Y-%m-%d %H:%M:%S")
     d["cadence"] = ("장중 5분 자동취득(정규장·장전·시간외·야간 中 데이터 제공 구간) · "
                     "옵션 PCR·IV스큐·GEX는 장중 1시간+장마감 캡처 · 매일 새벽 정산치로 z 재계산")
+    # (2026-07-20) 야간선물(KRX 18:00~06:00) — night_ws 웹소켓 데몬(H0MFCNT0)이 기록한 실시간가.
+    #   현물은 야간에 멈춰 있어 베이시스로 쓰면 왜곡 → 별도 '야간선물' 정보로만 노출한다.
+    nfp = BASE / "data" / "night_fut.json"
+    if nfp.exists():
+        try:
+            nf = json.loads(nfp.read_text(encoding="utf-8"))
+            age = time.time() - nfp.stat().st_mtime
+            if age < 900 and nf.get("px"):
+                nf["age_sec"] = int(age)
+                d["night"] = nf
+        except Exception:
+            pass
     return Response(content=json.dumps(d, ensure_ascii=False),
                     media_type="application/json", headers={"Cache-Control": "no-store"})
 

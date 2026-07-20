@@ -534,6 +534,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         if(!hasV) return `<td class="num note" colspan="2" style="text-align:center">N/A</td>`;
         return `<td class="num">${esc(c.v)}</td><td class="num ${hot?(z>0?'up':'dn'):'note'}" ${hot?'style="font-weight:800"':''}>${z!=null?z.toFixed(2):'<span class="note" style="font-style:italic">making</span>'}</td>`;
       }).join('')}</tr>`).join('')+
+      (dv.night?`<tr><td colspan="${1+names.length*2}" class="note" style="background:#f3f6ff">🌙 <b>야간선물</b>(KRX 18:00~06:00 실시간) — KOSPI200 <b>${esc(Number(dv.night.px).toLocaleString())}</b> <b class="${Number(dv.night.chg_pct)>=0?'up':'dn'}">${Number(dv.night.chg_pct)>=0?'+':''}${esc(dv.night.chg_pct)}%</b> <span class="note">(주간종가 대비 · ${esc(String(dv.night.mkt_time||'').replace(/^(\\d{2})(\\d{2}).*/,'$1:$2'))} 체결 · ${esc(dv.night.age_sec)}초 전)</span> — 야간엔 현물이 멈춰 베이시스·z에는 반영하지 않고 참고용으로만 표시</td></tr>`:'')+
       `<tr><td colspan="${1+names.length*2}" class="note">${esc(dv.asof||'')}${dv.built_at?` · <b>🔄 마지막 취득 ${esc(dv.built_at)} KST</b>`:''}</td></tr>`+
       (dv.cadence?`<tr><td colspan="${1+names.length*2}" class="note">갱신주기 — ${esc(dv.cadence)}</td></tr>`:'')+
       `<tr><td colspan="${1+names.length*2}" class="note">※ z 공란(—) 안내 — 풋콜비율·IV 스큐·딜러 감마(GEX)는 옵션 체인 과거 스냅샷이 공개 소스에 없어 2026-07-11 수집 개시분부터 자체 누적 중이며, 롤링 60거래일이 쌓이는 2026년 10월경부터 z가 자동 산출됩니다(그때까지 현재값 + 'making'(누적 진행 중) 표시). 한국 외국인·기관 수급 z도 주간 이력 누적 후 순차 산출. N/A = 해당 지수에서 조사 불가 항목(KOSPI200 옵션 지표는 VKOSPI로 대체, VKOSPI는 한국 전용 — 미국은 VIX).</td></tr>`;

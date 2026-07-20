@@ -1,0 +1,11 @@
+[Unit]
+Description=namoobi KOSPI200 night futures websocket collector
+After=network-online.target
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/namoobi/deriv_signals
+Environment=DERIV_DB=/home/ubuntu/namoobi/data/deriv_signals.db
+ExecStart=/home/ubuntu/namoobi/venv/bin/python -u night_ws.py
+Restart=on-failure
+RestartSec=10

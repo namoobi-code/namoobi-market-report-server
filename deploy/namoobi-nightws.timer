@@ -1,0 +1,7 @@
+[Unit]
+Description=Start KOSPI200 night futures collector at 18:00 (KRX night session)
+[Timer]
+OnCalendar=Mon-Fri 18:00:00
+Persistent=false
+[Install]
+WantedBy=timers.target
