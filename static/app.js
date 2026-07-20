@@ -2381,9 +2381,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      const vm=Math.max(...v)||1, X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, bw=Math.max(1,(W-P.l-P.r)/N*0.6);
      for(let i=0;i<N;i++){ x.fillStyle=(c[i]>=o[i])?'rgba(221,51,51,.45)':'rgba(31,111,235,.45)';
        const h2=(H-P.t-P.b)*v[i]/vm; x.fillRect(X(i)-bw/2, H-P.b-h2, bw, h2); }
-     const va=_sma(v,20); x.strokeStyle='#666'; x.beginPath(); let s=false;
-     for(let i=0;i<N;i++){ if(va[i]==null)continue; const y=H-P.b-(H-P.t-P.b)*va[i]/vm; s?x.lineTo(X(i),y):(x.moveTo(X(i),y),s=true); } x.stroke();
-     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('VOL·20평균', W-P.r+4, 12); }
+     /* (2026-07-20) 거래량 평균선 2종.
+        20일 = 최근 거래량 변화에 빠르게 반응(급증 포착용).
+        63일(3개월) = 표의 '거래량배수' 분모(미국 quotes 의 3개월 평균)와 같은 기준 → 표·차트 정합성. */
+     const vline=(arr,col,dash)=>{ x.strokeStyle=col; x.setLineDash(dash||[]); x.beginPath(); let s=false;
+       for(let i=0;i<N;i++){ if(arr[i]==null)continue; const y=H-P.b-(H-P.t-P.b)*arr[i]/vm;
+         s?x.lineTo(X(i),y):(x.moveTo(X(i),y),s=true); } x.stroke(); x.setLineDash([]); };
+     vline(_sma(v,20),'#666');
+     vline(_sma(v,63),'#d98c1a',[4,3]);
+     x.font='10px sans-serif';
+     x.fillStyle='#98a2ad'; x.fillText('VOL·20일', W-P.r+4, 12);
+     x.fillStyle='#d98c1a'; x.fillText('3개월(배수기준)', W-P.r+4, 24); }
     // ③ RSI(14)
     {const [x,W,H]=_cvs('sd_rsi'); const P={l:6,r:52,t:4,b:4};
      const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-p/100);
