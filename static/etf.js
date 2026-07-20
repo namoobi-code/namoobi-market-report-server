@@ -145,11 +145,11 @@
   const CORDER=['n','asset','exch','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr','lev','md'];
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
   const CDEFAULT={
-    kr:['n','asset','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr'],
-    us:['n','exch','px','chg','cap','tv','fee','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr']
+    kr:['n','hold','asset','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr'],
+    us:['n','hold','exch','px','chg','cap','tv','fee','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr']
   };
   let COLST={kr:CDEFAULT.kr.slice(),us:CDEFAULT.us.slice()};
-  const CKEY='nmr_etfcols_v1'; let colsSaved=false;
+  const CKEY='nmr_etfcols_v2'; let colsSaved=false;   // v2: '보유종목' 컬럼 기본 포함(구 설정 무효화)
   const saveCols=()=>{try{localStorage.setItem(CKEY,JSON.stringify(COLST));colsSaved=true;}catch(e){}};
   const clearCols=()=>{try{localStorage.removeItem(CKEY);}catch(e){}colsSaved=false;};
   (function loadCols(){try{const raw=localStorage.getItem(CKEY); if(!raw)return;
