@@ -991,6 +991,43 @@
   </div>
   <div class="lead" id="dv_syn" style="margin-top:12px"></div>
 
+  <!-- (2026-07-20) 지표별 의미·해석(값·z) 가이드 — docx 3.1.13 과 동일 -->
+  <style>
+  #deriv_guide{margin-top:14px;border:1px solid var(--line);border-radius:10px;padding:2px 14px 8px}
+  #deriv_guide summary{cursor:pointer;font-weight:700;font-size:13px;padding:9px 0;list-style:none}
+  #deriv_guide summary::-webkit-details-marker{display:none}
+  #deriv_guide summary::before{content:'▸ ';color:var(--tx2)}
+  #deriv_guide[open] summary::before{content:'▾ '}
+  table.dvguide{width:100%;border-collapse:collapse;font-size:12.5px}
+  table.dvguide th,table.dvguide td{border:1px solid var(--line);padding:6px 8px;vertical-align:top;text-align:left}
+  table.dvguide th{background:var(--bg2,#f6f7f9);font-weight:700;white-space:nowrap}
+  table.dvguide td:first-child{white-space:nowrap;font-weight:700}
+  table.dvguide .up{color:#c0392b}table.dvguide .dn{color:#1e6fd6}
+  </style>
+  <details id="deriv_guide">
+    <summary>📖 지표 해석 가이드 — 값과 z 읽는 법 (지표별 의미·해석)</summary>
+    <div class="note" style="margin:4px 0 8px;line-height:1.65">
+      <b>z-score</b> = (당일값 − 최근 60거래일 평균) ÷ 표준편차. 단위가 다른 지표를 같은 척도로 비교하며, <b>|z|≥1.5 주의(신호)·|z|≥2 강함</b>. <b>값</b>은 절대 수준, <b>z</b>는 그 지수의 평소 대비 이탈이라 <u>방향 판단은 z로</u> 한다. 여러 지표 z가 동시에 같은 방향이면 신뢰도↑.
+    </div>
+    <div style="border:1px solid #f0c36d;background:#fffbe9;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:12px;line-height:1.6">
+      ⚠ <b>주의 — z 부호와 "주식에 좋다/나쁘다"는 지표마다 다릅니다.</b> 베이시스·순포지션은 z(+)가 우호지만,
+      <b>IV 스큐는 z(+)가 비우호</b>(하방 헤지 쇄도=방어)이고, <b>풋콜비율·VKOSPI는 컨트라리안</b>이라 공포 극단(z+)이 오히려 반등 신호입니다.
+      그래서 아래 표는 z 부호가 아니라 <b>주식에 우호/비우호 기준</b>으로 정리했습니다(각 칸에 해당 z 부호를 표기).
+    </div>
+    <div style="overflow-x:auto"><table class="dvguide">
+      <tr><th>지표</th><th>값(値)의 의미</th><th class="up">📈 주식에 우호(강세)</th><th class="dn">📉 주식에 비우호(약세)</th></tr>
+      <tr><td>선물 베이시스 (bp)</td><td>(선물÷현물−1)×10⁴. 정상은 소폭(+), 이론상 ≈(금리−배당)×잔존. 만기·배당락에 구조적 변동 → 수준보다 z로</td><td class="up"><b>z(+)</b> 프리미엄 확대 = 선물 매수우위·위험선호 → 통상 현물 상승 선행</td><td class="dn"><b>z(−)</b> 디스카운트·역전 = 헤지매도 → 하락 압력</td></tr>
+      <tr><td>레버리지(美)/외국인(韓) 순</td><td>美 헤지펀드 롱−숏(계약)·韓 외국인 순매수(억원, 일별). 구조상 레버리지펀드는 순매도 성향</td><td class="up"><b>z(+)</b> 매수 쏠림(추세 동조). 외국인 순매수 급증은 KOSPI200 대표 <b>일별</b> 선행신호</td><td class="dn"><b>z(−)</b> 매도·이탈(포지션 청산·위험회피)</td></tr>
+      <tr><td>자산운용(美)/기관(韓) 순</td><td>美 자산운용사 롱−숏·韓 기관 순매수. 구조상 자산운용=순매수(현물대용 롱) 성향</td><td class="up"><b>z(+)</b> 리얼머니 매수 확대</td><td class="dn"><b>z(−)</b> 리얼머니 축소 = 하방 경계</td></tr>
+      <tr><td>선물 OI 변화 <span class="note">(조건부)</span></td><td>미결제약정 증감. <b>방향은 가격과 함께</b> 봐야 의미(가격↑+OI↑=신규매수, 가격↑+OI↓=숏커버)</td><td class="up">가격↑ + <b>z(+)</b> = 신규자금 유입 → 상승 추세 강화</td><td class="dn">가격↓ + <b>z(+)</b> = 하락 추세 강화 / <b>z(−)</b> = 디레버리징(청산)</td></tr>
+      <tr><td>풋콜비율 (OI) <span class="note">(컨트라리안)</span></td><td>풋÷콜 미결제. 지수옵션은 상시 풋 수요로 절대수준이 높음 → 반드시 z로 판단</td><td class="up"><b>z(+)</b> 과도한 공포·헤지 = 바닥권 <b>반등</b> 선행</td><td class="dn"><b>z(−)</b> 안주·탐욕 = 상단 리스크</td></tr>
+      <tr><td>IV 스큐 <span class="dn">⚠부호 반대</span></td><td>IV(25Δ풋)−IV(25Δ콜). 양수 = 풋이 비쌈 = 하방 보호 수요</td><td class="up"><b>z(−)</b> 위험선호 회복(헤지 수요 완화)</td><td class="dn"><b>z(+)</b> 꼬리위험 경계·헤지 쇄도 = 방어·하락 경계(급락 직전 먼저 서는 선행성)</td></tr>
+      <tr><td>딜러 감마 (GEX) <span class="note">(변동성 축)</span></td><td>딜러의 감마 순노출. (+)면 변동성 억제(눌림), (−)면 변동성 증폭</td><td class="up"><b>z(+)</b> 롱감마 = 변동성 억제(시장 안정)</td><td class="dn"><b>z(−)</b> 숏감마 = 변동성 증폭(급변 위험)</td></tr>
+      <tr><td>VKOSPI (변동성지수) <span class="note">(컨트라리안)</span></td><td>코스피200 변동성지수(공포 게이지). 옵션체인 붕괴로 못 쓰는 PCR/IV를 대체하는 韓 변동성축(美는 VIX)</td><td class="up"><b>z(+)</b> 공포 극단 = 컨트라리안 <b>반등</b> 소지</td><td class="dn"><b>z(−)</b> 변동성 진정이나, 지나치면 안주 = 상단 리스크</td></tr>
+    </table></div>
+    <div class="note" style="margin-top:8px;font-size:11.5px">※ 순행(추세 동조) 지표 = 베이시스·순포지션·OI / 컨트라리안(역행) 지표 = 풋콜비율·VKOSPI(극단일수록 반대 방향) / IV 스큐는 방어 강도라 z(+)가 하락 경계. 리서치용이며 투자권유가 아님.</div>
+  </details>
+
   <h2 id="s3114">3.1.14 국내 유동성·레버리지 점검<em>🖥 서버 자체 수집 · 매일 3회 06:35·14:10·16:10 KST · 차트=최신 보고서 회차 PNG(보고서와 동일)</em></h2>
   <div class="lead" id="kl_verdict">불러오는 중…</div>
   <h3>요약 (최신 관측치)</h3>
