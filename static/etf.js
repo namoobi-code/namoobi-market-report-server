@@ -151,14 +151,12 @@
     v200:{l:'200일선',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, yr:{l:'상장기간',n:1,m:'both'},
     lev:{l:'레버리지',n:0,m:'both'}, md:{l:'월배당',n:0,m:'kr'}
   };
-  const CORDER=['n','asset','exch','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr','lev','md'];
+  const CORDER=['n','hold','asset','exch','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr','lev','md'];
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
-  const CDEFAULT={
-    kr:['n','hold','asset','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr'],
-    us:['n','hold','exch','px','chg','cap','tv','fee','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr']
-  };
+  /* (2026-07-20) 확인 편의를 위해 기본값 = '전부 체크'. 시장 미해당 컬럼은 cAvail 이 렌더 단계에서 거른다. */
+  const CDEFAULT={ kr:CORDER.slice(), us:CORDER.slice() };
   let COLST={kr:CDEFAULT.kr.slice(),us:CDEFAULT.us.slice()};
-  const CKEY='nmr_etfcols_v2'; let colsSaved=false;   // v2: '보유종목' 컬럼 기본 포함(구 설정 무효화)
+  const CKEY='nmr_etfcols_v3'; let colsSaved=false;   // v3: 기본값 '전부 체크'(구 저장설정 무효화)
   const saveCols=()=>{try{localStorage.setItem(CKEY,JSON.stringify(COLST));colsSaved=true;}catch(e){}};
   const clearCols=()=>{try{localStorage.removeItem(CKEY);}catch(e){}colsSaved=false;};
   (function loadCols(){try{const raw=localStorage.getItem(CKEY); if(!raw)return;
@@ -505,6 +503,13 @@
       apply();
     }).catch(e=>{ if(st) st.textContent='ETF 풀 로드 실패 — 수집이 아직 안 됐을 수 있습니다: '+e; });
   }
+  /* (2026-07-20) ETF 탭 진입 시 START 자동 실행 — 매번 누를 필요 없이 바로 결과가 보이게. */
+  {const eb=document.getElementById('btn_etf');
+   if(eb) eb.addEventListener('click',()=>{ if(!loaded) setTimeout(()=>{ if(!loaded) start(); },60); });}
+  // 새로고침 직후 ETF 탭이 이미 열려 있는 경우(탭 상태 복원)도 자동 실행
+  setTimeout(()=>{ const p=document.getElementById('p_etf');
+    if(!loaded && p && p.classList.contains('on')) start(); }, 400);
+
   /* (2026-07-26) 장중 LIVE: 서버 증분(KR 1분·US 3분) 갱신 풀을 1분마다 자동 재조회 (탭 열림·화면 보일 때만) */
   setInterval(()=>{
     if(!loaded) return;

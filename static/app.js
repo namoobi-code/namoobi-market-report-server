@@ -1866,14 +1866,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* 기본 표시 컬럼 = 초기화 상태에서 '값이 걸린' 필터와 정확히 일치(구성·순서 동일)
      (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
      ※ 증권 구분만 고정값이라 대응 컬럼 없음 */
-  const CDEFAULT={
-    kr:['n','mk','px','chg','cap','tv','de','cr','oploss','age','v200'],
-    us:['n','sector','px','chg','cap','tv','de','cr','oploss','age','v200']
-  };
+  /* (2026-07-20) 확인 편의를 위해 기본값 = '전부 체크'. 시장별 미해당 컬럼은 cAvail 이 렌더 단계에서 거른다.
+     (원래 기본값: kr ['n','mk','px','chg','cap','tv','de','cr','oploss','age','v200'] /
+                   us ['n','sector','px','chg','cap','tv','de','cr','oploss','age','v200']) */
+  const CDEFAULT={ kr:CORDER.slice(), us:CORDER.slice() };
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
      (필터·정렬 등 나머지 상태는 세션 한정이라 sessionStorage 유지) */
-  const COLKEY='nmr_cols_v1';
+  const COLKEY='nmr_cols_v2';   // v2: 기본값을 '전부 체크'로 변경(구 저장설정 무효화)
   let colsSaved=false;
   function saveCols(){ try{ localStorage.setItem(COLKEY,JSON.stringify(COLST)); colsSaved=true; }catch(e){} }
   function loadCols(){                       // 저장된 설정이 있는지 체크 → 있으면 사용, 없으면 기본값
@@ -2732,6 +2732,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      if(!loaded){ loadPool(()=>applyRestored()); return; }
      if(scrAdmin){ scrForceRefresh(); } else { refresh(); }   // 비관리자: 필터 재적용(기존 동작)
    };}
+  /* (2026-07-20) 종목 스크리너 진입 시 START 자동 실행 — 매번 누를 필요 없이 바로 결과가 보이게. */
+  {const sb=$('btn_screener');
+   if(sb) sb.addEventListener('click',()=>{ if(!loaded) setTimeout(()=>{ if(!loaded) loadPool(()=>applyRestored()); },60); });}
+  setTimeout(()=>{ const p=$('p_screener')||document.querySelector('.pane.scr');
+    if(!loaded && p && p.classList.contains('on')) loadPool(()=>applyRestored()); }, 400);
   {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
    if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더
