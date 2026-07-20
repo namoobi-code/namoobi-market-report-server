@@ -44,6 +44,9 @@ def main(force=False):
     now = datetime.now(ET)
     if not force and not in_session(now):
         print("미국 장외 — skip"); return
+    # (2026-07-20) cron 은 매분 실행하되 US 는 3분마다만 — Yahoo 벌크 35콜/회 부담 완화(무료서버)
+    if not force and now.minute % 3 != 0:
+        print("US 3분 주기 대기 — skip"); return
     pool = T.load_db("screener_pool") or {}
     stdb = (T.load_db("ta_state_us") or {}).get("st") or {}
     us = pool.get("us") or []

@@ -15,10 +15,10 @@
   function paint(){
     tab.style.display = me ? '' : 'none';
     lock.classList.toggle('on', !!me);
-    lock.title = me ? (me + ' 로그인됨 — 방문자 탭 열기') : '개발자 로그인';
-    lock.textContent = me ? ('🔓 ' + me) : '🔒';
+    lock.title = me ? '로그인됨 — 방문자 탭 열기' : '개발자 로그인';
+    lock.textContent = me ? '🔓' : '🔒';   // (2026-07-20) 사용자명 표시 제거
     $('auth_out').classList.toggle('on', !!me);
-    const w = $('vs_who'); if(w) w.textContent = me ? (me + ' · 관리자 전용') : '관리자 전용';
+    const w = $('vs_who'); if(w) w.textContent = '관리자 전용';
   }
 
   async function logout(){

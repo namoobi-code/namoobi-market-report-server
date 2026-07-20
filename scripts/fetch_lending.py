@@ -14,11 +14,16 @@ BASE = "https://apis.data.go.kr/1160100/GetStocLendBorrInfoService_V2"
 
 
 def _key():
-    for anc in [T.CACHE, os.path.dirname(os.path.abspath(__file__))]:
-        for p in (os.path.join(anc, "..", "..", "SECURITY", "data.go.kr.txt"),
-                  "/home/ubuntu/SECURITY/data.go.kr.txt"):
-            if os.path.exists(p):
-                return open(p).read().strip()
+    _BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))   # ~/namoobi
+    # (2026-07-20) 서버 정식 위치 = ~/namoobi/keys/data.go.kr.txt (최우선)
+    import glob as _g
+    for p in ([os.path.join(_BASE, "keys", "data.go.kr.txt"),
+               os.path.join(T.CACHE, "..", "..", "SECURITY", "data.go.kr.txt"),
+               "/home/ubuntu/SECURITY/data.go.kr.txt"]
+              + _g.glob("/sessions/*/mnt/claudeCowork/SECURITY/data.go.kr.txt")
+              + _g.glob("/sessions/*/mnt/*/SECURITY/data.go.kr.txt")):
+        if os.path.exists(p):
+            return open(p).read().strip()
     k = os.environ.get("DATA_GO_KR_KEY")
     if k:
         return k.strip()

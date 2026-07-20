@@ -408,7 +408,7 @@
     window.open(url,'etf_ext','width=1150,height=900'); };}
   function apply(){ applyTable(); renderChips(); }
 
-  function statusText(d){ return `기준 ${d.asof||''}${d.live_at?' · 🟢 '+d.live_at:''} · KR ${(d.kr||[]).length}종 · US ${(d.us||[]).length}종 <span class="note">· 장중 자동갱신 KR 1분·US 3분(시간외 포함)</span>`; }
+  function statusText(d){ return `기준 ${d.asof||''}${d.live_at?` · <b style="color:#1f6feb">⚡LIVE ${E(d.live_at)}</b>`:''} · KR ${(d.kr||[]).length}종 · US ${(d.us||[]).length}종 <span class="note">· 장중 자동갱신 KR 1분·US 3분(시간외 포함)</span>`; }
   function start(){
     const st=$('etf_status'); if(st) st.textContent='ETF 풀 불러오는 중…';
     fetch('/api/db/etf_pool').then(r=>r.json()).then(d=>{
