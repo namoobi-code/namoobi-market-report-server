@@ -534,7 +534,14 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         if(!hasV) return `<td class="num note" colspan="2" style="text-align:center">N/A</td>`;
         return `<td class="num">${esc(c.v)}</td><td class="num ${hot?(z>0?'up':'dn'):'note'}" ${hot?'style="font-weight:800"':''}>${z!=null?z.toFixed(2):'<span class="note" style="font-style:italic">making</span>'}</td>`;
       }).join('')}</tr>`).join('')+
-      (dv.night?`<tr><td colspan="${1+names.length*2}" class="note" style="background:#f3f6ff">🌙 <b>야간선물</b>(KRX 18:00~06:00 실시간) — KOSPI200 <b>${esc(Number(dv.night.px).toLocaleString())}</b> <b class="${Number(dv.night.chg_pct)>=0?'up':'dn'}">${Number(dv.night.chg_pct)>=0?'+':''}${esc(dv.night.chg_pct)}%</b> <span class="note">(주간종가 대비 · ${esc(String(dv.night.mkt_time||'').replace(/^(\\d{2})(\\d{2}).*/,'$1:$2'))} 체결 · ${esc(dv.night.age_sec)}초 전)</span> — 야간엔 현물이 멈춰 베이시스·z에는 반영하지 않고 참고용으로만 표시</td></tr>`:'')+
+      (dv.night?(()=>{const n=dv.night, up=Number(n.chg_pct)>=0,
+        hms=String(n.mkt_time||'').replace(/^(\d{2})(\d{2})(\d{2}).*$/,'$1:$2:$3');
+        return `<tr><td colspan="${1+names.length*2}" class="note" style="background:#f3f6ff;line-height:1.75">
+        🌙 <b>야간선물</b> (KRX 야간세션 18:00~06:00) — KOSPI200 <b>${esc(Number(n.px).toLocaleString())}</b>
+        <b class="${up?'up':'dn'}">${up?'+':''}${esc(n.chg_pct)}%</b> <span class="note">(주간 정규장 종가 대비)</span><br>
+        · <b>기준시각 ${esc(n.ts)} KST</b>${hms?` <span class="note">(거래소 체결 ${esc(hms)})</span>`:''} — 조회 시점 기준 <b>${esc(n.age_sec)}초 전</b> 값<br>
+        · <b>갱신주기</b> — 수집: 웹소켓 <b>실시간</b>(체결 발생 즉시 기록) · 화면: <b>5분마다</b> 자동 폴링(새로고침하면 즉시 최신)<br>
+        · 야간엔 현물(코스피200 지수)이 멈춰 있어 <b>베이시스·z에는 반영하지 않고</b> 참고용으로만 표시합니다</td></tr>`;})():'')+
       `<tr><td colspan="${1+names.length*2}" class="note">${esc(dv.asof||'')}${dv.built_at?` · <b>🔄 마지막 취득 ${esc(dv.built_at)} KST</b>`:''}</td></tr>`+
       (dv.cadence?`<tr><td colspan="${1+names.length*2}" class="note">갱신주기 — ${esc(dv.cadence)}</td></tr>`:'')+
       `<tr><td colspan="${1+names.length*2}" class="note">※ 기준일 안내 — <b>미국 COT는 주간 지표</b>라 1주 내외 지연이 정상입니다(화요일 포지션을 그 주 금요일에 CFTC가 공표 → 다음 갱신은 금요일). 일중 타이밍이 아니라 <b>주간 포지셔닝(구조적 쏠림)</b>으로 읽습니다. 반면 선물 베이시스·KOSPI200 현물/수급·옵션 지표는 당일~T+1 로 단기 신호를 담당합니다. 한국 수급·공매도 등 KRX 공표 항목도 T+1~T+2 지연이 정상이며, 값 옆 (MM-DD) 는 그 값의 실제 기준일입니다.</td></tr>`+
