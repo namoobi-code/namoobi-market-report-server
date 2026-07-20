@@ -118,9 +118,15 @@ def light(con, now, us_on=True):
 
 
 def osample(con, now):
-    """장중 5분 — 좁은창(ATM±8%) KIS 옵션 샘플 스캔으로 IV스큐·GEX만 T+0 갱신.
-       PCR 은 좁은창에서 외가격 꼬리를 빼먹어 편향되므로 갱신하지 않는다(장중 1H 전체스캔이 담당).
-       IV스큐(25델타)·GEX(ATM 집중)는 좁은창으로도 정확 → 5분 라이브에 적합."""
+    """장중 5분 — 좁은창(ATM±8%) KIS 옵션 샘플 스캔으로 **GEX만** T+0 갱신.
+
+    (2026-07-20 수정) 갱신 대상에서 IV스큐를 제외했다. 25델타 행사가는 변동성이 커질수록
+    ATM 에서 멀어지는데(VKOSPI 86.9 · 잔존 1개월이면 1σ=25.1% → 25델타 ≈ ATM±16.8%),
+    ±8% 창에는 아예 안 들어온다. 그러면 d25() 가 창 안의 '가장 25델타에 가까운' 근ATM 옵션을
+    집어 스큐를 계산해 값이 왜곡된다(실측: 정상 +8 부근이던 값이 -16.9 로 뒤집혀 z=-3.96 허위신호).
+    → IV스큐는 넓은 창을 훑는 장중 1H·장마감 전체스캔에만 맡긴다.
+    PCR 도 외가격 꼬리를 빼먹어 편향되므로 제외. GEX 는 감마가 ATM 에 집중돼 좁은창으로도 방향이 유효.
+    """
     try:
         import kis_api
         oc = kis_api.option_chain(window=0.08, max_calls=80, time_budget=45)
@@ -129,15 +135,13 @@ def osample(con, now):
     if not oc:
         print("[deriv-live] osample: 옵션 응답 없음(장 종료?)"); return
     d = oc.get("asof") or now.date().isoformat()
-    sk, gx = oc.get("iv_skew"), oc.get("gex")
-    if sk is not None:
-        con.execute("INSERT INTO kr_derivatives_daily(id,date,iv_skew_25d) VALUES(?,?,?) "
-                    "ON CONFLICT(id,date) DO UPDATE SET iv_skew_25d=excluded.iv_skew_25d", (KID, d, sk))
+    gx = oc.get("gex")                      # IV스큐·PCR 은 좁은창에서 왜곡 → 기록하지 않음
     if gx is not None:
         con.execute("INSERT INTO kr_derivatives_daily(id,date,gex) VALUES(?,?,?) "
                     "ON CONFLICT(id,date) DO UPDATE SET gex=excluded.gex", (KID, d, gx))
-    con.commit()
-    print(f"[deriv-live] osample {d} · IV스큐 {sk} · GEX {gx} (ATM±8% 샘플, {oc.get('scanned')}행사가)")
+        con.commit()
+    print(f"[deriv-live] osample {d} · GEX {gx} (ATM±8% 샘플 {oc.get('scanned')}행사가 · "
+          f"IV스큐/PCR 은 전체스캔 담당)")
 
 
 def heavy(now):
