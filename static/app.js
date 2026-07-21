@@ -2359,11 +2359,33 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       else { ag=(ag*(n-1)+Math.max(d,0))/n; al=(al*(n-1)+Math.max(-d,0))/n; out[i]=100-100/(1+ag/(al||1e-9)); } }
     return out; }
   function _cvs(id){ const cv=$(id); const w=cv.clientWidth||760, h=cv.clientHeight||80; cv.width=w; cv.height=h; const x=cv.getContext('2d'); x.clearRect(0,0,w,h); return [x,w,h]; }
-  function drawAll(D){
+  /* ── 자체차트 (2026-07-21 네이버식 정보 표시로 확장) ─────────────────────
+     상단 범례(시·고·저·종/등락/거래량 + MA·볼린저 파라미터), 최고·최저 지점 라벨,
+     우측 현재가 배지, 가격 y축 7눈금, 거래량·MACD y축, RSI 시그널(9),
+     월 경계 x축, 그리고 마우스를 올리면 십자선이 따라오며 모든 범례가 그 봉 기준으로 바뀐다. */
+  let _CD=null, _CHI=null, _CN=0, _CBOUND=false;
+  const _mk=n=>{ const a=Math.abs(n);
+    return a>=1e6?(n/1e6).toFixed(2)+'m':a>=1e3?Math.round(n/1e3)+'k':String(Math.round(n)); };
+  const _pf=p=>mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2);
+  function _bindChart(){ if(_CBOUND) return; _CBOUND=true;
+    ['sd_main','sd_vol','sd_rsi','sd_macd'].forEach(id=>{ const e=$(id); if(!e) return;
+      e.addEventListener('mousemove',ev=>{ if(!_CN) return;
+        const r=e.getBoundingClientRect(), PL=6, PR=52;
+        const step=(r.width-PL-PR)/_CN;
+        let i=Math.round(((ev.clientX-r.left)-PL)/step-0.5);
+        i=Math.max(0,Math.min(_CN-1,i));
+        if(i!==_CHI){ _CHI=i; _paint(); } });
+      e.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } });
+    }); }
+  function drawAll(D){ _CD=D; _CHI=null; _bindChart(); _paint(); }
+  function _paint(){ const D=_CD; if(!D) return;
     // 데이터 정리 (null 보간)
     const full=D.c.slice();
     for(let i=0;i<full.length;i++) if(full[i]==null) full[i]=full[i-1]??null;
     const N=Math.min(250, full.length), off=full.length-N;
+    _CN=N;
+    const HI=(_CHI!=null&&_CHI>=0&&_CHI<N)?_CHI:N-1;   // 범례 기준 봉(호버 없으면 최신)
+    //  ※ drawMain 안에는 가격 표시범위용 lo/hi 가 따로 있어 이름을 HI 로 구분한다.
     const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
     const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
     const ma20=sl(_sma(full,20)), ma50=sl(_sma(full,50)), ma200=sl(_sma(full,200));
@@ -2379,7 +2401,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('sd_last').innerHTML=`${mkt==='kr'?Math.round(last).toLocaleString()+'원':'$'+(+last).toFixed(2)} <span class="${chg>=0?'up':'dn'}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>`;
     // ① 메인(캔들+MA+BB+52주고점) — 일반·로그 두 판 (useLog=가격을 log 공간에 매핑, 상승률 기준 균등)
     const drawMain=(id,useLog)=>{
-     const [x,W,H]=_cvs(id); const P={l:6,r:52,t:8,b:16};
+     const [x,W,H]=_cvs(id); const P={l:6,r:52,t:32,b:16};   // t=32 : 상단 범례 2줄 자리
      const T=useLog?Math.log:(p=>p), IV=useLog?Math.exp:(p=>p);
      const lo=T(Math.min(...ll,...bL.filter(y=>y!=null))), hi=T(Math.max(...hh,...bU.filter(y=>y!=null)));
      const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(T(p)-lo)/((hi-lo)||1));
@@ -2388,11 +2410,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      for(let i=0;i<N;i++){ if(bU[i]==null)continue; st?x.lineTo(X(i),Y(bU[i])):(x.moveTo(X(i),Y(bU[i])),st=true); }
      for(let i=N-1;i>=0;i--){ if(bL[i]==null)continue; x.lineTo(X(i),Y(bL[i])); }
      x.closePath(); x.fillStyle='rgba(130,150,170,.10)'; x.fill();
-     // y 그리드 3줄 (로그면 log 공간에서 균등 → 라벨은 역변환한 가격)
+     // y 그리드 — 네이버처럼 촘촘하게(7눈금). lo/hi 는 위에서 잡은 표시범위 변수라 이름 충돌 없음.
      x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.strokeStyle='#eceff3';
-     for(let g=0;g<=3;g++){ const p=IV(lo+(hi-lo)*g/3), y=Y(p);
+     const GT=6;
+     for(let g=0;g<=GT;g++){ const p=IV(lo+(hi-lo)*g/GT), y=Y(p);
        x.beginPath(); x.moveTo(P.l,y); x.lineTo(W-P.r,y); x.stroke();
-       x.fillText(mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2), W-P.r+4, y+3); }
+       x.fillText(_pf(p), W-P.r+4, y+3); }
      // 52주 최고 점선
      const mx=Math.max(...hh); x.setLineDash([4,3]); x.strokeStyle='#b7b0a6';
      x.beginPath(); x.moveTo(P.l,Y(mx)); x.lineTo(W-P.r,Y(mx)); x.stroke(); x.setLineDash([]);
@@ -2406,15 +2429,60 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      const line=(a,col)=>{ x.strokeStyle=col; x.lineWidth=1.4; x.beginPath(); let s=false;
        for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); x.lineWidth=1; };
      line(ma20,'#f39c12'); line(ma50,'#27ae60'); line(ma200,'#8e44ad');
-     // x축 날짜 5틱
-     x.fillStyle='#98a2ad';
-     for(let g=0;g<5;g++){ const i=Math.floor(N*g/5), d=String(t[i]||'').replace(/-/g,'');
-       x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-4); }
-     if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 14); }
+     // x축 — 월이 바뀌는 지점에만 라벨(네이버 방식). 해가 바뀌면 연도를 쓴다.
+     x.fillStyle='#98a2ad'; x.font='10px sans-serif';
+     {let lastM='',lastY='',px=-99;
+      for(let i=0;i<N;i++){ const d=String(t[i]||'').replace(/-/g,''); if(d.length<6) continue;
+        const yy=d.slice(0,4), mm=d.slice(4,6);
+        if(mm===lastM) continue; const first=(lastM!=='');
+        lastM=mm;
+        if(!first){ lastY=yy; continue; }
+        const lab=(yy!==lastY)?(lastY=yy,yy):(+mm)+'월';
+        const xx=X(i); if(xx-px<42) continue; px=xx;
+        x.fillText(lab, xx-10, H-4); } }
+     // 최고·최저 지점 라벨 (현재가 대비 등락률까지 — 네이버 '최고 83,200 (-45.67%)' 형식)
+     {const iMax=hh.indexOf(Math.max(...hh)), iMin=ll.indexOf(Math.min(...ll));
+      const cur=c[N-1];
+      const mark=(i,val,isHi)=>{ const xx=X(i), yy=Y(val);
+        const pct=cur&&val?((cur/val-1)*100):0;
+        const txt=`${isHi?'▼최고':'▲최저'} ${_pf(val)} (${pct>=0?'+':''}${pct.toFixed(2)}%)`;
+        x.font='10px sans-serif'; const w=x.measureText(txt).width;
+        let tx=Math.min(Math.max(xx-w/2,P.l), W-P.r-w), ty=isHi?yy-6:yy+13;
+        x.fillStyle='rgba(255,255,255,.82)'; x.fillRect(tx-2,ty-9,w+4,12);
+        x.fillStyle='#5b6470'; x.fillText(txt,tx,ty); };
+      mark(iMax,hh[iMax],true); mark(iMin,ll[iMin],false); }
+     // 우측 축에 현재가 배지
+     {const cur=c[N-1], yy=Y(cur), lab=_pf(cur);
+      x.font='bold 10px sans-serif'; const w=x.measureText(lab).width;
+      x.fillStyle='#2c3542'; x.fillRect(W-P.r+1, yy-7, w+7, 14);
+      x.fillStyle='#fff'; x.fillText(lab, W-P.r+4, yy+3); }
+     // 십자선 — 호버 중인 봉 위치
+     if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
+       x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke();
+       x.beginPath(); x.moveTo(P.l,Y(c[HI])); x.lineTo(W-P.r,Y(c[HI])); x.stroke(); x.restore(); }
+     // 상단 범례 2줄 — 호버 중이면 그 봉, 아니면 최신 봉 기준
+     {const dd=String(t[HI]||'').replace(/-/g,''), pv=(HI>0?c[HI-1]:c[HI]);
+      const df=c[HI]-pv, dp=pv?(df/pv*100):0, upc=df>=0;
+      x.font='10px sans-serif'; x.textAlign='left';
+      let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
+        x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
+      put(dd?`${dd.slice(0,4)}.${dd.slice(4,6)}.${dd.slice(6,8)}`:'', '#5b6470', true);
+      put('시','#98a2ad'); put(_pf(o[HI]),'#5b6470');
+      put('고','#98a2ad'); put(_pf(hh[HI]),'#5b6470');
+      put('저','#98a2ad'); put(_pf(ll[HI]),'#5b6470');
+      put('종','#98a2ad'); put(_pf(c[HI]),'#5b6470',true);
+      put(`${upc?'▲':'▼'}${_pf(Math.abs(df))} ${dp>=0?'+':''}${dp.toFixed(2)}%`, upc?'#d33':'#1f6feb', true);
+      put('거','#98a2ad'); put(Math.round(v[HI]).toLocaleString(),'#5b6470');
+      cx=P.l+4;
+      const put2=(txt,col)=>{ x.font='10px sans-serif'; x.fillStyle=col; x.fillText(txt,cx,25); cx+=x.measureText(txt).width+5; };
+      put2('이동평균','#98a2ad'); put2('20','#f39c12'); put2('50','#27ae60'); put2('200','#8e44ad');
+      put2('볼린저밴드(20,2)','#8296aa');
+     }
+     if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 38); }
     };
     drawMain('sd_main',false);   // 로그 판은 (2026-07-26) 제거 — drawMain 의 useLog 경로는 남겨둠
     // ② 거래량
-    {const [x,W,H]=_cvs('sd_vol'); const P={l:6,r:52,t:2,b:2};
+    {const [x,W,H]=_cvs('sd_vol'); const P={l:6,r:52,t:16,b:2};   // t=16 : 상단 거래량 표기 자리
      /* (2026-07-20) 장중 '진행 중' 마지막 봉 처리 —
         반나절치 봉을 온종일 평균선과 비교하면 거래량이 안 터진 것처럼 보인다(실제 문의 사례).
         ① 진행 중 봉은 반투명+빗금으로 미완성임을 표시,
@@ -2472,7 +2540,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      vline(_sma(v,63),'#d98c1a',[4,3]);
      x.font='10px sans-serif';
      /* 우측 여백(P.r=52)은 다른 패널과 x축을 맞추려 고정 — 라벨은 9px로 줄여 잘리지 않게 한다. */
-     x.font='9px sans-serif';
+     if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
+       x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke(); x.restore(); }
+     // 좌상단 현재(또는 호버) 거래량 · 우측 y축 눈금
+     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('거래량', P.l+4, 12);
+     x.fillStyle='#5b6470'; x.font='bold 10px sans-serif';
+     x.fillText(Math.round(v[HI]).toLocaleString(), P.l+42, 12);
+     x.font='9px sans-serif'; x.fillStyle='#98a2ad';
+     x.fillText(_mk(vm), W-P.r+4, 74); x.fillText(_mk(vm/2), W-P.r+4, 86);
      x.fillStyle='#98a2ad'; x.fillText('VOL·20일', W-P.r+4, 12);
      x.fillStyle='#d98c1a'; x.fillText('3개월평균', W-P.r+4, 24);
      if(_inProg){ x.fillStyle='#c0392b';
@@ -2483,14 +2558,25 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      window.__volProg = _inProg ? {f:_sf.f, now:v[N-1], proj:_projV,
                                    ma63:(_sma(v,63)[N-1]||null)} : null; }
     // ③ RSI(14)
-    {const [x,W,H]=_cvs('sd_rsi'); const P={l:6,r:52,t:4,b:4};
+    {const [x,W,H]=_cvs('sd_rsi'); const P={l:6,r:52,t:18,b:4};   // t=18 : 상단 범례 자리
      const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-p/100);
      x.strokeStyle='#eceff3'; [30,50,70].forEach(g=>{ x.beginPath(); x.moveTo(P.l,Y(g)); x.lineTo(W-P.r,Y(g)); x.stroke(); });
-     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('RSI 70',W-P.r+4,Y(70)+3); x.fillText('30',W-P.r+4,Y(30)+3);
-     x.strokeStyle='#555'; x.beginPath(); let s=false;
-     for(let i=0;i<N;i++){ if(rsi[i]==null)continue; s?x.lineTo(X(i),Y(rsi[i])):(x.moveTo(X(i),Y(rsi[i])),s=true); } x.stroke(); }
+     x.font='10px sans-serif';
+     x.fillStyle='#d33'; x.fillText('70',W-P.r+4,Y(70)+3);
+     x.fillStyle='#1f6feb'; x.fillText('30',W-P.r+4,Y(30)+3);
+     const rsig=_sma(rsi,9);   // RSI 시그널 = RSI 의 9일 이동평균(네이버 RSI(14,9) 의 뒤 숫자)
+     const rline=(a,col)=>{ x.strokeStyle=col; x.beginPath(); let st2=false;
+       for(let i=0;i<N;i++){ if(a[i]==null)continue; st2?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),st2=true); } x.stroke(); };
+     rline(rsi,'#555'); rline(rsig,'#f39c12');
+     if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
+       x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke(); x.restore(); }
+     {let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
+        x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
+      put('RSI (14,9)','#98a2ad'); put('RSI','#98a2ad');
+      put(rsi[HI]!=null?rsi[HI].toFixed(2):'—','#5b6470',true);
+      put('RSI-Signal','#f39c12'); put(rsig[HI]!=null?rsig[HI].toFixed(2):'—','#f39c12',true); } }
     // ④ MACD
-    {const [x,W,H]=_cvs('sd_macd'); const P={l:6,r:52,t:4,b:4};
+    {const [x,W,H]=_cvs('sd_macd'); const P={l:6,r:52,t:18,b:4};  // t=18 : 상단 범례 자리
      const vals=[...macd,...sig,...hist].filter(y=>y!=null);
      const mx=Math.max(...vals.map(Math.abs))||1;
      const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=p=>P.t+(H-P.t-P.b)*(1-(p+mx)/(2*mx));
@@ -2501,7 +2587,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      const line=(a,col)=>{ x.strokeStyle=col; x.beginPath(); let s=false;
        for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); };
      line(macd,'#333'); line(sig,'#f39c12');
-     x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('MACD·시그널', W-P.r+4, 12); }
+     if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
+       x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke(); x.restore(); }
+     x.font='9px sans-serif'; x.fillStyle='#98a2ad';
+     x.fillText(_mk(mx), W-P.r+4, Y(mx)+9); x.fillText('0', W-P.r+4, Y(0)+3);
+     {let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
+        x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
+      const f2=z=>z==null?'—':(Math.abs(z)>=1000?Math.round(z).toLocaleString():z.toFixed(2));
+      put('MACD (12,26,9)','#98a2ad'); put('MACD','#98a2ad'); put(f2(macd[HI]),'#333',true);
+      put('Signal','#f39c12'); put(f2(sig[HI]),'#f39c12',true); } }
   }
   // ⑤ 투자자별 누적순매수 (KR 전용 — 네이버 1년 + KIS 30일 병합)
   async function loadInv(c){
