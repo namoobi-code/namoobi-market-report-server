@@ -207,6 +207,20 @@ def disclosure_api(code: str):
         return {"items": [], "err": repr(e)[:80]}
 
 
+def _logged_in(request) -> bool:
+    """namoobi 로그인 세션 여부. KIS 를 쓰는 엔드포인트는 이걸로 막는다.
+
+    (2026-07-21) 분봉·호가·체결은 KIS 실계정을 호출한다. 공개로 열어두면
+    유량제한에 걸려 파생·수급 수집 배치까지 같이 죽는다.
+    클라이언트에서 버튼만 비활성화하면 URL 직접 호출로 뚫리므로 서버에서 막는다.
+    """
+    try:
+        from auth_visitors import current_user
+        return bool(current_user(request))
+    except Exception:
+        return False
+
+
 _invt_cache = {}
 
 
@@ -261,7 +275,7 @@ _ob_cache = {}
 
 
 @app.get("/api/orderbook/kr/{code}")
-def orderbook_api(code: str):
+def orderbook_api(request: Request, code: str):
     """호가 10단계 · 체결강도 · 최근 체결 — KIS 실전계정 REST(실시간).
 
     (2026-07-21) 네이버 호가·거래원은 20분 지연이라 단타 판단에 못 쓴다.
@@ -274,6 +288,8 @@ def orderbook_api(code: str):
     """
     if not re.fullmatch(r"[0-9]{6}", code):
         raise HTTPException(400, "bad code")
+    if not _logged_in(request):
+        raise HTTPException(401, "로그인 후 이용 가능합니다(KIS 부하 보호)")
     now = time.time()
     hit = _ob_cache.get(code)
     if hit and now - hit[0] < 5:          # 실시간이라 5초만 캐시(연타 방어)
@@ -366,7 +382,7 @@ _tick_cache = {}
 
 
 @app.get("/api/ticks/kr/{code}")
-def ticks_api(code: str, pages: int = 6):
+def ticks_api(request: Request, code: str, pages: int = 6):
     """시간별 시세(체결가 + 그 시점 매도/매수 호가) — 네이버 sise_time 파싱.
 
     (2026-07-21) 분봉 차트 아래에 붙여 '공격성'을 같이 본다.
@@ -381,6 +397,8 @@ def ticks_api(code: str, pages: int = 6):
     """
     if not re.fullmatch(r"[0-9A-Za-z]{6}", code):
         raise HTTPException(400, "bad code")
+    if not _logged_in(request):
+        raise HTTPException(401, "로그인 후 이용 가능합니다")
     pages = max(1, min(int(pages or 6), 12))
     now = time.time()
     key = f"{code}:{pages}"
@@ -482,7 +500,7 @@ TF_MIN = {"1m": 1, "3m": 3, "5m": 5, "10m": 10, "30m": 30, "60m": 60}
 
 
 @app.get("/api/chart/{mkt}/{code}")
-def chart_api(mkt: str, code: str, tf: str = "d"):
+def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
     """종목 차트 프록시 — KR: 네이버 / US: Yahoo v8.
 
     tf: 1m·3m·5m·10m·30m·60m(분봉) · d(일) · w(주) · M(월)
@@ -496,6 +514,8 @@ def chart_api(mkt: str, code: str, tf: str = "d"):
         raise HTTPException(400, "bad params")
     if tf not in TF_MIN and tf not in ("d", "w", "M"):
         raise HTTPException(400, "bad tf")
+    if tf in TF_MIN and not _logged_in(request):
+        raise HTTPException(401, "분봉은 로그인 후 이용 가능합니다(KIS·외부 API 부하 보호)")
     key = f"{mkt}:{code}:{tf}"; now = time.time()
     hit = _chart_cache.get(key)
     if hit and now - hit[0] < (30 if tf in TF_MIN else 60):
@@ -655,7 +675,11 @@ def etf_holdings(mkt: str, code: str):
 #   병합: KIS 구간은 KIS 우선(개인 실측), 그 이전 개인은 null → 프론트가 −(외인+기관) 추정 점선
 _inv_cache = {}
 
-def _frgn_naver(code: str, pages: int = 13):
+def _frgn_naver(code: str, pages: int = 80):
+    # (2026-07-21) 13페이지(≈1년) → 80페이지(≈6.5년).
+    #   일봉 이력을 10년으로 늘린 뒤 수급 패널만 1년이라 화면 오른쪽 끝에만 그려졌다.
+    #   실측: frgn.naver 는 2005년까지 제공하고, 10워커 병렬로 80페이지 3.7초.
+    #   확정치라 하루 1번만 바뀌므로 캐시를 길게 잡아 반복 호출을 없앤다.
     """finance.naver.com/item/frgn.naver 표 파싱 → [(YYYYMMDD, 기관, 외인)]"""
     from concurrent.futures import ThreadPoolExecutor
     def one(p):
@@ -707,7 +731,7 @@ def investor_api(code: str):
     if not re.fullmatch(r"\d{6}", code):
         raise HTTPException(400, "bad code")
     now = time.time(); hit = _inv_cache.get(code)
-    if hit and now - hit[0] < 1800:      # 30분 캐시
+    if hit and now - hit[0] < 21600:     # 6시간 캐시 — 투자자별 순매매는 마감 후 확정이라 하루 1번만 바뀐다
         return hit[1]
     data = {}
     try:

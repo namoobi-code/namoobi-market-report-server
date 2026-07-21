@@ -2299,6 +2299,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
     _bindTF();                                   // 주기 선택(분봉·일·주·월) 배선 — 최초 1회
     _bindAuto();                                 // 장중 자동 갱신 타이머 — 최초 1회
+    _applyAuthTF();                              // 분봉 잠금 상태 반영
     document.querySelectorAll('.csrc').forEach(b=>{
       b.style.display = (b.dataset.s==='tv' && mkt==='kr') ? 'none' : '';
       b.classList.toggle('on', b.dataset.s===mode);
@@ -2639,12 +2640,41 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
 
   let _TFBOUND=false;
+  /* (2026-07-21) 분봉은 KIS 실계정을 쓰므로 로그인한 경우에만 허용한다.
+     공개로 열어두면 유량제한에 걸려 파생·수급 수집 배치까지 같이 죽는다.
+     화면에서 비활성화하는 건 안내용이고, 실제 차단은 서버(401)가 한다. */
+  let _AUTH=null;
+  function _applyAuthTF(){
+    const sel=$('sd_tfmin'); if(!sel) return;
+    const ok=!!_AUTH;
+    sel.disabled=!ok;
+    sel.style.opacity=ok?'':'0.45';
+    sel.style.cursor=ok?'pointer':'not-allowed';
+    sel.title=ok?'':'분봉은 로그인 후 이용 가능합니다 (KIS 부하 보호)';
+    const nt=$('sd_tfnote');
+    if(!ok && nt && !/로그인/.test(nt.textContent||''))
+      nt.innerHTML=(nt.textContent||'')+' <span style="color:#c0392b">· 분봉은 로그인 필요</span>';
+  }
   function _bindTF(){ if(_TFBOUND) return; _TFBOUND=true;
+    fetch('/api/auth/me').then(r=>r.json())
+      .then(d=>{ _AUTH=!!(d&&d.ok); _applyAuthTF();
+        if(!_AUTH && _isMin()){ _TF='d'; if(dcode) showDetail(dcode); } })
+      .catch(()=>{ _AUTH=false; _applyAuthTF(); });
     const sel=$('sd_tfmin');
     const sync=()=>{ document.querySelectorAll('#sd_tfbar .tfb')
         .forEach(b=>b.classList.toggle('on', b.dataset.tf===_TF));
       if(sel) sel.classList.toggle('on', _isMin()); };
-    if(sel) sel.onchange=()=>{ _TF=sel.value; sync(); if(dcode) showDetail(dcode); };
+    /* (2026-07-21) 일/주/월 상태에서 드롭다운의 '현재 선택값'(예: 5분)을 다시 고르면
+       select 의 value 가 안 바뀌어 change 이벤트가 안 난다 → 아무 반응이 없었다.
+       (다른 값을 고르면 정상 동작해서 더 헷갈렸다)
+       → 드롭다운을 '클릭'하는 순간 분봉이 아니면 현재 선택값으로 바로 전환한다.
+         네이버도 분 드롭다운을 누르면 분봉으로 넘어간다. 이후 다른 값을 고르면 change 로 다시 전환. */
+    if(sel){
+      sel.onchange=()=>{ if(!_AUTH) return; _TF=sel.value; sync(); if(dcode) showDetail(dcode); };
+      sel.addEventListener('mousedown',()=>{
+        if(!_AUTH) return;
+        if(!_isMin() && sel.value){ _TF=sel.value; sync(); if(dcode) showDetail(dcode); } });
+    }
     document.querySelectorAll('#sd_tfbar .tfb').forEach(b=>{
       b.onclick=()=>{ _TF=b.dataset.tf; sync(); if(dcode) showDetail(dcode); }; });
     sync(); }
