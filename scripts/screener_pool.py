@@ -7,6 +7,53 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from datetime import date, datetime, timedelta
 import ta_screen as T
 
+def _adx14(h, l, c, p=14):
+    """ADX(14) — Wilder. 추세의 '강도'(방향 아님). 25↑ 추세장 · 20↓ 횡보장.
+
+    RSI(과열도)·MACD(방향)와 정보축이 달라 겹치지 않는다. 이동평균 크로스 전략이
+    횡보장에서 깨지는 구간을 걸러내는 용도로 쓴다.
+    네이버 일봉에 고가·저가가 이미 있어 추가 네트워크 요청은 0.
+    (미국은 Yahoo 일괄조회(spark)가 종가만 줘서 산출 불가 → US 미제공)
+    """
+    n = len(c)
+    if n < p * 2 + 2:
+        return None
+    tr, pdm, ndm = [0.0], [0.0], [0.0]
+    for i in range(1, n):
+        if None in (h[i], l[i], c[i - 1], h[i - 1], l[i - 1]):
+            tr.append(0.0); pdm.append(0.0); ndm.append(0.0); continue
+        tr.append(max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1])))
+        up, dn = h[i] - h[i - 1], l[i - 1] - l[i]
+        pdm.append(up if (up > dn and up > 0) else 0.0)
+        ndm.append(dn if (dn > up and dn > 0) else 0.0)
+
+    def _sm(a):
+        o = [None] * n
+        acc = sum(a[1:p + 1]); o[p] = acc
+        for i in range(p + 1, n):
+            acc = acc - acc / p + a[i]; o[i] = acc
+        return o
+
+    TR, PD, ND = _sm(tr), _sm(pdm), _sm(ndm)
+    prev, cnt, acc = None, 0, 0.0
+    for i in range(p, n):
+        if not TR[i]:
+            continue
+        pdi, ndi = 100 * PD[i] / TR[i], 100 * ND[i] / TR[i]
+        t = pdi + ndi
+        if t <= 0:
+            continue
+        dx = 100 * abs(pdi - ndi) / t
+        cnt += 1
+        if cnt <= p:
+            acc += dx
+            if cnt == p:
+                prev = acc / p
+        else:
+            prev = (prev * (p - 1) + dx) / p
+    return round(prev, 1) if prev is not None else None
+
+
 def _score(rs, key, axdef):
     """stage2 score_axes 와 동일 — 축별 z-score(zmap) + 종합(min 3축)."""
     zz={ax:[T.zmap({r[key]:g(r) for r in rs}) for g in fs] for ax,fs in axdef.items()}
@@ -122,6 +169,12 @@ def _enrich_kr(kr, d0s):
                 # 볼린저(20,2) %b
                 sd=(sum((x-ma20)**2 for x in cl[-20:])/20)**0.5
                 if sd>0: o["bb"]=round((c-(ma20-2*sd))/(4*sd)*100,1)   # 0=하단, 100=상단
+                # (2026-07-21) ADX(14) — 같은 일봉 시리즈로 계산(네트워크 비용 0)
+                try:
+                    _h=[x.get("highPrice") for x in rows]; _l=[x.get("lowPrice") for x in rows]
+                    if not any(z is None for z in _h[-60:]) and not any(z is None for z in _l[-60:]):
+                        o["adx"]=_adx14(_h,_l,cl)
+                except Exception: pass
                 # 거래량 배수 = 최근 거래일 ÷ 직전 20일 평균
                 vol=[x.get("accumulatedTradingVolume") or 0 for x in rows]
                 if len(vol)>=21:

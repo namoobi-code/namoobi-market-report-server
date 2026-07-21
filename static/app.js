@@ -1585,6 +1585,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       v50:{label:'50일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−10% ↑',-10],['+10% ↑',10]],def:[null,null]},
       align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조'],hint:{'정배열':['up','상승 추세'],'역배열':['dn','하락 추세'],'혼조':['neu','전환 구간']}},
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
+      /* (2026-07-21) ADX(14) — 추세의 '강도'. RSI(과열도)·MACD(방향)와 축이 달라 겹치지 않는다.
+         25↑ 추세장 · 20↓ 횡보장. 이평 크로스·모멘텀 전략이 횡보장에서 깨지는 걸 걸러내는 용도.
+         한국만 제공 — 미국은 Yahoo 일괄조회가 종가만 줘서 고가·저가가 없어 산출 불가. */
+      adx:{label:'ADX(14)',fmt:v=>'ADX '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['20 ↑(추세 시작)',20],['25 ↑(추세장)',25],['40 ↑(강한 추세)',40]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
       turn:{label:'회전율',fmt:v=>v.toFixed(2)+'%',min:1,reqData:1,presets:[['전체',null],['0.1% ↑',0.1],['0.5% ↑',0.5],['1% ↑',1]],def:[null,null]},
       macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],disp:MACD_DISP,hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
@@ -1662,7 +1666,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
   const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age',
               /* (2026-07-21) 이동평균은 기간 오름차순으로 — 20일 → 50일 → 200일 */
-              'v20','v50','v200','align','rsi','volx','turn','macd','bb',
+              'v20','v50','v200','align','rsi','adx','volx','turn','macd','bb',
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
                  r1y 와 사실상 동일값이었다(실측 ALKS +98/+97.7 · AEHR +393/+392.7 · NAVN +30/+29.8).
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
@@ -1859,7 +1863,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     oploss:{l:'영업적자',n:1,m:'both'},
     age:{l:'상장기간',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
     v20:{l:'20일선',n:1,m:'both'}, v50:{l:'50일선',n:1,m:'both'}, align:{l:'이평배열',n:0,m:'both'},
-    rsi:{l:'RSI',n:1,m:'both'}, volx:{l:'거래량배수',n:1,m:'both'}, turn:{l:'회전율',n:1,m:'both'},
+    rsi:{l:'RSI',n:1,m:'both'}, adx:{l:'ADX',n:1,m:'kr'}, volx:{l:'거래량배수',n:1,m:'both'}, turn:{l:'회전율',n:1,m:'both'},
     macd:{l:'MACD',n:0,m:'both'}, bb:{l:'볼린저밴드',n:1,m:'both'},
     /* 라벨을 시장별로 다르게 — 한국은 12M, 미국은 12−1M 이라 값의 의미가 다르다.
        getter 라 mkt 전환 시 헤더·컬럼패널·필터칩이 자동으로 따라간다. */
@@ -1899,7 +1903,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
      (필터·정렬 등 나머지 상태는 세션 한정이라 sessionStorage 유지) */
-  const COLKEY='nmr_cols_v4';   // v4: 1Y 제거·모멘텀 시장별 정의·이평 20→50→200 순서 (구 저장설정 무효화)
+  const COLKEY='nmr_cols_v5';   // v4: 1Y 제거·모멘텀 시장별 정의·이평 20→50→200 순서 (구 저장설정 무효화)
   let colsSaved=false;
   function saveCols(){ try{ localStorage.setItem(COLKEY,JSON.stringify(COLST)); colsSaved=true; }catch(e){} }
   function loadCols(){                       // 저장된 설정이 있는지 체크 → 있으면 사용, 없으면 기본값
@@ -1943,6 +1947,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'v20': return r.v20!=null?r.v20*100:null;
       case 'v50': return r.v50!=null?r.v50*100:null;
       case 'align': return r.align??null; case 'macd': return r.macd??null;
+      case 'adx': return r.adx??null;
       case 'rsi': return r.rsi; case 'volx': return r.volx; case 'bb': return r.bb;
       case 'de': return r.de; case 'cr': return r.cr;
       case 'oploss': return r.oploss!=null?r.oploss:(r.op3neg?3:null);
@@ -2192,6 +2197,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['50일선','50일 이동평균 대비 현재가 — 중기 추세'],
         ['이평배열','20·50·200일선 배열 — 정배열(20>50>200)=상승추세장, 역배열=하락추세장, 혼조=전환 구간'],
         ['RSI(14)','상대강도지수 — 30 이하 과매도(반등 후보), 50 상회 = 상승 모멘텀, 70 이상 과매수(조정 경계)'],
+        ['ADX(14)','추세의 <b>강도</b>(방향 아님) — 25 이상이면 추세장, 20 이하면 횡보장. RSI(과열도)·MACD(방향)와 정보축이 달라 겹치지 않는다. 이평 크로스·모멘텀 전략은 횡보장에서 잘 깨지므로 그 구간을 걸러낼 때 쓴다. <b>한국 전용</b> — 미국은 일괄 시세조회가 종가만 줘서 고가·저가가 없어 산출 불가'],
         ['거래량배수','최근 거래일 거래량 ÷ 직전 20일 평균 — 1.5배↑ 급증 = 추세 전환/돌파 확인 신호'],
         ['MACD','(12,26,9) 상태. 앞의 <b>골든/데드</b>=시그널선 돌파 방향, 괄호의 <b>0선↑/↓</b>=MACD 의 0선 위/아래 위치. 골든(0선↑)=강한 상승 · 골든(0선↓)=상승 전환 초기(0선 아래 반등) · 데드(0선↑)=하락 전환 초기(고점권 꺾임) · 데드(0선↓)=강한 하락'],
         ['볼린저밴드','볼린저밴드(20,2) 내 위치(%b) — 0=하단(과매도권), 50=중심선, 100 이상=상단 돌파(거래량 동반 시 추세가속)'],
@@ -2377,6 +2383,33 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        미국 20/50/100/200   : 50의 배수 관습. 골든/데드 크로스 정의가 50·200 교차.
                               ※ 미국 연 거래일은 252일이라 200일선은 실제로 1년이 아니다(9~10개월).
      장기선이 화면 전 구간에 그려지도록 /api/chart 이력을 KR 760일·US 2y 로 늘렸다. */
+  /* ADX(14) — Wilder 방식. RSI(과열도)·MACD(방향)와 달리 '추세의 강도'를 본다.
+     보통 25 이상이면 추세장, 20 이하면 횡보장으로 보고, 이동평균 크로스 전략은
+     횡보장에서 깨지므로 그 구간을 걸러내는 용도로 쓴다. 방향은 알려주지 않는다. */
+  function _adx(h,l,c,p){ p=p||14; const n=h.length;
+    if(n<p*2+2) return new Array(n).fill(null);
+    const tr=[null],pdm=[null],ndm=[null];
+    for(let i=1;i<n;i++){
+      tr.push(Math.max(h[i]-l[i], Math.abs(h[i]-c[i-1]), Math.abs(l[i]-c[i-1])));
+      const up=h[i]-h[i-1], dn=l[i-1]-l[i];
+      pdm.push(up>dn&&up>0?up:0); ndm.push(dn>up&&dn>0?dn:0); }
+    const sm=a=>{ const o=new Array(n).fill(null); let acc=0;
+      for(let i=1;i<=p;i++) acc+=a[i]||0;
+      o[p]=acc;
+      for(let i=p+1;i<n;i++){ acc=acc-acc/p+(a[i]||0); o[i]=acc; }
+      return o; };
+    const TR=sm(tr),PD=sm(pdm),ND=sm(ndm);
+    const dx=new Array(n).fill(null);
+    for(let i=p;i<n;i++){ if(!TR[i]) continue;
+      const pdi=100*PD[i]/TR[i], ndi=100*ND[i]/TR[i], t=pdi+ndi;
+      if(t>0) dx[i]=100*Math.abs(pdi-ndi)/t; }
+    const out=new Array(n).fill(null); let acc=0,cnt=0,prev=null;
+    for(let i=p;i<n;i++){ if(dx[i]==null) continue;
+      cnt++;
+      if(cnt<=p){ acc+=dx[i]; if(cnt===p){ prev=acc/p; out[i]=prev; } }
+      else { prev=(prev*(p-1)+dx[i])/p; out[i]=prev; } }
+    return out; }
+
   const MASET={ kr:[[5,'#16a085'],[20,'#f39c12'],[60,'#27ae60'],[120,'#8e44ad'],[240,'#2c3e50']],
                 us:[[20,'#f39c12'],[50,'#27ae60'],[100,'#16a085'],[200,'#8e44ad']] };
   function _bindChart(){ if(_CBOUND) return; _CBOUND=true;
@@ -2439,6 +2472,28 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      for(let i=0;i<N;i++){ if(bU[i]==null)continue; st?x.lineTo(X(i),Y(bU[i])):(x.moveTo(X(i),Y(bU[i])),st=true); }
      for(let i=N-1;i>=0;i--){ if(bL[i]==null)continue; x.lineTo(X(i),Y(bL[i])); }
      x.closePath(); x.fillStyle='rgba(130,150,170,.10)'; x.fill();
+     /* 매물분석도(가격대별 거래량) — 일봉의 고가~저가 구간에 그날 거래량을 균등 배분해 근사한다.
+        (일봉만으로는 체결가별 분포를 알 수 없으므로 표준적인 근사법)
+        위쪽에 두꺼운 막대 = 그 가격대에 물린 물량이 많다 = 반등 시 저항.
+        가장 두꺼운 구간(POC)은 주황으로 강조. 캔들보다 아래 레이어라 시야를 가리지 않는다. */
+     {const VPB=30, vLo=Math.min(...ll), vHi=Math.max(...hh), rng=(vHi-vLo)||1;
+      const bins=new Array(VPB).fill(0);
+      for(let i=0;i<N;i++){
+        const a=Math.min(ll[i],hh[i]), b=Math.max(ll[i],hh[i]);
+        const k0=Math.max(0,Math.min(VPB-1,Math.floor((a-vLo)/rng*VPB)));
+        const k1=Math.max(0,Math.min(VPB-1,Math.floor((b-vLo)/rng*VPB)));
+        const span=k1-k0+1;
+        for(let k=k0;k<=k1;k++) bins[k]+=(v[i]||0)/span; }
+      const bmx=Math.max(...bins)||1, poc=bins.indexOf(bmx);
+      const vpW=(W-P.l-P.r)*0.20;
+      for(let k=0;k<VPB;k++){
+        const y0=Y(vLo+rng*(k+1)/VPB), y1=Y(vLo+rng*k/VPB);
+        const bh=Math.max(1,y1-y0-1), bwd=vpW*bins[k]/bmx;
+        x.fillStyle=(k===poc)?'rgba(243,156,18,.42)':'rgba(120,140,165,.18)';
+        x.fillRect(W-P.r-bwd, y0, bwd, bh); }
+      // POC 가격 라벨
+      x.font='9px sans-serif'; x.fillStyle='#c07a10';
+      x.fillText('매물대 최대 '+_pf(vLo+rng*(poc+0.5)/VPB), W-P.r-vpW, Y(vLo+rng*(poc+0.5)/VPB)-3); }
      // y 그리드 — 네이버처럼 촘촘하게(7눈금). lo/hi 는 위에서 잡은 표시범위 변수라 이름 충돌 없음.
      x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.strokeStyle='#eceff3';
      const GT=6;
@@ -2598,13 +2653,21 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      const rline=(a,col)=>{ x.strokeStyle=col; x.beginPath(); let st2=false;
        for(let i=0;i<N;i++){ if(a[i]==null)continue; st2?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),st2=true); } x.stroke(); };
      rline(rsi,'#555'); rline(rsig,'#f39c12');
+     /* ADX 를 같은 패널에 얹는다 — 0~100 스케일이 RSI 와 같아 축을 공유할 수 있고,
+        패널을 하나 더 늘리지 않아 스크롤 부담이 없다. 25 기준선을 점선으로 표시. */
+     const adxA=_adx(hh,ll,c,14);
+     x.save(); x.setLineDash([2,2]); x.strokeStyle='#cfd6de';
+     x.beginPath(); x.moveTo(P.l,Y(25)); x.lineTo(W-P.r,Y(25)); x.stroke(); x.restore();
+     x.save(); x.setLineDash([5,3]); rline(adxA,'#8e44ad'); x.restore(); x.setLineDash([]);
      if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
        x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke(); x.restore(); }
      {let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
         x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
       put('RSI (14,9)','#98a2ad'); put('RSI','#98a2ad');
       put(rsi[HI]!=null?rsi[HI].toFixed(2):'—','#5b6470',true);
-      put('RSI-Signal','#f39c12'); put(rsig[HI]!=null?rsig[HI].toFixed(2):'—','#f39c12',true); } }
+      put('RSI-Signal','#f39c12'); put(rsig[HI]!=null?rsig[HI].toFixed(2):'—','#f39c12',true);
+      put('ADX(14)','#8e44ad'); put(adxA[HI]!=null?adxA[HI].toFixed(1):'—','#8e44ad',true);
+      put(adxA[HI]==null?'':(adxA[HI]>=25?'추세':'횡보'), adxA[HI]>=25?'#c0392b':'#98a2ad'); } }
     // ④ MACD
     {const [x,W,H]=_cvs('sd_macd'); const P={l:6,r:52,t:18,b:4};  // t=18 : 상단 범례 자리
      const vals=[...macd,...sig,...hist].filter(y=>y!=null);
@@ -2626,12 +2689,39 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const f2=z=>z==null?'—':(Math.abs(z)>=1000?Math.round(z).toLocaleString():z.toFixed(2));
       put('MACD (12,26,9)','#98a2ad'); put('MACD','#98a2ad'); put(f2(macd[HI]),'#333',true);
       put('Signal','#f39c12'); put(f2(sig[HI]),'#f39c12',true); } }
-    if(_INV) drawInv(_INV);        // ⑤ 수급 패널도 같은 호버 상태로 다시 그린다
+    // ⑤ 수급(한국) / OBV(미국) — 같은 패널 자리를 공유한다.
+    //    한국은 실제 투자자별 순매수가 있으므로 그쪽이 우월하고, 미국은 그 데이터가 없어
+    //    비어 있던 자리에 OBV(누적 거래량으로 본 매집·분산)를 넣는다.
+    if(mkt!=='kr'){
+      const el=$('sd_inv');
+      if(el){ el.style.display='block';
+        const [x,W,H]=_cvs('sd_inv'); const P={l:6,r:52,t:16,b:14};
+        const ob=[]; let acc=0;
+        for(let i=0;i<N;i++){ if(i>0) acc+=(c[i]>c[i-1]?(v[i]||0):c[i]<c[i-1]?-(v[i]||0):0); ob.push(acc); }
+        let omx=Math.max(...ob), omn=Math.min(...ob); if(omx===omn){omx+=1;omn-=1;}
+        const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=q=>P.t+(H-P.t-P.b)*(1-(q-omn)/(omx-omn));
+        x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke();
+        x.strokeStyle='#1f6feb'; x.lineWidth=1.5; x.beginPath();
+        for(let i=0;i<N;i++) i?x.lineTo(X(i),Y(ob[i])):x.moveTo(X(i),Y(ob[i]));
+        x.stroke(); x.lineWidth=1;
+        if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
+          x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke(); x.restore(); }
+        x.font='9px sans-serif'; x.fillStyle='#98a2ad';
+        x.fillText(_mk(omx),W-P.r+4,Y(omx)+9); x.fillText(_mk(omn),W-P.r+4,Y(omn)-2);
+        // x축 날짜(메인 차트와 동일 인덱스라 그대로 맞는다)
+        for(let g=0;g<3;g++){ const i=Math.floor(N*g/3), d=String(t[i]||'').replace(/-/g,'');
+          x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-3); }
+        let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
+          x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
+        put('OBV (누적 거래량)','#98a2ad'); put(_mk(ob[HI]),'#1f6feb',true);
+        put('· 주가와 같이 오르면 매집 · 주가만 오르고 OBV 정체면 분산 의심','#98a2ad');
+      }
+    } else if(_INV) drawInv(_INV);   // 한국: 투자자별 누적순매수 패널을 같은 호버 상태로 재그리기
   }
   // ⑤ 투자자별 누적순매수 (KR 전용 — 네이버 1년 + KIS 30일 병합)
   async function loadInv(c){
     const e=$('sd_inv'); if(!e) return;
-    if(mkt!=='kr'){ e.style.display='none'; return; }   // 투자자 구분은 한국 시장 고유
+    if(mkt!=='kr'){ _INV=null; e.style.display='block'; _paint(); return; }  // 미국: 같은 자리에 OBV(_paint 가 그림)
     e.style.display='block';
     try{
       const J=await (await fetch(`/api/investor/kr/${encodeURIComponent(c)}`)).json();
