@@ -1679,11 +1679,19 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       else {o[k]={min:null,max:null};} } return o; }
   function allF(){ F_ST[mkt]=clearF(); F=F_ST[mkt]; }
   function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF();           // 마켓 전환 → 저장분 로드(원복 안함)
-    else { const df=buildF(); for(const k in df) if(!(k in F_ST[mkt])) F_ST[mkt][k]=df[k]; } // 신규 필터키 백필(구버전 저장상태 호환)
+    else { const df=buildF();
+      for(const k in df) if(!(k in F_ST[mkt])) F_ST[mkt][k]=df[k];        // 신규 필터키 백필
+      for(const k in F_ST[mkt]) if(!(k in df)) delete F_ST[mkt][k]; }     // 없어진 필터키 정리(구버전 세션 호환)
     F=F_ST[mkt]; }
   const ageOf=r=>r.yr?nowY-r.yr:null;
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
+      /* (2026-07-21) 정의가 사라진 필터키는 건너뛴다.
+         F_ST 는 sessionStorage('nmr_scr')에 저장돼 탭을 새로고침해도 남는다. 그래서 필터를
+         제거·개편하면(예: 수익률 1Y 삭제) 옛 상태에 남은 키가 d[k]=undefined 가 되어
+         '풀 로드 실패: Cannot read properties of undefined (reading tgl)' 로 화면 전체가 죽었다.
+         앞으로 어떤 필터를 빼도 안전하도록 방어한다. */
+      if(!f) continue;
       if(f.tgl){ if(!st.on) continue;
         if(k==='cov' && r.tp==null) return false;
         if(k==='tob' && !r.tob) return false;
