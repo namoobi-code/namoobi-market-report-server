@@ -380,6 +380,10 @@
   .fpop .ohint.dn{color:#1e6fd6;background:#e8f1fd}
   .fpop .ohint.neu{color:#6b7684;background:#eef0f3}
   .fpop .preset.sel .ohint{color:#fff;background:rgba(255,255,255,.22)}
+  /* 주기 선택 바 — 분봉은 드롭다운, 일/주/월은 버튼(네이버와 동일 구성) */
+  .tfsel{padding:4px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:12px;cursor:pointer;color:var(--tx)}
+  .tfsel.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}
+  .tfb.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}
   .fpop .man{display:flex;gap:6px;align-items:center;margin-top:7px;border-top:1px dashed var(--line);padding-top:8px}
   .fpop .man input{width:82px;border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:right;font-family:inherit}
   .fpop .man span{font-size:11px;color:var(--tx2)}
@@ -830,6 +834,18 @@
                 <div id="sd_nwrap" style="overflow:hidden;border:1px solid var(--line);border-radius:6px;background:#fff;height:640px">
                   <iframe id="sd_nifr" style="width:100%;height:760px;border:0;margin-top:-118px" loading="lazy"></iframe>
                 </div>
+              </div>
+              <!-- (2026-07-21) 주기 선택 — 네이버와 동일 구성: 분봉 드롭다운 + 일/주/월 버튼 -->
+              <div id="sd_tfbar" style="display:none;align-items:center;gap:4px;margin:2px 0 4px">
+                <select id="sd_tfmin" class="tfsel">
+                  <option value="1m">1분</option><option value="3m">3분</option>
+                  <option value="5m" selected>5분</option><option value="10m">10분</option>
+                  <option value="30m">30분</option><option value="60m">1시간</option>
+                </select>
+                <button class="cp-x tfb" data-tf="d">일</button>
+                <button class="cp-x tfb" data-tf="w">주</button>
+                <button class="cp-x tfb" data-tf="M">월</button>
+                <span class="note" id="sd_tfnote" style="margin-left:6px;font-size:11px"></span>
               </div>
               <canvas id="sd_main"></canvas><canvas id="sd_vol"></canvas>
               <canvas id="sd_rsi"></canvas><canvas id="sd_macd"></canvas><canvas id="sd_inv"></canvas>

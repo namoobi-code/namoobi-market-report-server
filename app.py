@@ -209,35 +209,117 @@ def disclosure_api(code: str):
 
 _chart_cache = {}
 
+def _agg(t, o, h, l, c, v, keyfn):
+    """봉 합치기 — keyfn(시각문자열)이 같은 것끼리 시가=처음·고가=max·저가=min·종가=마지막·거래량=합.
+    분봉→N분봉, 일봉→주봉·월봉 모두 이 하나로 처리한다."""
+    T, O, H, L, C, V = [], [], [], [], [], []
+    prev = None
+    for i in range(len(t)):
+        if c[i] is None:
+            continue
+        k = keyfn(t[i])
+        if k != prev:
+            T.append(t[i]); O.append(o[i]); H.append(h[i]); L.append(l[i]); C.append(c[i]); V.append(v[i] or 0)
+            prev = k
+        else:
+            if H[-1] is None or (h[i] is not None and h[i] > H[-1]): H[-1] = h[i]
+            if L[-1] is None or (l[i] is not None and l[i] < L[-1]): L[-1] = l[i]
+            C[-1] = c[i]; V[-1] = (V[-1] or 0) + (v[i] or 0)
+    return {"t": T, "o": O, "h": H, "l": L, "c": C, "v": V}
+
+
+# 지원 주기 — 네이버 차트와 동일 구성(분봉 드롭다운 + 일/주/월)
+TF_MIN = {"1m": 1, "3m": 3, "5m": 5, "10m": 10, "30m": 30, "60m": 60}
+
+
 @app.get("/api/chart/{mkt}/{code}")
-def chart_api(mkt: str, code: str):
-    """종목 일봉(종가 기준) 프록시 — KR: 네이버 / US: Yahoo v8. 10분 메모리 캐시."""
+def chart_api(mkt: str, code: str, tf: str = "d"):
+    """종목 차트 프록시 — KR: 네이버 / US: Yahoo v8.
+
+    tf: 1m·3m·5m·10m·30m·60m(분봉) · d(일) · w(주) · M(월)
+      · KR 분봉은 네이버가 1분봉만 준다(interval 파라미터 무시) → 서버에서 N분으로 합친다.
+        실측: 1분봉 3,400개 = 최근 9거래일. 5분 집계 시 약 680봉.
+      · US 분봉은 Yahoo 가 1m(최근 5일)·5m(최근 1개월)을 준다. 3분은 1m 에서, 10·30·60분은 5m 에서 합친다.
+      · 주·월봉은 일봉을 합쳐서 만든다(추가 호출 없음).
+    캐시: 분봉 30초 / 그 외 60초.
+    """
     if mkt not in ("kr", "us") or not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
         raise HTTPException(400, "bad params")
-    key = f"{mkt}:{code}"; now = time.time()
+    if tf not in TF_MIN and tf not in ("d", "w", "M"):
+        raise HTTPException(400, "bad tf")
+    key = f"{mkt}:{code}:{tf}"; now = time.time()
     hit = _chart_cache.get(key)
-    if hit and now - hit[0] < 60:      # 장중 실시간성 — 1분 캐시
+    if hit and now - hit[0] < (30 if tf in TF_MIN else 60):
         return hit[1]
     try:
         from datetime import date as _d, timedelta as _td, datetime as _dt
-        if mkt == "kr":
-            E = _d.today().strftime("%Y%m%d"); S = (_d.today() - _td(days=760)).strftime("%Y%m%d")   # 250봉 표시 + 240일선 = 490거래일 필요
-            url = f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime={S}&endDateTime={E}"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            rows = json.loads(urllib.request.urlopen(req, timeout=12).read())
-            out = {"t": [str(r.get("localDate") or "") for r in rows],
-                   "o": [r.get("openPrice") for r in rows], "h": [r.get("highPrice") for r in rows],
-                   "l": [r.get("lowPrice") for r in rows], "c": [r.get("closePrice") for r in rows],
-                   "v": [r.get("accumulatedTradingVolume") for r in rows]}
+        if tf in TF_MIN:
+            n = TF_MIN[tf]
+            if mkt == "kr":
+                E = _d.today().strftime("%Y%m%d") + "1600"
+                S = (_d.today() - _td(days=20)).strftime("%Y%m%d") + "0900"
+                url = (f"https://api.stock.naver.com/chart/domestic/item/{code}"
+                       f"/minute?startDateTime={S}&endDateTime={E}")
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
+                                                           "Referer": "https://m.stock.naver.com/"})
+                rows = json.loads(urllib.request.urlopen(req, timeout=15).read())
+                t = [str(r.get("localDateTime") or "")[:12] for r in rows]
+                base = {"t": t,
+                        "o": [r.get("openPrice") for r in rows], "h": [r.get("highPrice") for r in rows],
+                        "l": [r.get("lowPrice") for r in rows], "c": [r.get("currentPrice") for r in rows],
+                        "v": [r.get("accumulatedTradingVolume") for r in rows]}
+            else:
+                iv, rg = ("1m", "5d") if n <= 3 else ("5m", "1mo")
+                url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}"
+                       f"?range={rg}&interval={iv}")
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                j = json.loads(urllib.request.urlopen(req, timeout=15).read())
+                res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]
+                off = (res.get("meta") or {}).get("gmtoffset") or 0     # 현지 거래시각으로 표시
+                ts = res.get("timestamp") or []
+                base = {"t": [_dt.utcfromtimestamp(x + off).strftime("%Y%m%d%H%M") for x in ts],
+                        "o": q.get("open"), "h": q.get("high"), "l": q.get("low"),
+                        "c": q.get("close"), "v": q.get("volume")}
+            # 분 단위 버킷 — 같은 날짜 안에서 (시*60+분)//n
+            def _kf(s):
+                return s[:8] + str((int(s[8:10]) * 60 + int(s[10:12])) // n)
+            out = _agg(base["t"], base["o"], base["h"], base["l"], base["c"], base["v"], _kf) \
+                if n > 1 else base
+            out["tf"] = tf
         else:
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}?range=2y&interval=1d"
-            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-            j = json.loads(urllib.request.urlopen(req, timeout=12).read())
-            res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]
-            ts = res.get("timestamp") or []
-            out = {"t": [_dt.utcfromtimestamp(x).strftime("%Y%m%d") for x in ts],
-                   "o": q.get("open"), "h": q.get("high"), "l": q.get("low"),
-                   "c": q.get("close"), "v": q.get("volume")}
+            # 필요한 이력 = 표시 250봉 + 최장 이동평균(240) + 줌아웃 여유.
+            #   일 10년(≈2,500봉) · 주 15년(≈780주) · 월 30년(≈360개월)
+            #   실측: 네이버 일봉은 1990년까지, Yahoo 는 상장 이후 전부 준다.
+            YRS = {"d": 10, "w": 15, "M": 30}[tf]
+            if mkt == "kr":
+                E = _d.today().strftime("%Y%m%d")
+                S = (_d.today() - _td(days=int(YRS * 366))).strftime("%Y%m%d")
+                url = f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime={S}&endDateTime={E}"
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                rows = json.loads(urllib.request.urlopen(req, timeout=20).read())
+                out = {"t": [str(r.get("localDate") or "") for r in rows],
+                       "o": [r.get("openPrice") for r in rows], "h": [r.get("highPrice") for r in rows],
+                       "l": [r.get("lowPrice") for r in rows], "c": [r.get("closePrice") for r in rows],
+                       "v": [r.get("accumulatedTradingVolume") for r in rows]}
+            else:
+                # range=max 는 Yahoo 가 자동으로 주/월로 다운샘플해 버린다(실측: 27년치가 331봉).
+                # 반드시 period1/period2 로 기간을 지정해야 진짜 일봉이 온다.
+                _p2 = int(time.time()); _p1 = _p2 - int(YRS * 366 * 86400)
+                url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}"
+                       f"?period1={_p1}&period2={_p2}&interval=1d")
+                req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+                j = json.loads(urllib.request.urlopen(req, timeout=20).read())
+                res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]
+                ts = res.get("timestamp") or []
+                out = {"t": [_dt.utcfromtimestamp(x).strftime("%Y%m%d") for x in ts],
+                       "o": q.get("open"), "h": q.get("high"), "l": q.get("low"),
+                       "c": q.get("close"), "v": q.get("volume")}
+            if tf == "w":
+                out = _agg(out["t"], out["o"], out["h"], out["l"], out["c"], out["v"],
+                           lambda s: _dt.strptime(s, "%Y%m%d").strftime("%G%V"))   # ISO 주
+            elif tf == "M":
+                out = _agg(out["t"], out["o"], out["h"], out["l"], out["c"], out["v"], lambda s: s[:6])
+            out["tf"] = tf
         _chart_cache[key] = (now, out)
         if len(_chart_cache) > 300:
             _chart_cache.clear()

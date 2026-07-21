@@ -2297,6 +2297,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
     const mode = mkt==='kr' ? 'canvas' : chartSrc;
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
+    _bindTF();                                   // 주기 선택(분봉·일·주·월) 배선 — 최초 1회
     document.querySelectorAll('.csrc').forEach(b=>{
       b.style.display = (b.dataset.s==='tv' && mkt==='kr') ? 'none' : '';
       b.classList.toggle('on', b.dataset.s===mode);
@@ -2322,22 +2323,35 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cvs.forEach(id=>{const e=$(id); if(e)e.style.display='block';});
       $('sd_src').textContent='차트 불러오는 중…';
       try{
-        const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
+        const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${_TF}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
         drawAll(D);
-        $('sd_src').textContent=`종가 기준 일봉(최근 250거래일) · ${mkt==='kr'?'네이버':'Yahoo'} · 이동평균 ${(MASET[mkt]||MASET.us).map(m=>m[0]).join('/')}일`
-          +(mkt==='kr'?'(한국식 — 60=수급선 · 120=경기선 · 240=1년선)'
-                      :'(해외식 — 골든/데드 크로스는 50·200 교차 기준. 미국 연 거래일이 252일이라 200일선은 실제 1년이 아닌 9~10개월)')
-          +` · 볼린저(20,2) 회색밴드 · RSI(14,9) · MACD(12,26,9)`
-          +(mkt==='kr'?' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)':'')
-          /* (2026-07-20) 장중엔 마지막 봉이 '아직 안 끝난 하루'라 20일 평균선과 직접 비교하면 과소해 보인다.
-             표의 거래량배수는 하루치로 환산한 값이라 서로 달라 보이는 것 — 그 차이를 각주로 명시. */
-          +(()=>{ const g=window.__volProg;
-             if(!g) return '';
+        const _src = mkt==='kr'?'네이버':'Yahoo';
+        const _ma  = (_isMin()||_TF!=='d') ? '5/20/60/120' : (MASET[mkt]||MASET.us).map(m=>m[0]).join('/');
+        $('sd_src').textContent =
+          `${TFL[_TF]}봉 · ${_src} · 이동평균 ${_ma}`
+          + (_TF==='d' ? (mkt==='kr' ? '일(한국식 — 60=수급선 · 120=경기선 · 240=1년선)'
+                                     : '일(해외식 — 골든/데드 크로스는 50·200 교차 기준)')
+                       : (_isMin()?'봉':'')) 
+          + ` · 볼린저(20,2) 회색밴드 · 매물분석도 · RSI(14,9) · ADX(14) · MACD(12,26,9)`
+          + (_TF==='d'&&mkt==='kr' ? ' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)'
+                                   : ' · OBV(누적 거래량)')
+          + (_isMin() ? `  ⏱ 단타용 — 흐름은 5분, 진입·청산 순간만 1분으로 내려 보는 조합이 일반적입니다.`
+              + ` <b>다만 실제 타이밍은 차트만으로 부족합니다</b> — 호가창·체결강도(네이버 '시세' 탭)와`
+              + ` '투자자별 매매동향' 탭을 같이 봐야 정확합니다.`
+              + ` 차트는 '자리'(고점권인지, 매물대 위인지)를 보는 도구입니다.` : '')
+          /* (2026-07-20) 일봉 장중엔 마지막 봉이 '아직 안 끝난 하루'라 평균선과 직접 비교하면 과소해 보인다.
+             분봉은 봉 자체가 짧아 이 왜곡이 의미 없으므로 일봉일 때만 붙인다. */
+          + ((()=>{ const g=window.__volProg;
+             if(!g||_TF!=='d') return '';
              const u=n=>n>=1e8?(n/1e8).toFixed(1)+'억':n>=1e4?Math.round(n/1e4).toLocaleString()+'만':Math.round(n).toLocaleString();
              const x1=g.ma63?(g.now/g.ma63).toFixed(2):'—', x2=g.ma63?(g.proj/g.ma63).toFixed(2):'—';
              return ` · ⚠ 맨 오른쪽 봉은 아직 진행 중 — 장 ${Math.round(g.f*100)}% 경과 시점의 ${u(g.now)}주(빗금)이며 평균선과 비교하면 ${x1}배로 보입니다.`
-                  + ` 점선은 이 페이스로 마감까지 갔을 때의 예상치 ${u(g.proj)}주(${x2}배)로, 표의 거래량배수가 이 값입니다.`; })();
+                  + ` 점선은 이 페이스로 마감까지 갔을 때의 예상치 ${u(g.proj)}주(${x2}배)로, 표의 거래량배수가 이 값입니다.`; })());
+        $('sd_tfbar').style.display='flex';
+        $('sd_tfnote').textContent = _isMin()
+          ? `${D.t?D.t.length:0}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
+          : `${D.t?D.t.length:0}봉`;
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
         loadDisc(c);                              // 공시 마커도 별도 로드
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
@@ -2386,6 +2400,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      이력도 이미 2년치(KR 505·US 501 거래일)를 받아두고 있다.
      휠은 sd_main 에서만 가로챈다 — 보조 패널까지 가로채면 차트 스택(880px)을 지나
      페이지를 스크롤할 방법이 없어진다. */
+  /* (2026-07-21) 주기(timeframe) — 네이버와 동일 구성. 서버가 tf 파라미터로 만들어 준다.
+     저장은 하지 않는다: 볼 때만 받아오는 온디맨드다. 분봉을 전 종목 저장하면 용량만 커지고
+     쓰이지도 않는다(원본은 네이버·야후가 이미 보관). 서버는 30~60초 메모리 캐시만 둔다. */
+  const TFL={'1m':'1분','3m':'3분','5m':'5분','10m':'10분','30m':'30분','60m':'1시간',
+             'd':'일','w':'주','M':'월'};
+  let _TF='d';
+  const _isMin=()=>_TF.endsWith('m');
   const CZ0=250;                          // 기본 표시 봉수
   let _CZ=CZ0, _COFF=0, _DRAG=null, _DMOVE=0;
   const _mk=n=>{ const a=Math.abs(n);
@@ -2457,6 +2478,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   const MASET={ kr:[[5,'#16a085'],[20,'#f39c12'],[60,'#27ae60'],[120,'#8e44ad'],[240,'#2c3e50']],
                 us:[[20,'#f39c12'],[50,'#27ae60'],[100,'#16a085'],[200,'#8e44ad']] };
+  let _TFBOUND=false;
+  function _bindTF(){ if(_TFBOUND) return; _TFBOUND=true;
+    const sel=$('sd_tfmin');
+    const sync=()=>{ document.querySelectorAll('#sd_tfbar .tfb')
+        .forEach(b=>b.classList.toggle('on', b.dataset.tf===_TF));
+      if(sel) sel.classList.toggle('on', _isMin()); };
+    if(sel) sel.onchange=()=>{ _TF=sel.value; sync(); if(dcode) showDetail(dcode); };
+    document.querySelectorAll('#sd_tfbar .tfb').forEach(b=>{
+      b.onclick=()=>{ _TF=b.dataset.tf; sync(); if(dcode) showDetail(dcode); }; });
+    sync(); }
+
   function _bindChart(){ if(_CBOUND) return; _CBOUND=true;
     ['sd_main','sd_vol','sd_rsi','sd_macd'].forEach(id=>{ const e=$(id); if(!e) return;
       e.addEventListener('mousemove',ev=>{ if(!_CN) return;
@@ -2561,7 +2593,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
     const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
     _CT=t; _CHD=String(t[HI]||'').replace(/-/g,'');   // 수급 패널과 '날짜'로 동기화(t 선언 이후여야 함)
-    const MAS=(MASET[mkt]||MASET.us).map(([per,col])=>({per,col,a:sl(_sma(full,per))}));
+    /* 일봉만 시장별 관례 세트를 쓴다. 분봉·주·월봉은 그 관례가 적용되는 단위가 아니므로
+       네이버와 동일하게 5/20/60/120 을 쓴다(네이버도 분봉에서 같은 세트). */
+    const _MASET = (_TF==='d') ? (MASET[mkt]||MASET.us)
+                               : [[5,'#16a085'],[20,'#f39c12'],[60,'#27ae60'],[120,'#8e44ad']];
+    const MAS=_MASET.map(([per,col])=>({per,col,a:sl(_sma(full,per))}));
     const bm=_sma(full,20), bsd=full.map((x,i)=>{ if(i<19||bm[i]==null) return null; let s=0; for(let j=i-19;j<=i;j++) s+=(full[j]-bm[i])**2; return Math.sqrt(s/20); });
     const bU=sl(bm.map((m,i)=>m==null?null:m+2*bsd[i])), bL=sl(bm.map((m,i)=>m==null?null:m-2*bsd[i]));
     const rsi=sl(_rsiArr(full,14));
@@ -2626,7 +2662,19 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      MAS.forEach(m=>line(m.a,m.col));
      // x축 — 월이 바뀌는 지점에만 라벨(네이버 방식). 해가 바뀌면 연도를 쓴다.
      x.fillStyle='#98a2ad'; x.font='10px sans-serif';
-     {let lastM='',lastY='',px=-99;
+     if(_isMin()){
+       /* 분봉: 날짜가 바뀌는 첫 봉에 'M/D', 그 사이는 시각 — 라벨이 겹치지 않게 최소 간격 유지 */
+       let lastD='', px=-99;
+       for(let i=0;i<N;i++){ const z=String(t[i]||''); if(z.length<12) continue;
+         const d=z.slice(0,8), hm=z.slice(8,10)+':'+z.slice(10,12);
+         const isNew=(d!==lastD); const xx=X(i);
+         if(isNew){ lastD=d;
+           if(xx-px>=46){ px=xx; x.save(); x.fillStyle='#5b6470'; x.font='bold 10px sans-serif';
+             x.fillText((+d.slice(4,6))+'/'+(+d.slice(6,8)), xx-10, H-4); x.restore(); }
+           continue; }
+         if(hm.endsWith(':00') && xx-px>=52){ px=xx; x.fillText(hm, xx-12, H-4); } }
+     } else {
+      let lastM='',lastY='',px=-99;
       for(let i=0;i<N;i++){ const d=String(t[i]||'').replace(/-/g,''); if(d.length<6) continue;
         const yy=d.slice(0,4), mm=d.slice(4,6);
         if(mm===lastM) continue; const first=(lastM!=='');
@@ -2705,7 +2753,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       x.font='10px sans-serif'; x.textAlign='left';
       let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
         x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
-      put(dd?`${dd.slice(0,4)}.${dd.slice(4,6)}.${dd.slice(6,8)}`:'', '#5b6470', true);
+      put(dd?(`${dd.slice(0,4)}.${dd.slice(4,6)}.${dd.slice(6,8)}`
+              +(dd.length>=12?` ${dd.slice(8,10)}:${dd.slice(10,12)}`:'')):'', '#5b6470', true);
       put('시','#98a2ad'); put(_pf(o[HI]),'#5b6470');
       put('고','#98a2ad'); put(_pf(hh[HI]),'#5b6470');
       put('저','#98a2ad'); put(_pf(ll[HI]),'#5b6470');
