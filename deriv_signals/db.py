@@ -125,6 +125,22 @@ def _seed_local():
     d.mkdir(parents=True, exist_ok=True)
     local = d / "deriv_signals.db"
     if local.exists():
+        # (fix 2026-07-21) 기존 로컬본을 무조건 재사용하면 안 된다.
+        #   kis_close_capture.py 는 발행본(PUBLISH_DB)에 직접 쓰는데, 그 뒤 5분 주기 light 가
+        #   낡은 로컬본으로 publish_db() 하면서 방금 쓴 PCR·IV스큐·GEX 를 통째로 되돌려 놓았다.
+        #   (실측 2026-07-21: 10:00·11:00 캡처가 DB에 남지 않고 화면은 IV스큐 07-17·GEX 07-20 에 정체)
+        #   → 발행본이 더 새로우면 재시딩해 외부 기록을 흡수한다.
+        try:
+            pub = Path(PUBLISH_DB)
+            if (pub.exists() and pub.stat().st_mtime > local.stat().st_mtime + 1
+                    and _integrity_ok(PUBLISH_DB)):
+                shutil.copy(PUBLISH_DB, local)
+                if not _integrity_ok(local):
+                    try: local.unlink()
+                    except Exception: pass
+                    _rebuild_from_dump(local)
+        except Exception:
+            pass
         return local
     seeded = False
     # 1) 마운트 바이너리 DB 가 '온전하면' 복사(빠름)

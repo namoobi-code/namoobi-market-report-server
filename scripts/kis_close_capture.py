@@ -20,7 +20,10 @@ import os, sys, json, sqlite3, datetime
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import kis_api
 
-BASE = os.path.expanduser("~/namoobi")
+# (fix 2026-07-21) expanduser("~") 는 HOME 에 의존해 systemd/sudo 실행 시 /root 로 튀고,
+#   그러면 secrets/.env 를 못 찾아 "KIS 키 없음 — skip" 으로 조용히 넘어간다(실측).
+#   → 스크립트 위치 기준으로 고정한다(scripts/ 의 부모 = 프로젝트 루트).
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB = os.path.join(BASE, "data", "deriv_signals.db")
 OUT = os.path.join(BASE, "data", "kis_close.json")
 KID = "KOSPI200"

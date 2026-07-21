@@ -84,13 +84,47 @@ def _vkospi_cnbc():
         return None
 
 
+def _kis_spot_fut():
+    """KOSPI200 현물·선물을 KIS 에서 '같은 시점'으로 취득.
+
+    (fix 2026-07-21) 네이버 지수 API 는 현물(KPI200)과 선물(FUT)의 갱신 시각이 다르다.
+      실측: 현물 11:22:00 / 선물 11:03:59 → 19분 지연. 변동성이 큰 날(VKOSPI 85, 일중 5% 폭)
+      이 시차만으로 베이시스가 −72bp ~ +161bp 로 요동쳐 z=2.9 짜리 가짜 신호가 떴다.
+      동일 시점 KIS 취득 시 +84bp 로, 네이버 조합값(+167bp)의 절반이었다.
+    반환: (현물, 선물) — 실패 시 None
+    """
+    try:
+        import kis_api as K
+        c = K._creds()
+        if not c:
+            return None
+        tok = K._token(c)
+        r = K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-index-price",
+                   "FHPUP02100000", {"FID_COND_MRKT_DIV_CODE": "U", "FID_INPUT_ISCD": "2001"})
+        spot = float(((r or {}).get("output") or {}).get("bstp_nmix_prpr") or 0)
+        fo = K.futures_oi() or {}
+        fut = float(fo.get("price") or 0)
+        if spot > 0 and fut > 0:
+            return spot, fut
+    except Exception as e:
+        print("[deriv-live] KIS 현물·선물 취득 실패(네이버로 폴백):", repr(e)[:70])
+    return None
+
+
 def light(con, now, us_on=True):
-    """KR 현물·선물·베이시스(네이버 T+0) + VKOSPI(CNBC) + US 지수(Yahoo) 를 당일행에 force-upsert."""
+    """KR 현물·선물·베이시스(KIS 동시각, 실패 시 네이버) + VKOSPI(CNBC) + US 지수(Yahoo)."""
     n = 0
     fut, idx = _naver_series("FUT"), _naver_series("KPI200")
     common = sorted(set(fut) & set(idx))
     if common:
         d = common[-1]                 # 최신 거래일(장중이면 오늘)
+        # 장중에는 KIS 동시각 취득으로 대체 — 네이버 선물 지연에 따른 가짜 베이시스 방지
+        src = "naver"
+        if _kr_live(now):
+            kf = _kis_spot_fut()
+            if kf:
+                idx[d], fut[d] = kf
+                src = "KIS"
         if idx[d] and idx[d] > 0:
             basis = round((fut[d] / idx[d] - 1.0) * 1e4, 1)
             con.execute("INSERT OR REPLACE INTO prices_daily(id,date,spot_close,future_close,vix_close) "
@@ -104,8 +138,8 @@ def light(con, now, us_on=True):
                 con.execute("INSERT INTO kr_derivatives_daily(id,date,vkospi) VALUES(?,?,?) "
                             "ON CONFLICT(id,date) DO UPDATE SET vkospi=excluded.vkospi", (KID, d, vk))
                 con.commit()
-            print("[deriv-live] KR T+0 %s 현물 %.2f · 선물 %.2f · 베이시스 %+.1fbp%s"
-                  % (d, idx[d], fut[d], basis, (" · VKOSPI %.2f" % vk) if vk else ""))
+            print("[deriv-live] KR T+0 %s 현물 %.2f · 선물 %.2f · 베이시스 %+.1fbp%s · src=%s"
+                  % (d, idx[d], fut[d], basis, (" · VKOSPI %.2f" % vk) if vk else "", src))
     # US 지수(Yahoo) — 미국장 세션일 때만(그 외엔 최근 종가 유지, 헛호출·로그노이즈 방지)
     if us_on:
         try:
