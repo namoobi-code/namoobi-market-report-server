@@ -2364,6 +2364,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      우측 현재가 배지, 가격 y축 7눈금, 거래량·MACD y축, RSI 시그널(9),
      월 경계 x축, 그리고 마우스를 올리면 십자선이 따라오며 모든 범례가 그 봉 기준으로 바뀐다. */
   let _CD=null, _CHI=null, _CN=0, _CBOUND=false;
+  let _INV=null, _CT=null, _CHD=null;   // 수급 패널 원본 · 메인 차트 날짜배열 · 호버 날짜
   const _mk=n=>{ const a=Math.abs(n);
     return a>=1e6?(n/1e6).toFixed(2)+'m':a>=1e3?Math.round(n/1e3)+'k':String(Math.round(n)); };
   const _pf=p=>mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2);
@@ -2376,7 +2377,23 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         i=Math.max(0,Math.min(_CN-1,i));
         if(i!==_CHI){ _CHI=i; _paint(); } });
       e.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } });
-    }); }
+    });
+    /* 수급 패널(sd_inv)은 네이버 1년+KIS 병합이라 메인 차트와 기간·봉수가 다르다.
+       인덱스로 맞추면 다른 날짜를 가리키게 되므로 '날짜'를 공통키로 역매핑한다. */
+    const ei=$('sd_inv');
+    if(ei){ ei.addEventListener('mousemove',ev=>{
+        if(!_INV||!_CT) return; const jt=_INV.t||[]; if(!jt.length) return;
+        const d0=String((_CT[0])||'').replace(/-/g,'');
+        let j0=0; for(let k=0;k<jt.length;k++){ if(String(jt[k]||'').replace(/-/g,'')>=d0){ j0=k; break; } }
+        const nv2=Math.max(jt.length-j0,1);
+        const r=ei.getBoundingClientRect(), PL=6, PR=52, step=(r.width-PL-PR)/nv2;
+        let j=j0+Math.round(((ev.clientX-r.left)-PL)/step-0.5);
+        j=Math.max(j0,Math.min(jt.length-1,j));
+        const d=String(jt[j]||'').replace(/-/g,'');
+        let i=_CT.findIndex(z=>String(z||'').replace(/-/g,'')===d);
+        if(i<0){ for(let k=_CT.length-1;k>=0;k--){ if(String(_CT[k]||'').replace(/-/g,'')<=d){ i=k; break; } } }
+        if(i>=0&&i!==_CHI){ _CHI=i; _paint(); } });
+      ei.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } }); } }
   function drawAll(D){ _CD=D; _CHI=null; _bindChart(); _paint(); }
   function _paint(){ const D=_CD; if(!D) return;
     // 데이터 정리 (null 보간)
@@ -2388,6 +2405,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     //  ※ drawMain 안에는 가격 표시범위용 lo/hi 가 따로 있어 이름을 HI 로 구분한다.
     const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
     const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
+    _CT=t; _CHD=String(t[HI]||'').replace(/-/g,'');   // 수급 패널과 '날짜'로 동기화(t 선언 이후여야 함)
     const ma20=sl(_sma(full,20)), ma50=sl(_sma(full,50)), ma200=sl(_sma(full,200));
     const bm=_sma(full,20), bsd=full.map((x,i)=>{ if(i<19||bm[i]==null) return null; let s=0; for(let j=i-19;j<=i;j++) s+=(full[j]-bm[i])**2; return Math.sqrt(s/20); });
     const bU=sl(bm.map((m,i)=>m==null?null:m+2*bsd[i])), bL=sl(bm.map((m,i)=>m==null?null:m-2*bsd[i]));
@@ -2596,6 +2614,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const f2=z=>z==null?'—':(Math.abs(z)>=1000?Math.round(z).toLocaleString():z.toFixed(2));
       put('MACD (12,26,9)','#98a2ad'); put('MACD','#98a2ad'); put(f2(macd[HI]),'#333',true);
       put('Signal','#f39c12'); put(f2(sig[HI]),'#f39c12',true); } }
+    if(_INV) drawInv(_INV);        // ⑤ 수급 패널도 같은 호버 상태로 다시 그린다
   }
   // ⑤ 투자자별 누적순매수 (KR 전용 — 네이버 1년 + KIS 30일 병합)
   async function loadInv(c){
@@ -2609,6 +2628,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }catch(err){ const [x]=_cvs('sd_inv'); x.font='11px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('수급 데이터 로드 실패',10,22); }
   }
   function drawInv(J){
+    _INV=J;                                   // 호버 재그리기용 원본 보관
     const n=(J.t||[]).length; if(!n) return;
     // 누적합 — 개인 미제공 구간(KIS 이전)은 −(외인+기관) 추정
     const cf=[],co=[],cp=[],est=[]; let sf=0,so=0,sp=0;
@@ -2617,9 +2637,19 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       sp+= isEst? -((J.frgn[i]||0)+(J.orgn[i]||0)) : J.prsn[i];
       cf.push(sf); co.push(so); cp.push(sp); est.push(isEst); }
     const [x,W,H]=_cvs('sd_inv'); const P={l:6,r:52,t:6,b:14};
-    const all=[...cf,...co,...cp]; let mx=Math.max(...all,0), mn=Math.min(...all,0);
+    /* (2026-07-21) x축을 메인 차트와 정렬한다.
+       수급 소스(네이버 1년+KIS)가 가격 차트(최근 250봉)보다 길어서, 그대로 그리면
+       같은 날짜인데도 십자선 위치가 패널마다 어긋났다.
+       → 표시 구간만 메인 차트 시작일 이후로 자른다. 누적 순매수 자체는 전 구간으로
+         계산한 뒤 잘라내므로 '그 시점까지의 진짜 누적값'은 그대로 유지된다. */
+    let i0=0;
+    if(_CT&&_CT.length){ const d0=String(_CT[0]||'').replace(/-/g,'');
+      for(let k=0;k<n;k++){ if(String(J.t[k]||'').replace(/-/g,'')>=d0){ i0=k; break; } } }
+    const nv=Math.max(n-i0,1);
+    const all=[...cf.slice(i0),...co.slice(i0),...cp.slice(i0)];
+    let mx=Math.max(...all,0), mn=Math.min(...all,0);
     if(mx===mn){ mx+=1; mn-=1; }
-    const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/n, Y=p=>P.t+(H-P.t-P.b)*(1-(p-mn)/(mx-mn));
+    const X=i=>P.l+(W-P.l-P.r)*((i-i0)+0.5)/nv, Y=p=>P.t+(H-P.t-P.b)*(1-(p-mn)/(mx-mn));
     // 0선 + 상하한 라벨
     x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke();
     const fmt=v=>{const a=Math.abs(v);
@@ -2633,17 +2663,29 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       for(let i=i0+1;i<=i1;i++) x.lineTo(X(i),Y(a[i]));
       x.stroke(); x.setLineDash([]); x.lineWidth=1; };
     const F='#d33', O='#1f6feb', PP='#27ae60';   // 외국인 빨강 · 기관 파랑 · 개인 초록 (3.2.1 배색)
-    seg(cf,F,0,n-1,false); seg(co,O,0,n-1,false);
-    let cut=est.indexOf(false); if(cut<0) cut=n;                 // 개인: 추정(점선) → 실측(실선)
-    seg(cp,PP,0,Math.min(cut,n-1),true); if(cut<n) seg(cp,PP,Math.max(cut-1,0),n-1,false);
+    seg(cf,F,i0,n-1,false); seg(co,O,i0,n-1,false);
+    let cut=est.indexOf(false); if(cut<0) cut=n; cut=Math.max(cut,i0);   // 개인: 추정(점선) → 실측(실선)
+    seg(cp,PP,i0,Math.min(cut,n-1),true); if(cut<n) seg(cp,PP,Math.max(cut-1,i0),n-1,false);
     // x축 날짜 3틱 + 범례
     x.fillStyle='#98a2ad';
-    for(let g=0;g<3;g++){ const i=Math.floor(n*g/3), d=String(J.t[i]||'');
+    for(let g=0;g<3;g++){ const i=i0+Math.floor(nv*g/3), d=String(J.t[i]||'').replace(/-/g,'');
       x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-3); }
-    x.font='bold 10px sans-serif';
-    x.fillStyle=F; x.fillText('외국인',P.l+4,14); x.fillStyle=O; x.fillText('기관',P.l+40,14);
-    x.fillStyle=PP; x.fillText('개인',P.l+68,14);
-    x.font='10px sans-serif'; x.fillStyle='#98a2ad'; x.fillText('누적순매수',P.l+96,14);
+    /* 십자선 — 메인 차트와 봉수가 달라 인덱스가 아니라 날짜로 맞춘다.
+       정확히 같은 날짜가 없으면(휴장·데이터 갭) 그 이전 최근 거래일로 붙인다. */
+    let hj=n-1;
+    if(_CHI!=null&&_CHD){
+      let f=J.t.findIndex(z=>String(z||'').replace(/-/g,'')===_CHD);
+      if(f<0){ for(let k=n-1;k>=0;k--){ if(String(J.t[k]||'').replace(/-/g,'')<=_CHD){ f=k; break; } } }
+      if(f>=0){ hj=f;
+        x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
+        x.beginPath(); x.moveTo(X(hj),P.t); x.lineTo(X(hj),H-P.b); x.stroke(); x.restore(); } }
+    // 범례 — 해당일(호버 없으면 최신) 누적 순매수까지 같이 표기
+    {let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
+       x.fillStyle=col; x.fillText(txt,cx,14); cx+=x.measureText(txt).width+4; };
+     put('누적순매수','#98a2ad');
+     put('외국인',F,true); put(fmt(cf[hj]),F);
+     put('기관',O,true);   put(fmt(co[hj]),O);
+     put('개인',PP,true);  put(fmt(cp[hj])+(est[hj]?'(추정)':''),PP); }
   }
 
   // ── 2단계 z-score 랭킹 ──
