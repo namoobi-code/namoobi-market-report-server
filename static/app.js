@@ -2341,8 +2341,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           + (_TF==='d'&&mkt==='kr' ? ' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)'
                                    : ' · OBV(누적 거래량)')
           + (_isMin() ? `  ⏱ 단타용 — 흐름은 5분, 진입·청산 순간만 1분으로 내려 보는 조합이 일반적입니다.`
-              + ` <b>다만 실제 타이밍은 차트만으로 부족합니다</b> — 호가창·체결강도(네이버 '시세' 탭)와`
-              + ` '투자자별 매매동향' 탭을 같이 봐야 정확합니다.`
+              + ` <b>다만 실제 체결 타이밍은 차트만으로 부족합니다</b> — 호가 잔량과 체결강도(체결이 매도호가에 붙는지 매수호가에 붙는지)를 같이 봐야 합니다.`
+              + ` <b>단, 네이버 호가·거래원은 20분 지연이고 투자자별 순매매는 장 마감 후 확정치라 실시간 진입 판단에는 쓸 수 없습니다</b>`
+              + ` — 실시간 호가·체결강도는 증권사 HTS/MTS 로 봐야 하고, 네이버 화면은 '어제까지의 수급 흐름' 파악용입니다.`
               + ` 차트는 '자리'(고점권인지, 매물대 위인지)를 보는 도구입니다.` : '')
           /* (2026-07-20) 일봉 장중엔 마지막 봉이 '아직 안 끝난 하루'라 평균선과 직접 비교하면 과소해 보인다.
              분봉은 봉 자체가 짧아 이 왜곡이 의미 없으므로 일봉일 때만 붙인다. */
@@ -2952,7 +2953,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     // ⑤ 수급(한국) / OBV(미국) — 같은 패널 자리를 공유한다.
     //    한국은 실제 투자자별 순매수가 있으므로 그쪽이 우월하고, 미국은 그 데이터가 없어
     //    비어 있던 자리에 OBV(누적 거래량으로 본 매집·분산)를 넣는다.
-    if(mkt!=='kr'){
+    /* 수급 패널은 '일별' 데이터라 일봉·분봉에만 맞는다(분봉은 그 날 마지막 봉 위치에 찍음).
+       주·월봉은 봉의 대표일이 주/월 시작일이라 일별 수급과 날짜가 어긋나므로 OBV 로 대체한다.
+       미국은 투자자별 수급 자체가 없어 항상 OBV. */
+    const _useInv = (mkt==='kr' && (_TF==='d' || _isMin()));
+    if(!_useInv){
       const el=$('sd_inv');
       if(el){ el.style.display='block';
         const [x,W,H]=_cvs('sd_inv'); const P={l:6,r:52,t:16,b:14};
@@ -2976,12 +2981,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         put('OBV (누적 거래량)','#98a2ad'); put(_mk(ob[HI]),'#1f6feb',true);
         put('· 주가와 같이 오르면 매집 · 주가만 오르고 OBV 정체면 분산 의심','#98a2ad');
       }
-    } else if(_INV) drawInv(_INV);   // 한국: 투자자별 누적순매수 패널을 같은 호버 상태로 재그리기
+    } else if(_INV) drawInv(_INV);   // 한국 일봉·분봉: 투자자별 누적순매수
   }
   // ⑤ 투자자별 누적순매수 (KR 전용 — 네이버 1년 + KIS 30일 병합)
   async function loadInv(c){
     const e=$('sd_inv'); if(!e) return;
-    if(mkt!=='kr'){ _INV=null; e.style.display='block'; _paint(); return; }  // 미국: 같은 자리에 OBV(_paint 가 그림)
+    if(mkt!=='kr' || !(_TF==='d'||_isMin())){ _INV=null; e.style.display='block'; _paint(); return; }  // OBV 로 대체(_paint 가 그림)
     e.style.display='block';
     try{
       const J=await (await fetch(`/api/investor/kr/${encodeURIComponent(c)}`)).json();
@@ -3004,14 +3009,36 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        같은 날짜인데도 십자선 위치가 패널마다 어긋났다.
        → 표시 구간만 메인 차트 시작일 이후로 자른다. 누적 순매수 자체는 전 구간으로
          계산한 뒤 잘라내므로 '그 시점까지의 진짜 누적값'은 그대로 유지된다. */
-    let i0=0;
-    if(_CT&&_CT.length){ const d0=String(_CT[0]||'').replace(/-/g,'');
-      for(let k=0;k<n;k++){ if(String(J.t[k]||'').replace(/-/g,'')>=d0){ i0=k; break; } } }
-    const nv=Math.max(n-i0,1);
-    const all=[...cf.slice(i0),...co.slice(i0),...cp.slice(i0)];
+    /* (2026-07-21 재작성) x 를 '메인 차트 인덱스'로 직접 매핑한다.
+       종전엔 수급 패널이 자기 인덱스로 폭을 나눠 썼다. 일봉 250봉일 땐 얼추 맞았지만
+         · 분봉으로 바꾸면 9거래일 = 수급 점 9개를 화면 전체에 늘려 그려 선이 평평해 보였고
+         · 일봉을 10년으로 늘린 뒤엔 수급(1년)이 화면 일부 구간에만 해당하는데 전체 폭을 차지했다.
+       → 수급 점의 '날짜'를 메인 차트의 봉 위치로 옮겨 찍는다. 화면 밖 날짜는 그리지 않는다.
+         분봉이면 하루에 여러 봉이므로 그 날의 마지막 봉 위치에 찍는다(수급은 종가 기준 확정치). */
+    const NN=Math.max(_CN||1,1);
+    const posOf=new Map();
+    if(_CT) for(let i=0;i<Math.min(NN,_CT.length);i++) posOf.set(String(_CT[i]||'').slice(0,8), i);
+    const vis=[];                                  // [메인인덱스, 수급인덱스]
+    for(let k=0;k<n;k++){ const q=posOf.get(String(J.t[k]||'').replace(/-/g,'').slice(0,8));
+      if(q!=null) vis.push([q,k]); }
+    if(!vis.length){                               // 겹치는 구간이 없다(줌아웃이 수급 이력보다 과거)
+      x.font='11px sans-serif'; x.fillStyle='#98a2ad';
+      x.fillText('이 구간에는 투자자별 수급 데이터가 없습니다(최근 1년만 제공)', P.l+6, H/2);
+      return; }
+    /* (2026-07-21) 표시 구간 시작점을 0 으로 맞춘다(리베이스).
+       세 계열의 '절대 누적 수준'이 서로 크게 벌어져 있어(외인 −1.8억 · 기관 +0.7억 · 개인 +1.1억)
+       그대로 그리면 계열 간 간격이 y축을 다 먹고, 구간 내 변화는 평평한 직선으로 보인다.
+       실제로 알고 싶은 건 '이 구간 동안 누가 얼마나 샀나'이므로 구간 시작을 0 으로 놓는다.
+       특히 분봉(9거래일)에서는 리베이스 없이는 사실상 아무 정보가 없다. */
+    const i0=vis[0][1];
+    const b0=cf[i0], b1=co[i0], b2=cp[i0];
+    const RF=k=>cf[k]-b0, RO=k=>co[k]-b1, RP=k=>cp[k]-b2;
+    const all=vis.flatMap(([,k])=>[RF(k),RO(k),RP(k)]);
     let mx=Math.max(...all,0), mn=Math.min(...all,0);
     if(mx===mn){ mx+=1; mn-=1; }
-    const X=i=>P.l+(W-P.l-P.r)*((i-i0)+0.5)/nv, Y=p=>P.t+(H-P.t-P.b)*(1-(p-mn)/(mx-mn));
+    const X=i=>{ const q=posOf.get(String(J.t[i]||'').replace(/-/g,'').slice(0,8));
+      return P.l+(W-P.l-P.r)*(((q==null?0:q))+0.5)/NN; };
+    const Y=p=>P.t+(H-P.t-P.b)*(1-(p-mn)/(mx-mn));
     // 0선 + 상하한 라벨
     x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke();
     const fmt=v=>{const a=Math.abs(v);
@@ -3019,19 +3046,24 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     x.font='10px sans-serif'; x.fillStyle='#98a2ad';
     x.fillText(fmt(mx),W-P.r+4,Y(mx)+8); x.fillText(fmt(mn),W-P.r+4,Y(mn)-2);
     // 선 그리기 (from~to 구간, 점선 여부)
+    const inView=i=>posOf.has(String(J.t[i]||'').replace(/-/g,'').slice(0,8));
     const seg=(a,col,i0,i1,dash)=>{ if(i1<=i0) return;
       x.strokeStyle=col; x.lineWidth=1.5; x.setLineDash(dash?[3,3]:[]);
-      x.beginPath(); x.moveTo(X(i0),Y(a[i0]));
-      for(let i=i0+1;i<=i1;i++) x.lineTo(X(i),Y(a[i]));
-      x.stroke(); x.setLineDash([]); x.lineWidth=1; };
+      x.beginPath(); let started=false;
+      for(let i=i0;i<=i1;i++){ if(!inView(i)) continue;      // 화면 밖 날짜는 건너뛴다
+        started?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),started=true); }
+      if(started) x.stroke();
+      x.setLineDash([]); x.lineWidth=1; };
     const F='#d33', O='#1f6feb', PP='#27ae60';   // 외국인 빨강 · 기관 파랑 · 개인 초록 (3.2.1 배색)
-    seg(cf,F,i0,n-1,false); seg(co,O,i0,n-1,false);
+    const _cf=cf.map((v,k)=>v-b0), _co=co.map((v,k)=>v-b1), _cp=cp.map((v,k)=>v-b2);
+    seg(_cf,F,i0,n-1,false); seg(_co,O,i0,n-1,false);
     let cut=est.indexOf(false); if(cut<0) cut=n; cut=Math.max(cut,i0);   // 개인: 추정(점선) → 실측(실선)
-    seg(cp,PP,i0,Math.min(cut,n-1),true); if(cut<n) seg(cp,PP,Math.max(cut-1,i0),n-1,false);
+    seg(_cp,PP,i0,Math.min(cut,n-1),true); if(cut<n) seg(_cp,PP,Math.max(cut-1,i0),n-1,false);
     // x축 날짜 3틱 + 범례
     x.fillStyle='#98a2ad';
-    for(let g=0;g<3;g++){ const i=i0+Math.floor(nv*g/3), d=String(J.t[i]||'').replace(/-/g,'');
-      x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-3); }
+    for(let g=0;g<3;g++){ const [,k]=vis[Math.floor((vis.length-1)*g/3)]||vis[0];
+      const d=String(J.t[k]||'').replace(/-/g,'');
+      x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(k)-10, H-3); }
     /* 십자선 — 메인 차트와 봉수가 달라 인덱스가 아니라 날짜로 맞춘다.
        정확히 같은 날짜가 없으면(휴장·데이터 갭) 그 이전 최근 거래일로 붙인다. */
     let hj=n-1;
@@ -3044,10 +3076,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     // 범례 — 해당일(호버 없으면 최신) 누적 순매수까지 같이 표기
     {let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
        x.fillStyle=col; x.fillText(txt,cx,14); cx+=x.measureText(txt).width+4; };
-     put('누적순매수','#98a2ad');
-     put('외국인',F,true); put(fmt(cf[hj]),F);
-     put('기관',O,true);   put(fmt(co[hj]),O);
-     put('개인',PP,true);  put(fmt(cp[hj])+(est[hj]?'(추정)':''),PP); }
+     put('구간 순매수','#98a2ad');
+     put('외국인',F,true); put(fmt(cf[hj]-b0),F);
+     put('기관',O,true);   put(fmt(co[hj]-b1),O);
+     put('개인',PP,true);  put(fmt(cp[hj]-b2)+(est[hj]?'(추정)':''),PP);
+     put('· 표시 구간 시작을 0 으로 맞춘 누계','#b0b8c2'); }
   }
 
   // ── 2단계 z-score 랭킹 ──
