@@ -221,7 +221,72 @@ def futures_oi():
             "oi_chg": _f(o.get("otst_stpl_qty_icdc")),
             "asof": datetime.date.today().isoformat()}
 
-def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_budget=90):
+def _expiry_dte(ym):
+    """만기(YYYYMM) 까지 남은 일수 — KOSPI200 옵션 만기 = 해당월 두 번째 목요일."""
+    try:
+        y, mm = int(ym[:4]), int(ym[4:6])
+        d = datetime.date(y, mm, 1)
+        d += datetime.timedelta(days=(3 - d.weekday()) % 7)   # 첫 목요일
+        d += datetime.timedelta(days=7)                       # 둘째 목요일
+        return max((d - datetime.date.today()).days, 1)
+    except Exception:
+        return 21
+
+
+def _delta_target_strikes(spot, atm_iv, dte, tgt=0.25):
+    """|델타|=tgt 가 되는 대략적 행사가(콜·풋) — 스캔 범위를 잡기 위한 추정치.
+
+    K = S·exp(±z·σ√T + ½σ²T),  z = Φ⁻¹(1−tgt) = 0.6745 (tgt=0.25)
+    변동성이 커질수록 25델타 행사가는 급격히 바깥으로 밀린다
+    (실측 2026-07-21 VKOSPI 86: 25델타 콜이 현물 +12% 지점 K≈1230 — 기존 ±25% 창의 앞 120개
+     행사가만 훑던 방식으로는 K=1120(델타 0.46)에서 끊겨 아예 도달하지 못했다).
+    """
+    import math
+    z = {0.25: 0.6745, 0.10: 1.2816, 0.35: 0.3853}.get(tgt, 0.6745)
+    s = max(float(atm_iv or 0), 8.0) / 100.0 * math.sqrt(max(dte, 1) / 365.0)
+    return spot * math.exp(-z * s + 0.5 * s * s), spot * math.exp(z * s + 0.5 * s * s)
+
+
+def _iv_at_delta(rows, side, tgt=0.25, span=0.12, min_pts=4):
+    """|델타|=tgt 지점의 IV 를 OI 가중 국소 선형회귀로 내삽한다.
+
+    단일 행사가 IV 를 그대로 쓰면 안 된다 — KIS 의 hts_ints_vltl 은 최종 체결가 기반이라
+    인접 행사가끼리도 크게 튄다(실측 2026-07-21: K=1120 IV 79.4 ↔ K=1122.5 IV 61.1).
+    → tgt 주변 |델타| 밴드의 유효 호가들에 iv ≈ a + b·|delta| 를 OI 가중 최소제곱으로 적합해
+      tgt 에서의 값을 읽는다. 노이즈는 평균화되고 행사가 격자에 따른 계단현상도 사라진다.
+
+    반환: (iv, 진단dict) — 조건 미달이면 (None, 사유dict)
+    """
+    pts = [(abs(r["delta"]), r["iv"], max(r["oi"] or 0.0, 0.0)) for r in rows
+           if r["side"] == side and r.get("delta") and 0 < r["iv"] < 150
+           and abs(tgt - abs(r["delta"])) <= span and (r["oi"] or 0) > 0]
+    if len(pts) < min_pts:
+        return None, {"reason": "표본부족", "n": len(pts)}
+    # 외삽 금지: tgt 양옆에 실제 관측이 있어야 한다(= 25델타 구간에 스캔이 닿았다는 증거)
+    if not [p for p in pts if p[0] <= tgt] or not [p for p in pts if p[0] >= tgt]:
+        dl = [p[0] for p in pts]
+        return None, {"reason": "25델타 미도달", "delta_range": [round(min(dl), 3), round(max(dl), 3)]}
+    import math
+    w = [math.sqrt(p[2]) for p in pts]                    # 유동성(OI) 가중 — 빈 행사가 영향 축소
+    sw = sum(w)
+    mx = sum(wi * p[0] for wi, p in zip(w, pts)) / sw
+    my = sum(wi * p[1] for wi, p in zip(w, pts)) / sw
+    sxx = sum(wi * (p[0] - mx) ** 2 for wi, p in zip(w, pts))
+    sxy = sum(wi * (p[0] - mx) * (p[1] - my) for wi, p in zip(w, pts))
+    b = (sxy / sxx) if sxx > 1e-9 else 0.0
+    iv = my + b * (tgt - mx)
+    resid = math.sqrt(sum(wi * (p[1] - (my + b * (p[0] - mx))) ** 2
+                          for wi, p in zip(w, pts)) / sw)
+    if not (0 < iv < 150):
+        return None, {"reason": "적합값 이상", "iv": round(iv, 2)}
+    return round(iv, 2), {"n": len(pts), "resid": round(resid, 2),
+                          "delta_range": [round(min(p[0] for p in pts), 3),
+                                          round(max(p[0] for p in pts), 3)]}
+
+
+def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_budget=90, window=None):
+    # window= 는 하위호환용으로만 받고 무시한다. 좁은 고정창(±8%)이 25델타 행사가에 닿지 못해
+    # 스큐를 오염시킨 장본인이며, 이제 ATM IV 기반으로 필요한 폭을 스스로 잡는다.
     """코스피200 옵션 근월물 체인을 T+0 로 훑어 PCR·IV스큐·GEX 를 낸다.
 
     체인 전체(390 행사가 × 2 = 780 호출)는 모의(1건/초)에서 13분이라 과하다.
@@ -245,25 +310,61 @@ def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_bu
         fo = futures_oi()
         spot = fo["price"] if fo else (ks[len(ks) // 2])
 
+    # (fix 2026-07-21) 25델타 '날개' 행사가 확보를 두 경로 공통으로 보장한다.
+    #   구버전 문제: ±25% 창을 만든 뒤 앞에서부터 max_calls//2 개를 잘랐는데, 행사가가 오름차순이라
+    #   '낮은 쪽(딥 풋)'만 남고 OTM 콜이 통째로 잘렸다. 실측(현물 1094): 창 822~1367 인데 스캔은
+    #   822~1120 에서 종료 → 25델타 콜(K≈1230) 미도달 → 델타 0.46 짜리를 '25델타'로 오인.
+    #   krx_base(일일 공식 캡처) 경로도 OI 순위로만 뽑아 날개 포함이 보장되지 않았다.
+    #   → ATM IV 로 σ 를 잡아 25델타 목표 행사가를 계산하고, 두 경로 모두 그 주변을 강제 편입한다.
+    atm_k = min(ks, key=lambda k: abs(k - spot))
+    atm_iv = 0.0
+    try:                                       # ATM 콜·풋 2콜만 미리 떠서 σ 추정
+        _ivs = []
+        for _tbl in (call, put):
+            _j = _get(c, tok, "/uapi/domestic-futureoption/v1/quotations/inquire-price",
+                      "FHMIF10000000", {"FID_COND_MRKT_DIV_CODE": "O", "FID_INPUT_ISCD": _tbl[atm_k]})
+            _v = _f((_j.get("output1") or {}).get("hts_ints_vltl"))
+            if 0 < _v < 150:
+                _ivs.append(_v)
+        atm_iv = sum(_ivs) / len(_ivs) if _ivs else 0.0
+    except Exception:
+        pass
+    dte = _expiry_dte(ym)
+    kp25, kc25 = _delta_target_strikes(spot, atm_iv or 40.0, dte)
+    budget = max(max_calls // 2, 24)
+    wing = max(8, budget // 8)                 # 각 날개에서 목표 행사가 주변으로 확보할 개수
+
+    def _around(target, n):
+        return sorted(ks, key=lambda k: abs(k - target))[:n]
+
+    need = set(_around(kp25, wing)) | set(_around(kc25, wing))
+
     if krx_base:
         bc, bp = krx_base.get("call", {}), krx_base.get("put", {})
         tot = sum(bc.values()) + sum(bp.values())
         rank = sorted(ks, key=lambda k: -(bc.get(k, 0) + bp.get(k, 0)))
-        pick, s = [], 0.0
+        pick, s = list(need), 0.0               # 날개 먼저 확보하고 나머지를 OI 상위로 채움
         for k in rank:
             if len(pick) * 2 >= max_calls:
                 break
+            if k in need:
+                continue
             pick.append(k)
             s += bc.get(k, 0) + bp.get(k, 0)
             if tot and s / tot >= coverage:
                 break
-        scan = sorted(pick)
+        scan = sorted(set(pick))
     else:
-        scan = [k for k in ks if spot * 0.75 <= k <= spot * 1.25][: max_calls // 2]
+        core = [k for k in _around(spot, budget) if k not in need][: max(budget - len(need), 0)]
+        scan = sorted(need | set(core))
+    # 시간예산에 걸려 조기종료되더라도 25델타 날개는 반드시 확보되도록 날개부터 조회한다.
+    order = sorted(need) + [k for k in scan if k not in need]
+    print("    [KIS] 스캔설계 ATM IV %.1f · 잔존 %d일 → 25델타 목표 K≈%.0f(풋)/%.0f(콜) · %d행사가(%.1f~%.1f)"
+          % (atm_iv, dte, kp25, kc25, len(scan), scan[0], scan[-1]))
 
     rows = []
     _t0 = time.time()
-    for k in scan:
+    for k in (order if order else scan):
         # 신규 3일 유량제한(3건/초) 구간에선 전체 스캔이 수 분 걸린다 → 시간 예산 초과 시 조기 종료,
         # 나머지 행사가는 KRX T+1 값으로 채운다(아래 꼬리보정). 배치가 무한정 늘어지는 걸 막는다.
         if time.time() - _t0 > time_budget:
@@ -295,13 +396,17 @@ def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_bu
     pv = sum(r["vol"] for r in rows if r["side"] == "P")
 
     # 25델타 스큐 = 25델타 풋 IV − 25델타 콜 IV (양수 = 하방 헤지 수요 우위 = 공포)
-    def d25(side, tgt):
-        cand = [r for r in rows if r["side"] == side and 0 < r["iv"] < 150 and 0.05 <= abs(r["delta"]) <= 0.60]
-        return min(cand, key=lambda r: abs(abs(r["delta"]) - tgt)) if cand else None
-    cp, pp = d25("C", 0.25), d25("P", 0.25)
-    skew = round(pp["iv"] - cp["iv"], 2) if (cp and pp) else None
+    # (2026-07-21 재설계) 최근접 행사가 1개를 집던 방식 → OI 가중 국소회귀 내삽.
+    #   ① 델타 0.25 를 양옆에서 감싸지 못하면(=날개 미도달) 값을 만들지 않는다(외삽 금지).
+    #   ② 유효 호가 4개 이상 + OI>0 만 사용해 단일 행사가의 체결가 노이즈를 평균화한다.
+    #   근거: 기존 방식은 델타 0.46 짜리를 '25델타'로 오인해 스큐를 5.19→25.49 로 널뛰게 했다.
+    iv_c25, dg_c = _iv_at_delta(rows, "C", 0.25)
+    iv_p25, dg_p = _iv_at_delta(rows, "P", 0.25)
+    skew = round(iv_p25 - iv_c25, 2) if (iv_c25 and iv_p25) else None
+    skew_q = {"call": dg_c, "put": dg_p}
     if skew is not None and abs(skew) > 30:
         # (sanity · 2026-07-17) 장전/호가공백 구간의 이론가 IV 왜곡(실측: 장전 콜 25d IV 170%) — ±30pp 초과 스큐는 퇴화값으로 폐기
+        skew_q["reject"] = "±30pp 초과(%.2f)" % skew
         skew = None
 
     # 딜러 감마(GEX) — 콜은 딜러 롱감마(+), 풋은 숏감마(−). 계약승수 25만원.
@@ -312,8 +417,8 @@ def option_chain(spot=None, coverage=0.99, krx_base=None, max_calls=600, time_bu
             "scanned": len(scan), "strikes": len(ks),
             "call_oi": C, "put_oi": P, "pcr_oi": round(P / C, 3) if C else None,
             "call_vol": cv, "put_vol": pv, "pcr_vol": (round(pv / cv, 3) if (cv >= 100 and pv >= 100) else None),  # (sanity) 양쪽 거래량 100계약 미만(장전·개장직후)이면 미산출 — 4,199 같은 퇴화 PCR 방지
-            "iv_skew": skew,
-            "iv_call_25d": cp["iv"] if cp else None, "iv_put_25d": pp["iv"] if pp else None,
+            "iv_skew": skew, "iv_skew_quality": skew_q,   # 표본수·잔차·델타범위(미기록 시 사유)
+            "iv_call_25d": iv_c25, "iv_put_25d": iv_p25,
             "gex": round(gex / 1e8, 1) if gex else None,     # 억원
             "src": "KIS(%s) T+0%s" % (c["mode"], " + KRX 꼬리보정" if krx_base else "")}
 

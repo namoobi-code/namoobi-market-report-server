@@ -84,7 +84,10 @@ def main():
         "call_vol": oc.get("call_vol"),
         "put_vol": oc.get("put_vol"),
         "scanned": oc.get("scanned"),
-        "note": "server close capture (±25% 창 스캔 — PCR(OI) 미산출, 아침 PC 실행이 전체체인으로 채움)",
+        # 25델타 내삽 품질(표본수·잔차·실제 델타범위) — 값을 믿어도 되는지 사후 감사용.
+        # 날개 미도달·표본부족이면 iv_skew 는 None 이 되고 여기에 사유가 남는다.
+        "iv_skew_quality": oc.get("iv_skew_quality"),
+        "note": "server capture (25델타 날개 강제확보 + OI가중 국소회귀 내삽 — PCR(OI) 미산출, 아침 전체체인 실행이 채움)",
     }
     print("[kis_close]", json.dumps(rec, ensure_ascii=False))
     if dry:
