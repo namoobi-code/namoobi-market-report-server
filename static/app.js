@@ -1545,6 +1545,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const wonF=v=>v==null?'—':(v>=1e12?(v/1e12).toFixed(v>=1e13?0:2)+'조':(v>=1e8?Math.round(v/1e8).toLocaleString()+'억':Math.round(v).toLocaleString()));
   const usdF=v=>v==null?'—':(v>=1e9?'$'+(v/1e9).toFixed(v>=1e10?0:1)+'B':(v>=1e6?'$'+(v/1e6).toFixed(0)+'M':'$'+Math.round(v).toLocaleString()));
 
+  /* (2026-07-21) MACD 표기 명확화.
+     저장값의 화살표는 '방향'이 아니라 MACD 가 0선 위(↑)냐 아래(↓)냐를 뜻한다.
+       골든↑ = 골든크로스 + 0선 위 · 골든↓ = 골든크로스 + 0선 아래 …
+     그런데 화살표가 방향으로 읽혀 '골든↓인데 상승 전환?' 이라는 혼동을 낳았다.
+     서버 수집값(screener_pool·intraday_kr/us)은 그대로 두고 화면 표기만 풀어 쓴다. */
+  const MACD_DISP={'골든↑':'골든(0선↑)','골든↓':'골든(0선↓)','데드↑':'데드(0선↑)','데드↓':'데드(0선↓)'};
+  const dispOpt=(f,v)=>((f&&f.disp&&f.disp[v])||v);
+
   const DEF={
     kr:{
       mk:{label:'시장',cat:1},
@@ -1579,7 +1587,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
       turn:{label:'회전율',fmt:v=>v.toFixed(2)+'%',min:1,reqData:1,presets:[['전체',null],['0.1% ↑',0.1],['0.5% ↑',0.5],['1% ↑',1]],def:[null,null]},
-      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
+      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],disp:MACD_DISP,hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
       bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1642,7 +1650,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조'],hint:{'정배열':['up','상승 추세'],'역배열':['dn','하락 추세'],'혼조':['neu','전환 구간']}},
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
-      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
+      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],disp:MACD_DISP,hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
       bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1713,7 +1721,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   function chipLabel(k){ const f=DEF[mkt][k], st=F[k]||{};
     if(f.fixed!==undefined) return `${f.label}: <span class="cv">${E(f.fixed)}</span>`;
     if(f.tgl) return `${f.label}: <span class="cv">${st.on?'ON':'OFF'}</span>`;
-    if(f.cat) return `${f.label}: <span class="cv">${E(st.v||'전체')}</span>`;
+    if(f.cat) return `${f.label}: <span class="cv">${E(dispOpt(f,st.v)||'전체')}</span>`;
     if(f.exclGE) return `${f.label}: <span class="cv">${st.max==null?'전체':st.max+'년이상 제외'}</span>`;
     const lo=st.min, hi=st.max;
     let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
@@ -1779,7 +1787,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         pop=`<div class="pl">선택</div>`+_opts.map(o=>{
           const h=(f.hint||{})[o];
           const tag=h?`<span class="ohint ${h[0]}">${E(h[1])}</span>`:'';
-          return `<button class="preset ohas ${st.v===(o||null)?'sel':''}" data-cat="${k}" data-v="${E(o)}">${E(o||'전체')}${tag}</button>`;
+          return `<button class="preset ohas ${st.v===(o||null)?'sel':''}" data-cat="${k}" data-v="${E(o)}">${E(dispOpt(f,o)||'전체')}${tag}</button>`;
         }).join('');
       } else if(f.tgl){
         pop=`<label class="tgl"><input type="checkbox" data-tgl="${k}" ${st.on?'checked':''}> ${E(f.tglLabel)}</label>`;
@@ -2026,7 +2034,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'lb': return v==null?'—':wonF(v*1e8);
       case 'lbr': return `<span class="${v>=10?'dn':''}">${v.toFixed(2)}%</span>`;
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
-      case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(v)}</span>`;
+      case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(MACD_DISP[v]||v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
       case 'volx': return `<span class="${v>=1.5?'up':'note'}">${(+v).toFixed(1)}배</span>`;
       case 'bb': return (+v).toFixed(0);
@@ -2162,7 +2170,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['20일선·50일선','해당 이동평균 대비 현재가 위치'],
         ['이평배열','MA20>MA50>MA200=정배열(상승 구조) · 반대=역배열'],
         ['RSI(14)','상대강도지수 — 30↓ 과매도 · 70↑ 과매수'],
-        ['MACD','12-26 EMA 차이 vs 시그널(9) — 골든/데드 크로스 상태'],
+        ['MACD','12-26 EMA 차이 vs 시그널(9). 앞의 <b>골든/데드</b>=시그널선 돌파 방향, 괄호의 <b>0선↑/↓</b>=MACD 가 0선 위인지 아래인지. 골든(0선↓)=하락 국면에서 막 돌아선 상승 전환 초기 · 데드(0선↑)=상승 국면에서 막 꺾인 하락 전환 초기'],
         ['볼린저밴드','볼린저(20,2) 밴드 내 위치 — 0=하단 · 100=상단'],
         ['거래량배수','당일 거래량 ÷ 3개월 평균(미국)/20일 평균(한국). <b>장중에는 하루치로 환산해 추정</b>(일중 거래량이 개장·마감에 몰리는 U자 곡선을 반영) → 차트의 진행 중인 마지막 봉과는 값이 다를 수 있다'],
         ['배당성향','배당금÷순이익(payout ratio)'],
@@ -2185,7 +2193,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['이평배열','20·50·200일선 배열 — 정배열(20>50>200)=상승추세장, 역배열=하락추세장, 혼조=전환 구간'],
         ['RSI(14)','상대강도지수 — 30 이하 과매도(반등 후보), 50 상회 = 상승 모멘텀, 70 이상 과매수(조정 경계)'],
         ['거래량배수','최근 거래일 거래량 ÷ 직전 20일 평균 — 1.5배↑ 급증 = 추세 전환/돌파 확인 신호'],
-        ['MACD','(12,26,9) 상태 — 골든↑=시그널 상향돌파+0선 위(강한 상승), 골든↓=0선 아래 반등, 데드↑/↓=하향 전환'],
+        ['MACD','(12,26,9) 상태. 앞의 <b>골든/데드</b>=시그널선 돌파 방향, 괄호의 <b>0선↑/↓</b>=MACD 의 0선 위/아래 위치. 골든(0선↑)=강한 상승 · 골든(0선↓)=상승 전환 초기(0선 아래 반등) · 데드(0선↑)=하락 전환 초기(고점권 꺾임) · 데드(0선↓)=강한 하락'],
         ['볼린저밴드','볼린저밴드(20,2) 내 위치(%b) — 0=하단(과매도권), 50=중심선, 100 이상=상단 돌파(거래량 동반 시 추세가속)'],
         ['수익률 12M','최근 12개월 주가 수익률(현재가 ÷ 12개월 전 종가). <b>미국은 12-1M</b>(최근 1개월 제외)이라 정의가 다르다'],
         ['수익률 1M·3M·6M','해당 기간 주가 수익률'],
