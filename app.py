@@ -165,6 +165,42 @@ def bundle(request: Request):
         return Response(status_code=304, headers=hdr)
     return Response(content=_bundle_cache["body"], media_type="application/json", headers=hdr)
 
+_disc_cache = {}
+
+
+@app.get("/api/disclosure/kr/{code}")
+def disclosure_api(code: str):
+    """종목 공시 목록 — 네이버 m.stock 프록시. 차트에 마커로 찍고 클릭하면 내용을 보여준다.
+
+    (2026-07-21) 한국 전용. 미국은 SEC EDGAR 가 종목코드→CIK 매핑을 따로 요구하고
+    공시 성격도 달라(8-K 등) 같은 UX 로 묶기 어려워 제외한다.
+    30분 캐시 — 공시는 실시간성이 낮고 같은 종목을 반복 조회하는 화면이라 충분하다.
+    """
+    if not re.fullmatch(r"[0-9A-Za-z]{6}", code):
+        raise HTTPException(400, "bad code")
+    now = time.time()
+    hit = _disc_cache.get(code)
+    if hit and now - hit[0] < 1800:
+        return hit[1]
+    try:
+        url = ("https://m.stock.naver.com/api/stock/%s/disclosure?pageSize=100&page=1" % code)
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
+                                                   "Referer": "https://m.stock.naver.com/"})
+        rows = json.loads(urllib.request.urlopen(req, timeout=10).read())
+        out = {"items": [{"d": str(r.get("datetime") or "")[:10].replace("-", ""),
+                          "t": r.get("title") or "",
+                          "at": str(r.get("datetime") or "")[11:16],
+                          "src": r.get("author") or "",
+                          "id": r.get("disclosureId")}
+                         for r in (rows or []) if r.get("datetime")]}
+        _disc_cache[code] = (now, out)
+        if len(_disc_cache) > 300:
+            _disc_cache.clear()
+        return out
+    except Exception as e:
+        return {"items": [], "err": repr(e)[:80]}
+
+
 _chart_cache = {}
 
 @app.get("/api/chart/{mkt}/{code}")

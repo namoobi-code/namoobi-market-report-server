@@ -2339,6 +2339,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
              return ` · ⚠ 맨 오른쪽 봉은 아직 진행 중 — 장 ${Math.round(g.f*100)}% 경과 시점의 ${u(g.now)}주(빗금)이며 평균선과 비교하면 ${x1}배로 보입니다.`
                   + ` 점선은 이 페이스로 마감까지 갔을 때의 예상치 ${u(g.proj)}주(${x2}배)로, 표의 거래량배수가 이 값입니다.`; })();
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
+        loadDisc(c);                              // 공시 마커도 별도 로드
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
     }
     $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -2374,6 +2375,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      월 경계 x축, 그리고 마우스를 올리면 십자선이 따라오며 모든 범례가 그 봉 기준으로 바뀐다. */
   let _CD=null, _CHI=null, _CN=0, _CBOUND=false;
   let _INV=null, _CT=null, _CHD=null;   // 수급 패널 원본 · 메인 차트 날짜배열 · 호버 날짜
+  /* (2026-07-21) 공시 마커 — 네이버처럼 A·B·C… 원형 배지를 캔들 위에 찍고 '클릭'하면 내용을 띄운다.
+     호버가 아니라 클릭인 이유: 이미 십자선 호버가 걸려 있어 마우스만 올려도 뜨면 서로 방해된다.
+     한국 전용(네이버 공시 API). 미국은 SEC EDGAR 가 코드→CIK 매핑을 따로 요구하고
+     공시 성격도 달라 같은 UX 로 묶기 어렵다. */
+  let _DISC=null, _DSEL=null, _DHIT=[];   // 공시목록 · 선택된 마커 · 마커 히트박스
   const _mk=n=>{ const a=Math.abs(n);
     return a>=1e6?(n/1e6).toFixed(2)+'m':a>=1e3?Math.round(n/1e3)+'k':String(Math.round(n)); };
   const _pf=p=>mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2);
@@ -2452,6 +2458,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         i=Math.max(0,Math.min(_CN-1,i));
         if(i!==_CHI){ _CHI=i; _paint(); } });
       e.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } });
+      if(id==='sd_main'){
+        e.addEventListener('click',ev=>{
+          if(!_DHIT.length) return;
+          const r=e.getBoundingClientRect();
+          const px=(ev.clientX-r.left)*(e.width/r.width), py=(ev.clientY-r.top)*(e.height/r.height);
+          let hit=null;
+          for(const m of _DHIT){ if((px-m.x)**2+(py-m.y)**2 <= (m.r+3)**2){ hit=m.d; break; } }
+          _DSEL = (hit && hit!==_DSEL) ? hit : null;   // 같은 마커 재클릭·빈 곳 클릭 → 닫기
+          _paint(); });
+        e.style.cursor='pointer';
+      }
     });
     /* 수급 패널(sd_inv)은 네이버 1년+KIS 병합이라 메인 차트와 기간·봉수가 다르다.
        인덱스로 맞추면 다른 날짜를 가리키게 되므로 '날짜'를 공통키로 역매핑한다. */
@@ -2469,7 +2486,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         if(i<0){ for(let k=_CT.length-1;k>=0;k--){ if(String(_CT[k]||'').replace(/-/g,'')<=d){ i=k; break; } } }
         if(i>=0&&i!==_CHI){ _CHI=i; _paint(); } });
       ei.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } }); } }
-  function drawAll(D){ _CD=D; _CHI=null; _bindChart(); _paint(); }
+  function drawAll(D){ _CD=D; _CHI=null; _DISC=null; _DSEL=null; _DHIT=[]; _bindChart(); _paint(); }
+  async function loadDisc(c){
+    if(mkt!=='kr'){ _DISC=null; return; }
+    try{ const J=await (await fetch('/api/disclosure/kr/'+encodeURIComponent(c))).json();
+      if(dcode!==c) return;
+      _DISC=(J.items||[]); _DSEL=null; _paint();
+    }catch(e){ _DISC=null; }
+  }
   function _paint(){ const D=_CD; if(!D) return;
     // 데이터 정리 (null 보간)
     const full=D.c.slice();
@@ -2571,6 +2595,45 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       x.font='bold 10px sans-serif'; const w=x.measureText(lab).width;
       x.fillStyle='#2c3542'; x.fillRect(W-P.r+1, yy-7, w+7, 14);
       x.fillStyle='#fff'; x.fillText(lab, W-P.r+4, yy+3); }
+     /* 공시 마커 — 날짜별로 묶어 최신부터 A·B·C… 를 부여하고 캔들 고가 위에 원형 배지로 찍는다.
+        클릭 판정을 위해 화면좌표를 _DHIT 에 쌓아 둔다(캔버스는 DOM 이 없어 직접 히트테스트). */
+     _DHIT=[];
+     if(_DISC&&_DISC.length){
+       const byD={}; for(const it of _DISC){ (byD[it.d]=byD[it.d]||[]).push(it); }
+       const idx={}; for(let i=0;i<N;i++) idx[String(t[i]||'').replace(/-/g,'')]=i;
+       const days=Object.keys(byD).filter(d=>idx[d]!=null).sort().reverse().slice(0,26);
+       const LT='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+       days.forEach((d,k)=>{ const i=idx[d], cx0=X(i), cy0=Y(hh[i])-11;
+         const sel=(_DSEL===d);
+         x.beginPath(); x.arc(cx0, Math.max(cy0,P.t+8), sel?8:6.5, 0, Math.PI*2);
+         x.fillStyle=sel?'#c0392b':'rgba(214,69,69,.85)'; x.fill();
+         x.strokeStyle='#fff'; x.lineWidth=1.2; x.stroke(); x.lineWidth=1;
+         x.fillStyle='#fff'; x.font='bold 9px sans-serif'; x.textAlign='center';
+         x.fillText(LT[k]||'*', cx0, Math.max(cy0,P.t+8)+3); x.textAlign='left';
+         _DHIT.push({d, x:cx0, y:Math.max(cy0,P.t+8), r:9}); });
+       // 선택된 공시 내용 상자
+       if(_DSEL&&byD[_DSEL]){
+         const its=byD[_DSEL].slice(0,6), i=idx[_DSEL];
+         x.font='11px sans-serif';
+         const lines=its.map(z=>'· '+z.t);
+         const head=`${_DSEL.slice(0,4)}.${_DSEL.slice(4,6)}.${_DSEL.slice(6,8)} 공시 ${byD[_DSEL].length}건`;
+         const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+16, 420);
+         const bh=20+lines.length*14+(byD[_DSEL].length>6?14:0);
+         let bx=Math.min(Math.max(X(i)-wmax/2, P.l), W-P.r-wmax), by=Math.min(Y(hh[i])+14, H-P.b-bh-4);
+         if(by<P.t+18) by=P.t+18;
+         x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
+         if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,7); x.fill(); x.stroke(); }
+         else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
+         x.fillStyle='#c0392b'; x.font='bold 11px sans-serif'; x.fillText(head, bx+8, by+15);
+         x.fillStyle='#3d454f'; x.font='11px sans-serif';
+         lines.forEach((z,q)=>{ let tx=z;
+           while(x.measureText(tx).width>wmax-16 && tx.length>4) tx=tx.slice(0,-2);
+           if(tx!==z) tx=tx.slice(0,-1)+'…';
+           x.fillText(tx, bx+8, by+29+q*14); });
+         if(byD[_DSEL].length>6){ x.fillStyle='#98a2ad';
+           x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+8, by+29+lines.length*14); }
+       }
+     }
      // 십자선 — 호버 중인 봉 위치
      if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
        x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke();
