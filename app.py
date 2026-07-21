@@ -179,7 +179,7 @@ def chart_api(mkt: str, code: str):
     try:
         from datetime import date as _d, timedelta as _td, datetime as _dt
         if mkt == "kr":
-            E = _d.today().strftime("%Y%m%d"); S = (_d.today() - _td(days=430)).strftime("%Y%m%d")
+            E = _d.today().strftime("%Y%m%d"); S = (_d.today() - _td(days=760)).strftime("%Y%m%d")   # 250봉 표시 + 240일선 = 490거래일 필요
             url = f"https://api.stock.naver.com/chart/domestic/item/{code}/day?startDateTime={S}&endDateTime={E}"
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             rows = json.loads(urllib.request.urlopen(req, timeout=12).read())
@@ -188,7 +188,7 @@ def chart_api(mkt: str, code: str):
                    "l": [r.get("lowPrice") for r in rows], "c": [r.get("closePrice") for r in rows],
                    "v": [r.get("accumulatedTradingVolume") for r in rows]}
         else:
-            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}?range=1y&interval=1d"
+            url = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}?range=2y&interval=1d"
             req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
             j = json.loads(urllib.request.urlopen(req, timeout=12).read())
             res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]

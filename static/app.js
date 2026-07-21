@@ -2319,7 +2319,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
         drawAll(D);
-        $('sd_src').textContent=`종가 기준 일봉(최근 1년) · ${mkt==='kr'?'네이버':'Yahoo'} · MA20 주황 · MA50 초록 · MA200 보라 · 볼린저(20,2) 회색밴드 · RSI(14) · MACD(12,26,9)`
+        $('sd_src').textContent=`종가 기준 일봉(최근 250거래일) · ${mkt==='kr'?'네이버':'Yahoo'} · 이동평균 ${(MASET[mkt]||MASET.us).map(m=>m[0]).join('/')}일`
+          +(mkt==='kr'?'(한국식 — 60=수급선 · 120=경기선 · 240=1년선)'
+                      :'(해외식 — 골든/데드 크로스는 50·200 교차 기준. 미국 연 거래일이 252일이라 200일선은 실제 1년이 아닌 9~10개월)')
+          +` · 볼린저(20,2) 회색밴드 · RSI(14,9) · MACD(12,26,9)`
           +(mkt==='kr'?' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)':'')
           /* (2026-07-20) 장중엔 마지막 봉이 '아직 안 끝난 하루'라 20일 평균선과 직접 비교하면 과소해 보인다.
              표의 거래량배수는 하루치로 환산한 값이라 서로 달라 보이는 것 — 그 차이를 각주로 명시. */
@@ -2368,6 +2371,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const _mk=n=>{ const a=Math.abs(n);
     return a>=1e6?(n/1e6).toFixed(2)+'m':a>=1e3?Math.round(n/1e3)+'k':String(Math.round(n)); };
   const _pf=p=>mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2);
+  /* (2026-07-21) 이동평균은 시장별 관례가 다르다 — 일봉 기준.
+       한국 5/20/60/120/240 : 20의 배수 체계로 1주·1개월·분기·반기·1년을 거래일 환산
+                              (60=수급선, 120=경기선, 240=1년선. 네이버·국내 HTS 기본은 5/20/60/120)
+       미국 20/50/100/200   : 50의 배수 관습. 골든/데드 크로스 정의가 50·200 교차.
+                              ※ 미국 연 거래일은 252일이라 200일선은 실제로 1년이 아니다(9~10개월).
+     장기선이 화면 전 구간에 그려지도록 /api/chart 이력을 KR 760일·US 2y 로 늘렸다. */
+  const MASET={ kr:[[5,'#16a085'],[20,'#f39c12'],[60,'#27ae60'],[120,'#8e44ad'],[240,'#2c3e50']],
+                us:[[20,'#f39c12'],[50,'#27ae60'],[100,'#16a085'],[200,'#8e44ad']] };
   function _bindChart(){ if(_CBOUND) return; _CBOUND=true;
     ['sd_main','sd_vol','sd_rsi','sd_macd'].forEach(id=>{ const e=$(id); if(!e) return;
       e.addEventListener('mousemove',ev=>{ if(!_CN) return;
@@ -2406,7 +2417,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
     const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
     _CT=t; _CHD=String(t[HI]||'').replace(/-/g,'');   // 수급 패널과 '날짜'로 동기화(t 선언 이후여야 함)
-    const ma20=sl(_sma(full,20)), ma50=sl(_sma(full,50)), ma200=sl(_sma(full,200));
+    const MAS=(MASET[mkt]||MASET.us).map(([per,col])=>({per,col,a:sl(_sma(full,per))}));
     const bm=_sma(full,20), bsd=full.map((x,i)=>{ if(i<19||bm[i]==null) return null; let s=0; for(let j=i-19;j<=i;j++) s+=(full[j]-bm[i])**2; return Math.sqrt(s/20); });
     const bU=sl(bm.map((m,i)=>m==null?null:m+2*bsd[i])), bL=sl(bm.map((m,i)=>m==null?null:m-2*bsd[i]));
     const rsi=sl(_rsiArr(full,14));
@@ -2446,7 +2457,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      // MA 라인
      const line=(a,col)=>{ x.strokeStyle=col; x.lineWidth=1.4; x.beginPath(); let s=false;
        for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); x.lineWidth=1; };
-     line(ma20,'#f39c12'); line(ma50,'#27ae60'); line(ma200,'#8e44ad');
+     MAS.forEach(m=>line(m.a,m.col));
      // x축 — 월이 바뀌는 지점에만 라벨(네이버 방식). 해가 바뀌면 연도를 쓴다.
      x.fillStyle='#98a2ad'; x.font='10px sans-serif';
      {let lastM='',lastY='',px=-99;
@@ -2493,7 +2504,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       put('거','#98a2ad'); put(Math.round(v[HI]).toLocaleString(),'#5b6470');
       cx=P.l+4;
       const put2=(txt,col)=>{ x.font='10px sans-serif'; x.fillStyle=col; x.fillText(txt,cx,25); cx+=x.measureText(txt).width+5; };
-      put2('이동평균','#98a2ad'); put2('20','#f39c12'); put2('50','#27ae60'); put2('200','#8e44ad');
+      put2('이동평균','#98a2ad');
+      MAS.forEach(m=>put2(String(m.per), m.col));
       put2('볼린저밴드(20,2)','#8296aa');
      }
      if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 38); }
