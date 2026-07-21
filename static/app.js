@@ -3138,7 +3138,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        실제로 알고 싶은 건 '이 구간 동안 누가 얼마나 샀나'이므로 구간 시작을 0 으로 놓는다.
        특히 분봉(9거래일)에서는 리베이스 없이는 사실상 아무 정보가 없다. */
     const i0=vis[0][1];
-    const b0=cf[i0], b1=co[i0], b2=cp[i0];
+    /* (2026-07-21 수정) 리베이스 기준은 '첫 표시일'이 아니라 '그 직전일'이어야 한다.
+       cf[i0] 를 빼면 첫날 자신의 순매수가 0 으로 지워져 구간 합계에서 빠진다.
+       실측(005930 5분봉 9거래일): 첫날(7/8) 외국인 −301만이 누락돼
+         표시 +367만 vs 실제 9일 합계 +65.7만 으로 크게 벌어졌다.
+       → 직전일 누계를 기준으로 삼아 표시 구간의 모든 날이 합계에 들어가게 한다. */
+    const bi=Math.max(i0-1,-1);
+    const b0=bi>=0?cf[bi]:0, b1=bi>=0?co[bi]:0, b2=bi>=0?cp[bi]:0;
     const RF=k=>cf[k]-b0, RO=k=>co[k]-b1, RP=k=>cp[k]-b2;
     const all=vis.flatMap(([,k])=>[RF(k),RO(k),RP(k)]);
     let mx=Math.max(...all,0), mn=Math.min(...all,0);
@@ -3168,9 +3174,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     seg(_cp,PP,i0,Math.min(cut,n-1),true); if(cut<n) seg(_cp,PP,Math.max(cut-1,i0),n-1,false);
     // x축 날짜 3틱 + 범례
     x.fillStyle='#98a2ad';
-    for(let g=0;g<3;g++){ const [,k]=vis[Math.floor((vis.length-1)*g/3)]||vis[0];
-      const d=String(J.t[k]||'').replace(/-/g,'');
-      x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(k)-10, H-3); }
+    /* 표시 구간이 짧으면(분봉 등) 연.월 라벨이 전부 같아져 무의미하다 → 월.일로 바꾼다. */
+    {const dFirst=String(J.t[vis[0][1]]||'').replace(/-/g,''),
+           dLast =String(J.t[vis[vis.length-1][1]]||'').replace(/-/g,'');
+     const sameMonth = dFirst.slice(0,6)===dLast.slice(0,6);
+     for(let g=0;g<3;g++){ const [,k]=vis[Math.floor((vis.length-1)*g/3)]||vis[0];
+       const d=String(J.t[k]||'').replace(/-/g,'');
+       x.fillText(sameMonth ? (+d.slice(4,6))+'.'+(+d.slice(6,8))
+                            : d.slice(2,4)+'.'+d.slice(4,6), X(k)-10, H-3); } }
     /* 십자선 — 메인 차트와 봉수가 달라 인덱스가 아니라 날짜로 맞춘다.
        정확히 같은 날짜가 없으면(휴장·데이터 갭) 그 이전 최근 거래일로 붙인다. */
     let hj=n-1;
@@ -3187,7 +3198,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      put('외국인',F,true); put(fmt(cf[hj]-b0),F);
      put('기관',O,true);   put(fmt(co[hj]-b1),O);
      put('개인',PP,true);  put(fmt(cp[hj]-b2)+(est[hj]?'(추정)':''),PP);
-     put('· 표시 구간 시작을 0 으로 맞춘 누계','#b0b8c2'); }
+     put('· 표시 구간 전체 합계(첫날 포함)','#b0b8c2'); }
   }
 
   // ── 2단계 z-score 랭킹 ──
