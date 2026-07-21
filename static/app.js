@@ -2380,6 +2380,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      한국 전용(네이버 공시 API). 미국은 SEC EDGAR 가 코드→CIK 매핑을 따로 요구하고
      공시 성격도 달라 같은 UX 로 묶기 어렵다. */
   let _DISC=null, _DSEL=null, _DHIT=[];   // 공시목록 · 선택된 마커 · 마커 히트박스
+  /* (2026-07-21) 줌·팬 — 휠로 기간 확대/축소, 드래그로 좌우 이동.
+     구조상 어렵지 않다: 지표는 이미 전체 시계열(full)로 계산한 뒤 표시 구간만 잘라 쓰므로,
+     보이는 봉수(_CZ)와 뒤로 밀린 봉수(_COFF)만 바꾸면 MA·RSI·MACD·ADX 가 전부 그대로 맞는다.
+     이력도 이미 2년치(KR 505·US 501 거래일)를 받아두고 있다.
+     휠은 sd_main 에서만 가로챈다 — 보조 패널까지 가로채면 차트 스택(880px)을 지나
+     페이지를 스크롤할 방법이 없어진다. */
+  const CZ0=250;                          // 기본 표시 봉수
+  let _CZ=CZ0, _COFF=0, _DRAG=null, _DMOVE=0;
   const _mk=n=>{ const a=Math.abs(n);
     return a>=1e6?(n/1e6).toFixed(2)+'m':a>=1e3?Math.round(n/1e3)+'k':String(Math.round(n)); };
   const _pf=p=>mkt==='kr'?Math.round(p).toLocaleString():(+p).toFixed(2);
@@ -2454,12 +2462,41 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       e.addEventListener('mousemove',ev=>{ if(!_CN) return;
         const r=e.getBoundingClientRect(), PL=6, PR=52;
         const step=(r.width-PL-PR)/_CN;
+        if(_DRAG){                                   // 드래그 중엔 십자선 대신 구간 이동
+          _DMOVE=Math.max(_DMOVE, Math.abs(ev.clientX-_DRAG.x));
+          const TOT=(_CD&&_CD.c)?_CD.c.length:0; if(!TOT) return;
+          const d=Math.round((ev.clientX-_DRAG.x)/step);   // 오른쪽으로 끌면 과거로
+          const nv=Math.max(0, Math.min(TOT-_CZ, _DRAG.off+d));
+          if(nv!==_COFF){ _COFF=nv; _paint(); }
+          return; }
         let i=Math.round(((ev.clientX-r.left)-PL)/step-0.5);
         i=Math.max(0,Math.min(_CN-1,i));
         if(i!==_CHI){ _CHI=i; _paint(); } });
       e.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } });
+
+      /* 팬(좌우 이동) — 모든 패널에서 잡는다. 어느 패널을 끌든 전체가 같이 움직인다. */
+      e.addEventListener('mousedown',ev=>{ if(ev.button!==0) return;
+        _DRAG={x:ev.clientX, off:_COFF}; _DMOVE=0; e.style.cursor='grabbing'; });
+      e.addEventListener('dblclick',()=>{ _CZ=CZ0; _COFF=0; _paint(); });   // 더블클릭 = 원래대로
+
       if(id==='sd_main'){
+        /* 줌(휠) — sd_main 에서만. passive:false 라야 페이지 스크롤을 막을 수 있다.
+           커서 위치의 봉을 기준으로 확대/축소해야 보고 있던 지점이 안 튄다. */
+        e.addEventListener('wheel',ev=>{
+          const TOT=(_CD&&_CD.c)?_CD.c.length:0; if(!TOT) return;
+          ev.preventDefault();
+          const r=e.getBoundingClientRect(), PL=6, PR=52;
+          const frac=Math.max(0,Math.min(1,((ev.clientX-r.left)-PL)/(r.width-PL-PR)));
+          const anchor=(TOT-_CZ-_COFF)+frac*_CZ;      // 커서가 가리키던 전체기준 인덱스
+          const z0=_CZ;
+          _CZ=Math.max(30, Math.min(TOT, Math.round(_CZ*(ev.deltaY>0?1.2:1/1.2))));
+          if(_CZ===z0) return;
+          const off=Math.round(anchor-frac*_CZ);       // 그 인덱스가 같은 위치에 오도록
+          _COFF=Math.max(0, Math.min(TOT-_CZ, TOT-_CZ-off));
+          _paint(); }, {passive:false});
+
         e.addEventListener('click',ev=>{
+          if(_DMOVE>4) return;                        // 드래그였으면 클릭으로 치지 않는다
           if(!_DHIT.length) return;
           const r=e.getBoundingClientRect();
           const px=(ev.clientX-r.left)*(e.width/r.width), py=(ev.clientY-r.top)*(e.height/r.height);
@@ -2467,13 +2504,27 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           for(const m of _DHIT){ if((px-m.x)**2+(py-m.y)**2 <= (m.r+3)**2){ hit=m.d; break; } }
           _DSEL = (hit && hit!==_DSEL) ? hit : null;   // 같은 마커 재클릭·빈 곳 클릭 → 닫기
           _paint(); });
-        e.style.cursor='pointer';
       }
+      e.style.cursor='grab';
     });
+    window.addEventListener('mouseup',()=>{ if(_DRAG){ _DRAG=null;
+      ['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'].forEach(id=>{ const q=$(id); if(q) q.style.cursor='grab'; }); } });
     /* 수급 패널(sd_inv)은 네이버 1년+KIS 병합이라 메인 차트와 기간·봉수가 다르다.
        인덱스로 맞추면 다른 날짜를 가리키게 되므로 '날짜'를 공통키로 역매핑한다. */
     const ei=$('sd_inv');
-    if(ei){ ei.addEventListener('mousemove',ev=>{
+    if(ei){
+      ei.addEventListener('mousedown',ev=>{ if(ev.button!==0) return;
+        _DRAG={x:ev.clientX, off:_COFF}; _DMOVE=0; ei.style.cursor='grabbing'; });
+      ei.addEventListener('dblclick',()=>{ _CZ=CZ0; _COFF=0; _paint(); });
+      ei.style.cursor='grab';
+      ei.addEventListener('mousemove',ev=>{
+        if(_DRAG){ _DMOVE=Math.max(_DMOVE, Math.abs(ev.clientX-_DRAG.x));
+          const TOT=(_CD&&_CD.c)?_CD.c.length:0; if(!TOT) return;
+          const r0=ei.getBoundingClientRect(), st0=(r0.width-58)/Math.max(_CN,1);
+          const d=Math.round((ev.clientX-_DRAG.x)/st0);
+          const nv=Math.max(0, Math.min(TOT-_CZ, _DRAG.off+d));
+          if(nv!==_COFF){ _COFF=nv; _paint(); }
+          return; }
         if(!_INV||!_CT) return; const jt=_INV.t||[]; if(!jt.length) return;
         const d0=String((_CT[0])||'').replace(/-/g,'');
         let j0=0; for(let k=0;k<jt.length;k++){ if(String(jt[k]||'').replace(/-/g,'')>=d0){ j0=k; break; } }
@@ -2486,7 +2537,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         if(i<0){ for(let k=_CT.length-1;k>=0;k--){ if(String(_CT[k]||'').replace(/-/g,'')<=d){ i=k; break; } } }
         if(i>=0&&i!==_CHI){ _CHI=i; _paint(); } });
       ei.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } }); } }
-  function drawAll(D){ _CD=D; _CHI=null; _DISC=null; _DSEL=null; _DHIT=[]; _bindChart(); _paint(); }
+  function drawAll(D){ _CD=D; _CHI=null; _DISC=null; _DSEL=null; _DHIT=[];
+    _CZ=CZ0; _COFF=0;                    // 종목이 바뀌면 기본 구간으로
+    _bindChart(); _paint(); }
   async function loadDisc(c){
     if(mkt!=='kr'){ _DISC=null; return; }
     try{ const J=await (await fetch('/api/disclosure/kr/'+encodeURIComponent(c))).json();
@@ -2498,7 +2551,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     // 데이터 정리 (null 보간)
     const full=D.c.slice();
     for(let i=0;i<full.length;i++) if(full[i]==null) full[i]=full[i-1]??null;
-    const N=Math.min(250, full.length), off=full.length-N;
+    const TOT=full.length;
+    _CZ=Math.max(30, Math.min(_CZ, TOT));            // 최소 30봉
+    _COFF=Math.max(0, Math.min(_COFF, TOT-_CZ));     // 과거로 더 못 감 / 미래로 못 감
+    const N=_CZ, off=TOT-N-_COFF;
     _CN=N;
     const HI=(_CHI!=null&&_CHI>=0&&_CHI<N)?_CHI:N-1;   // 범례 기준 봉(호버 없으면 최신)
     //  ※ drawMain 안에는 가격 표시범위용 lo/hi 가 따로 있어 이름을 HI 로 구분한다.
@@ -2601,15 +2657,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      if(_DISC&&_DISC.length){
        const byD={}; for(const it of _DISC){ (byD[it.d]=byD[it.d]||[]).push(it); }
        const idx={}; for(let i=0;i<N;i++) idx[String(t[i]||'').replace(/-/g,'')]=i;
-       const days=Object.keys(byD).filter(d=>idx[d]!=null).sort().reverse().slice(0,26);
-       const LT='ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+       /* (2026-07-21 수정) 예전엔 '최근 26일'만 잘라 써서 마커가 최근 몇 달에만 몰렸다.
+          공시가 잦은 종목(삼성전자)은 26일이 4개월치밖에 안 돼 1년 전체가 비어 보였다.
+          → 창(표시 구간) 안의 공시일은 모두 쓰고, 라벨을 A~Z 다음 a~z 까지 늘린다(52일).
+            그래도 넘치면 라벨 없이 점만 찍되 클릭은 그대로 된다. */
+       const days=Object.keys(byD).filter(d=>idx[d]!=null).sort().reverse();
+       const LT='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
        days.forEach((d,k)=>{ const i=idx[d], cx0=X(i), cy0=Y(hh[i])-11;
          const sel=(_DSEL===d);
          x.beginPath(); x.arc(cx0, Math.max(cy0,P.t+8), sel?8:6.5, 0, Math.PI*2);
          x.fillStyle=sel?'#c0392b':'rgba(214,69,69,.85)'; x.fill();
          x.strokeStyle='#fff'; x.lineWidth=1.2; x.stroke(); x.lineWidth=1;
          x.fillStyle='#fff'; x.font='bold 9px sans-serif'; x.textAlign='center';
-         x.fillText(LT[k]||'*', cx0, Math.max(cy0,P.t+8)+3); x.textAlign='left';
+         if(LT[k]) x.fillText(LT[k], cx0, Math.max(cy0,P.t+8)+3);
+         x.textAlign='left';
          _DHIT.push({d, x:cx0, y:Math.max(cy0,P.t+8), r:9}); });
        // 선택된 공시 내용 상자
        if(_DSEL&&byD[_DSEL]){
@@ -2656,6 +2717,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       put2('이동평균','#98a2ad');
       MAS.forEach(m=>put2(String(m.per), m.col));
       put2('볼린저밴드(20,2)','#8296aa');
+      put2(`${N}봉`,'#5b6470');
+      put2('휠=확대·축소 · 드래그=좌우이동 · 더블클릭=원래대로','#b0b8c2');
      }
      if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 38); }
     };

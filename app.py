@@ -183,16 +183,22 @@ def disclosure_api(code: str):
     if hit and now - hit[0] < 1800:
         return hit[1]
     try:
-        url = ("https://m.stock.naver.com/api/stock/%s/disclosure?pageSize=100&page=1" % code)
+        url = ("https://m.stock.naver.com/api/stock/%s/disclosure?pageSize=200&page=1" % code)
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
                                                    "Referer": "https://m.stock.naver.com/"})
         rows = json.loads(urllib.request.urlopen(req, timeout=10).read())
+        # (2026-07-21) 거래소 시장조치 공지는 뺀다.
+        #   '주식선물·옵션 가격제한폭 확대요건 도달' 류는 주가가 크게 움직였다는 사실의 '결과'로
+        #   자동 발생하는 공지다. 이걸 주가 차트에 사건으로 찍으면 순환논리이고,
+        #   실측(005930 1년): 80건 중 20건이 이 유형이라 정작 실적·자사주 같은 실제 공시를 밀어냈다.
+        NOISE = re.compile(r"가격제한폭|매매거래정지|매매거래재개|시장조치|투자유의")
         out = {"items": [{"d": str(r.get("datetime") or "")[:10].replace("-", ""),
                           "t": r.get("title") or "",
                           "at": str(r.get("datetime") or "")[11:16],
                           "src": r.get("author") or "",
                           "id": r.get("disclosureId")}
-                         for r in (rows or []) if r.get("datetime")]}
+                         for r in (rows or [])
+                         if r.get("datetime") and not NOISE.search(r.get("title") or "")]}
         _disc_cache[code] = (now, out)
         if len(_disc_cache) > 300:
             _disc_cache.clear()
