@@ -384,6 +384,26 @@
   .tfsel{padding:4px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:12px;cursor:pointer;color:var(--tx)}
   .tfsel.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}
   .tfb.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}
+  /* 차트 하단 패널 — 호가창 / 시간별체결 / 외국인·기관 순매매 */
+  .bkwrap{display:flex;gap:10px;flex-wrap:wrap}
+  .bkbox{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff}
+  .bktit{font-size:11.5px;font-weight:700;color:var(--tx);margin-bottom:6px}
+  .bktit small{font-weight:400;color:#98a2ad;margin-left:5px}
+  table.bk{border-collapse:collapse;font-size:11.5px}
+  table.bk td{padding:2px 7px;text-align:right;white-space:nowrap}
+  table.bk td.ap{background:#eaf1fb;color:#1e6fd6}          /* 매도호가 */
+  table.bk td.aq{background:#f4f8fe;color:#1e6fd6}
+  table.bk td.bp{background:#fdeceb;color:#c0392b}          /* 매수호가 */
+  table.bk td.bq{background:#fef6f5;color:#c0392b}
+  table.bk tr.tot td{border-top:1px solid var(--line);font-weight:700;padding-top:4px}
+  table.tk{border-collapse:collapse;font-size:11.5px;width:100%}
+  table.tk th{background:#f5f6f8;color:#5b6470;font-weight:600;padding:4px 6px;position:sticky;top:0}
+  table.tk td{padding:2px 6px;text-align:right;border-bottom:1px solid #f2f4f6;white-space:nowrap}
+  table.tk td.l{text-align:left}
+  .sbadge{display:inline-block;padding:1px 6px;border-radius:9px;font-size:10.5px;font-weight:700}
+  .sbadge.buy{color:#c0392b;background:#fdeaea}
+  .sbadge.sell{color:#1e6fd6;background:#e8f1fd}
+  .sbadge.mid{color:#6b7684;background:#eef0f3}
   .fpop .man{display:flex;gap:6px;align-items:center;margin-top:7px;border-top:1px dashed var(--line);padding-top:8px}
   .fpop .man input{width:82px;border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:right;font-family:inherit}
   .fpop .man span{font-size:11px;color:var(--tx2)}
@@ -850,6 +870,9 @@
               <canvas id="sd_main"></canvas><canvas id="sd_vol"></canvas>
               <canvas id="sd_rsi"></canvas><canvas id="sd_macd"></canvas><canvas id="sd_inv"></canvas>
               <div class="src" id="sd_src" style="margin-top:6px"></div>
+              <!-- (2026-07-21) 차트 하단 패널 — 분봉이면 호가·체결, 일/주/월이면 외국인·기관 순매매 표 -->
+              <div id="sd_book" style="display:none;margin-top:8px"></div>
+              <div id="sd_invt" style="display:none;margin-top:8px"></div>
             </div>
             <div class="box" id="sd_sum" style="padding:10px 12px"></div>
           </div>

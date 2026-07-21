@@ -2341,9 +2341,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           + (_TF==='d'&&mkt==='kr' ? ' · 누적순매수(외국인·기관·개인 — 1개월 이전 개인은 −(외인+기관) 추정 점선)'
                                    : ' · OBV(누적 거래량)')
           + (_isMin() ? `  ⏱ 단타용 — 흐름은 5분, 진입·청산 순간만 1분으로 내려 보는 조합이 일반적입니다.`
-              + ` <b>다만 실제 체결 타이밍은 차트만으로 부족합니다</b> — 호가 잔량과 체결강도(체결이 매도호가에 붙는지 매수호가에 붙는지)를 같이 봐야 합니다.`
-              + ` <b>단, 네이버 호가·거래원은 20분 지연이고 투자자별 순매매는 장 마감 후 확정치라 실시간 진입 판단에는 쓸 수 없습니다</b>`
-              + ` — 실시간 호가·체결강도는 증권사 HTS/MTS 로 봐야 하고, 네이버 화면은 '어제까지의 수급 흐름' 파악용입니다.`
+              + ` 차트만으로는 체결 타이밍이 부족해 <b>아래에 호가·체결강도·투자자 가집계를 KIS 실전계정 실시간</b>으로 붙였습니다`
+              + ` (네이버 호가·거래원은 20분 지연이라 쓰지 않습니다).`
+              + ` 일봉으로 바꾸면 그 자리에 마감 후 확정치인 외국인·기관 순매매 표가 나옵니다.`
               + ` 차트는 '자리'(고점권인지, 매물대 위인지)를 보는 도구입니다.` : '')
           /* (2026-07-20) 일봉 장중엔 마지막 봉이 '아직 안 끝난 하루'라 평균선과 직접 비교하면 과소해 보인다.
              분봉은 봉 자체가 짧아 이 왜곡이 의미 없으므로 일봉일 때만 붙인다. */
@@ -2359,6 +2359,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           : `${D.t?D.t.length:0}봉`;
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
         loadDisc(c);                              // 공시 마커도 별도 로드
+        loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
     }
     $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
@@ -2492,6 +2493,112 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        ② 드래그 중에는 건너뛴다. 조작 중 다시 그리면 끊긴다.
        ③ 장중 + 브라우저 탭이 보일 때만. 장 끝나고도 계속 부르면 낭비다.
      공시 목록은 여기서 다시 받지 않는다(하루 몇 건이라 30초마다 부를 이유가 없다). */
+  /* ── 차트 하단 패널 ────────────────────────────────────────────────────────
+     분봉  : 호가 10단계 + 체결강도(KIS 실시간) + 시간별체결(네이버 분단위 + 공격성 판정)
+     일·주·월: 외국인·기관 순매매 일별 표
+     소스별 지연이 다르므로 각 상자에 그대로 적는다 —
+       KIS(실전) = 실시간 / 네이버 호가·거래원 = 20분 지연 / 투자자별 순매매 = 마감 후 확정 */
+  const _nf=v=>v==null?'—':Number(v).toLocaleString();
+  const _sg=v=>v==null?'':(v>0?'+':'')+Number(v).toLocaleString();
+  async function loadBottom(c){
+    const bk=$('sd_book'), it=$('sd_invt');
+    if(!bk||!it) return;
+    bk.style.display='none'; it.style.display='none';
+    if(mkt!=='kr') return;                       // 두 패널 모두 한국 전용
+    if(_isMin()) await _drawBook(c, bk);         // 분봉 → KIS 실시간
+    else         await _drawInvT(c, it);         // 일·주·월 → 네이버(마감 후 확정)
+  }
+
+  /* 분봉 하단 — 전부 KIS 실전계정 실시간. 네이버(20분 지연)는 여기 쓰지 않는다. */
+  async function _drawBook(c, bk){
+    try{
+      const O=await (await fetch('/api/orderbook/kr/'+encodeURIComponent(c))).json();
+      if(dcode!==c || !_isMin() || !O || O.err || !O.ask) return;
+      const sc=O.score>=1?'buy':(O.score<=-1?'sell':'mid');
+      const hh=String(O.at||'').replace(/(\d{2})(\d{2})(\d{2})/,'$1:$2:$3');
+      let h='<div class="bkwrap">';
+
+      // ① 호가창
+      h+=`<div class="bkbox"><div class="bktit">① 호가 10단계 <small>${E(O.src||'')} · ${hh}</small></div><table class="bk">`;
+      for(let i=9;i>=0;i--){ const a=O.ask[i]||{};
+        h+=`<tr><td class="aq">${_nf(a.q)}</td><td class="ap">${_nf(a.p)}</td><td></td><td></td></tr>`; }
+      for(let i=0;i<10;i++){ const b=O.bid[i]||{};
+        h+=`<tr><td></td><td></td><td class="bp">${_nf(b.p)}</td><td class="bq">${_nf(b.q)}</td></tr>`; }
+      h+=`<tr class="tot"><td class="aq">${_nf(O.ask_tot)}</td><td colspan="2" style="text-align:center;color:#98a2ad">잔량합계</td><td class="bq">${_nf(O.bid_tot)}</td></tr></table>
+          <div class="note" style="font-size:11px;margin-top:5px;max-width:230px">
+            잔량은 <b>벽</b>이다. 위(매도)가 두꺼우면 저항이지만 거래량 실어 뚫으면 오히려 돌파 신호.
+            아래(매수)가 두꺼우면 지지. 정적인 숫자보다 <b>벽이 쌓이는지 걷히는지</b>가 중요하다.</div></div>`;
+
+      // ② 체결강도 + 최근 체결
+      h+=`<div class="bkbox"><div class="bktit">② 체결강도 · 최근 체결 <small>실시간</small></div>
+          <div style="font-size:13px;margin-bottom:6px">체결강도
+            <b style="font-size:16px">${O.strength??'—'}</b>
+            <span class="sbadge ${parseFloat(O.strength)>=100?'buy':'sell'}">${parseFloat(O.strength)>=100?'매수 우위':'매도 우위'}</span></div>
+          <div style="max-height:210px;overflow:auto"><table class="tk">
+          <tr><th>시각</th><th>체결가</th><th>수량</th></tr>`;
+      for(const t of (O.ticks||[])){
+        const up=(t.sg==='1'||t.sg==='2');
+        h+=`<tr><td class="l">${E(String(t.t||'').replace(/(\d{2})(\d{2})(\d{2})/,'$1:$2:$3'))}</td>
+             <td class="${up?'up':'dn'}">${_nf(t.p)}</td><td>${_nf(t.v)}</td></tr>`; }
+      h+=`</table></div><div class="note" style="font-size:11px;margin-top:5px;max-width:250px">
+          체결강도 = 매수 체결량 ÷ 매도 체결량 × 100. 100 초과면 사는 쪽이 <b>매도호가를 올려 치며</b> 가져간 것.
+          100 미만이면 파는 쪽이 매수호가로 내려 던진 것.</div></div>`;
+
+      // ③ 투자자 가집계 + 종합
+      h+=`<div class="bkbox" style="flex:1;min-width:280px">
+          <div class="bktit">③ 투자자 가집계 · 종합 <small>장중 잠정치</small></div>
+          <div style="font-size:12.5px;margin-bottom:6px">
+            외국인 <b class="${(O.frg_est||0)>=0?'up':'dn'}">${_sg(O.frg_est)}</b> ·
+            기관 <b class="${(O.org_est||0)>=0?'up':'dn'}">${_sg(O.org_est)}</b></div>
+          <div style="font-size:14px;margin:8px 0">현재 압력
+            <span class="sbadge ${sc}" style="font-size:13px;padding:3px 10px">${E(O.label)}</span>
+            <span class="note" style="font-size:11px">(${O.score>=0?'+':''}${O.score}점)</span></div>
+          <table class="tk"><tr><th>항목</th><th>값</th><th>점수</th></tr>`;
+      for(const p of (O.parts||[])){
+        h+=`<tr><td class="l">${E(p.k)}</td><td>${E(String(p.v))}</td>
+             <td class="${p.s>0?'up':(p.s<0?'dn':'')}">${p.s>0?'+':''}${p.s}</td></tr>
+            <tr><td class="l" colspan="3" style="color:#98a2ad;font-size:10.5px;padding-top:0">${E(p.d)}</td></tr>`; }
+      h+=`</table>
+          <div class="note" style="font-size:11px;margin-top:6px">
+            ⚠ 이건 <b>지금 주문흐름에 나타난 매수·매도 압력의 요약</b>이지 매매 권유가 아닙니다.
+            네 항목은 서로 어긋날 수 있고(예: 체결은 강한데 매도벽이 두꺼움), 그 경우 점수보다
+            <b>왜 어긋나는지</b>를 보는 게 맞습니다. 진입·청산 기준과 손절선은 미리 정해 두세요.</div></div>`;
+      h+='</div>';
+      bk.innerHTML=h; bk.style.display='block';
+    }catch(e){}
+  }
+
+  /* 일·주·월 하단 — 네이버 외국인·기관 순매매(장 마감 후 확정치) */
+  async function _drawInvT(c, it){
+    try{
+      const J=await (await fetch('/api/invtable/kr/'+encodeURIComponent(c)+'?n=20')).json();
+      if(dcode!==c || _isMin()) return;
+      const rs=J.items||[]; if(!rs.length) return;
+      let h=`<div class="bkbox"><div class="bktit">외국인 · 기관 순매매
+               <small>네이버 · 장 마감 후 확정치(장중 잠정치는 분봉 화면에서 KIS 실시간으로 제공)</small></div>
+             <div style="max-height:300px;overflow:auto"><table class="tk">
+             <tr><th>날짜</th><th>종가</th><th>전일비</th><th>등락률</th><th>거래량</th>
+                 <th>기관 순매매</th><th>외국인 순매매</th><th>개인 순매매</th><th>외인 보유율</th></tr>`;
+      for(const r of rs){
+        const pct=(r.px&&r.chg)?((r.chg/(r.px-r.chg))*100):null;
+        const cc=r.chg>0?'up':(r.chg<0?'dn':'');
+        const sc2=v=>v==null?'':(v>0?'up':(v<0?'dn':''));
+        h+=`<tr><td class="l">${r.d.slice(0,4)}.${r.d.slice(4,6)}.${r.d.slice(6,8)}</td>
+             <td>${_nf(r.px)}</td>
+             <td class="${cc}">${r.chg>0?'▲':(r.chg<0?'▼':'')}${_nf(Math.abs(r.chg))}</td>
+             <td class="${cc}">${pct==null?'—':(pct>0?'+':'')+pct.toFixed(2)+'%'}</td>
+             <td>${_nf(r.vol)}</td>
+             <td class="${sc2(r.org)}">${_sg(r.org)}</td>
+             <td class="${sc2(r.frg)}">${_sg(r.frg)}</td>
+             <td class="${sc2(r.ind)}">${_sg(r.ind)}</td>
+             <td>${E(r.hold||'—')}</td></tr>`; }
+      h+=`</table></div><div class="note" style="font-size:11px;margin-top:5px">
+          기관·외국인이 <b>동시에 순매수</b>한 날이 상승의 수급 근거가 된다.
+          외인 보유율이 며칠 연속 오르면 일회성 매수가 아니라는 뜻.</div></div>`;
+      it.innerHTML=h; it.style.display='block';
+    }catch(e){}
+  }
+
   let _LASTFETCH=0, _AUTOBOUND=false;
   function _mktLive(){
     try{

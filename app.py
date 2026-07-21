@@ -1,4 +1,4 @@
-import json, time, urllib.request, os, re, sqlite3, zlib
+import json, time, urllib.request, os, re, sqlite3, zlib, sys
 from pathlib import Path
 from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request
@@ -203,6 +203,255 @@ def disclosure_api(code: str):
         if len(_disc_cache) > 300:
             _disc_cache.clear()
         return out
+    except Exception as e:
+        return {"items": [], "err": repr(e)[:80]}
+
+
+_invt_cache = {}
+
+
+@app.get("/api/invtable/kr/{code}")
+def invtable_api(code: str, n: int = 20):
+    """외국인·기관 순매매 일별 표 — 네이버 trend API.
+
+    (2026-07-21) 일봉 차트 하단에 붙인다. 차트의 수급 '선'은 추세를 보고,
+    이 표는 '어느 날 누가 얼마나' 를 숫자로 확인하는 용도다.
+    제공: 종가·전일비·등락률·거래량·기관 순매수·외국인 순매수·개인 순매수·외국인 보유율
+    (보유주수는 이 API 에 없다 — 보유율로 대체)
+    ※ 투자자별 순매매는 장 마감 후 확정치다. 장중 값은 잠정치조차 공개 API 로는 안 나온다.
+    """
+    if not re.fullmatch(r"[0-9A-Za-z]{6}", code):
+        raise HTTPException(400, "bad code")
+    n = max(5, min(int(n or 20), 60))
+    now = time.time()
+    key = f"{code}:{n}"
+    hit = _invt_cache.get(key)
+    if hit and now - hit[0] < 600:
+        return hit[1]
+    try:
+        url = ("https://m.stock.naver.com/api/stock/%s/trend?pageSize=%d&page=1" % (code, n))
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
+                                                   "Referer": "https://m.stock.naver.com/"})
+        rows = json.loads(urllib.request.urlopen(req, timeout=10).read())
+
+        def _i(z):
+            try:
+                return int(str(z).replace(",", "").replace("+", "").strip())
+            except Exception:
+                return None
+        out = [{"d": r.get("bizdate"),
+                "px": _i(r.get("closePrice")),
+                "chg": _i(r.get("compareToPreviousClosePrice")),
+                "up": ((r.get("compareToPreviousPrice") or {}).get("code") in ("1", "2")),
+                "vol": _i(r.get("accumulatedTradingVolume")),
+                "org": _i(r.get("organPureBuyQuant")),
+                "frg": _i(r.get("foreignerPureBuyQuant")),
+                "ind": _i(r.get("individualPureBuyQuant")),
+                "hold": r.get("foreignerHoldRatio")} for r in (rows or [])]
+        res = {"items": out}
+        _invt_cache[key] = (now, res)
+        if len(_invt_cache) > 200:
+            _invt_cache.clear()
+        return res
+    except Exception as e:
+        return {"items": [], "err": repr(e)[:80]}
+
+
+_ob_cache = {}
+
+
+@app.get("/api/orderbook/kr/{code}")
+def orderbook_api(code: str):
+    """호가 10단계 · 체결강도 · 최근 체결 — KIS 실전계정 REST(실시간).
+
+    (2026-07-21) 네이버 호가·거래원은 20분 지연이라 단타 판단에 못 쓴다.
+    KIS 는 실전 계정이면 지연이 없어 그대로 쓸 수 있다(mode=real 확인).
+      · 호가   FHKST01010200 → askp1~10 / bidp1~10 + 잔량 + 총잔량
+      · 체결강도 FHKST01010300 의 tday_rltv (당일 누적, 100 초과면 매수 우위)
+      · 체결   같은 응답의 output 30건(초 단위)
+    검증: 2026-07-21 마감값이 네이버 호가창과 완전 일치
+          (매도 183,629@259,000 · 매수 38,824@258,500 · 총잔량 1,220,989 / 337,861)
+    """
+    if not re.fullmatch(r"[0-9]{6}", code):
+        raise HTTPException(400, "bad code")
+    now = time.time()
+    hit = _ob_cache.get(code)
+    if hit and now - hit[0] < 5:          # 실시간이라 5초만 캐시(연타 방어)
+        return hit[1]
+    try:
+        sys.path.insert(0, str(BASE / "scripts"))
+        import kis_api as _K
+        c = _K._creds()
+        if not c:
+            return {"err": "KIS 키 없음"}
+        tok = _K._token(c)
+        a = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-asking-price-exp-ccn",
+                    "FHKST01010200", {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code})
+        o1 = a.get("output1") or {}
+        o2 = a.get("output2") or {}
+
+        def _i(z):
+            try:
+                return int(str(z).replace(",", "").strip())
+            except Exception:
+                return None
+        ask = [{"p": _i(o1.get("askp%d" % i)), "q": _i(o1.get("askp_rsqn%d" % i))} for i in range(1, 11)]
+        bid = [{"p": _i(o1.get("bidp%d" % i)), "q": _i(o1.get("bidp_rsqn%d" % i))} for i in range(1, 11)]
+        t = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-ccnl",
+                    "FHKST01010300", {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code})
+        tk = t.get("output") or []
+        # 장중 투자자 가집계(잠정) — 거래소가 장중 몇 차례 발표하는 외인·기관 추정 순매수.
+        #   확정치는 마감 후에 나오므로, 장중에 방향을 보려면 이 잠정치뿐이다.
+        frg = org = None
+        try:
+            iv = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/investor-trend-estimate",
+                         "HHPTJ04160200", {"MKSC_SHRN_ISCD": code})
+            rows = iv.get("output2") or []
+            if rows:
+                last = max(rows, key=lambda z: str(z.get("bsop_hour_gb") or ""))
+                frg, org = _i(last.get("frgn_fake_ntby_qty")), _i(last.get("orgn_fake_ntby_qty"))
+        except Exception:
+            pass
+
+        # ── 체결·호가에 나타난 '압력' 요약 (매매 권유가 아니라 현재 주문흐름의 서술)
+        st = None
+        try:
+            st = float(tk[0].get("tday_rltv")) if tk else None
+        except Exception:
+            st = None
+        at_, bt_ = _i(o1.get("total_askp_rsqn")), _i(o1.get("total_bidp_rsqn"))
+        ratio = (bt_ / at_) if (at_ and bt_) else None          # 매수잔량 ÷ 매도잔량
+        upn = sum(1 for x in tk[:30] if str(x.get("prdy_vrss_sign")) in ("1", "2"))
+        upr = (upn / len(tk[:30])) if tk else None
+        parts, sc = [], 0
+        if st is not None:
+            v = 2 if st >= 120 else (1 if st >= 105 else (0 if st > 95 else (-1 if st > 80 else -2)))
+            sc += v; parts.append({"k": "체결강도", "v": round(st, 1), "s": v,
+                                   "d": "100 초과 = 매수 체결 우위(당일 누적)"})
+        if ratio is not None:
+            v = 1 if ratio >= 1.2 else (-1 if ratio <= 0.83 else 0)
+            sc += v; parts.append({"k": "호가 잔량비(매수÷매도)", "v": round(ratio, 2), "s": v,
+                                   "d": "1 초과 = 아래 받치는 물량이 두꺼움. 단 위쪽 매도벽은 저항이자 돌파 시 신호라 해석이 갈린다"})
+        if upr is not None:
+            v = 1 if upr >= 0.6 else (-1 if upr <= 0.4 else 0)
+            sc += v; parts.append({"k": "최근 30체결 중 상승", "v": "%d%%" % round(upr * 100), "s": v,
+                                   "d": "직전 대비 상승 체결 비중"})
+        if frg is not None and org is not None:
+            tot = frg + org
+            v = 1 if tot > 0 else (-1 if tot < 0 else 0)
+            sc += v; parts.append({"k": "외인+기관 가집계", "v": tot, "s": v,
+                                   "d": "장중 추정 순매수(잠정) — 확정치는 마감 후"})
+        lab = ("매수 우위" if sc >= 3 else "약한 매수 우위" if sc >= 1 else
+               "중립" if sc == 0 else "약한 매도 우위" if sc >= -2 else "매도 우위")
+        res = {"ask": ask, "bid": bid,
+               "ask_tot": at_, "bid_tot": bt_,
+               "at": o1.get("aspr_acpt_hour"),
+               "px": _i(o2.get("stck_prpr")),
+               "strength": (tk[0].get("tday_rltv") if tk else None),
+               "frg_est": frg, "org_est": org,
+               "score": sc, "label": lab, "parts": parts,
+               "ticks": [{"t": x.get("stck_cntg_hour"), "p": _i(x.get("stck_prpr")),
+                          "v": _i(x.get("cntg_vol")), "sg": x.get("prdy_vrss_sign")}
+                         for x in tk[:30]],
+               "src": "KIS(%s) 실시간" % c.get("mode")}
+        _ob_cache[code] = (now, res)
+        if len(_ob_cache) > 200:
+            _ob_cache.clear()
+        return res
+    except Exception as e:
+        return {"err": repr(e)[:100]}
+
+
+_tick_cache = {}
+
+
+@app.get("/api/ticks/kr/{code}")
+def ticks_api(code: str, pages: int = 6):
+    """시간별 시세(체결가 + 그 시점 매도/매수 호가) — 네이버 sise_time 파싱.
+
+    (2026-07-21) 분봉 차트 아래에 붙여 '공격성'을 같이 본다.
+      체결가 >= 매도호가 → 공격적 매수(사는 쪽이 값을 올려 가져감)
+      체결가 <= 매수호가 → 공격적 매도(파는 쪽이 값을 내려 던짐)
+      그 사이            → 중립
+    호가 스냅샷이 체결 직후 값이라 정확히 일치하지 않는 경우가 있어 '=' 가 아니라 부등호로 판정한다.
+    한 페이지 10행(1분 단위) — 기본 6페이지 ≈ 60분.
+
+    ※ 네이버 고지대로 이 데이터는 20분 지연이다. 실시간 진입 판단용이 아니라
+      '방금까지 매수·매도 중 어느 쪽이 공격적이었나'를 사후 확인하는 용도다.
+    """
+    if not re.fullmatch(r"[0-9A-Za-z]{6}", code):
+        raise HTTPException(400, "bad code")
+    pages = max(1, min(int(pages or 6), 12))
+    now = time.time()
+    key = f"{code}:{pages}"
+    hit = _tick_cache.get(key)
+    if hit and now - hit[0] < 30:
+        return hit[1]
+    out, seen = [], set()
+
+    def _parse(html):
+        rows = []
+        for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.S):
+            tds = [re.sub(r"<[^>]+>", "", x).replace("&nbsp;", " ").strip()
+                   for x in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+            tds = [t for t in tds if t.strip()]
+            if len(tds) >= 7 and re.match(r"^\d{2}:\d{2}", tds[0]):
+                rows.append(tds)
+        return rows
+
+    def _get(tt, pg):
+        url = ("https://finance.naver.com/item/sise_time.naver"
+               "?code=%s&thistime=%s&page=%d" % (code, tt, pg))
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0",
+                                                   "Referer": "https://finance.naver.com/"})
+        return urllib.request.urlopen(req, timeout=10).read().decode("euc-kr", "ignore")
+
+    try:
+        # thistime 은 '거래일'이어야 한다. 휴장일·장 시작 전이면 빈 표가 온다(실측).
+        # → 오늘(현재시각)부터 시작해 하루씩 거슬러 올라가며 데이터가 있는 날을 찾는다.
+        from datetime import timedelta as _td2
+        cands = [datetime.now().strftime("%Y%m%d%H%M%S")] + [
+            (datetime.now() - _td2(days=k)).strftime("%Y%m%d") + "160000" for k in range(0, 8)]
+        thistime, first = None, []
+        for tt in cands:
+            r0 = _parse(_get(tt, 1))
+            if r0:
+                thistime, first = tt, r0
+                break
+        if not thistime:
+            return {"items": [], "err": "최근 8일 내 시간별시세 없음"}
+        for pg in range(1, pages + 1):
+            url = None
+            n0 = len(out)
+            for tds in (first if pg == 1 else _parse(_get(thistime, pg))):
+                if tds[0] in seen:
+                    continue
+                seen.add(tds[0])
+
+                def _n(z):
+                    try:
+                        return int(str(z).replace(",", "").strip())
+                    except Exception:
+                        return None
+                px, ask, bid = _n(tds[1]), _n(tds[3]), _n(tds[4])
+                side = None
+                if px is not None and ask is not None and bid is not None:
+                    side = "buy" if px >= ask else ("sell" if px <= bid else "mid")
+                out.append({"t": tds[0], "px": px, "ask": ask, "bid": bid,
+                            "cum": _n(tds[5]), "vol": _n(tds[6]), "side": side})
+            if len(out) == n0:       # 더 이상 안 나오면 중단(장 시작 전 구간 등)
+                break
+        # 체결강도 = 공격적 매수 거래량 / 공격적 매도 거래량 × 100 (100 초과면 매수 우위)
+        bv = sum(r["vol"] or 0 for r in out if r["side"] == "buy")
+        sv = sum(r["vol"] or 0 for r in out if r["side"] == "sell")
+        res = {"items": out, "buy_vol": bv, "sell_vol": sv,
+               "date": thistime[:8],
+               "strength": round(bv / sv * 100, 1) if sv else None,
+               "delay": "20분 지연(네이버 고지)"}
+        _tick_cache[key] = (now, res)
+        if len(_tick_cache) > 200:
+            _tick_cache.clear()
+        return res
     except Exception as e:
         return {"items": [], "err": repr(e)[:80]}
 
