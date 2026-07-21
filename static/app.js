@@ -1575,11 +1575,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
       v50:{label:'50일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−10% ↑',-10],['+10% ↑',10]],def:[null,null]},
-      align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조']},
+      align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조'],hint:{'정배열':['up','상승 추세'],'역배열':['dn','하락 추세'],'혼조':['neu','전환 구간']}},
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
       turn:{label:'회전율',fmt:v=>v.toFixed(2)+'%',min:1,reqData:1,presets:[['전체',null],['0.1% ↑',0.1],['0.5% ↑',0.5],['1% ↑',1]],def:[null,null]},
-      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓']},
+      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
       bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1639,10 +1639,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
       v50:{label:'50일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−10% ↑',-10],['+10% ↑',10]],def:[null,null]},
-      align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조']},
+      align:{label:'이평배열',cat:1,opts:['정배열','역배열','혼조'],hint:{'정배열':['up','상승 추세'],'역배열':['dn','하락 추세'],'혼조':['neu','전환 구간']}},
       rsi:{label:'RSI(14)',fmt:v=>'RSI '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['과매도(≤30)',null,30],['30~50',30,50],['50 ↑(모멘텀)',50,null],['과매수 제외(≤70)',null,70],['과매수(≥70)',70,null]],def:[null,null]},
       volx:{label:'거래량배수',fmt:v=>v.toFixed(1)+'배',min:1,reqData:1,presets:[['전체',null],['1.5배 ↑',1.5],['2배 ↑',2],['3배 ↑',3]],def:[null,null]},
-      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓']},
+      macd:{label:'MACD',cat:1,opts:['골든↑','골든↓','데드↑','데드↓'],hint:{'골든↑':['up','강한 상승'],'골든↓':['up','상승 전환'],'데드↑':['dn','하락 전환'],'데드↓':['dn','강한 하락']}},
       bb:{label:'볼린저밴드',fmt:v=>'%b '+v.toFixed(0),reqData:1,presets:[['전체',null,null],['하단권(≤20)',null,20],['중심 위(≥50)',50,null],['상단권(≥80)',80,null],['상단 돌파(≥100)',100,null]],def:[null,null]},
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -1765,8 +1765,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       let pop;
       if(f.cat){
         const _opts=f.opts?['',...f.opts]:catOpts(k);   // (2026-07-18) 고정 옵션 지원 — 데이터 도착 전에도 선택지 표시
-        pop=`<div class="pl">선택</div>`+_opts.map(o=>
-          `<button class="preset ${st.v===(o||null)?'sel':''}" data-cat="${k}" data-v="${E(o)}">${E(o||'전체')}</button>`).join('');
+        /* (2026-07-21) 상태값 옵션에 주식 관점 방향(상승/하락)을 배지로 붙인다.
+           '골든↓' 처럼 화살표만 봐서는 우호/비우호가 직관적이지 않다는 지적 반영.
+           색은 화면 전체 규칙과 동일 — 빨강=주식 우호, 파랑=비우호, 회색=중립. */
+        pop=`<div class="pl">선택</div>`+_opts.map(o=>{
+          const h=(f.hint||{})[o];
+          const tag=h?`<span class="ohint ${h[0]}">${E(h[1])}</span>`:'';
+          return `<button class="preset ohas ${st.v===(o||null)?'sel':''}" data-cat="${k}" data-v="${E(o)}">${E(o||'전체')}${tag}</button>`;
+        }).join('');
       } else if(f.tgl){
         pop=`<label class="tgl"><input type="checkbox" data-tgl="${k}" ${st.on?'checked':''}> ${E(f.tglLabel)}</label>`;
       } else {

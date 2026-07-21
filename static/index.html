@@ -372,6 +372,14 @@
   .fpop .preset{display:block;width:100%;text-align:left;border:none;background:#f4f5f7;border-radius:7px;padding:8px 10px;font-size:12.5px;margin-bottom:5px;cursor:pointer;color:var(--tx)}
   .fpop .preset:hover{background:#e6edfa}
   .fpop .preset.sel{background:#1f6feb;color:#fff;font-weight:600}
+  /* (2026-07-21) 상태값 옵션의 주식 관점 방향 배지 — 빨강=상승(우호) · 파랑=하락 · 회색=중립.
+     선택된 항목(파란 배경)에서는 대비를 위해 흰색으로 반전. */
+  .fpop .preset.ohas{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .fpop .ohint{font-size:11px;font-weight:600;padding:1px 6px;border-radius:9px;white-space:nowrap}
+  .fpop .ohint.up{color:#c0392b;background:#fdeaea}
+  .fpop .ohint.dn{color:#1e6fd6;background:#e8f1fd}
+  .fpop .ohint.neu{color:#6b7684;background:#eef0f3}
+  .fpop .preset.sel .ohint{color:#fff;background:rgba(255,255,255,.22)}
   .fpop .man{display:flex;gap:6px;align-items:center;margin-top:7px;border-top:1px dashed var(--line);padding-top:8px}
   .fpop .man input{width:82px;border:1px solid var(--line);border-radius:6px;padding:6px;font-size:12px;text-align:right;font-family:inherit}
   .fpop .man span{font-size:11px;color:var(--tx2)}
