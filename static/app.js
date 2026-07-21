@@ -2383,6 +2383,33 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
        미국 20/50/100/200   : 50의 배수 관습. 골든/데드 크로스 정의가 50·200 교차.
                               ※ 미국 연 거래일은 252일이라 200일선은 실제로 1년이 아니다(9~10개월).
      장기선이 화면 전 구간에 그려지도록 /api/chart 이력을 KR 760일·US 2y 로 늘렸다. */
+  /* (2026-07-21) 차트 범례의 '상태 배지' — 숫자만 보고 해석하지 않아도 되게 판정을 같이 띄운다.
+     색은 화면 전체 규칙과 동일: 빨강=주식 우호 · 파랑=비우호 · 회색=중립.
+     RSI 과매도를 빨강으로 두는 건 컨트라리안(반등 후보) 관점이며, 그 취지가 드러나도록
+     배지 문구에 '반등 후보'를 함께 적는다. */
+  function _badge(x,cx,y,txt,col,bg){ x.font='bold 10px sans-serif';
+    const w=x.measureText(txt).width+10;
+    x.fillStyle=bg;
+    if(x.roundRect){ x.beginPath(); x.roundRect(cx,y-9.5,w,13,6); x.fill(); }
+    else x.fillRect(cx,y-9.5,w,13);
+    x.fillStyle=col; x.fillText(txt,cx+5,y); return w+6; }
+  const R_UP=['#c0392b','#fdeaea'], R_DN=['#1e6fd6','#e8f1fd'], R_NE=['#6b7684','#eef0f3'];
+  const _rsiState=v=> v==null?null
+    : v>=70?['과매수 · 조정 경계',...R_DN]
+    : v>=50?['상승 모멘텀',...R_UP]
+    : v>30 ?['약세',...R_NE]
+    :       ['과매도 · 반등 후보',...R_UP];
+  const _adxState=v=> v==null?null
+    : v>=40?['강한 추세',...R_UP]
+    : v>=25?['추세',...R_UP]
+    : v>=20?['추세 형성',...R_NE]
+    :       ['횡보',...R_NE];
+  const _macdState=(mv,sg)=> (mv==null||sg==null)?null
+    : (mv>sg&&mv>0)?['골든(0선↑) 강한 상승',...R_UP]
+    : (mv>sg)      ?['골든(0선↓) 상승 전환',...R_UP]
+    : (mv<0)       ?['데드(0선↓) 강한 하락',...R_DN]
+    :               ['데드(0선↑) 하락 전환',...R_DN];
+
   /* ADX(14) — Wilder 방식. RSI(과열도)·MACD(방향)와 달리 '추세의 강도'를 본다.
      보통 25 이상이면 추세장, 20 이하면 횡보장으로 보고, 이동평균 크로스 전략은
      횡보장에서 깨지므로 그 구간을 걸러내는 용도로 쓴다. 방향은 알려주지 않는다. */
@@ -2665,9 +2692,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
       put('RSI (14,9)','#98a2ad'); put('RSI','#98a2ad');
       put(rsi[HI]!=null?rsi[HI].toFixed(2):'—','#5b6470',true);
+      const rs=_rsiState(rsi[HI]); if(rs) cx+=_badge(x,cx,12,rs[0],rs[1],rs[2]);
       put('RSI-Signal','#f39c12'); put(rsig[HI]!=null?rsig[HI].toFixed(2):'—','#f39c12',true);
       put('ADX(14)','#8e44ad'); put(adxA[HI]!=null?adxA[HI].toFixed(1):'—','#8e44ad',true);
-      put(adxA[HI]==null?'':(adxA[HI]>=25?'추세':'횡보'), adxA[HI]>=25?'#c0392b':'#98a2ad'); } }
+      const as=_adxState(adxA[HI]); if(as) cx+=_badge(x,cx,12,as[0],as[1],as[2]); } }
     // ④ MACD
     {const [x,W,H]=_cvs('sd_macd'); const P={l:6,r:52,t:18,b:4};  // t=18 : 상단 범례 자리
      const vals=[...macd,...sig,...hist].filter(y=>y!=null);
@@ -2688,7 +2716,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
       const f2=z=>z==null?'—':(Math.abs(z)>=1000?Math.round(z).toLocaleString():z.toFixed(2));
       put('MACD (12,26,9)','#98a2ad'); put('MACD','#98a2ad'); put(f2(macd[HI]),'#333',true);
-      put('Signal','#f39c12'); put(f2(sig[HI]),'#f39c12',true); } }
+      put('Signal','#f39c12'); put(f2(sig[HI]),'#f39c12',true);
+      const ms=_macdState(macd[HI],sig[HI]); if(ms) cx+=_badge(x,cx,12,ms[0],ms[1],ms[2]); } }
     // ⑤ 수급(한국) / OBV(미국) — 같은 패널 자리를 공유한다.
     //    한국은 실제 투자자별 순매수가 있으므로 그쪽이 우월하고, 미국은 그 데이터가 없어
     //    비어 있던 자리에 OBV(누적 거래량으로 본 매집·분산)를 넣는다.
