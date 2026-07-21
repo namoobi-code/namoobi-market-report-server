@@ -2298,6 +2298,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const mode = mkt==='kr' ? 'canvas' : chartSrc;
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
     _bindTF();                                   // 주기 선택(분봉·일·주·월) 배선 — 최초 1회
+    _bindAuto();                                 // 장중 자동 갱신 타이머 — 최초 1회
     document.querySelectorAll('.csrc').forEach(b=>{
       b.style.display = (b.dataset.s==='tv' && mkt==='kr') ? 'none' : '';
       b.classList.toggle('on', b.dataset.s===mode);
@@ -2325,10 +2326,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       try{
         const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${_TF}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
+        _LASTFETCH=Date.now();
         drawAll(D);
         const _src = mkt==='kr'?'네이버':'Yahoo';
         const _ma  = (_isMin()||_TF!=='d') ? '5/20/60/120' : (MASET[mkt]||MASET.us).map(m=>m[0]).join('/');
-        $('sd_src').textContent =
+        /* (2026-07-21) 각주에 <b> 강조가 있어 textContent 로 넣으면 태그가 글자로 보인다.
+           내용이 전부 우리 코드가 만든 정적 문자열이라 innerHTML 로 넣어도 안전하다. */
+        $('sd_src').innerHTML =
           `${TFL[_TF]}봉 · ${_src} · 이동평균 ${_ma}`
           + (_TF==='d' ? (mkt==='kr' ? '일(한국식 — 60=수급선 · 120=경기선 · 240=1년선)'
                                      : '일(해외식 — 골든/데드 크로스는 50·200 교차 기준)')
@@ -2478,6 +2482,54 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   const MASET={ kr:[[5,'#16a085'],[20,'#f39c12'],[60,'#27ae60'],[120,'#8e44ad'],[240,'#2c3e50']],
                 us:[[20,'#f39c12'],[50,'#27ae60'],[100,'#16a085'],[200,'#8e44ad']] };
+  /* (2026-07-21) 상세 차트 장중 자동 갱신.
+     종전엔 종목을 열 때 한 번만 받아서, 5분봉을 띄워놓고 봐도 봉이 자라지 않았다(단타 용도에 치명적).
+     주기는 서버 캐시와 맞춘다 — 분봉 30초 / 일·주·월 60초.
+     지켜야 할 3가지:
+       ① 줌·팬 상태 유지. 갱신마다 기본 250봉으로 돌아가면 못 쓴다.
+          과거 구간을 보고 있으면(_COFF>0) 새로 생긴 봉 수만큼 오프셋을 밀어 같은 구간을 유지한다.
+       ② 드래그 중에는 건너뛴다. 조작 중 다시 그리면 끊긴다.
+       ③ 장중 + 브라우저 탭이 보일 때만. 장 끝나고도 계속 부르면 낭비다.
+     공시 목록은 여기서 다시 받지 않는다(하루 몇 건이라 30초마다 부를 이유가 없다). */
+  let _LASTFETCH=0, _AUTOBOUND=false;
+  function _mktLive(){
+    try{
+      const tz = mkt==='kr' ? 'Asia/Seoul' : 'America/New_York';
+      const pp={}; new Intl.DateTimeFormat('en-CA',{timeZone:tz,hour:'2-digit',minute:'2-digit',
+        hour12:false, weekday:'short'}).formatToParts(new Date()).forEach(z=>pp[z.type]=z.value);
+      if(pp.weekday==='Sat'||pp.weekday==='Sun') return false;
+      const hm=+pp.hour*60 + +pp.minute;
+      return mkt==='kr' ? (hm>=8*60+50 && hm<=15*60+45)    // 장전 동시호가~마감 직후
+                        : (hm>=9*60+20 && hm<=16*60+5);
+    }catch(e){ return false; }
+  }
+  async function _autoTick(){
+    if(!dcode || chartSrc!=='canvas') return;
+    if(document.visibilityState!=='visible') return;
+    const dv=$('scr_detail'); if(!dv || dv.style.display==='none') return;
+    if(_DRAG) return;                                   // 드래그 중이면 건너뛴다
+    if(!_mktLive()) return;
+    const need = _isMin() ? 30000 : 60000;
+    if(Date.now()-_LASTFETCH < need) return;
+    const c=dcode, tf=_TF;
+    try{
+      const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${tf}`)).json();
+      if(dcode!==c || _TF!==tf) return;                 // 그 사이 종목·주기가 바뀌었으면 버린다
+      _LASTFETCH=Date.now();
+      const prevTot=(_CD&&_CD.c)?_CD.c.length:0, tot=(D.c||[]).length;
+      _CD=D;
+      if(_COFF>0 && tot>prevTot) _COFF += (tot-prevTot);  // 과거를 보던 중이면 그 구간 고정
+      _paint();
+      const nt=$('sd_tfnote');
+      if(nt) nt.textContent = (_isMin()
+          ? `${tot}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
+          : `${tot}봉`) + ` · 🔴 LIVE ${new Date().toLocaleTimeString('ko-KR',{hour12:false})}`;
+    }catch(e){}
+  }
+  function _bindAuto(){ if(_AUTOBOUND) return; _AUTOBOUND=true;
+    setInterval(_autoTick, 15000);                      // 15초마다 확인, 실제 조회는 위 주기대로
+  }
+
   let _TFBOUND=false;
   function _bindTF(){ if(_TFBOUND) return; _TFBOUND=true;
     const sel=$('sd_tfmin');
