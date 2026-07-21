@@ -1570,7 +1570,6 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       r1m:{label:'수익률 1M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20]],def:[null,null]},
       r3m:{label:'수익률 3M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       r6m:{label:'수익률 6M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['30% ↑',30],['50% ↑',50],['100% ↑',100]],def:[null,null]},
-      r1y:{label:'수익률 1Y',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       vol20:{label:'변동성(20일)',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['2% ↓(안정)',null,2],['3% ↓',null,3],['5% ↑(고변동)',5,null]],def:[null,null]},
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,presets:[['전체',null],['-10% 이내',-10],['-20% 이내',-20],['-30% 이내',-30]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
@@ -1623,7 +1622,6 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       r1m:{label:'수익률 1M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20]],def:[null,null]},
       r3m:{label:'수익률 3M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       r6m:{label:'수익률 6M',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['30% ↑',30],['50% ↑',50],['100% ↑',100]],def:[null,null]},
-      r1y:{label:'수익률 1Y',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['50% ↑',50],['100% ↑',100],['200% ↑',200]],def:[null,null]},
       vol20:{label:'변동성(20일)',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['2% ↓(안정)',null,2],['3% ↓',null,3],['5% ↑(고변동)',5,null]],def:[null,null]},
       turn:{label:'회전율',fmt:v=>v.toFixed(2)+'%',min:1,reqData:1,presets:[['전체',null],['0.1% ↑',0.1],['0.5% ↑',0.5],['1% ↑',1]],def:[null,null]},
       tob:{label:'흑자전환',fixed:'— (US 미제공)'},
@@ -1656,7 +1654,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
   const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age','v200',
               'v20','v50','align','rsi','volx','turn','macd','bb',
-              'mom','r1m','r3m','r6m','r1y','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
+              /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
+                 r1y 와 사실상 동일값이었다(실측 ALKS +98/+97.7 · AEHR +393/+392.7 · NAVN +30/+29.8).
+                 중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
+              'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
               'ern','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
@@ -1839,7 +1840,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     macd:{l:'MACD',n:0,m:'both'}, bb:{l:'볼린저밴드',n:1,m:'both'},
     mom:{l:'수익률 12-1M',n:1,m:'both'},
     r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
-    r6m:{l:'수익률 6M',n:1,m:'both'}, r1y:{l:'수익률 1Y',n:1,m:'both'},
+    r6m:{l:'수익률 6M',n:1,m:'both'},
     vol20:{l:'변동성(20일)',n:1,m:'both'},
     hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
@@ -1873,7 +1874,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let COLST={kr:CDEFAULT.kr.slice(), us:CDEFAULT.us.slice()};
   /* 컬럼 구성은 '개인 PC'(localStorage)에 영구 저장 — 접속자마다 각자 설정 유지.
      (필터·정렬 등 나머지 상태는 세션 한정이라 sessionStorage 유지) */
-  const COLKEY='nmr_cols_v2';   // v2: 기본값을 '전부 체크'로 변경(구 저장설정 무효화)
+  const COLKEY='nmr_cols_v3';   // v3: 수익률 1Y 제거 + 12-1M 위치 이동(구 저장설정에 r1y 가 남아 무효화 필요)
   let colsSaved=false;
   function saveCols(){ try{ localStorage.setItem(COLKEY,JSON.stringify(COLST)); colsSaved=true; }catch(e){} }
   function loadCols(){                       // 저장된 설정이 있는지 체크 → 있으면 사용, 없으면 기본값
@@ -1919,7 +1920,6 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'r1m': return r.r1m!=null?r.r1m*100:null;
       case 'r3m': return r.r3m!=null?r.r3m*100:null;
       case 'r6m': return r.r6m!=null?r.r6m*100:null;
-      case 'r1y': return r.r1y!=null?r.r1y*100:null;
       case 'vol20': return r.vol20;                       // 이미 % 값
       case 'opm': return r.opm!=null?r.opm*100:null;
       case 'turn': return r.turn!=null?r.turn*100:null;
@@ -1991,7 +1991,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
       case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': case 'v20': case 'v50': return sgn(0);
-      case 'r1m': case 'r3m': case 'r6m': case 'r1y': case 'opm': return sgn(1);
+      case 'r1m': case 'r3m': case 'r6m': case 'opm': return sgn(1);
       case 'vol20': return v.toFixed(1)+'%';
       case 'turn': return v.toFixed(2)+'%';
       case 'peg': case 'psr': return v.toFixed(2);
@@ -2202,7 +2202,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }}
   }
   /* (2026-07-26) 필터 라벨 → 카테고리. 상세 요약 그룹(GCAT)을 라벨 기준으로 역참조 */
-  const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','r1y','mom']],
+  const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','mom']],
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
@@ -2212,7 +2212,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     for(const [cat,ks] of GCAT) for(const k of ks){ const c=CDEF[k]; if(c) m[c.l]=cat; }
     // 필터 전용/복합 라벨 보정 (컬럼 라벨과 다르게 표기되는 것들)
     Object.assign(m,{ '시장':'시세','섹터':'시세','가격':'시세','등락':'시세','시가총액':'시세','거래대금':'시세','회전율':'시세',
-      '수익률 12-1M':'기간수익률','수익률 1M·3M·6M·1Y':'기간수익률','수익률 1M':'기간수익률','수익률 3M':'기간수익률','수익률 6M':'기간수익률','수익률 1Y':'기간수익률','변동성(20일)':'기간수익률',
+      '수익률 12-1M':'기간수익률','수익률 1M·3M·6M':'기간수익률','수익률 1M':'기간수익률','수익률 3M':'기간수익률','수익률 6M':'기간수익률','변동성(20일)':'기간수익률',
       'RSI(14)':'기술적 지표','거래량배수':'기술적 지표','MACD':'기술적 지표','볼린저밴드':'기술적 지표','이평배열':'기술적 지표','200일선':'기술적 지표','20일선':'기술적 지표','50일선':'기술적 지표','고점比':'기술적 지표',
       '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝임박':'컨센서스',
       'PER':'밸류·수익성','PEG':'밸류·수익성','PBR':'밸류·수익성','PSR':'밸류·수익성','ROE':'밸류·수익성','배당성향':'밸류·수익성','배당':'밸류·수익성','영업이익률':'밸류·수익성',
@@ -2304,7 +2304,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function renderSum(r){
     const G=[['시세',['px','chg','cap','tv','turn']],
-             ['기간수익률',['r1m','r3m','r6m','r1y','mom']],
+             ['기간수익률',['r1m','r3m','r6m','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
