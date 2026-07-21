@@ -157,11 +157,17 @@ def _enrich_kr(kr, d0s):
         fper=cper if (cper and cper>0) else (per if per and per>0 else None)
         mkt="stk" if r.get("mk")=="KOSPI" else "ksq"
         a1,a12=anchors["m1"][mkt].get(r["c"]),anchors["m12"][mkt].get(r["c"])
+        # (2026-07-21) 한국 모멘텀 정의를 12−1M → 12M 으로 변경.
+        #   기존: (1개월 전 종가)/(12개월 전 종가)−1 = 최근 1개월을 건너뛴 학술형 모멘텀
+        #   변경: (현재가)/(12개월 전 종가)−1 = 순수 12개월 수익률
+        #   ※ 미국은 반대로 12−1M 을 쓴다(아래) — 시장별 정의가 다르므로 라벨도 시장별로 다르게 표기한다.
+        #   액면분할 등으로 상장주식수가 10% 넘게 변한 종목은 가격 연속성이 깨지므로 제외(기존 유지).
         mom=None
-        if a1 and a12:
-            c1,c12=T.num(a1.get("TDD_CLSPRC")),T.num(a12.get("TDD_CLSPRC"))
-            sh0,sh12=T.num(a1.get("LIST_SHRS")),T.num(a12.get("LIST_SHRS"))
-            if c1 and c12 and not (sh0 and sh12 and abs(sh0/sh12-1)>0.10): mom=c1/c12-1
+        if a12:
+            c12=T.num(a12.get("TDD_CLSPRC"))
+            sh0=T.num((a1 or {}).get("LIST_SHRS")); sh12=T.num(a12.get("LIST_SHRS"))
+            if c12 and r.get("px") and not (sh0 and sh12 and abs(sh0/sh12-1)>0.10):
+                mom=r["px"]/c12-1
         near52=(r["px"]/hi52-1) if (hi52 and r.get("px")) else None
         # 컨센서스 목표주가·투자의견 (KR: recommMean 높을수록 매수)
         cons=r.get("cons") or {}
@@ -394,11 +400,28 @@ def _enrich_us(us):
         print(f"[pool] US 기술지표(spark) {ok_ta}/{len(us)} (+이월 {cfta})")
     except Exception as e:
         print("[pool] US spark 실패:", repr(e)[:80])
+
+    # (2026-07-21) 미국 모멘텀 = 12−1M (최근 1개월을 건너뛴 모멘텀).
+    #   종전엔 w52(52주 변화율 = 12M)를 '수익률 12-1M' 라벨로 내보내 라벨과 값이 불일치했다.
+    #   추가 수집 없이 항등식으로 정확히 유도된다:
+    #     P(t−1M)/P(t−12M) = [P(t)/P(t−12M)] ÷ [P(t)/P(t−1M)] = (1+r1y)/(1+r1m)−1
+    #   실측 차이(2026-07-21): NAVN 12M +30% 인데 12−1M 은 −1.8% — 상승분이 전부 최근 1개월이었다.
+    #   ※ r1y=w52(52주), r1m=21거래일이라 기간이 정확히 12개월·1개월은 아닌 통상적 근사.
+    _mom_n=0
+    for r in us:
+        a,b=r.get("r1y"),r.get("r1m")
+        if a is not None and b is not None and (1+b)>0:
+            r["mom"]=round((1+a)/(1+b)-1,4); _mom_n+=1
+        else:
+            r["mom"]=None
+    print(f"[pool] US 모멘텀(12−1M) {_mom_n}/{len(us)}")
+
     _score(us,"c",{"val":[lambda r:(-r["fpe"] if r.get("fpe") else None),
                           lambda r:(-r["pb"] if r.get("pb") else None),
                           lambda r:r.get("divy")],
                    "grw":[lambda r:r.get("g_new")],
-                   "mom":[lambda r:r.get("w52"), lambda r:r.get("hi52"), lambda r:r.get("vs200"), lambda r:r.get("rev")],
+                   # M축 = 화면에 보이는 모멘텀 컬럼과 동일 정의(12−1M). 종전엔 w52(12M)라 표시값과 달랐다.
+                   "mom":[lambda r:r.get("mom"), lambda r:r.get("hi52"), lambda r:r.get("vs200"), lambda r:r.get("rev")],
                    "qly":[lambda r:r.get("roe"), lambda r:r.get("fcfy"),
                           lambda r:(-r["de"] if r.get("de") is not None and not r.get("isfin") else None)]})
 
