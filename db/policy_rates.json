@@ -1,48 +1,42 @@
 {
  "marker": "2026-07",
- "as_of": "2026-07-18",
+ "as_of": "2026-07-22",
  "data": [
   {
    "country": "미국",
-   "rate": "3.50~3.75%",
-   "asof": "2026-06-17",
-   "source": "Federal Reserve (FOMC Statement, federalreserve.gov/newsevents/pressreleases/monetary20260617a.htm)",
-   "note": "동결 - 6월 FOMC(12-0 만장일치)에서 목표범위 3.50~3.75% 유지, 7월 28-29일 회의는 동결 전망"
-  },
-  {
-   "country": "한국",
-   "rate": "2.75%",
-   "asof": "2026-07-16",
-   "source": "한국은행 금융통화위원회 통화정책방향 결정 (bok.or.kr/portal/singl/crncyPolicyDrcMtg)",
-   "note": "인상 - 2.50%에서 0.25%p 인상, 금통위원 7인 만장일치, 2023년 1월 이후 3년6개월 만의 인상"
-  },
-  {
-   "country": "일본",
-   "rate": "1.00%",
-   "asof": "2026-06-16",
-   "source": "Bank of Japan, Monetary Policy Meeting (boj.or.jp/en/mopo/mpmdeci/mpr_2026/k260616a.pdf)",
-   "note": "인상 - 25bp 인상(7-1 찬성)으로 1995년 이후 최고 수준, 7월 30-31일 회의는 동결 전망(시장 예측 동결 93%)"
-  },
-  {
-   "country": "중국",
-   "rate": "3.00% (1年 LPR)",
-   "asof": "2026-06-22",
-   "source": "中国人民银行(PBOC) 授权 全国银行间同业拆借中心 공표 (jrj.sh.gov.cn 재게재, 원출처 中国人民银行)",
-   "note": "동결 - 1년 LPR 3.0%, 5년 이상 LPR 3.5%로 13개월 연속 동결"
+   "rate": "3.50~3.75",
+   "asof": "2026-07-21",
+   "note": "FRED DFEDTARU/L(실측)"
   },
   {
    "country": "유로존",
-   "rate": "2.25% (예금금리)",
-   "asof": "2026-06-11",
-   "source": "European Central Bank, Monetary policy decisions (ecb.europa.eu/press/pr/date/2026/html/ecb.mp260611~4d41bd5e83.en.html)",
-   "note": "인상 - 예금금리 2.25%(2026-06-17 발효)로 3년 만의 첫 인상, 7월 23일 회의는 동결 전망(무변경 확률 93%)"
+   "rate": "2.25",
+   "asof": "2026-07-21",
+   "note": "FRED ECBDFR(예금금리·실측)"
+  },
+  {
+   "country": "한국",
+   "rate": "2.75",
+   "asof": "2026-07-19",
+   "note": "한국은행 ECOS 722Y001(실측)"
+  },
+  {
+   "country": "일본",
+   "rate": "1.00",
+   "asof": "2026-07-22",
+   "note": "global-rates(실측 스크랩)"
+  },
+  {
+   "country": "중국",
+   "rate": "3.00",
+   "asof": "2026-07-22",
+   "note": "global-rates(실측 스크랩)"
   },
   {
    "country": "영국",
-   "rate": "3.75%",
-   "asof": "2026-06-18",
-   "source": "Bank of England, Monetary Policy Summary and Minutes (bankofengland.co.uk/monetary-policy-summary-and-minutes/2026/june-2026)",
-   "note": "동결 - 7-2 투표로 3.75% 유지(2명은 4.00% 인상 주장), 다음 결정은 7월 30일"
+   "rate": "3.75",
+   "asof": "2026-07-22",
+   "note": "global-rates(실측 스크랩)"
   }
  ]
 }

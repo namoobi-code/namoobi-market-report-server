@@ -338,6 +338,9 @@ def ism():
     for k, q in (("mfg", "ISM Manufacturing PMI"), ("svc", "ISM Services PMI")):
         cands = gnews(q, hours=24 * 40, cap=10, lang="en") + gnews(q.replace("Manufacturing", "제조업").replace("Services", "서비스업"), hours=24 * 40, cap=10)
         for it in cands:
+            # (2026-07-22 재발방지) 토픽 필터 — svc 쿼리 결과에 제조업 헤드라인이 섞여 svc 에 mfg 값이 복제되던 오염 방지
+            if k == "svc" and not ("Services" in it["title"] or "서비스" in it["title"]): continue
+            if k == "mfg" and not ("Manufacturing" in it["title"] or "제조업" in it["title"]): continue
             m = re.search(r"(\d{2}\.\d)\b", it["title"])
             mon = re.search(r"(1[0-2]|[1-9])월|January|February|March|April|May|June|July|August|September|October|November|December", it["title"])
             if m and ("ISM" in it["title"] or "PMI" in it["title"]):

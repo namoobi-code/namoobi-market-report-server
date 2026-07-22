@@ -73,6 +73,7 @@ def m7_outlook(op, crumb):
                     "eps_7d": (ep.get("7daysAgo") or {}).get("raw"),
                     "eps_30d": (ep.get("30daysAgo") or {}).get("raw"),
                     "eps_60d": (ep.get("60daysAgo") or {}).get("raw"),
+                    "eps_90d": (ep.get("90daysAgo") or {}).get("raw"),   # (v3.80) 스크리너와 동일 기준(FY1+FY2·90일) 통일용
                     "rev": ((t.get("revenueEstimate") or {}).get("avg") or {}).get("raw"),
                     "growth": (t.get("growth") or {}).get("raw")})
             out.append(row)
@@ -80,7 +81,7 @@ def m7_outlook(op, crumb):
             print(f"  m7 {sym} 실패: {type(e).__name__}")
     if out:
         save("m7_estimates", {"rows": out,
-             "desc": "Yahoo earningsTrend — EPS·매출 컨센서스와 7/30/60일 전 값(리비전 방향), 목표주가·투자의견"})
+             "desc": "Yahoo earningsTrend — EPS·매출 컨센서스와 7/30/60/90일 전 값(리비전 방향), 목표주가·투자의견"})
         print(f"m7_estimates: {len(out)}종목")
 
 # ── ② 뉴스 헤드라인 풀 ────────────────────────────────────

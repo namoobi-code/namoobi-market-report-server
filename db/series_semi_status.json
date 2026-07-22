@@ -1,6 +1,6 @@
 {
- "marker": "2026-07-18",
- "as_of": "2026-07-18",
+ "marker": "2026-07-22",
+ "as_of": "2026-07-22",
  "data": [
   [
    "2026-07-04",
@@ -68,6 +68,38 @@
   ],
   [
    "2026-07-18",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-19",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-20",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-21",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-22",
    {
     "inventory": 0,
     "price_qoq": 1,

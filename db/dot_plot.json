@@ -1,34 +1,40 @@
 {
  "marker": "2026-07",
- "as_of": "2026-07-18",
+ "as_of": "2026-07-22",
  "data": {
-  "unit": "%(연말 정책금리 midpoint, 중간값)",
-  "source": "federalreserve.gov Summary of Economic Projections (SEP), 2026-06-17 공식 발표문(Table 1, 'Federal funds rate' 및 동 표에 병기된 March projection 행)",
+  "as_of": "2026-07-22",
   "rows": [
    {
-    "year": "2026말",
-    "jun": 3.8,
-    "mar": 3.4,
-    "change": "+0.4"
+    "year": "2026년말",
+    "jun": "3.8%",
+    "mar": "3.4%",
+    "change": "미공개"
    },
    {
-    "year": "2027말",
-    "jun": 3.6,
-    "mar": 3.1,
-    "change": "+0.5"
+    "year": "2027년말",
+    "jun": "3.6%",
+    "mar": "3.1%",
+    "change": "미공개"
    },
    {
-    "year": "2028말",
-    "jun": 3.4,
-    "mar": 3.1,
-    "change": "+0.3"
+    "year": "2028년말",
+    "jun": "3.4%",
+    "mar": "3.1%",
+    "change": "미공개"
    },
    {
     "year": "장기중립",
-    "jun": 3.1,
-    "mar": 3.1,
-    "change": "+0.0"
+    "jun": "3.1%",
+    "mar": "3.1%",
+    "change": "미공개"
    }
+  ],
+  "asof_sep": "2026-06-17(6월 SEP, 최신) / 2026-03-18(3월 SEP)",
+  "verification": "WebSearch로 2026년 6월 SEP(2026-06-17) 이후 신규 FOMC SEP(점도표) 발표가 없음을 확인 — 남은 2026년 회의 중 다음 SEP는 9월 15~16일 회의(분기 공개 주기 3·6·9·12월)에서 예정되고 10월 27~28일 회의는 SEP 미발표. DB(db/dot_plot.json)의 jun·mar 중간값은 변동 없이 그대로 carry-forward.",
+  "sources": [
+   "federalreserve.gov FOMC SEP 2026-06-17",
+   "federalreserve.gov FOMC SEP 2026-03-18",
+   "Yahoo Finance - Fed's 2026 FOMC meeting schedule (2026-07 확인)"
   ]
  }
 }
