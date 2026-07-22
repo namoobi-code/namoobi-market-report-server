@@ -144,7 +144,9 @@ def _enrich_kr(kr, d0s):
                 c=cl[-1]
                 ma20=sum(cl[-20:])/20; ma50=sum(cl[-50:])/50; ma200v=sum(cl[-200:])/min(200,n)
                 o["v20"]=c/ma20-1; o["v50"]=c/ma50-1
-                o["align"]="정배열" if ma20>ma50>ma200v else ("역배열" if ma20<ma50<ma200v else "혼조")
+                # (2026-07-22) 이평배열 = 한국 차트선(20>60>120) 기준 — 차트와 라벨 일치. 20/50/200(미국식) 폐기.
+                ma60=sum(cl[-60:])/min(60,n); ma120=sum(cl[-120:])/min(120,n)
+                o["align"]="정배열" if ma20>ma60>ma120 else ("역배열" if ma20<ma60<ma120 else "혼조")
                 # RSI(14) — Wilder 평활(시리즈 전체)
                 g=l=None
                 for i in range(1,n):
@@ -402,9 +404,11 @@ def _enrich_us(us):
             if not cl or len(cl)<30: continue
             c=cl[-1]; n=len(cl)
             ma20=sum(cl[-20:])/20; r["v20"]=c/ma20-1
+            # (2026-07-22) 이평배열 = 미국 차트선(50>100>200) 기준 — 50·200 은 Yahoo 평균(정확), 100 은 6mo 스파크로 산출.
             ma50v,ma200v=q.get("fiftyDayAverage"),q.get("twoHundredDayAverage")
-            if ma50v and ma200v:
-                r["align"]="정배열" if ma20>ma50v>ma200v else ("역배열" if ma20<ma50v<ma200v else "혼조")
+            ma100=sum(cl[-100:])/100 if n>=100 else None
+            if ma50v and ma100 and ma200v:
+                r["align"]="정배열" if ma50v>ma100>ma200v else ("역배열" if ma50v<ma100<ma200v else "혼조")
             g=l=None
             for i2 in range(1,n):
                 d1=cl[i2]-cl[i2-1]; up=max(d1,0.0); dn=max(-d1,0.0)
