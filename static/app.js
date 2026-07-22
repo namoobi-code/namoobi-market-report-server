@@ -2866,6 +2866,30 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
     const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
     _CT=t; _CHD=String(t[HI]||'').replace(/-/g,'');   // 수급 패널과 '날짜'로 동기화(t 선언 이후여야 함)
+    /* (2026-07-21) x축 라벨을 공통 함수로 — 메인 차트와 보조 패널(OBV 등)이 똑같은 라벨·위치를 쓴다.
+       예전엔 OBV 패널이 분봉에서도 '년.월'(26.07)만 찍어 다 같아 보였다(정렬은 맞는데 라벨만 무의미).
+       모든 패널이 P.l=6·P.r=52·N 동일이라 X(i) 픽셀이 일치 → 같은 함수를 쓰면 라벨도 세로로 딱 맞는다. */
+    function _xlabels(cx2, Xf, Hc){
+      cx2.fillStyle='#98a2ad'; cx2.font='10px sans-serif';
+      if(_isMin()){
+        let lastD='', px=-99;
+        for(let i=0;i<N;i++){ const z=String(t[i]||''); if(z.length<12) continue;
+          const d=z.slice(0,8), hm=z.slice(8,10)+':'+z.slice(10,12), xx=Xf(i);
+          if(d!==lastD){ lastD=d;
+            if(xx-px>=46){ px=xx; cx2.save(); cx2.fillStyle='#5b6470'; cx2.font='bold 10px sans-serif';
+              cx2.fillText((+d.slice(4,6))+'/'+(+d.slice(6,8)), xx-10, Hc-4); cx2.restore(); }
+            continue; }
+          if(hm.endsWith(':00') && xx-px>=52){ px=xx; cx2.fillText(hm, xx-12, Hc-4); } }
+      } else {
+        let lastM='',lastY='',px=-99;
+        for(let i=0;i<N;i++){ const d=String(t[i]||'').replace(/-/g,''); if(d.length<6) continue;
+          const yy=d.slice(0,4), mm=d.slice(4,6);
+          if(mm===lastM) continue; const first=(lastM!=='');
+          lastM=mm; if(!first){ lastY=yy; continue; }
+          const lab=(yy!==lastY)?(lastY=yy,yy):(+mm)+'월';
+          const xx=Xf(i); if(xx-px<42) continue; px=xx;
+          cx2.fillText(lab, xx-10, Hc-4); } }
+    }
     /* 일봉만 시장별 관례 세트를 쓴다. 분봉·주·월봉은 그 관례가 적용되는 단위가 아니므로
        네이버와 동일하게 5/20/60/120 을 쓴다(네이버도 분봉에서 같은 세트). */
     const _MASET = (_TF==='d') ? (MASET[mkt]||MASET.us)
@@ -2933,29 +2957,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      const line=(a,col)=>{ x.strokeStyle=col; x.lineWidth=1.4; x.beginPath(); let s=false;
        for(let i=0;i<N;i++){ if(a[i]==null)continue; s?x.lineTo(X(i),Y(a[i])):(x.moveTo(X(i),Y(a[i])),s=true); } x.stroke(); x.lineWidth=1; };
      MAS.forEach(m=>line(m.a,m.col));
-     // x축 — 월이 바뀌는 지점에만 라벨(네이버 방식). 해가 바뀌면 연도를 쓴다.
-     x.fillStyle='#98a2ad'; x.font='10px sans-serif';
-     if(_isMin()){
-       /* 분봉: 날짜가 바뀌는 첫 봉에 'M/D', 그 사이는 시각 — 라벨이 겹치지 않게 최소 간격 유지 */
-       let lastD='', px=-99;
-       for(let i=0;i<N;i++){ const z=String(t[i]||''); if(z.length<12) continue;
-         const d=z.slice(0,8), hm=z.slice(8,10)+':'+z.slice(10,12);
-         const isNew=(d!==lastD); const xx=X(i);
-         if(isNew){ lastD=d;
-           if(xx-px>=46){ px=xx; x.save(); x.fillStyle='#5b6470'; x.font='bold 10px sans-serif';
-             x.fillText((+d.slice(4,6))+'/'+(+d.slice(6,8)), xx-10, H-4); x.restore(); }
-           continue; }
-         if(hm.endsWith(':00') && xx-px>=52){ px=xx; x.fillText(hm, xx-12, H-4); } }
-     } else {
-      let lastM='',lastY='',px=-99;
-      for(let i=0;i<N;i++){ const d=String(t[i]||'').replace(/-/g,''); if(d.length<6) continue;
-        const yy=d.slice(0,4), mm=d.slice(4,6);
-        if(mm===lastM) continue; const first=(lastM!=='');
-        lastM=mm;
-        if(!first){ lastY=yy; continue; }
-        const lab=(yy!==lastY)?(lastY=yy,yy):(+mm)+'월';
-        const xx=X(i); if(xx-px<42) continue; px=xx;
-        x.fillText(lab, xx-10, H-4); } }
+     // x축 — 분봉이면 날짜경계·정시, 그 외 월/연 (보조 패널과 동일 함수로 정렬)
+     _xlabels(x, X, H);
      // 최고·최저 지점 라벨 (현재가 대비 등락률까지 — 네이버 '최고 83,200 (-45.67%)' 형식)
      {const iMax=hh.indexOf(Math.max(...hh)), iMin=ll.indexOf(Math.min(...ll));
       const cur=c[N-1];
@@ -3192,9 +3195,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke(); x.restore(); }
         x.font='9px sans-serif'; x.fillStyle='#98a2ad';
         x.fillText(_mk(omx),W-P.r+4,Y(omx)+9); x.fillText(_mk(omn),W-P.r+4,Y(omn)-2);
-        // x축 날짜(메인 차트와 동일 인덱스라 그대로 맞는다)
-        for(let g=0;g<3;g++){ const i=Math.floor(N*g/3), d=String(t[i]||'').replace(/-/g,'');
-          x.fillText(d.slice(2,4)+'.'+d.slice(4,6), X(i)-10, H-3); }
+        // x축 — 메인 차트와 같은 라벨·위치(공통 함수). 분봉이면 M/D·정시, 그 외 월/연.
+        _xlabels(x, X, H);
         let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
           x.fillStyle=col; x.fillText(txt,cx,12); cx+=x.measureText(txt).width+5; };
         put('OBV (누적 거래량)','#98a2ad'); put(_mk(ob[HI]),'#1f6feb',true);
