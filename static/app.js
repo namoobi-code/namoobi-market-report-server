@@ -1722,14 +1722,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     for(const r of (POOL[mkt]||[])){ const v=r[k]; if(v) set.add(String(v)); }
     return ['', ...[...set].sort()];
   }
+  /* (2026-07-22) 이평선 컬럼/필터 라벨을 시장별로 — 한국 차트선 20/60/120, 미국 20/50/200. (차트에 있는 선만 노출) */
+  const _MALBL = {v20:{kr:'20일선',us:'20일선'}, v50:{kr:'60일선',us:'50일선'}, v200:{kr:'120일선',us:'200일선'}};
   function chipLabel(k){ const f=DEF[mkt][k], st=F[k]||{};
-    if(f.fixed!==undefined) return `${f.label}: <span class="cv">${E(f.fixed)}</span>`;
-    if(f.tgl) return `${f.label}: <span class="cv">${st.on?'ON':'OFF'}</span>`;
-    if(f.cat) return `${f.label}: <span class="cv">${E(dispOpt(f,st.v)||'전체')}</span>`;
-    if(f.exclGE) return `${f.label}: <span class="cv">${st.max==null?'전체':st.max+'년이상 제외'}</span>`;
+    const L = _MALBL[k]?_MALBL[k][mkt]:f.label;
+    if(f.fixed!==undefined) return `${L}: <span class="cv">${E(f.fixed)}</span>`;
+    if(f.tgl) return `${L}: <span class="cv">${st.on?'ON':'OFF'}</span>`;
+    if(f.cat) return `${L}: <span class="cv">${E(dispOpt(f,st.v)||'전체')}</span>`;
+    if(f.exclGE) return `${L}: <span class="cv">${st.max==null?'전체':st.max+'년이상 제외'}</span>`;
     const lo=st.min, hi=st.max;
     let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
-    return `${f.label}: <span class="cv">${E(v)}</span>`; }
+    return `${L}: <span class="cv">${E(v)}</span>`; }
 
   /* (2026-07-22) 결과표 UI 옵션 — 종목 클릭 시 상세로 자동이동(기본 ON) · 스크롤 전 표시 행수(기본 8). localStorage 유지. */
   let autoScroll = localStorage.getItem('scr_autoscroll') === '1';   // 기본 OFF (명시적 '1'일 때만 ON)
@@ -1892,7 +1895,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
     payout:{l:'배당성향',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'}
   };
-  const cl =k=>CDEF[k].l;   // 표 헤더 = 패널 = 필터, 모두 동일 라벨
+  const cl =k=>_MALBL[k]?_MALBL[k][mkt]:CDEF[k].l;   // 표 헤더 = 패널 = 필터 (이평선은 시장별 라벨)
   const cpl=cl;
   const CALL=Object.keys(CDEF);
   /* '추가 가능' 목록 정렬 = 필터가 없는 컬럼 먼저(종목·시장·섹터·등락·목표주가)
@@ -2049,6 +2052,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(MACD_DISP[v]||v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
+      case 'adx': return `<span class="${v<20?'note':''}" title="ADX ≥25 추세장 · 20~25 추세 시작 · <20 횡보">${(+v).toFixed(0)}</span>`;
       case 'volx': return `<span class="${v>=1.5?'up':'note'}">${(+v).toFixed(1)}배</span>`;
       case 'bb': return (+v).toFixed(0);
     }
@@ -2185,8 +2189,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['흑자전환·수급·공매도·대차잔고','미국 미제공 — 연간 영업이익 배열·투자자별 수급·공매도·대차잔고 데이터 없음'],
         ['어닝임박','다음 실적발표일까지 D-day (Yahoo earnings date)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
-        ['200일선','200일 이동평균 대비 현재가. 기본 −30%↑ = 심각한 하락추세 제외(구 건전성 신호)'],
-        ['20일선·50일선','해당 이동평균 대비 현재가 위치'],
+        ['장기 이평선','<b>한국 120일·미국 200일</b> 이동평균 대비 현재가 — 장기 추세(차트선). 기본 −30%↑ = 심각한 하락추세 제외'],
+        ['단기·중기 이평선','해당 이동평균 대비 현재가 위치 — 한국 20·60일 / 미국 20·50일(차트선)'],
         ['이평배열','정배열=단기선이 장기선 위(상승 구조) · 반대=역배열 — 한국 20>60>120 / 미국 50>100>200 (차트 이평선과 동일)'],
         ['RSI(14)','상대강도지수 — 30↓ 과매도 · 70↑ 과매수'],
         ['MACD','12-26 EMA 차이 vs 시그널(9). 앞의 <b>골든/데드</b>=시그널선 돌파 방향, 괄호의 <b>0선↑/↓</b>=MACD 가 0선 위인지 아래인지. 골든(0선↓)=하락 국면에서 막 돌아선 상승 전환 초기 · 데드(0선↑)=상승 국면에서 막 꺾인 하락 전환 초기'],
@@ -2206,7 +2210,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['유동비율','당좌자산÷유동부채(당좌비율) — 단기 지급능력. 금융업 면제'],
         ['영업적자','최근 연속 영업적자 연수. 기본 3년이상 제외'],
         ['상장기간','상장 후 경과 연수'],
-        ['200일선','200일 이동평균 대비 현재가 — 장기 추세. 기본 −30%↑ = 심각한 하락추세 제외'],
+        ['장기 이평선','<b>한국 120일·미국 200일</b> 이동평균 대비 현재가 — 장기 추세(차트선). 기본 −30%↑ = 심각한 하락추세 제외'],
         ['20일선','20일 이동평균 대비 현재가 — 단기 추세'],
         ['50일선','50일 이동평균 대비 현재가 — 중기 추세'],
         ['이평배열','차트 이평선 기준 — <b>한국 20>60>120</b> · <b>미국 50>100>200</b>. 정배열=단기선이 장기선 위(상승추세장), 역배열=아래(하락추세장), 혼조=교차(전환) 구간. 차트에 그려진 이평선과 동일 기준이라 눈으로 대조 가능'],

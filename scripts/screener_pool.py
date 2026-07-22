@@ -136,16 +136,16 @@ def _enrich_kr(kr, d0s):
             dch=T.jget(f"https://api.stock.naver.com/chart/domestic/item/{r['c']}/day?startDateTime={S}&endDateTime={E}",timeout=12)
             rows=[x for x in dch if x.get("closePrice")]
             cl=[x["closePrice"] for x in rows]
-            if len(cl)>=100: o["ma200"]=cl[-1]/(sum(cl[-200:])/min(200,len(cl)))-1
+            # (2026-07-22) 한국 장기 이평선 = 차트선 120일(기존 200 폐기 — KR 차트엔 200일선 없음). vs200(z랭킹·컬럼)에 매핑.
+            if len(cl)>=60: o["ma200"]=cl[-1]/(sum(cl[-120:])/min(120,len(cl)))-1
             # (2026-07-18) 일봉 기술지표 — 같은 시리즈로 추가 계산(네트워크 비용 0). DB(screener_pool)에 저장돼
             # 1일 2회 cron 때만 갱신되는 스냅샷이다. 학습 프레임: 일봉=방향 필터(이평배열·RSI·거래량·MACD·볼린저).
             n=len(cl)
             if n>=60:
                 c=cl[-1]
-                ma20=sum(cl[-20:])/20; ma50=sum(cl[-50:])/50; ma200v=sum(cl[-200:])/min(200,n)
-                o["v20"]=c/ma20-1; o["v50"]=c/ma50-1
-                # (2026-07-22) 이평배열 = 한국 차트선(20>60>120) 기준 — 차트와 라벨 일치. 20/50/200(미국식) 폐기.
-                ma60=sum(cl[-60:])/min(60,n); ma120=sum(cl[-120:])/min(120,n)
+                # (2026-07-22) 한국 이평 컬럼/배열 = 차트선 20/60/120 (기존 20/50/200 폐기 — KR 차트엔 50·200 없음).
+                ma20=sum(cl[-20:])/20; ma60=sum(cl[-60:])/min(60,n); ma120=sum(cl[-120:])/min(120,n)
+                o["v20"]=c/ma20-1; o["v50"]=c/ma60-1   # v50 필드 = 60일선(라벨도 60일선)
                 o["align"]="정배열" if ma20>ma60>ma120 else ("역배열" if ma20<ma60<ma120 else "혼조")
                 # RSI(14) — Wilder 평활(시리즈 전체)
                 g=l=None
