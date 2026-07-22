@@ -1733,7 +1733,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   /* (2026-07-22) 결과표 UI 옵션 — 종목 클릭 시 상세로 자동이동(기본 ON) · 스크롤 전 표시 행수(기본 8). localStorage 유지. */
   let autoScroll = localStorage.getItem('scr_autoscroll') !== '0';
-  let visRows = Math.max(4, Math.min(60, +localStorage.getItem('scr_visrows') || 8));
+  let visRows = Math.max(1, Math.min(60, +localStorage.getItem('scr_visrows') || 8));
   function applyTblHeight(){
     const w=document.getElementById('scr_tblwrap'); if(!w) return;
     const tbl=document.getElementById('scr_tbl');
@@ -3621,7 +3621,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     paint(); ab.onclick=()=>{ autoScroll=!autoScroll; localStorage.setItem('scr_autoscroll',autoScroll?'1':'0'); paint(); }; }}
   /* (2026-07-22) 결과표 표시 행수 */
   {const rn=$('scr_rows'); if(rn){ rn.value=visRows;
-    rn.oninput=()=>{ visRows=Math.max(4,Math.min(60,+rn.value||8)); localStorage.setItem('scr_visrows',visRows); applyTblHeight(); }; }}
+    rn.oninput=()=>{ visRows=Math.max(1,Math.min(60,+rn.value||8)); localStorage.setItem('scr_visrows',visRows); applyTblHeight(); }; }}
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
    if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더
    if(gx&&gp) gx.onclick=()=>{ gp.style.display='none'; };}
