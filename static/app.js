@@ -2554,7 +2554,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
       // ③ 투자자 가집계 + 종합
       h+=`<div class="bkbox" style="flex:1;min-width:280px">
-          <div class="bktit">③ 투자자 가집계 · 종합 <small>장중 잠정치 · 당일 누적</small></div>
+          <div class="bktit">③ 투자자 가집계 · 종합 <small><b style="color:#c0392b">오늘 장중</b> 잠정치 · 당일 누적(회차별)</small></div>
           <div style="font-size:12.5px;margin-bottom:6px">
             외국인 <b class="${(O.frg_est||0)>=0?'up':'dn'}">${_sg(O.frg_est)}</b> ·
             기관 <b class="${(O.org_est||0)>=0?'up':'dn'}">${_sg(O.org_est)}</b>
@@ -3154,13 +3154,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       put('MACD (12,26,9)','#98a2ad'); put('MACD','#98a2ad'); put(f2(macd[HI]),'#333',true);
       put('Signal','#f39c12'); put(f2(sig[HI]),'#f39c12',true);
       const ms=_macdState(macd[HI],sig[HI]); if(ms) cx+=_badge(x,cx,12,ms[0],ms[1],ms[2]); } }
-    // ⑤ 수급(한국) / OBV(미국) — 같은 패널 자리를 공유한다.
-    //    한국은 실제 투자자별 순매수가 있으므로 그쪽이 우월하고, 미국은 그 데이터가 없어
-    //    비어 있던 자리에 OBV(누적 거래량으로 본 매집·분산)를 넣는다.
-    /* 수급 패널은 '일별' 데이터라 일봉·분봉에만 맞는다(분봉은 그 날 마지막 봉 위치에 찍음).
-       주·월봉은 봉의 대표일이 주/월 시작일이라 일별 수급과 날짜가 어긋나므로 OBV 로 대체한다.
-       미국은 투자자별 수급 자체가 없어 항상 OBV. */
-    const _useInv = (mkt==='kr' && (_TF==='d' || _isMin()));
+    // ⑤ 수급(한국 일봉) / OBV(그 외) — 같은 패널 자리를 공유한다.
+    /* (2026-07-21 수정) 투자자별 순매매는 KRX가 '일 단위로만' 공표한다(분 단위 데이터 없음).
+       그래서 분봉(하루 안 여러 봉)에 얹으면 하루 점 하나짜리 일일 누적선이라 x축과 안 맞았다.
+       → 일별 수급선은 '일봉'에만 그린다. 분봉·주월봉에는 그 자리에 OBV(분봉 거래량 기반 매집/분산)를
+         그린다. 분봉의 장중 외인·기관 흐름은 ③ 투자자 가집계(당일 5회차)가 담당한다. */
+    const _useInv = (mkt==='kr' && _TF==='d');
     if(!_useInv){
       const el=$('sd_inv');
       if(el){ el.style.display='block';
@@ -3190,7 +3189,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   // ⑤ 투자자별 누적순매수 (KR 전용 — 네이버 1년 + KIS 30일 병합)
   async function loadInv(c){
     const e=$('sd_inv'); if(!e) return;
-    if(mkt!=='kr' || !(_TF==='d'||_isMin())){ _INV=null; e.style.display='block'; _paint(); return; }  // OBV 로 대체(_paint 가 그림)
+    if(!(mkt==='kr' && _TF==='d')){ _INV=null; e.style.display='block'; _paint(); return; }  // 일봉 아니면 OBV(_paint 가 그림)
     e.style.display='block';
     try{
       const J=await (await fetch(`/api/investor/kr/${encodeURIComponent(c)}`)).json();
@@ -3295,7 +3294,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      put('외국인',F,true); put(fmt(cf[hj]-b0),F);
      put('기관',O,true);   put(fmt(co[hj]-b1),O);
      put('개인',PP,true);  put(fmt(cp[hj]-b2)+(est[hj]?'(추정)':''),PP);
-     put('· 표시 구간 전체 합계(첫날 포함)','#b0b8c2'); }
+     put('· 여러 날 누적(일 단위) · 표시 구간 합계','#b0b8c2'); }
   }
 
   // ── 2단계 z-score 랭킹 ──
