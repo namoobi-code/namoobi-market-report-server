@@ -342,21 +342,37 @@ def orderbook_api(request: Request, code: str):
             st = None
         at_, bt_ = _i(o1.get("total_askp_rsqn")), _i(o1.get("total_bidp_rsqn"))
         ratio = (bt_ / at_) if (at_ and bt_) else None          # 매수잔량 ÷ 매도잔량
-        upn = sum(1 for x in tk[:30] if str(x.get("prdy_vrss_sign")) in ("1", "2"))
-        upr = (upn / len(tk[:30])) if tk else None
+        # (2026-07-21) '최근 30체결 중 상승'(수 초 노이즈·거의 항상 100%)을 빼고
+        #   체결강도 '추세'(1시간 전 대비)로 대체 — 힘이 붙는 중인지 빠지는 중인지가 진짜 정보다.
+        st_prev = None
+        try:
+            from datetime import timezone as _tz, timedelta as _td3
+            _kst = _tz(_td3(hours=9))
+            _nm = datetime.now(_kst); _m = _nm.hour * 60 + _nm.minute - 60
+            _m = min(max(_m, 9 * 60 + 30), 15 * 60 + 30)
+            _hh = "%02d%02d00" % (_m // 60, _m % 60)
+            _r = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-time-itemconclusion",
+                         "FHPST01060000", {"FID_COND_MRKT_DIV_CODE": "J",
+                                          "FID_INPUT_ISCD": code, "FID_INPUT_HOUR_1": _hh})
+            _o = (_r.get("output2") or [])
+            if _o:
+                st_prev = float(_o[0].get("tday_rltv") or 0)
+        except Exception:
+            st_prev = None
         parts, sc = [], 0
         if st is not None:
             v = 2 if st >= 120 else (1 if st >= 105 else (0 if st > 95 else (-1 if st > 80 else -2)))
-            sc += v; parts.append({"k": "체결강도", "v": round(st, 1), "s": v,
-                                   "d": "100 초과 = 매수 체결 우위(당일 누적)"})
+            sc += v; parts.append({"k": "체결강도(당일 누적)", "v": round(st, 1), "s": v,
+                                   "d": "100 초과 = 매수 체결 우위"})
+        if st is not None and st_prev is not None:
+            d1 = st - st_prev
+            v = 1 if d1 >= 3 else (-1 if d1 <= -3 else 0)
+            sc += v; parts.append({"k": "체결강도 추세(1시간)", "v": "%+.1f" % d1, "s": v,
+                                   "d": "1시간 전 대비 — 오르면 매수세 유입, 내리면 이탈. 방금 30체결(수 초)보다 이 추세가 신뢰도 높다"})
         if ratio is not None:
             v = 1 if ratio >= 1.2 else (-1 if ratio <= 0.83 else 0)
             sc += v; parts.append({"k": "호가 잔량비(매수÷매도)", "v": round(ratio, 2), "s": v,
                                    "d": "1 초과 = 아래 받치는 물량이 두꺼움. 단 위쪽 매도벽은 저항이자 돌파 시 신호라 해석이 갈린다"})
-        if upr is not None:
-            v = 1 if upr >= 0.6 else (-1 if upr <= 0.4 else 0)
-            sc += v; parts.append({"k": "최근 30체결 중 상승", "v": "%d%%" % round(upr * 100), "s": v,
-                                   "d": "직전 대비 상승 체결 비중"})
         if frg is not None and org is not None:
             tot = frg + org
             v = 1 if tot > 0 else (-1 if tot < 0 else 0)
