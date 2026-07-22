@@ -1769,7 +1769,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function findChipHTML(){
     return findOpen
-      ? `<div class="fchip"><span class="findbox">🔎<input id="find_in" placeholder="종목명·코드  (예: 화장품|뷰티, 삼성&전자)" value="${E(findQ)}"
+      ? `<div class="fchip"><span class="findbox">🔎<input id="find_in" placeholder="${mkt==='us'?'종목명·코드  (예: apple|tesla, advanced&micro)':'종목명·코드  (예: 화장품|뷰티, 삼성&전자)'}" value="${E(findQ)}"
            autocomplete="off" spellcheck="false"><button id="find_x" title="찾기 해제">✕</button></span></div>`
       : `<div class="fchip"><button class="${findQ?'act':''}" id="find_btn" title="종목명·코드로 찾기">🔎 종목: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }

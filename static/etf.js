@@ -242,14 +242,14 @@
     return ['',...[...s].sort()];};
   function findChipHTML(){
     return findOpen
-      ? `<div class="fchip"><span class="findbox">🔎<input id="efind_in" placeholder="이름·코드  (예: 화장품|뷰티, 삼성&전자)" value="${E(findQ)}" autocomplete="off" spellcheck="false"><button id="efind_x">✕</button></span></div>`
+      ? `<div class="fchip"><span class="findbox">🔎<input id="efind_in" placeholder="${mkt==='us'?'이름·코드  (예: S&P500|nasdaq, gold&miner)':'이름·코드  (예: 화장품|뷰티, 삼성&전자)'}" value="${E(findQ)}" autocomplete="off" spellcheck="false"><button id="efind_x">✕</button></span></div>`
       : `<div class="fchip"><button class="${findQ?'act':''}" id="efind_btn">🔎 ETF: <span class="cv">${findQ?E(findQ):'전체'}</span></button></div>`;
   }
   /* (2026-07-20) 종목 역검색 — "이 종목을 담은 ETF" 찾기. db/etf_holdings.json(전 ETF Top10) 지연 로드. */
   function holdChipHTML(){
     const busy = holdQ && !HOLD;
     return holdOpen
-      ? `<div class="fchip"><span class="findbox">🔎<input id="ehold_in" placeholder="종목명·티커 (예: 삼성전자, NVDA)" value="${E(holdQ)}" autocomplete="off" spellcheck="false"><button id="ehold_x">✕</button></span></div>`
+      ? `<div class="fchip"><span class="findbox">🔎<input id="ehold_in" placeholder="${mkt==='us'?'종목명·티커 (예: Apple, NVDA)':'종목명·티커 (예: 삼성전자, SK하이닉스)'}" value="${E(holdQ)}" autocomplete="off" spellcheck="false"><button id="ehold_x">✕</button></span></div>`
       : `<div class="fchip"><button class="${holdQ?'act':''}" id="ehold_btn" title="입력한 종목을 보유한 ETF만 표시">🔎 종목: <span class="cv">${holdQ?E(holdQ)+(busy?' …':''):'전체'}</span></button></div>`;
   }
   function renderChips(){
