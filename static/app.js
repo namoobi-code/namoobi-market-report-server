@@ -2531,12 +2531,21 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             아래(매수)가 두꺼우면 지지. 정적인 숫자보다 <b>벽이 쌓이는지 걷히는지</b>가 중요하다.</div></div>`;
 
       // ② 체결강도 + 최근 체결
+      const _st=parseFloat(O.strength);
+      const _tb=O.tick_buy||0, _ts=O.tick_sell||0;
+      /* 최근 30체결 판정 — 5% 이내 차이는 '팽팽'. 체결강도(당일)와 별개 지표라 각각 자기 숫자로 판정. */
+      const _tw=(_tb+_ts)?Math.abs(_tb-_ts)/(_tb+_ts):0;
+      const _tside=_tw<0.05?['mid','팽팽']:(_tb>_ts?['buy','매수 우위']:['sell','매도 우위']);
+      const _div=(!isNaN(_st) && ((_st>=100)!==(_tb>_ts)) && _tw>=0.05);   // 당일 vs 최근 방향이 다름
       h+=`<div class="bkbox"><div class="bktit">② 체결강도 · 최근 체결 <small>실시간</small></div>
-          <div style="font-size:13px;margin-bottom:6px">체결강도
+          <div style="font-size:13px;margin-bottom:3px">체결강도
             <b style="font-size:16px">${O.strength??'—'}</b>
-            <span class="sbadge ${parseFloat(O.strength)>=100?'buy':'sell'}">${parseFloat(O.strength)>=100?'매수 우위':'매도 우위'}</span></div>
-          <div style="font-size:11px;margin-bottom:4px">최근 30체결
-            <b class="up">매수 ${_nf(O.tick_buy)}</b> · <b class="dn">매도 ${_nf(O.tick_sell)}</b></div>
+            <span class="sbadge ${_st>=100?'buy':'sell'}">당일 ${_st>=100?'매수 우위':'매도 우위'}</span>
+            <span class="note" style="font-size:10.5px">당일 누적</span></div>
+          <div style="font-size:11.5px;margin-bottom:5px">최근 30체결
+            <b class="up">매수 ${_nf(_tb)}</b> · <b class="dn">매도 ${_nf(_ts)}</b>
+            <span class="sbadge ${_tside[0]}">${_tside[1]}</span></div>
+          ${_div?`<div class="note" style="font-size:10.5px;margin-bottom:5px;color:#c07a10">⚠ 당일은 ${_st>=100?'매수':'매도'} 우위인데 최근 30체결은 ${_tb>_ts?'매수':'매도'}가 붙는 중 — 방향이 바뀌는 초기일 수 있어 다음 체결 흐름을 더 봐야 합니다.</div>`:''}
           <div style="max-height:200px;overflow:auto"><table class="tk">
           <tr><th>시각</th><th>체결가</th><th>수량</th><th>구분</th></tr>`;
       for(const t of (O.ticks||[])){
@@ -2547,7 +2556,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
              <td class="${up?'up':'dn'}">${_nf(t.p)}</td><td>${_nf(t.v)}</td>
              <td><span class="sbadge ${sd}">${lab}</span></td></tr>`; }
       h+=`</table></div><div class="note" style="font-size:11px;margin-top:5px;max-width:270px">
-          체결강도 = 매수 체결량 ÷ 매도 체결량 × 100. 100 초과면 사는 쪽이 <b>매도호가를 올려 치며</b> 가져간 것.
+          체결강도(<b>당일 누적</b>) = 매수 체결량 ÷ 매도 체결량 × 100. 100 초과면 매수 우위. 아래 '최근 30체결'은 <b>직전 몇 초</b>의 미시 흐름이라 당일 값과 다를 수 있다.
           <b>구분</b>은 직전 체결가 대비 오르며 체결(매수)·내리며 체결(매도)로 판정한 것(틱 규칙 — KIS가 체결별 구분값을 안 줘 이 방식으로 추정).</div></div>`;
 
       // ③ 투자자 가집계 + 종합
