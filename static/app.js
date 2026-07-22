@@ -2605,28 +2605,34 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const w=cv.clientWidth||280, hh=72;
       cv.width=Math.round(w*dpr); cv.height=Math.round(hh*dpr);
       const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,hh);
-      const P={l:6,r:26,t:8,b:14};
-      /* (2026-07-21) y축을 데이터에 맞춰 자동 스케일 — 예전엔 80~120 고정이라 값이 80~95면
-         선이 아래 1/3 에 눌려 위가 텅 비어 이상해 보였다. 100은 항상 포함하고 ±2 여백. */
+      const P={l:6,r:34,t:10,b:14};
+      /* (2026-07-21) y축 자동 스케일 + 여백. 100 이 범위 밖이면(전부 <100 등) 살짝 넓혀 항상 보이게. */
       const vs=pts.map(p=>p.cttr), dmn=Math.min(...vs), dmx=Math.max(...vs);
-      const lo=Math.floor((Math.min(dmn,100)-2)/5)*5, hi=Math.ceil((Math.max(dmx,100)+2)/5)*5;
+      let lo=Math.min(dmn,100)-2, hi=Math.max(dmx,100)+2;
+      const li=pts.length-1, mid=Math.floor(li/2);
       const X=i=>P.l+(w-P.l-P.r)*i/(pts.length-1), Y=v=>P.t+(hh-P.t-P.b)*(1-(v-lo)/((hi-lo)||1));
-      // 100 기준선 (매수/매도 경계)
-      x.strokeStyle='#e3e7ec'; x.lineWidth=1; x.beginPath(); x.moveTo(P.l,Y(100)); x.lineTo(w-P.r,Y(100)); x.stroke();
-      x.fillStyle='#b0b8c2'; x.font='9px sans-serif'; x.textAlign='left';
-      x.fillText('100', w-P.r+3, Y(100)+3);
-      x.fillText(String(hi), w-P.r+3, Y(hi)+7); x.fillText(String(lo), w-P.r+3, Y(lo));
-      // 선 — 부드럽게(한 스트로크). 100 위=빨강 / 아래=파랑 세그먼트, 라운드 조인.
+      // 100 기준선(매수/매도 경계) — 점선, 라벨은 이것 하나만(겹침 방지)
+      x.strokeStyle='#e6e9ee'; x.lineWidth=1; x.setLineDash([3,3]);
+      x.beginPath(); x.moveTo(P.l,Y(100)); x.lineTo(w-P.r,Y(100)); x.stroke(); x.setLineDash([]);
+      x.fillStyle='#c2c8d0'; x.font='9px sans-serif'; x.textAlign='left'; x.fillText('100', w-P.r+4, Y(100)+3);
+      // 선 아래 옅은 면적 채움(마무리감)
+      const last=vs[li];
+      x.beginPath(); x.moveTo(X(0),Y(vs[0]));
+      for(let i=1;i<pts.length;i++) x.lineTo(X(i),Y(vs[i]));
+      x.lineTo(X(li),hh-P.b); x.lineTo(X(0),hh-P.b); x.closePath();
+      x.fillStyle=last>=100?'rgba(221,51,51,.06)':'rgba(31,111,235,.06)'; x.fill();
+      // 선 — 라운드 조인·캡, 100 위=빨강 / 아래=파랑 세그먼트
       x.lineWidth=1.8; x.lineJoin='round'; x.lineCap='round';
       for(let i=1;i<pts.length;i++){ const up=(vs[i-1]+vs[i])/2>=100;
         x.strokeStyle=up?'#d33':'#1f6feb'; x.beginPath();
         x.moveTo(X(i-1),Y(vs[i-1])); x.lineTo(X(i),Y(vs[i])); x.stroke(); }
       x.lineWidth=1;
-      // 마지막 점 강조
-      const li=pts.length-1; x.fillStyle=vs[li]>=100?'#d33':'#1f6feb';
-      x.beginPath(); x.arc(X(li),Y(vs[li]),3,0,Math.PI*2); x.fill();
-      // x축 시각 — 첫점은 왼쪽정렬, 끝점은 오른쪽정렬, 가운데는 중앙(잘림 방지)
-      x.fillStyle='#98a2ad'; const mid=Math.floor(li/2);
+      // 마지막 점 + 현재값 라벨
+      x.fillStyle=last>=100?'#d33':'#1f6feb';
+      x.beginPath(); x.arc(X(li),Y(last),3,0,Math.PI*2); x.fill();
+      x.font='bold 9px sans-serif'; x.textAlign='left'; x.fillText(String(Math.round(last)), w-P.r+4, Y(last)+3);
+      // x축 시각 — 첫점 왼쪽·끝점 오른쪽·가운데 중앙(잘림 방지)
+      x.fillStyle='#98a2ad'; x.font='9px sans-serif';
       x.textAlign='left';   x.fillText(pts[0].t,   X(0),   hh-3);
       x.textAlign='center'; x.fillText(pts[mid].t, X(mid), hh-3);
       x.textAlign='right';  x.fillText(pts[li].t,  X(li),  hh-3);
