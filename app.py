@@ -737,6 +737,7 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
 #   US: Yahoo quoteSummary topHoldings (crumb 인증 필요 → ta_screen.yahoo_opener 재사용)
 #   6시간 메모리 캐시. 실패해도 200 + 빈 holdings (프론트가 '정보 없음' 표기).
 _hold_cache = {}
+_hold_qcache = {}   # ETF 구성종목 시세(현재가·전일비·등락률) 45초 캐시
 _yop = {"op": None, "crumb": None, "ts": 0.0}
 
 def _pctnum(s):
@@ -757,50 +758,104 @@ def _yahoo_oc():
     _yop.update(op=op, crumb=crumb, ts=time.time())
     return op, crumb
 
-@app.get("/api/etf/holdings/{mkt}/{code}")
-def etf_holdings(mkt: str, code: str):
-    if mkt not in ("kr", "us") or not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
-        raise HTTPException(400, "bad params")
-    key = f"{mkt}:{code}"; now = time.time()
-    hit = _hold_cache.get(key)
-    if hit and now - hit[0] < 6 * 3600:
-        return hit[1]
-    out = {"mkt": mkt, "code": code, "holdings": []}
+def _etf_quotes(mkt, codes):
+    """구성종목 코드 → {code: {px 현재가, chg 전일비(부호), chgp 등락률%(부호)}}.
+       KR: 네이버 폴링 배치(1회 호출, delayTime=0 실시간). US: Yahoo v7 quote(crumb). 실패 비차단."""
+    codes = [c for c in dict.fromkeys(codes) if c]
+    if not codes:
+        return {}
+    qm = {}
     try:
         if mkt == "kr":
-            url = f"https://m.stock.naver.com/api/stock/{code}/etfAnalysis"
-            req = urllib.request.Request(url, headers={
-                "User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/"})
-            d = json.loads(urllib.request.urlopen(req, timeout=12).read().decode("utf-8", "ignore"))
-            for x in (d.get("etfTop10MajorConstituentAssets") or []):
-                nm = x.get("itemName")
-                if not nm:
-                    continue
-                out["holdings"].append({"n": nm, "c": x.get("itemCode") or "",
-                                        "w": _pctnum(x.get("etfWeight"))})
+            qu = "https://polling.finance.naver.com/api/realtime/domestic/stock/" + ",".join(codes)
+            qreq = urllib.request.Request(qu, headers={
+                "User-Agent": "Mozilla/5.0", "Referer": "https://finance.naver.com/"})
+            qd = json.loads(urllib.request.urlopen(qreq, timeout=10).read().decode("utf-8", "ignore"))
+            for it in (qd.get("datas") or []):
+                # compareToPreviousClosePrice·fluctuationsRatio 는 이미 부호 포함(하락 = 음수).
+                qm[it.get("itemCode")] = {"px": _pctnum(it.get("closePrice")),
+                                          "chg": _pctnum(it.get("compareToPreviousClosePrice")),
+                                          "chgp": _pctnum(it.get("fluctuationsRatio"))}
         else:
             import sys as _sys
             _sys.path.insert(0, str(BASE / "scripts"))
             import ta_screen as _T
             op, crumb = _yahoo_oc()
-            url = ("https://query1.finance.yahoo.com/v10/finance/quoteSummary/%s"
-                   "?modules=topHoldings&crumb=%s"
-                   % (urllib.parse.quote(code), urllib.parse.quote(crumb)))
-            j = _T.jget(url, opener=op, timeout=15)
-            th = ((j.get("quoteSummary", {}).get("result") or [{}])[0] or {}).get("topHoldings", {}) or {}
-            for h in (th.get("holdings") or []):
-                nm = h.get("holdingName") or h.get("symbol")
-                if not nm:
-                    continue
-                hp = h.get("holdingPercent") or {}
-                w = hp.get("raw")
-                w = round(w * 100, 2) if isinstance(w, (int, float)) else _pctnum(hp.get("fmt"))
-                out["holdings"].append({"n": nm, "c": h.get("symbol") or "", "w": w})
-    except Exception as e:
-        out["err"] = str(e)[:120]
-    _hold_cache[key] = (now, out)
-    if len(_hold_cache) > 600:
-        _hold_cache.clear()
+            qu = ("https://query1.finance.yahoo.com/v7/finance/quote?symbols=%s&crumb=%s"
+                  % (urllib.parse.quote(",".join(codes)), urllib.parse.quote(crumb)))
+            qj = _T.jget(qu, opener=op, timeout=12)
+            for it in ((qj.get("quoteResponse", {}) or {}).get("result") or []):
+                rnd = lambda v: round(v, 2) if isinstance(v, (int, float)) else None
+                qm[it.get("symbol")] = {"px": rnd(it.get("regularMarketPrice")),
+                                        "chg": rnd(it.get("regularMarketChange")),
+                                        "chgp": rnd(it.get("regularMarketChangePercent"))}
+    except Exception:
+        pass
+    return qm
+
+@app.get("/api/etf/holdings/{mkt}/{code}")
+def etf_holdings(mkt: str, code: str):
+    if mkt not in ("kr", "us") or not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
+        raise HTTPException(400, "bad params")
+    key = f"{mkt}:{code}"; now = time.time()
+    # ── 구성종목(이름·비중·코드): 6시간 캐시 ──
+    hit = _hold_cache.get(key)
+    if hit and now - hit[0] < 6 * 3600:
+        base = hit[1]
+    else:
+        base = {"mkt": mkt, "code": code, "holdings": []}
+        try:
+            if mkt == "kr":
+                url = f"https://m.stock.naver.com/api/stock/{code}/etfAnalysis"
+                req = urllib.request.Request(url, headers={
+                    "User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/"})
+                d = json.loads(urllib.request.urlopen(req, timeout=12).read().decode("utf-8", "ignore"))
+                for x in (d.get("etfTop10MajorConstituentAssets") or []):
+                    nm = x.get("itemName")
+                    if not nm:
+                        continue
+                    base["holdings"].append({"n": nm, "c": x.get("itemCode") or "",
+                                             "w": _pctnum(x.get("etfWeight"))})
+            else:
+                import sys as _sys
+                _sys.path.insert(0, str(BASE / "scripts"))
+                import ta_screen as _T
+                op, crumb = _yahoo_oc()
+                url = ("https://query1.finance.yahoo.com/v10/finance/quoteSummary/%s"
+                       "?modules=topHoldings&crumb=%s"
+                       % (urllib.parse.quote(code), urllib.parse.quote(crumb)))
+                j = _T.jget(url, opener=op, timeout=15)
+                th = ((j.get("quoteSummary", {}).get("result") or [{}])[0] or {}).get("topHoldings", {}) or {}
+                for h in (th.get("holdings") or []):
+                    nm = h.get("holdingName") or h.get("symbol")
+                    if not nm:
+                        continue
+                    hp = h.get("holdingPercent") or {}
+                    w = hp.get("raw")
+                    w = round(w * 100, 2) if isinstance(w, (int, float)) else _pctnum(hp.get("fmt"))
+                    base["holdings"].append({"n": nm, "c": h.get("symbol") or "", "w": w})
+        except Exception as e:
+            base["err"] = str(e)[:120]
+        _hold_cache[key] = (now, base)
+        if len(_hold_cache) > 600:
+            _hold_cache.clear()
+    # ── 시세·전일비·등락률 조인: 45초 캐시(장중 변동 반영, 네이버처럼) ──
+    out = {"mkt": mkt, "code": code, "holdings": [dict(h) for h in base["holdings"]]}
+    if base.get("err"):
+        out["err"] = base["err"]
+    qhit = _hold_qcache.get(key)
+    if qhit and now - qhit[0] < 45:
+        qm = qhit[1]
+    else:
+        qm = _etf_quotes(mkt, [h.get("c") for h in out["holdings"]])
+        _hold_qcache[key] = (now, qm)
+        if len(_hold_qcache) > 800:
+            _hold_qcache.clear()
+    for h in out["holdings"]:
+        q = qm.get(h.get("c"))
+        if q:
+            h.update(q)
+    out["quoted"] = bool(qm)
     return out
 
 # ── 종목별 투자자 수급 (외국인·기관·개인 누적순매수) ──

@@ -463,9 +463,26 @@
     const sum=hs.reduce((a,h)=>a+(h.w||0),0), rest=Math.max(0,100-sum);
     const seg=hs.map((h,i)=>`<span class="hbar-seg" style="width:${Math.max(h.w||0,0)}%;background:${HOLD_COLORS[i%HOLD_COLORS.length]}" title="${E(h.n)} ${(h.w||0).toFixed(2)}%"></span>`).join('')
       +(rest>0.3?`<span class="hbar-seg" style="width:${rest}%;background:var(--line)" title="기타 ${rest.toFixed(2)}%"></span>`:'');
-    const rows=hs.map((h,i)=>`<div class="hrow"><span class="hdot" style="background:${HOLD_COLORS[i%HOLD_COLORS.length]}"></span><span class="hnm">${E(h.n)}</span><span class="hw">${h.w!=null?h.w.toFixed(2):'—'}%</span></div>`).join('');
-    return `<div class="sgt hold-t">보유비중 Top <span class="note" style="font-weight:400">· 상위 ${hs.length}</span></div>`
-      +`<div class="hbar">${seg}</div><div class="hlist">${rows}</div>`;
+    // (2026-07-22) 네이버식 시세·전일비·등락률 컬럼. 상승=빨강·하락=파랑(한국 관례). 서버가 45초 캐시로 실시간 조인.
+    const UP='#d24a3f', DN='#1666d6', us=(mkt==='us');
+    const fpx=v=>v==null?'—':(us?v.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):Math.round(v).toLocaleString());
+    const fchg=v=>{ if(v==null) return '<span class="hq hqm">—</span>';
+      const c=v>0?UP:(v<0?DN:'var(--tx2)'), t=v>0?'▲':(v<0?'▼':''), a=us?Math.abs(v).toFixed(2):Math.round(Math.abs(v)).toLocaleString();
+      return `<span class="hq" style="color:${c}">${t}${a}</span>`; };
+    const fpct=v=>{ if(v==null) return '<span class="hqp hqm">—</span>';
+      const c=v>0?UP:(v<0?DN:'var(--tx2)'), s=v>0?'+':'';
+      return `<span class="hqp" style="color:${c}">${s}${v.toFixed(2)}%</span>`; };
+    const head=`<div class="hrow hhead"><span class="hdot" style="visibility:hidden"></span>`
+      +`<span class="hnm">종목</span><span class="hw">비중</span><span class="hpx">시세</span>`
+      +`<span class="hq">전일비</span><span class="hqp">등락률</span></div>`;
+    const rows=hs.map((h,i)=>`<div class="hrow">`
+      +`<span class="hdot" style="background:${HOLD_COLORS[i%HOLD_COLORS.length]}"></span>`
+      +`<span class="hnm">${E(h.n)}</span>`
+      +`<span class="hw">${h.w!=null?h.w.toFixed(2):'—'}%</span>`
+      +`<span class="hpx">${fpx(h.px)}</span>${fchg(h.chg)}${fpct(h.chgp)}</div>`).join('');
+    const dly=(data&&data.quoted===false)?' <span class="note" style="font-weight:400;color:#c0392b">· 시세 일시 지연</span>':'';
+    return `<div class="sgt hold-t">보유비중 Top <span class="note" style="font-weight:400">· 상위 ${hs.length}</span>${dly}</div>`
+      +`<div class="hbar">${seg}</div><div class="hlist">${head}${rows}</div>`;
   }
   function showDetail(r){
     dcode=r.c;
