@@ -822,8 +822,11 @@
         <span class="scrcnt" id="scr_cnt">—</span>
         <!-- (2026-07-18) 필터 초기화는 START·컬럼설정 버튼 '위'에 별도 줄로 표시 -->
         <!-- (2026-07-18) 컬럼설정·START만 필터 바 마지막 줄 인라인(placeBtns) — 필터설명·초기화는 필터 바 위 고정 -->
-        <div class="scrbtns" id="scr_btns_grp">
-          <div class="scrbtns-r">
+        <div class="scrbtns" id="scr_btns_grp" style="margin-left:auto">
+          <div class="scrbtns-r" style="flex-wrap:wrap;justify-content:flex-end">
+            <button class="scrrst" id="scr_glsbtn">? 필터설명</button>
+            <button class="scrrst" id="scr_rst">↺ 필터 선택 초기화(default)</button>
+            <button class="scrrst" id="scr_allf" title="모든 필터를 '전체'로 — 하드컷 없이 전종목 표시">⊘ 전부전체</button>
             <button class="scrrst" id="scr_autoscroll" title="종목 클릭 시 상세 패널로 화면 자동이동 켜기/끄기">⤓ 자동이동: OFF</button>
             <span class="scrrst" id="scr_rowsbox" title="스크롤 없이 보이는 결과 행 수" style="display:inline-flex;align-items:center;gap:5px;cursor:default;padding:4px 8px">표시 <button type="button" class="rowspin" id="scr_rowsdn" title="한 행 줄이기">−</button><input type="number" id="scr_rows" min="1" max="60" value="8" style="width:28px;border:none;background:transparent;font-size:13px;font-weight:600;text-align:center;font-family:inherit;color:inherit"><button type="button" class="rowspin" id="scr_rowsup" title="한 행 늘리기">＋</button> 행</span>
             <button class="scrrst" id="scr_colbtn">⊞ 컬럼설정</button>
@@ -831,15 +834,8 @@
           </div>
         </div>
       </div>
-      <!-- (2026-07-26) flex-wrap + min-width — 모바일에서 안내문이 1글자 폭 세로쓰기로 짜부라지던 문제 -->
-      <div style="display:flex;align-items:flex-end;gap:8px;flex-wrap:wrap">
-        <p class="note" style="margin:2px 0 0;flex:1;min-width:240px">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
-        <div class="scrbtns-r" id="scr_glsrow" style="flex:0 0 auto"><!-- (2026-07-26) id 부여 — START 래퍼(.scrbtns-r 동명)와 querySelector 혼동 방지 -->
-          <button class="scrrst" id="scr_glsbtn">? 필터설명</button>
-          <button class="scrrst" id="scr_rst">↺ 필터 선택 초기화(default)</button>
-          <button class="scrrst" id="scr_allf" title="모든 필터를 '전체'로 — 하드컷 없이 전종목 표시">⊘ 전부전체</button>
-        </div>
-      </div>
+      <!-- (2026-07-22) 툴바 버튼 7종을 위 .scrtop 한 줄로 통합(ETF 동형) — 설명은 단독 문단 -->
+      <p class="note" style="margin:2px 0 6px">전종목(ETF·스팩 제외)에서 필터를 걸어 실시간으로 좁힌다. 각 필터는 <b>프리셋 선택 + 직접 입력</b>. 기본값은 표준 1단계 하드컷.</p>
       <!-- 1단계 -->
       <div id="scr_s1">
         <div class="fltbar" id="scr_fltbar"></div>

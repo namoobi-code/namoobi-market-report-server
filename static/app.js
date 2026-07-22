@@ -1742,23 +1742,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const rH = row ? row.offsetHeight : 48;
     w.style.maxHeight = (hH + visRows*rH + 2) + 'px';
   }
-  /* (2026-07-18) START·컬럼설정·필터설명·초기화 그룹 위치 — 1단계=필터 바 우측 끝, 2·3단계=상단 원위치 */
+  /* (2026-07-22) 툴바 버튼 7종(필터설명·초기화·전부전체·자동이동·표시·컬럼설정·START)을
+     .scrtop 한 줄에 고정 — ETF 스크리너와 동일 배치. placeBtns 는 이동 없이 단계별 표시/숨김만. */
   const BTNS_GRP=document.getElementById('scr_btns_grp');
-  function placeBtns(){ if(!BTNS_GRP) return;
-    const tgt = stage===1 ? $('scr_fltbar') : document.querySelector('.scrtop');
-    if(tgt && BTNS_GRP.parentElement!==tgt) tgt.appendChild(BTNS_GRP);
-    /* (2026-07-26) 컬럼설정·START·초기화·전부전체 = 1단계 전용.
-       ? 필터설명은 2단계에서도 필요(V·G·M·Q 설명) — 패널을 현재 단계 pane 으로 옮긴다 */
-    BTNS_GRP.style.display = stage===1?'':'none';
-    /* (2026-07-26) START 소실 근본 원인 수정 — .scrbtns-r 이 문서에 2개(필터설명 행 + START 래퍼).
-       3단계에서 BTNS_GRP 가 .scrtop 으로 이동하면 문서 순서가 바뀌어 querySelector 가
-       START 래퍼를 잡아 none 처리했었다 → 필터설명 행은 id(scr_glsrow)로 정확히 지정,
-       START 래퍼는 항상 표시로 복구 */
-    {const inner=BTNS_GRP.querySelector('.scrbtns-r'); if(inner) inner.style.display='';}
-    {const rb=document.getElementById('scr_glsrow'); if(rb) rb.style.display = stage<=2?'':'none';}
-    {const gb=$('scr_glsbtn'); if(gb) gb.style.display = stage<=2?'':'none';}   // 3단계: 필터설명도 제거
-    {const rs=$('scr_rst');  if(rs) rs.style.display = stage===1?'':'none';}
-    {const ab=$('scr_allf'); if(ab) ab.style.display = stage===1?'':'none';}
+  function placeBtns(){
+    const S1 = stage===1;
+    const show=(id,on,dsp)=>{ const el=$(id); if(el) el.style.display = on?(dsp||''):'none'; };
+    if(BTNS_GRP) BTNS_GRP.style.display='';           // 그룹은 항상 표시(개별 버튼만 제어)
+    show('scr_glsbtn', stage<=2);                     // 필터설명: 1·2단계
+    show('scr_rst', S1);                              // 초기화: 1단계
+    show('scr_allf', S1);                             // 전부전체: 1단계
+    show('scr_autoscroll', S1);
+    show('scr_rowsbox', S1, 'inline-flex');
+    show('scr_colbtn', S1);
+    show('scr_start', S1);
     {const gp=$('scr_glspanel');
      if(gp){
        if(stage===2){ const s2=$('scr_s2');
