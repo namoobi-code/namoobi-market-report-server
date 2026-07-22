@@ -115,26 +115,53 @@ def brokers3():
 
 
 # ── 2) 경제 이벤트 캘린더 ──
-def _fred_next_releases():
+_FRED_IDMAP = {"CPI": "CPIAUCSL", "PPI": "PPIFIS", "PCE 물가": "PCEPI", "고용보고서(NFP)": "PAYEMS",
+               "소매판매": "RSAFS", "GDP": "GDP", "신규 실업수당": "ICSA"}
+_FRED_TOP = ("CPI", "고용보고서(NFP)", "PCE 물가")
+
+
+def _fred_release_dates(limit=60):
+    """label -> 최근 발표일(오름차순) 리스트. 다음 발표일(미래)·지난 이벤트(과거) 공용.
+       (2026-07-22) 기존 _fred_next_releases 는 미래만 뽑아 '지난 이벤트'가 안 쌓였다.
+       과거 발표일도 함께 반환해 past 를 결정적으로 재생성한다.
+       limit=60: 주간 지표(신규 실업수당)는 FRED 예정일이 20개 넘게 미래에 깔려 있어
+       desc·limit=20 이면 과거는 물론 코앞 다음 회차(주 목요일)도 못 잡는다 → 현재를 확실히 감싼다."""
     key = key_of("fred.key")
     if not key:
         return {}
-    idmap = {"CPI": "CPIAUCSL", "PPI": "PPIFIS", "PCE 물가": "PCEPI", "고용보고서(NFP)": "PAYEMS",
-             "소매판매": "RSAFS", "GDP": "GDP", "신규 실업수당": "ICSA"}
     out = {}
-    for label, sid in idmap.items():
+    for label, sid in _FRED_IDMAP.items():
         try:
             ru = f"https://api.stlouisfed.org/fred/series/release?series_id={sid}&api_key={key}&file_type=json"
             rid = json.loads(fetch(ru))["releases"][0]["id"]
             du = (f"https://api.stlouisfed.org/fred/release/dates?release_id={rid}&api_key={key}"
-                  "&file_type=json&sort_order=desc&limit=10&include_release_dates_with_no_data=true")
-            ds = sorted(x["date"] for x in json.loads(fetch(du))["release_dates"]
-                        if x["date"] > NOW.strftime("%Y-%m-%d"))
-            if ds:
-                out[label] = ds[0]
+                  f"&file_type=json&sort_order=desc&limit={limit}&include_release_dates_with_no_data=true")
+            out[label] = sorted(x["date"] for x in json.loads(fetch(du))["release_dates"])
         except Exception:
             pass
     return out
+
+
+def _expiries_past(cutoff, tds):
+    """지난 창(cutoff≤d<오늘)에 든 만기 — KR 둘째 목요일 / 美 셋째 금요일(3·6·9·12월)."""
+    ev = []
+    for back in (0, 1):
+        yy, mm = NOW.year, NOW.month - back
+        if mm <= 0:
+            mm += 12
+            yy -= 1
+        thu = [d for d in range(1, 29) if date(yy, mm, d).weekday() == 3]
+        fri = [d for d in range(1, 29) if date(yy, mm, d).weekday() == 4]
+        kd = date(yy, mm, thu[1]).isoformat()
+        if cutoff <= kd < tds:
+            ev.append({"date": kd, "region": "한국", "event": "선물옵션 동시만기",
+                       "importance": "★★", "source": "거래소 규칙(매월 둘째 목요일)"})
+        if mm in (3, 6, 9, 12):
+            qd = date(yy, mm, fri[2]).isoformat()
+            if cutoff <= qd < tds:
+                ev.append({"date": qd, "region": "미국", "event": "쿼드러플 위칭(선물옵션 동시만기)",
+                           "importance": "★★★", "source": "거래소 규칙(3·6·9·12월 셋째 금요일)"})
+    return ev
 
 
 def _expiries(months=3):
@@ -161,10 +188,15 @@ def _expiries(months=3):
 
 def calendar():
     ev = []
-    # FRED 다음 발표일
-    for label, d in _fred_next_releases().items():
-        ev.append({"date": d, "region": "미국", "event": f"{label} 발표", "importance": "★★★" if label in ("CPI", "고용보고서(NFP)", "PCE 물가") else "★★",
-                   "source": "FRED release calendar(실측)"})
+    tds = NOW.strftime("%Y-%m-%d")
+    relmap = _fred_release_dates()          # label -> 발표일(오름차순), 미래·과거 공용
+    # FRED 다음 발표일(미래)
+    for label, ds in relmap.items():
+        fut = [x for x in ds if x > tds]
+        if fut:
+            ev.append({"date": fut[0], "region": "미국", "event": f"{label} 발표",
+                       "importance": "★★★" if label in _FRED_TOP else "★★",
+                       "source": "FRED release calendar(실측)"})
     # FOMC(기존 DB) + 중앙은행 회의(시드 — 보고서 실행이 확정 일정으로 갱신)
     fm = load("fomc_meetings", {})
     rows = fm.get("data") if isinstance(fm.get("data"), list) else (fm.get("data", {}).get("rows") if isinstance(fm.get("data"), dict) else fm.get("rows"))
@@ -203,10 +235,29 @@ def calendar():
     #   생성 로직이 미래만 만들기 때문에, 어제까지 '다가오는'에 있던 것이 오늘 지난 이벤트가 된다.
     #   캘린더 우측 '지난 이벤트' 패널(자동 반영 확인용)의 데이터 원천.
     prev = load("events_calendar", {})
-    tds = NOW.strftime("%Y-%m-%d")
     cutoff = (NOW.date() - timedelta(days=7)).isoformat()
     pseen, past = set(), []
-    for r in sorted((prev.get("past") or []) + (prev.get("upcoming") or []), key=lambda x: str(x.get("date", ""))):
+    # (2026-07-22) 지난 이벤트를 '이월'에만 의존하지 않고 실측 과거조회로 결정적 재생성.
+    #   기존엔 어제 upcoming→오늘 past 이월뿐이라, 연속 실행이 끊기거나 FRED가 '다음 발표일'만
+    #   주는 탓에 지난 이벤트가 1건(LPR)만 남았다. FRED 최근 발표 + 지난 FOMC/중앙은행/만기 직접 재생성.
+    gen = []
+    for label, ds in relmap.items():
+        for x in ds:
+            if cutoff <= x < tds:
+                gen.append({"date": x, "region": "미국", "event": f"{label} 발표",
+                            "importance": "★★★" if label in _FRED_TOP else "★★",
+                            "source": "FRED release calendar(실측)"})
+    for r in (rows or []):
+        dt = str(r.get("date", ""))[:10]
+        if cutoff <= dt < tds:
+            gen.append({"date": dt, "region": "미국", "event": "FOMC 회의", "importance": "★★★", "source": "db/fomc_meetings"})
+    for r in (cb.get("rows") or []):
+        dt = str(r.get("date", ""))[:10]
+        if cutoff <= dt < tds:
+            gen.append(r)
+    gen += _expiries_past(cutoff, tds)
+    # 실측 재생성분(gen) + 이월분(prev: 직전 보고서 검증 이벤트 등 생성기 밖 출처) 병합·중복제거
+    for r in sorted(gen + (prev.get("past") or []) + (prev.get("upcoming") or []), key=lambda x: str(x.get("date", ""))):
         dt = str(r.get("date", ""))[:10]
         if not (cutoff <= dt < tds) or not r.get("event"):
             continue
@@ -216,7 +267,7 @@ def calendar():
         pseen.add(k)
         past.append(r)
     save("events_calendar", {"upcoming": ded[:40], "longterm": lt[:12], "past": past[-40:],
-                             "desc": "FRED 발표일정(실측)+FOMC DB+중앙은행 회의 시드+만기 규칙+직전 보고서 검증 이벤트 · past=지난 7일 이월"})
+                             "desc": "FRED 발표일정(실측)+FOMC DB+중앙은행 회의 시드+만기 규칙+직전 보고서 검증 이벤트 · past=지난 7일(실측 재생성+이월)"})
 
 
 # ── 3) 정책금리 6개국 ──
