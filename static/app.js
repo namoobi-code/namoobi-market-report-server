@@ -2520,7 +2520,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       let h='<div class="bkwrap">';
 
       // ① 호가창
-      h+=`<div class="bkbox" style="width:210px;flex:0 0 auto"><div class="bktit">① 호가 10단계 <small>${E(O.src||'')} · ${hh}</small></div><table class="bk">`;
+      h+=`<div class="bkbox" style="flex:0 0 auto"><div class="bktit">① 호가 10단계 <small>${E(O.src||'')} · ${hh}</small></div><table class="bk">`;
       for(let i=9;i>=0;i--){ const a=O.ask[i]||{};
         h+=`<tr><td class="aq">${_nf(a.q)}</td><td class="ap">${_nf(a.p)}</td><td></td><td></td></tr>`; }
       for(let i=0;i<10;i++){ const b=O.bid[i]||{};
@@ -2569,6 +2569,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             KRX 가 장중 5회 발표하는 잠정 집계의 <b>당일 누적</b> 추이 — 회차가 갈수록 외인·기관이
             더 사들이면(값이 커지면) 매수세가 붙는 중, 줄면 빠지는 중.</div>`;
       }
+      /* OBV 는 판정에 넣지 않는다 — '체결강도 추세(1시간)'와 같은 '최근 방향'이라 중복이다.
+         OBV 의 고유 가치는 다이버전스(주가↑·OBV 정체=분산 의심)이고, 그건 점수화보다
+         차트(⑤ OBV 패널)로 눈으로 보는 게 맞다(패널에 그 설명이 이미 있다). */
       h+=`
           <div style="font-size:14px;margin:8px 0">현재 압력
             <span class="sbadge ${sc}" style="font-size:13px;padding:3px 10px">${E(O.label)}</span>
@@ -2603,7 +2606,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cv.width=Math.round(w*dpr); cv.height=Math.round(hh*dpr);
       const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,hh);
       const P={l:6,r:26,t:8,b:14};
-      const vs=pts.map(p=>p.cttr), lo=Math.floor(Math.min(80,...vs)/5)*5, hi=Math.ceil(Math.max(120,...vs)/5)*5;
+      /* (2026-07-21) y축을 데이터에 맞춰 자동 스케일 — 예전엔 80~120 고정이라 값이 80~95면
+         선이 아래 1/3 에 눌려 위가 텅 비어 이상해 보였다. 100은 항상 포함하고 ±2 여백. */
+      const vs=pts.map(p=>p.cttr), dmn=Math.min(...vs), dmx=Math.max(...vs);
+      const lo=Math.floor((Math.min(dmn,100)-2)/5)*5, hi=Math.ceil((Math.max(dmx,100)+2)/5)*5;
       const X=i=>P.l+(w-P.l-P.r)*i/(pts.length-1), Y=v=>P.t+(hh-P.t-P.b)*(1-(v-lo)/((hi-lo)||1));
       // 100 기준선 (매수/매도 경계)
       x.strokeStyle='#e3e7ec'; x.lineWidth=1; x.beginPath(); x.moveTo(P.l,Y(100)); x.lineTo(w-P.r,Y(100)); x.stroke();
