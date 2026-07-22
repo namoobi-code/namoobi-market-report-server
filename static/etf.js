@@ -12,7 +12,7 @@
   let POOL={kr:[],us:[]}, loaded=false, mkt='kr', sort={k:'cap',d:-1};
   let findQ='', findOpen=false, findCaret=null, findIME=false;
   /* (2026-07-22) 결과표 UI 옵션 — 종목 스크리너와 동일. 클릭 시 상세 자동이동(기본 ON) · 표시 행수(기본 8). */
-  let autoScroll = localStorage.getItem('etf_autoscroll') !== '0';
+  let autoScroll = localStorage.getItem('etf_autoscroll') === '1';   // 기본 OFF (명시적 '1'일 때만 ON)
   let visRows = Math.max(1, Math.min(60, +localStorage.getItem('etf_visrows') || 8));
   function applyTblHeight(){
     const w=$('etf_tblbox'); if(!w) return;

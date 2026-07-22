@@ -1732,7 +1732,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     return `${f.label}: <span class="cv">${E(v)}</span>`; }
 
   /* (2026-07-22) 결과표 UI 옵션 — 종목 클릭 시 상세로 자동이동(기본 ON) · 스크롤 전 표시 행수(기본 8). localStorage 유지. */
-  let autoScroll = localStorage.getItem('scr_autoscroll') !== '0';
+  let autoScroll = localStorage.getItem('scr_autoscroll') === '1';   // 기본 OFF (명시적 '1'일 때만 ON)
   let visRows = Math.max(1, Math.min(60, +localStorage.getItem('scr_visrows') || 8));
   function applyTblHeight(){
     const w=document.getElementById('scr_tblwrap'); if(!w) return;
