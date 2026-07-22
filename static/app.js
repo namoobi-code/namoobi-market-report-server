@@ -1731,6 +1731,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
     return `${f.label}: <span class="cv">${E(v)}</span>`; }
 
+  /* (2026-07-22) 결과표 UI 옵션 — 종목 클릭 시 상세로 자동이동(기본 ON) · 스크롤 전 표시 행수(기본 8). localStorage 유지. */
+  let autoScroll = localStorage.getItem('scr_autoscroll') !== '0';
+  let visRows = Math.max(4, Math.min(60, +localStorage.getItem('scr_visrows') || 8));
+  function applyTblHeight(){
+    const w=document.getElementById('scr_tblwrap'); if(!w) return;
+    const tbl=document.getElementById('scr_tbl');
+    const hd=tbl&&tbl.querySelector('th'); const row=tbl&&tbl.querySelector('tr[data-c]');
+    const hH = hd&&hd.parentElement ? hd.parentElement.offsetHeight : 34;
+    const rH = row ? row.offsetHeight : 48;
+    w.style.maxHeight = (hH + visRows*rH + 2) + 'px';
+  }
   /* (2026-07-18) START·컬럼설정·필터설명·초기화 그룹 위치 — 1단계=필터 바 우측 끝, 2·3단계=상단 원위치 */
   const BTNS_GRP=document.getElementById('scr_btns_grp');
   function placeBtns(){ if(!BTNS_GRP) return;
@@ -2112,6 +2123,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
     {const pl=$('scr_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
     $('scr_tbl').querySelectorAll('tr[data-c]').forEach(tr=>tr.onclick=()=>showDetail(tr.dataset.c));
+    applyTblHeight();   // (2026-07-22) 표시 행수 설정을 렌더마다 반영
     renderLegend();
   }
   /* (2026-07-26) 2단계 필터설명 = V·G·M·Q 축의 의미와 계산 방법 */
@@ -2367,7 +2379,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
     }
-    $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
+    if(autoScroll) $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   function renderSum(r){
     const G=[['시세',['px','chg','cap','tv','turn']],
@@ -3602,6 +3614,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   setTimeout(()=>{ const p=$('p_screener')||document.querySelector('.pane.scr');
     if(!loaded && p && p.classList.contains('on')) loadPool(()=>applyRestored()); }, 400);
   {const cb=$('scr_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
+  /* (2026-07-22) 자동이동 토글 */
+  {const ab=$('scr_autoscroll'); if(ab){
+    const paint=()=>{ ab.textContent='⤓ 자동이동: '+(autoScroll?'ON':'OFF');
+      ab.style.color=autoScroll?'#1f6feb':'var(--tx2)'; ab.style.borderColor=autoScroll?'#1f6feb':'var(--line)'; ab.style.fontWeight=autoScroll?'600':'400'; };
+    paint(); ab.onclick=()=>{ autoScroll=!autoScroll; localStorage.setItem('scr_autoscroll',autoScroll?'1':'0'); paint(); }; }}
+  /* (2026-07-22) 결과표 표시 행수 */
+  {const rn=$('scr_rows'); if(rn){ rn.value=visRows;
+    rn.oninput=()=>{ visRows=Math.max(4,Math.min(60,+rn.value||8)); localStorage.setItem('scr_visrows',visRows); applyTblHeight(); }; }}
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
    if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더
    if(gx&&gp) gx.onclick=()=>{ gp.style.display='none'; };}
