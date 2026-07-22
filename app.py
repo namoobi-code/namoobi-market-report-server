@@ -407,6 +407,78 @@ def orderbook_api(request: Request, code: str):
         return {"err": repr(e)[:100]}
 
 
+_str_cache = {}
+
+
+@app.get("/api/strength/kr/{code}")
+def strength_curve_api(request: Request, code: str):
+    """체결강도 '장중 추이' — 09:30부터 30분 간격으로 스냅샷.
+
+    (2026-07-21) '최근 30체결'은 삼성전자처럼 유동성 큰 종목에선 1~2초라 노이즈다.
+    체결강도(tday_rltv)는 당일 누적이라 값 하나론 흐름을 못 본다.
+    → inquire-time-itemconclusion 의 FID_INPUT_HOUR_1 로 특정 시각의 체결강도를 조회할 수 있어
+      하루를 30분 간격으로 훑어 곡선을 만든다. '매수세가 붙는 중인지 빠지는 중인지'가 보인다.
+    실측(005930): 10시 68.7 → 11:30 90.0 → 13시 86.8 → 14:30 81.1 → 15시 82.9
+    과거 시각 값은 고정이라 캐시를 길게 잡는다(5분).
+    """
+    if not re.fullmatch(r"[0-9]{6}", code):
+        raise HTTPException(400, "bad code")
+    if not _logged_in(request):
+        raise HTTPException(401, "로그인 후 이용 가능합니다")
+    now = time.time()
+    hit = _str_cache.get(code)
+    if hit and now - hit[0] < 300:
+        return hit[1]
+    try:
+        from concurrent.futures import ThreadPoolExecutor
+        sys.path.insert(0, str(BASE / "scripts"))
+        import kis_api as _K
+        c = _K._creds()
+        if not c:
+            return {"err": "KIS 키 없음"}
+        tok = _K._token(c)
+        # KST 현재 분 — 장중이면 지금까지, 마감 후면 15:30 까지
+        from datetime import timezone, timedelta
+        kst = timezone(timedelta(hours=9))
+        nm = datetime.now(kst)
+        cur = nm.hour * 60 + nm.minute
+        cur = min(max(cur, 9 * 60 + 30), 15 * 60 + 30)
+        slots = list(range(9 * 60 + 30, cur + 1, 30))
+        if slots and slots[-1] != cur:
+            slots.append(cur)
+
+        def _one(m):
+            hh = "%02d%02d00" % (m // 60, m % 60)
+            try:
+                r = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-time-itemconclusion",
+                            "FHPST01060000", {"FID_COND_MRKT_DIV_CODE": "J",
+                                              "FID_INPUT_ISCD": code, "FID_INPUT_HOUR_1": hh})
+                o = (r.get("output2") or [])
+                if not o:
+                    return None
+                x = o[0]
+                return {"t": "%02d:%02d" % (m // 60, m % 60),
+                        "cttr": float(x.get("tday_rltv") or 0),
+                        "vol": int(x.get("acml_vol") or 0)}
+            except Exception:
+                return None
+
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            pts = [p for p in ex.map(_one, slots) if p]
+        # 구간 거래량(그 30분에 실제로 붙은 양) = 누적 차분
+        for i in range(len(pts) - 1, 0, -1):
+            pts[i]["dvol"] = pts[i]["vol"] - pts[i - 1]["vol"]
+        if pts:
+            pts[0]["dvol"] = pts[0]["vol"]
+        res = {"pts": pts, "src": "KIS 실시간"}
+        _str_cache[code] = (now, res)
+        if len(_str_cache) > 200:
+            _str_cache.clear()
+        return res
+    except Exception as e:
+        return {"err": repr(e)[:100]}
+
+
 _tick_cache = {}
 
 

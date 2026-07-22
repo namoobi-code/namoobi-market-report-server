@@ -2532,32 +2532,25 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
       // ② 체결강도 + 최근 체결
       const _st=parseFloat(O.strength);
-      const _tb=O.tick_buy||0, _ts=O.tick_sell||0;
-      /* 최근 30체결 판정 — 5% 이내 차이는 '팽팽'. 체결강도(당일)와 별개 지표라 각각 자기 숫자로 판정. */
-      const _tw=(_tb+_ts)?Math.abs(_tb-_ts)/(_tb+_ts):0;
-      const _tside=_tw<0.05?['mid','팽팽']:(_tb>_ts?['buy','매수 우위']:['sell','매도 우위']);
-      const _div=(!isNaN(_st) && ((_st>=100)!==(_tb>_ts)) && _tw>=0.05);   // 당일 vs 최근 방향이 다름
-      h+=`<div class="bkbox"><div class="bktit">② 체결강도 · 최근 체결 <small>실시간</small></div>
-          <div style="font-size:13px;margin-bottom:3px">체결강도
+      h+=`<div class="bkbox" style="min-width:300px"><div class="bktit">② 체결강도 · 장중 추이 <small>실시간</small></div>
+          <div style="font-size:13px;margin-bottom:4px">체결강도
             <b style="font-size:16px">${O.strength??'—'}</b>
             <span class="sbadge ${_st>=100?'buy':'sell'}">당일 ${_st>=100?'매수 우위':'매도 우위'}</span>
-            <span class="note" style="font-size:10.5px">당일 누적</span></div>
-          <div style="font-size:11.5px;margin-bottom:5px">최근 30체결
-            <b class="up">매수 ${_nf(_tb)}</b> · <b class="dn">매도 ${_nf(_ts)}</b>
-            <span class="sbadge ${_tside[0]}">${_tside[1]}</span></div>
-          ${_div?`<div class="note" style="font-size:10.5px;margin-bottom:5px;color:#c07a10">⚠ 당일은 ${_st>=100?'매수':'매도'} 우위인데 최근 30체결은 ${_tb>_ts?'매수':'매도'}가 붙는 중 — 방향이 바뀌는 초기일 수 있어 다음 체결 흐름을 더 봐야 합니다.</div>`:''}
-          <div style="max-height:200px;overflow:auto"><table class="tk">
+            <span class="note" style="font-size:10.5px">당일 누적 · 100 초과=매수</span></div>
+          <canvas id="sd_strcv" style="width:100%;height:96px;display:block"></canvas>
+          <div class="note" id="sd_strnote" style="font-size:11px;margin-top:4px;max-width:290px">체결강도 추이 불러오는 중…</div>
+          <details style="margin-top:6px"><summary style="font-size:11px;color:#98a2ad;cursor:pointer">직전 체결 30건 (수 초 · 참고용) ▾</summary>
+          <div style="max-height:170px;overflow:auto;margin-top:4px"><table class="tk">
           <tr><th>시각</th><th>체결가</th><th>수량</th><th>구분</th></tr>`;
       for(const t of (O.ticks||[])){
-        const up=(t.sg==='1'||t.sg==='2');
-        const sd=t.side||'mid';
+        const up=(t.sg==='1'||t.sg==='2'); const sd=t.side||'mid';
         const lab= sd==='buy'?'매수':(sd==='sell'?'매도':'—');
         h+=`<tr><td class="l">${E(String(t.t||'').replace(/(\d{2})(\d{2})(\d{2})/,'$1:$2:$3'))}</td>
              <td class="${up?'up':'dn'}">${_nf(t.p)}</td><td>${_nf(t.v)}</td>
              <td><span class="sbadge ${sd}">${lab}</span></td></tr>`; }
-      h+=`</table></div><div class="note" style="font-size:11px;margin-top:5px;max-width:270px">
-          체결강도(<b>당일 누적</b>) = 매수 체결량 ÷ 매도 체결량 × 100. 100 초과면 매수 우위. 아래 '최근 30체결'은 <b>직전 몇 초</b>의 미시 흐름이라 당일 값과 다를 수 있다.
-          <b>구분</b>은 직전 체결가 대비 오르며 체결(매수)·내리며 체결(매도)로 판정한 것(틱 규칙 — KIS가 체결별 구분값을 안 줘 이 방식으로 추정).</div></div>`;
+      h+=`</table></div><div class="note" style="font-size:10.5px;margin-top:4px">
+          유동성 큰 종목은 30체결이 1~2초라 노이즈다. 방향은 위 <b>장중 추이</b>로 보는 게 맞다.
+          구분은 직전 체결가 대비 오르며/내리며 체결로 판정(틱 규칙 추정).</div></details></div>`;
 
       // ③ 투자자 가집계 + 종합
       h+=`<div class="bkbox" style="flex:1;min-width:280px">
@@ -2592,7 +2585,46 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
             <b>왜 어긋나는지</b>를 보는 게 맞습니다. 진입·청산 기준과 손절선은 미리 정해 두세요.</div></div>`;
       h+='</div>';
       bk.innerHTML=h; bk.style.display='block';
+      _loadStrengthCurve(c);                       // 체결강도 장중 추이(별도 요청·5분 캐시)
     }catch(e){}
+  }
+
+  /* 체결강도 장중 추이 — 09:30~현재 30분 간격. 30체결 노이즈 대신 '매수세가 붙는 중/빠지는 중'을 본다. */
+  async function _loadStrengthCurve(c){
+    const cv=$('sd_strcv'), nt=$('sd_strnote'); if(!cv) return;
+    try{
+      const D=await (await fetch('/api/strength/kr/'+encodeURIComponent(c))).json();
+      if(dcode!==c || !_isMin()) return;
+      const pts=(D&&D.pts)||[]; if(pts.length<2){ if(nt) nt.textContent=''; return; }
+      const w=cv.clientWidth||300, hh=96; cv.width=w; cv.height=hh;
+      const x=cv.getContext('2d'); x.clearRect(0,0,w,hh);
+      const P={l:4,r:30,t:8,b:14};
+      const vs=pts.map(p=>p.cttr), lo=Math.min(80,...vs), hi=Math.max(120,...vs);
+      const X=i=>P.l+(w-P.l-P.r)*i/(pts.length-1), Y=v=>P.t+(hh-P.t-P.b)*(1-(v-lo)/((hi-lo)||1));
+      // 100 기준선 (매수/매도 경계)
+      x.strokeStyle='#e3e7ec'; x.beginPath(); x.moveTo(P.l,Y(100)); x.lineTo(w-P.r,Y(100)); x.stroke();
+      x.fillStyle='#98a2ad'; x.font='9px sans-serif'; x.fillText('100', w-P.r+3, Y(100)+3);
+      x.fillText(String(Math.round(hi)), w-P.r+3, Y(hi)+7); x.fillText(String(Math.round(lo)), w-P.r+3, Y(lo));
+      // 선 — 100 위(매수)는 빨강, 아래(매도)는 파랑 세그먼트
+      for(let i=1;i<pts.length;i++){ const up=(vs[i-1]+vs[i])/2>=100;
+        x.strokeStyle=up?'#d33':'#1f6feb'; x.lineWidth=1.6; x.beginPath();
+        x.moveTo(X(i-1),Y(vs[i-1])); x.lineTo(X(i),Y(vs[i])); x.stroke(); }
+      x.lineWidth=1;
+      // 마지막 점 강조
+      const li=pts.length-1; x.fillStyle=vs[li]>=100?'#d33':'#1f6feb';
+      x.beginPath(); x.arc(X(li),Y(vs[li]),3,0,Math.PI*2); x.fill();
+      // x축 시각(처음·중간·끝)
+      x.fillStyle='#98a2ad';
+      [0,Math.floor(li/2),li].forEach(i=>x.fillText(pts[i].t, X(i)-12, hh-3));
+      // 해석 문구 — 최근 3점 기울기로 '붙는 중/빠지는 중'
+      if(nt){
+        const a=vs[Math.max(0,li-2)], b=vs[li], d=b-a;
+        const cur=b>=100?'매수 우위':'매도 우위';
+        const trend = Math.abs(d)<3 ? '횡보' : (d>0?'매수 쪽으로 강해지는 중':'매도 쪽으로 기우는 중');
+        nt.innerHTML=`장중 저점 ${Math.round(Math.min(...vs))} · 고점 ${Math.round(Math.max(...vs))} · 현재 <b>${Math.round(b)}</b>(${cur}) · 최근 ${trend}. `
+          +`<span style="color:#98a2ad">100 위=매수 체결 우위. 회차가 오르내리는 방향이 힘의 유입·이탈이다.</span>`;
+      }
+    }catch(e){ if(nt) nt.textContent=''; }
   }
 
   /* 일·주·월 하단 — 네이버 외국인·기관 순매매(장 마감 후 확정치) */
