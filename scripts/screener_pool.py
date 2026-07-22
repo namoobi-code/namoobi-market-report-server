@@ -645,6 +645,16 @@ def build():
     except Exception as e: print("[pool] US enrich 실패:", repr(e)[:80])
     try: _tp_history(kr); _score(kr,"c",KR_AXDEF)   # KR만 누적→rev(tp_rev) 세팅 후 M축 재채점
     except Exception as e: print("[pool] tp_history 실패:", repr(e)[:80])
+    # (2026-07-22) 동분기 YoY 성장 가속(growth_accel.py 주 1회 수집) 병합 — KR=KIS·US=SEC, 빌드 부담 0
+    try:
+        _ga=json.load(open(os.path.join(T.DB,"growth_accel.json"),encoding="utf-8"))
+        for _lst,_k in ((kr,"kr"),(us,"us")):
+            _gm=_ga.get(_k) or {}
+            for _r in _lst:
+                _v=_gm.get(_r.get("c"))
+                if _v: _r["gacc"]=_v.get("gacc"); _r["racc"]=_v.get("racc"); _r["oacc"]=_v.get("oacc")
+        print(f"[pool] growth_accel 병합 KR {len(_ga.get('kr') or {})} · US {len(_ga.get('us') or {})}")
+    except Exception as e: print("[pool] growth_accel 병합 skip:", repr(e)[:80])
     _pd=T.kr_price_date()
     out={"asof":T.now_kst(),"price_date":_pd,
          "kr":sorted(kr,key=lambda r:-(r["cap"] or 0)),

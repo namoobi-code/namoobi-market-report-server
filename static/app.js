@@ -1596,6 +1596,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      gacc:{label:'성장가속',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%p',min:1,reqData:1,presets:[['전체',null],['가속 전환(0%p ↑)',0],['+10%p ↑',10],['+30%p ↑',30],['+50%p ↑',50]],def:[null,null]},
       tob:{label:'흑자전환',tgl:1,def:false,tglLabel:'적자→흑자 전환 종목만'},
       opm:{label:'영업이익률',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['5% ↑',5],['10% ↑',10],['20% ↑',20]],def:[null,null]},
       peg:{label:'PEG',fmt:v=>v.toFixed(1),reqData:1,presets:[['전체',null,null],['1 ↓',null,1],['1.5 ↓',null,1.5],['2 ↓',null,2]],def:[null,null]},
@@ -1659,6 +1660,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       roe:{label:'ROE',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['5% ↑',5],['10% ↑',10],['15% ↑',15],['20% ↑',20]],def:[null,null]},
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
+      gacc:{label:'성장가속',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%p',min:1,reqData:1,presets:[['전체',null],['가속 전환(0%p ↑)',0],['+10%p ↑',10],['+30%p ↑',30],['+50%p ↑',50]],def:[null,null]},
       frgn:{label:'외인보유비중',fixed:'— (US 미제공)'},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
@@ -1672,7 +1674,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
               'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
               'ern','cov','upside','rec','rev','nan',
-              'grw','mgrw','ogrw','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
+              'grw','mgrw','ogrw','gacc','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
@@ -1891,7 +1893,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
-    grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'},
+    grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
     payout:{l:'배당성향',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'}
   };
@@ -1945,6 +1947,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'roe': return r.roe!=null?(mkt==='kr'?r.roe:r.roe*100):null;
       case 'revg': return r.revg!=null?r.revg*100:null;
       case 'opg': {const v=mkt==='kr'?r.opg:r.epsg; return v!=null?v*100:null;}
+      case 'gacc': return r.gacc!=null?r.gacc*100:null;   // 동분기 YoY 성장 가속(%p)
       /* (2026-07-21) 모멘텀 정의를 시장별로 분리 — 한국 12M · 미국 12−1M.
          미국은 풀의 mom 이 채워지기 전(직전 빌드 산출물)에도 화면이 비지 않도록
          항등식 (1+1Y)/(1+1M)−1 로 유도해 대체한다(수학적으로 동일값). */
@@ -2053,6 +2056,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(MACD_DISP[v]||v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
       case 'adx': return `<span class="${v<20?'note':''}" title="ADX ≥25 추세장 · 20~25 추세 시작 · <20 횡보">${(+v).toFixed(0)}</span>`;
+      case 'gacc': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="동분기 YoY 가속 = 이번 분기 YoY − 작년 동기 YoY (+면 성장 가속·−면 둔화)">${v>0?'+':''}${v.toFixed(0)}%p</span>`;
       case 'volx': return `<span class="${v>=1.5?'up':'note'}">${(+v).toFixed(1)}배</span>`;
       case 'bb': return (+v).toFixed(0);
     }
@@ -2178,6 +2182,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['성장','매출·EPS 성장률 평균'],
         ['매출성장','매출 전년동기比 성장률'],
         ['이익성장','EPS 전년동기比 성장률'],
+        ['성장가속','<b>동분기 YoY 가속</b> = 이번 분기 YoY − 작년 동기 YoY(%p). +면 성장 가속·−면 둔화. 같은 분기끼리 비교라 계절성 제거된 모멘텀. US=SEC 실측(주1회)'],
         ['ROE','자기자본이익률(순이익÷자기자본)'],
         ['수익률 12-1M','12개월 전 → 1개월 전 구간의 주가 수익률 = (1+1Y수익률)÷(1+1M수익률)−1. 최근 1개월을 <b>일부러 제외</b>한 모멘텀 — 단기 급등 직후의 반전 위험을 걸러낸다. <b>한국은 12M(순수 12개월 수익률)</b>이라 정의가 다르다'],
         ['수익률 1M·3M·6M','해당 기간 주가 수익률'],
@@ -2242,6 +2247,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['성장','매출·영업이익 성장률 평균'],
         ['매출성장','매출액 전년동기比 성장률'],
         ['이익성장','영업이익 전년동기比 성장률'],
+        ['성장가속','<b>동분기 YoY 가속</b> = 이번 분기 YoY − 작년 동기 YoY(%p). +면 성장 가속·−면 둔화. 같은 분기끼리 비교라 계절성 제거된 모멘텀. KR=KIS 손익·US=SEC 실측(주1회 갱신)'],
         ['PER','추정 주가수익비율(순이익 대비 주가). 낮을수록 저평가'],
         ['PBR','주가순자산비율(순자산 대비 주가). 낮을수록 저평가'],
         ['ROE','자기자본이익률(순이익÷자기자본)'],
@@ -2272,7 +2278,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       'RSI(14)':'기술적 지표','거래량배수':'기술적 지표','MACD':'기술적 지표','볼린저밴드':'기술적 지표','이평배열':'기술적 지표','200일선':'기술적 지표','20일선':'기술적 지표','50일선':'기술적 지표','고점比':'기술적 지표',
       '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝임박':'컨센서스',
       'PER':'밸류·수익성','PEG':'밸류·수익성','PBR':'밸류·수익성','PSR':'밸류·수익성','ROE':'밸류·수익성','배당성향':'밸류·수익성','배당':'밸류·수익성','영업이익률':'밸류·수익성',
-      '성장':'성장','매출성장':'성장','이익성장':'성장','흑자전환':'성장',
+      '성장':'성장','매출성장':'성장','이익성장':'성장','성장가속':'성장','흑자전환':'성장',
       '외인·기관수급(20일)':'수급','외인·기관연속매수':'수급','공매도비중':'수급','대차잔고비율':'수급','대차잔고':'수급','흑자전환·수급·공매도·대차잔고':'수급','외인보유비중':'수급',
       '부채비율':'건전성','유동비율':'건전성','영업적자':'건전성','상장기간':'기타','증권 구분':'기타' });
     return m; })();
