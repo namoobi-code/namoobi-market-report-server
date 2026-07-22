@@ -2520,7 +2520,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       let h='<div class="bkwrap">';
 
       // ① 호가창
-      h+=`<div class="bkbox"><div class="bktit">① 호가 10단계 <small>${E(O.src||'')} · ${hh}</small></div><table class="bk">`;
+      h+=`<div class="bkbox" style="width:210px;flex:0 0 auto"><div class="bktit">① 호가 10단계 <small>${E(O.src||'')} · ${hh}</small></div><table class="bk">`;
       for(let i=9;i>=0;i--){ const a=O.ask[i]||{};
         h+=`<tr><td class="aq">${_nf(a.q)}</td><td class="ap">${_nf(a.p)}</td><td></td><td></td></tr>`; }
       for(let i=0;i<10;i++){ const b=O.bid[i]||{};
@@ -2532,12 +2532,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
       // ② 체결강도 + 최근 체결
       const _st=parseFloat(O.strength);
-      h+=`<div class="bkbox" style="min-width:300px"><div class="bktit">② 체결강도 · 장중 추이 <small>실시간</small></div>
-          <div style="font-size:13px;margin-bottom:4px">체결강도
-            <b style="font-size:16px">${O.strength??'—'}</b>
-            <span class="sbadge ${_st>=100?'buy':'sell'}">당일 ${_st>=100?'매수 우위':'매도 우위'}</span>
-            <span class="note" style="font-size:10.5px">당일 누적 · 100 초과=매수</span></div>
-          <canvas id="sd_strcv" style="width:100%;height:96px;display:block"></canvas>
+      h+=`<div class="bkbox" style="width:300px;flex:0 0 auto"><div class="bktit">② 체결강도 · 장중 추이 <small>실시간</small></div>
+          <div style="font-size:12.5px;margin-bottom:3px">체결강도
+            <b style="font-size:15px">${O.strength??'—'}</b>
+            <span class="sbadge ${_st>=100?'buy':'sell'}">당일 ${_st>=100?'매수 우위':'매도 우위'}</span></div>
+          <div class="note" style="font-size:10px;margin-bottom:3px">당일 누적 · 100 초과=매수</div>
+          <canvas id="sd_strcv" style="width:100%;height:72px;display:block"></canvas>
           <div class="note" id="sd_strnote" style="font-size:11px;margin-top:4px;max-width:290px">체결강도 추이 불러오는 중…</div>
           <details style="margin-top:6px"><summary style="font-size:11px;color:#98a2ad;cursor:pointer">직전 체결 30건 (수 초 · 참고용) ▾</summary>
           <div style="max-height:170px;overflow:auto;margin-top:4px"><table class="tk">
@@ -2596,9 +2596,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const D=await (await fetch('/api/strength/kr/'+encodeURIComponent(c))).json();
       if(dcode!==c || !_isMin()) return;
       const pts=(D&&D.pts)||[]; if(pts.length<2){ if(nt) nt.textContent=''; return; }
-      const w=cv.clientWidth||300, hh=96; cv.width=w; cv.height=hh;
+      const w=cv.clientWidth||280, hh=72; cv.width=w; cv.height=hh;
       const x=cv.getContext('2d'); x.clearRect(0,0,w,hh);
-      const P={l:4,r:30,t:8,b:14};
+      const P={l:4,r:28,t:6,b:12};
       const vs=pts.map(p=>p.cttr), lo=Math.min(80,...vs), hi=Math.max(120,...vs);
       const X=i=>P.l+(w-P.l-P.r)*i/(pts.length-1), Y=v=>P.t+(hh-P.t-P.b)*(1-(v-lo)/((hi-lo)||1));
       // 100 기준선 (매수/매도 경계)
