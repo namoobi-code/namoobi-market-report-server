@@ -2544,7 +2544,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           <tr><th>시각</th><th>체결가</th><th>수량</th><th>구분</th></tr>`;
       for(const t of (O.ticks||[])){
         const up=(t.sg==='1'||t.sg==='2'); const sd=t.side||'mid';
-        const lab= sd==='buy'?'매수':(sd==='sell'?'매도':'—');
+        const lab= sd==='buy'?'매수':(sd==='sell'?'매도':'중립');
         h+=`<tr><td class="l">${E(String(t.t||'').replace(/(\d{2})(\d{2})(\d{2})/,'$1:$2:$3'))}</td>
              <td class="${up?'up':'dn'}">${_nf(t.p)}</td><td>${_nf(t.v)}</td>
              <td><span class="sbadge ${sd}">${lab}</span></td></tr>`; }
@@ -2596,26 +2596,35 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const D=await (await fetch('/api/strength/kr/'+encodeURIComponent(c))).json();
       if(dcode!==c || !_isMin()) return;
       const pts=(D&&D.pts)||[]; if(pts.length<2){ if(nt) nt.textContent=''; return; }
-      const w=cv.clientWidth||280, hh=72; cv.width=w; cv.height=hh;
-      const x=cv.getContext('2d'); x.clearRect(0,0,w,hh);
-      const P={l:4,r:28,t:6,b:12};
-      const vs=pts.map(p=>p.cttr), lo=Math.min(80,...vs), hi=Math.max(120,...vs);
+      /* (2026-07-21) 고해상도(레티나) 대응 — CSS px 로만 그리면 흐릿·깨져 보인다.
+         내부 버퍼를 devicePixelRatio 배로 잡고 컨텍스트를 스케일한다. */
+      const dpr=window.devicePixelRatio||1;
+      const w=cv.clientWidth||280, hh=72;
+      cv.width=Math.round(w*dpr); cv.height=Math.round(hh*dpr);
+      const x=cv.getContext('2d'); x.setTransform(dpr,0,0,dpr,0,0); x.clearRect(0,0,w,hh);
+      const P={l:6,r:26,t:8,b:14};
+      const vs=pts.map(p=>p.cttr), lo=Math.floor(Math.min(80,...vs)/5)*5, hi=Math.ceil(Math.max(120,...vs)/5)*5;
       const X=i=>P.l+(w-P.l-P.r)*i/(pts.length-1), Y=v=>P.t+(hh-P.t-P.b)*(1-(v-lo)/((hi-lo)||1));
       // 100 기준선 (매수/매도 경계)
-      x.strokeStyle='#e3e7ec'; x.beginPath(); x.moveTo(P.l,Y(100)); x.lineTo(w-P.r,Y(100)); x.stroke();
-      x.fillStyle='#98a2ad'; x.font='9px sans-serif'; x.fillText('100', w-P.r+3, Y(100)+3);
-      x.fillText(String(Math.round(hi)), w-P.r+3, Y(hi)+7); x.fillText(String(Math.round(lo)), w-P.r+3, Y(lo));
-      // 선 — 100 위(매수)는 빨강, 아래(매도)는 파랑 세그먼트
+      x.strokeStyle='#e3e7ec'; x.lineWidth=1; x.beginPath(); x.moveTo(P.l,Y(100)); x.lineTo(w-P.r,Y(100)); x.stroke();
+      x.fillStyle='#b0b8c2'; x.font='9px sans-serif'; x.textAlign='left';
+      x.fillText('100', w-P.r+3, Y(100)+3);
+      x.fillText(String(hi), w-P.r+3, Y(hi)+7); x.fillText(String(lo), w-P.r+3, Y(lo));
+      // 선 — 부드럽게(한 스트로크). 100 위=빨강 / 아래=파랑 세그먼트, 라운드 조인.
+      x.lineWidth=1.8; x.lineJoin='round'; x.lineCap='round';
       for(let i=1;i<pts.length;i++){ const up=(vs[i-1]+vs[i])/2>=100;
-        x.strokeStyle=up?'#d33':'#1f6feb'; x.lineWidth=1.6; x.beginPath();
+        x.strokeStyle=up?'#d33':'#1f6feb'; x.beginPath();
         x.moveTo(X(i-1),Y(vs[i-1])); x.lineTo(X(i),Y(vs[i])); x.stroke(); }
       x.lineWidth=1;
       // 마지막 점 강조
       const li=pts.length-1; x.fillStyle=vs[li]>=100?'#d33':'#1f6feb';
       x.beginPath(); x.arc(X(li),Y(vs[li]),3,0,Math.PI*2); x.fill();
-      // x축 시각(처음·중간·끝)
-      x.fillStyle='#98a2ad';
-      [0,Math.floor(li/2),li].forEach(i=>x.fillText(pts[i].t, X(i)-12, hh-3));
+      // x축 시각 — 첫점은 왼쪽정렬, 끝점은 오른쪽정렬, 가운데는 중앙(잘림 방지)
+      x.fillStyle='#98a2ad'; const mid=Math.floor(li/2);
+      x.textAlign='left';   x.fillText(pts[0].t,   X(0),   hh-3);
+      x.textAlign='center'; x.fillText(pts[mid].t, X(mid), hh-3);
+      x.textAlign='right';  x.fillText(pts[li].t,  X(li),  hh-3);
+      x.textAlign='left';
       // 해석 문구 — 최근 3점 기울기로 '붙는 중/빠지는 중'
       if(nt){
         const a=vs[Math.max(0,li-2)], b=vs[li], d=b-a;

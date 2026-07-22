@@ -313,9 +313,23 @@ def orderbook_api(request: Request, code: str):
                 return None
         ask = [{"p": _i(o1.get("askp%d" % i)), "q": _i(o1.get("askp_rsqn%d" % i))} for i in range(1, 11)]
         bid = [{"p": _i(o1.get("bidp%d" % i)), "q": _i(o1.get("bidp_rsqn%d" % i))} for i in range(1, 11)]
-        t = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-ccnl",
-                    "FHKST01010300", {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code})
-        tk = t.get("output") or []
+        # (2026-07-21) 체결 소스를 inquire-ccnl → inquire-time-itemconclusion 으로 교체.
+        #   후자는 각 체결에 '그 시점의 매도/매수호가(askp/bidp)'를 준다 → 체결가를 호가와 비교해
+        #   매수(매도호가 이상)·매도(매수호가 이하)를 실측 판정할 수 있다.
+        #   틱 규칙(직전가 대비)은 삼성전자처럼 같은 가격 연속 체결이면 전부 '중립(—)'이 돼 무의미했다.
+        from datetime import timezone as _tz0, timedelta as _td0
+        _kn = datetime.now(_tz0(_td0(hours=9)))
+        _hh0 = "%02d%02d00" % (min(_kn.hour, 15) if _kn.hour != 15 or _kn.minute <= 30 else 15,
+                               _kn.minute if not (_kn.hour == 15 and _kn.minute > 30) else 30)
+        t = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-time-itemconclusion",
+                    "FHPST01060000", {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code,
+                                      "FID_INPUT_HOUR_1": _hh0})
+        tk = t.get("output2") or []
+        if not tk:      # 장 시작 전 등 — 마감 스냅으로 폴백
+            t = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/inquire-time-itemconclusion",
+                        "FHPST01060000", {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code,
+                                          "FID_INPUT_HOUR_1": "153000"})
+            tk = t.get("output2") or []
         # 장중 투자자 가집계(잠정) — 거래소가 장중 몇 차례 발표하는 외인·기관 추정 순매수.
         #   확정치는 마감 후에 나오므로, 장중에 방향을 보려면 이 잠정치뿐이다.
         frg = org = None; est_series = []
@@ -388,27 +402,30 @@ def orderbook_api(request: Request, code: str):
                "frg_est": frg, "org_est": org, "est_series": est_series,
                "score": sc, "label": lab, "parts": parts,
                "ticks": [{"t": x.get("stck_cntg_hour"), "p": _i(x.get("stck_prpr")),
-                          "v": _i(x.get("cntg_vol")), "sg": x.get("prdy_vrss_sign")}
+                          "v": _i(x.get("cnqn")), "sg": x.get("prdy_vrss_sign"),
+                          "ask": _i(x.get("askp")), "bid": _i(x.get("bidp"))}
                          for x in tk[:30]],
                "src": "KIS(%s) 실시간" % c.get("mode")}
-        # (2026-07-21) 체결별 매수/매도 판정 — 틱 규칙(Lee-Ready).
-        #   KIS 체결 REST 엔 매수/매도 구분 필드가 없다(시각·가격·수량뿐).
-        #   → 직전 체결가보다 '오르며 체결'(업틱)이면 매수 주도, '내리며 체결'(다운틱)이면 매도 주도,
-        #     같으면 직전 판정을 그대로 잇는다. 배열은 최신순이라 옛것(끝)부터 훑는다.
+        # (2026-07-21) 체결별 매수/매도 판정 — 호가 우선 + 틱 규칙 보조(혼합).
+        #   1차: 체결가 >= 매도호가 → 매수 주도 / <= 매수호가 → 매도 주도
+        #   2차(중간가 체결): 직전 체결가 대비 오르면 매수·내리면 매도로 보조 판정
+        #   그래도 안 갈리면 중립(중간가 매칭 — NXT 중간가·종가 단일가에서 흔함, 매수·매도 균형).
         _tks = res["ticks"]
         _prev = None
         for i in range(len(_tks) - 1, -1, -1):
-            cur = _tks[i]["p"]
+            p_, a_, b_ = _tks[i]["p"], _tks[i].get("ask"), _tks[i].get("bid")
             older = _tks[i + 1]["p"] if i + 1 < len(_tks) else None
-            if cur is None or older is None:
-                d = _prev
-            elif cur > older:
-                d = "buy"
-            elif cur < older:
-                d = "sell"
-            else:
-                d = _prev
-            _tks[i]["side"] = d or "mid"
+            d = None
+            if p_ is not None and a_ and b_:
+                if p_ >= a_:
+                    d = "buy"
+                elif p_ <= b_:
+                    d = "sell"
+            if d is None and p_ is not None and older is not None:   # 중간가 → 틱 규칙 보조
+                d = "buy" if p_ > older else ("sell" if p_ < older else None)
+            if d is None:
+                d = "mid"
+            _tks[i]["side"] = d
             if d in ("buy", "sell"):
                 _prev = d
         bq = sum(t["v"] or 0 for t in _tks if t["side"] == "buy")
