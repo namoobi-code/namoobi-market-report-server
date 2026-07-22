@@ -19,10 +19,12 @@
   .mainc{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 60px 0}
   .mainc::-webkit-scrollbar,.invlist::-webkit-scrollbar,.side::-webkit-scrollbar{width:9px}
   .mainc::-webkit-scrollbar-thumb,.invlist::-webkit-scrollbar-thumb,.side::-webkit-scrollbar-thumb{background:#cfd4da;border-radius:9px}
-  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:10px;padding-bottom:14px;border-bottom:2px solid var(--dark);flex:0 0 auto}
+  header{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px;padding-bottom:14px;border-bottom:2px solid var(--dark);flex:0 0 auto}
   h1{font-size:21px;letter-spacing:-.3px}
   h1 span{color:var(--tx2);font-weight:400;font-size:13px;margin-left:7px}
-  .meta{font-size:12px;color:var(--tx2);text-align:right}
+  /* (2026-07-22) 로그인 시 헤더 2줄 방지 — 폭이 빠듯한 화면에선 부제를 숨겨 1줄 유지 */
+  @media(max-width:1850px){ header h1 span{display:none} }
+  .meta{font-size:11px;color:var(--tx2);text-align:right}
   nav{display:flex;flex-wrap:wrap;gap:5px;flex:0 0 auto;background:var(--bg);padding:6px 0 9px;border-bottom:1px solid var(--line);margin-bottom:10px;position:sticky;top:0;z-index:50}
   nav a{font-size:11.5px;padding:4px 9px;border-radius:999px;background:#fff;border:1px solid var(--line);color:var(--tx2);text-decoration:none}
   nav a:hover{border-color:var(--dark);color:var(--tx)}
@@ -68,8 +70,8 @@
   .tabs .etftab{background:#2f80ed;border-color:#2f80ed;color:#fff}
   .tabs .etftab small{color:#dbeafe}
   .tabs .etftab.on,.tabs .etftab:hover{background:#1f5fbf;border-color:#1f5fbf;color:#fff}
-  .hdr-r{display:flex;align-items:center;gap:9px}
-  .hbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;color:var(--tx2);font-weight:600;white-space:nowrap}
+  .hdr-r{display:flex;align-items:center;gap:6px}
+  .hbtn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:7px 9px;font-size:12px;cursor:pointer;color:var(--tx2);font-weight:600;white-space:nowrap}
   .hbtn:hover{border-color:var(--dark);color:var(--tx)}
   /* 개발자 로그인 — 로그인 전에는 흐릿하고 작게 */
   .lockbtn{padding:6px 7px;font-size:10px;opacity:.22;border-color:#e2e8f0;font-weight:400}
@@ -199,8 +201,8 @@
   footer{margin-top:40px;padding-top:14px;border-top:1px solid var(--line);font-size:11px;color:var(--tx2);text-align:center}
   .src{font-size:10.5px;color:var(--tx2);margin-top:6px}
   /* ── (2026-07-12) 상단 탭 — 우측 영역(nav+본문)을 통째로 전환 ── */
-  .tabs{display:flex;gap:6px;flex:1 1 auto;justify-content:center;flex-wrap:wrap}
-  .tab{font-size:12.5px;font-weight:600;padding:7px 15px;border-radius:7px;cursor:pointer;
+  .tabs{display:flex;gap:5px;flex:1 1 auto;justify-content:center;flex-wrap:wrap}
+  .tab{font-size:12.5px;font-weight:600;padding:7px 11px;border-radius:7px;cursor:pointer;
        background:#fff;border:1px solid var(--line);color:var(--tx2);white-space:nowrap;font-family:inherit}
   .tab:hover{border-color:var(--dark);color:var(--tx)}
   .tab.on{background:var(--dark);color:#fff;border-color:var(--dark)}
@@ -442,6 +444,8 @@
   #scr_tbl{font-size:12.5px}
   #scr_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
   #scr_tbl th:hover{background:#e0e7f2}
+  #scr_tblwrap{scroll-margin-top:8px}
+  #scr_hashtop:hover{background:#dbe6f6;color:#1f6feb}
   #scr_tbl th.dn::after{content:" \25be";color:#1f6feb}
   #scr_tbl th.up::after{content:" \25b4";color:#1f6feb}
 
@@ -494,7 +498,7 @@
       <button class="tab"    data-pane="p_daily">AI Daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB Server<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
-      <button class="tab"    data-pane="p_ta">AI TradingAgents<small>Multi-Agents LLM Financial Trading FRW</small></button>
+      <button class="tab"    data-pane="p_ta">AI TradingAgents<small>Multi-Agent LLM Trading</small></button>
       <button class="tab"    data-pane="p_auto">자동매매<small>KIS · 선정종목 집행</small></button>
       <button class="tab off" data-pane="p_fire" disabled title="준비 중">경제적 자유<small>퇴사 시뮬레이터</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
@@ -542,6 +546,8 @@
         <button class="scrrst" id="etf_glsbtn">? 필터설명</button>
         <button class="scrrst" id="etf_rst">↺ 필터 선택 초기화(default)</button>
         <button class="scrrst" id="etf_allf">⊘ 전부전체</button>
+        <button class="scrrst" id="etf_autoscroll" title="ETF 클릭 시 상세 패널로 화면 자동이동 켜기/끄기">⤓ 자동이동: ON</button>
+        <span class="scrrst" id="etf_rowsbox" title="스크롤 없이 보이는 결과 행 수" style="display:inline-flex;align-items:center;gap:5px;cursor:default;padding:4px 8px">표시 <button type="button" class="rowspin" id="etf_rowsdn" title="한 행 줄이기">−</button><input type="number" id="etf_rows" min="1" max="60" value="8" style="width:28px;border:none;background:transparent;font-size:13px;font-weight:600;text-align:center;font-family:inherit;color:inherit"><button type="button" class="rowspin" id="etf_rowsup" title="한 행 늘리기">＋</button> 행</span>
         <button class="scrrst" id="etf_colbtn">⊞ 컬럼설정</button>
         <button class="scrrst scrgo" id="etf_start">▶ START</button>
       </div>
@@ -809,8 +815,7 @@
   <!-- SCREENER (2026-07-15 · 인터랙티브 필터) -->
   <div class="pane" id="p_screener">
     <main class="mainc">
-      <div class="lead" id="scr_asof" style="margin-top:2px">불러오는 중…</div>
-      <h2 style="margin:8px 0 3px">종목 스크리너</h2><!-- (2026-07-26) 빈칸 표기 범례는 '필터설명' 패널로 이동 -->
+      <!-- (2026-07-22) ETF처럼 2줄로: 제목 + 상태(기준일·풀·LIVE)를 h2 안에 인라인 --><h2 style="margin:8px 0 3px">🔍 종목 스크리너 <span class="note" id="scr_asof" style="font-weight:400">불러오는 중…</span></h2>
       <div class="scrtop">
         <div class="mktseg"><button class="mkt on" data-mkt="kr">🇰🇷 한국</button><button class="mkt" data-mkt="us">🇺🇸 미국</button></div>
         <div class="mktseg stgseg"><button class="stg on" data-stg="1">1단계 하드컷</button><button class="stg" data-stg="2">2단계 z랭킹</button><button class="stg" data-stg="3">3단계 실측</button></div>
@@ -1192,6 +1197,8 @@
 #etf_tbl th:hover{background:#e0e7f2}
 #etf_tbl tr[data-c]{cursor:pointer}
 #etf_tbl tr[data-c]:hover td{background:#f2f6fc}
+#etf_tblbox{scroll-margin-top:8px}
+#etf_hashtop:hover{background:#dbe6f6;color:#1f6feb}
 #ed_main{width:100%;height:360px!important;max-height:none!important;display:block}
 /* (2026-07-26) 보조 패널 2배 — 70/70/90 → 140/140/180 (가독성, 종목 차트와 동일) */
 #ed_vol{width:100%;height:140px!important;max-height:none!important;display:block;margin-top:2px}

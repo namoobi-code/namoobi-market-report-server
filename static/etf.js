@@ -11,6 +11,16 @@
 
   let POOL={kr:[],us:[]}, loaded=false, mkt='kr', sort={k:'cap',d:-1};
   let findQ='', findOpen=false, findCaret=null, findIME=false;
+  /* (2026-07-22) 결과표 UI 옵션 — 종목 스크리너와 동일. 클릭 시 상세 자동이동(기본 ON) · 표시 행수(기본 8). */
+  let autoScroll = localStorage.getItem('etf_autoscroll') !== '0';
+  let visRows = Math.max(1, Math.min(60, +localStorage.getItem('etf_visrows') || 8));
+  function applyTblHeight(){
+    const w=$('etf_tblbox'); if(!w) return;
+    const tbl=$('etf_tbl'); const hd=tbl&&tbl.querySelector('th'); const row=tbl&&tbl.querySelector('tr[data-c]');
+    const hH=hd&&hd.parentElement?hd.parentElement.offsetHeight:34;
+    const rH=row?row.offsetHeight:40;
+    w.style.maxHeight=(hH+visRows*rH+2)+'px';
+  }
   /* (2026-07-20) 종목 역검색 상태 — HOLD={kr:{etf코드:[[종목명,코드,비중],..]},us:{...}} 지연 로드 */
   let holdQ='', holdOpen=false, holdCaret=null, holdIME=false, HOLD=null, holdLoading=false;
   function loadHold(cb){
@@ -358,7 +368,7 @@
     $('etf_cnt').innerHTML=`<b>${rows.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`
       +(findQ?` <span class="findtag">🔎 "${E(findQ)}"</span>`:'');
     const cols=COLST[mkt].filter(cAvail), cap=rows.slice(0,400);
-    $('etf_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-es="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(CDEF[k].l)}</th>`).join('')
+    $('etf_tbl').innerHTML='<tr><th id="etf_hashtop" title="클릭: 결과 표를 화면 맨 위로 · 다시 클릭: 필터로 복귀" style="cursor:pointer">#</th>'+cols.map(k=>`<th data-es="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(CDEF[k].l)}</th>`).join('')
       +'<th class="colbtn" id="etf_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
       cap.map((r,i)=>`<tr><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
       (rows.length?'':`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center;padding:16px">조건을 통과한 ETF 가 없습니다</td></tr>`)+
@@ -369,6 +379,11 @@
     $('etf_tbl').querySelectorAll('[data-es]').forEach(th=>th.onclick=e=>{ e.stopPropagation();
       const k=th.dataset.es; if(sort.k===k)sort.d*=-1; else{sort.k=k;sort.d=(CDEF[k].n||CDEF[k].sn)?-1:1;} applyTable();});
     {const pl=$('etf_colplus'); if(pl) pl.onclick=e=>{e.stopPropagation(); toggleColPanel();};}
+    {const hc=$('etf_hashtop'); if(hc) hc.onclick=e=>{ e.stopPropagation();   // (2026-07-22) # → 표 맨 위로(토글)
+       const w=$('etf_tblbox'); if(!w) return;
+       if(w.getBoundingClientRect().top < 80) window.scrollTo({top:0,behavior:'smooth'});
+       else w.scrollIntoView({behavior:'smooth',block:'start'}); };}
+    applyTblHeight();   // 표시 행수 반영
   }
 
   /* ── 종목 상세 (좌 차트 · 우 정보) ── */
@@ -502,7 +517,7 @@
     fetch(`/api/chart/${mkt}/${encodeURIComponent(r.c)}`).then(x=>x.json()).then(D=>{
       if(dcode!==r.c) return; drawChart(D);
     }).catch(()=>{ $('ed_src').textContent='차트 로드 실패'; });
-    $('etf_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
+    if(autoScroll) $('etf_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   {const cb=$('ed_close'); if(cb) cb.onclick=()=>{ $('etf_detail').style.display='none'; dcode=null; };}
   {const nv=$('ed_nvopen'); if(nv) nv.onclick=()=>{ if(!dcode) return;
@@ -572,6 +587,19 @@
   {const rb=$('etf_rst'); if(rb) rb.onclick=()=>{ F_ST[mkt]=buildF(); F=F_ST[mkt]; findQ=''; findOpen=false; apply(); };}
   {const ab=$('etf_allf'); if(ab) ab.onclick=()=>{ F_ST[mkt]=clearF(); F=F_ST[mkt]; findQ=''; findOpen=false; apply(); };}
   {const cb=$('etf_colbtn'); if(cb) cb.onclick=()=>toggleColPanel();}
+  /* (2026-07-22) 자동이동 토글 */
+  {const ab=$('etf_autoscroll'); if(ab){
+    const paint=()=>{ ab.textContent='⤓ 자동이동: '+(autoScroll?'ON':'OFF');
+      ab.style.color=autoScroll?'#1f6feb':'var(--tx2)'; ab.style.borderColor=autoScroll?'#1f6feb':'var(--line)'; ab.style.fontWeight=autoScroll?'600':'400'; };
+    paint(); ab.onclick=()=>{ autoScroll=!autoScroll; localStorage.setItem('etf_autoscroll',autoScroll?'1':'0'); paint(); }; }}
+  /* (2026-07-22) 결과표 표시 행수 −/+ */
+  {const rn=$('etf_rows'); if(rn){ rn.value=visRows;
+    const setRows=(v,writeInput)=>{ visRows=Math.max(1,Math.min(60,v)); if(writeInput) rn.value=visRows; localStorage.setItem('etf_visrows',visRows); applyTblHeight(); };
+    rn.oninput=()=>setRows(+rn.value||8, false);
+    const up=$('etf_rowsup'), dn=$('etf_rowsdn');
+    if(up) up.onclick=()=>setRows(visRows+1, true);
+    if(dn) dn.onclick=()=>setRows(visRows-1, true);
+  }}
   {const lb=$('etf_glsbtn'); if(lb) lb.onclick=()=>toggleLegend();}
   {const lx=$('etf_glsx'); if(lx) lx.onclick=()=>toggleLegend(false);}
   loadF(); renderChips();

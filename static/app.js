@@ -2112,7 +2112,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_cnt').innerHTML=`<b>${base.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`
       +(findQ?` <span class="findtag">🔎 “${E(findQ)}” ${rows.length.toLocaleString()}종</span>`:'');
     const cols=COLST[mkt].filter(cAvail); const cap=rows.slice(0,400);
-    $('scr_tbl').innerHTML='<tr><th>#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(cl(k))}</th>`).join('')
+    $('scr_tbl').innerHTML='<tr><th id="scr_hashtop" title="클릭: 결과 표를 화면 맨 위로 · 다시 클릭: 필터로 복귀" style="cursor:pointer">#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(cl(k))}</th>`).join('')
       +'<th class="colbtn" id="scr_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
       cap.map((r,i)=>`<tr data-c="${E(r.c)}"><td class="note">${i+1}</td>`+cols.map(k=>`<td class="${CDEF[k].n?'num':''}">${cell(r,k)}</td>`).join('')+'<td></td></tr>').join('')+
       (rows.length?'':`<tr><td colspan="${cols.length+2}" class="note" style="text-align:center;padding:16px">`+
@@ -2122,6 +2122,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_tbl').querySelectorAll('[data-sort]').forEach(th=>th.onclick=()=>{
       const k=th.dataset.sort; if(sort.k===k)sort.d*=-1; else {sort.k=k; sort.d=(k==='n')?1:-1;} applyTable(); });
     {const pl=$('scr_colplus'); if(pl) pl.onclick=()=>toggleColPanel();}
+    {const hc=document.getElementById('scr_hashtop'); if(hc) hc.onclick=()=>{  // (2026-07-22) # 클릭 → 표를 맨 위로(토글)
+       const w=document.getElementById('scr_tblwrap'); if(!w) return;
+       if(w.getBoundingClientRect().top < 80) window.scrollTo({top:0,behavior:'smooth'});   // 이미 위 → 필터로 복귀
+       else w.scrollIntoView({behavior:'smooth',block:'start'});                             // 표를 화면 맨 위로
+    };}
     $('scr_tbl').querySelectorAll('tr[data-c]').forEach(tr=>tr.onclick=()=>showDetail(tr.dataset.c));
     applyTblHeight();   // (2026-07-22) 표시 행수 설정을 렌더마다 반영
     renderLegend();
