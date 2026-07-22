@@ -318,16 +318,21 @@ def orderbook_api(request: Request, code: str):
         tk = t.get("output") or []
         # 장중 투자자 가집계(잠정) — 거래소가 장중 몇 차례 발표하는 외인·기관 추정 순매수.
         #   확정치는 마감 후에 나오므로, 장중에 방향을 보려면 이 잠정치뿐이다.
-        frg = org = None
+        frg = org = None; est_series = []
         try:
             iv = _K._get(c, tok, "/uapi/domestic-stock/v1/quotations/investor-trend-estimate",
                          "HHPTJ04160200", {"MKSC_SHRN_ISCD": code})
             rows = iv.get("output2") or []
-            if rows:
-                last = max(rows, key=lambda z: str(z.get("bsop_hour_gb") or ""))
+            # 회차(bsop_hour_gb 1~5)별 '당일 누적' 추정 순매수 — 오름차순 = 시간 진행.
+            series = sorted(rows, key=lambda z: str(z.get("bsop_hour_gb") or ""))
+            est_series = [{"gb": _i(z.get("bsop_hour_gb")),
+                           "frg": _i(z.get("frgn_fake_ntby_qty")),
+                           "org": _i(z.get("orgn_fake_ntby_qty"))} for z in series]
+            if series:
+                last = series[-1]
                 frg, org = _i(last.get("frgn_fake_ntby_qty")), _i(last.get("orgn_fake_ntby_qty"))
         except Exception:
-            pass
+            est_series = []
 
         # ── 체결·호가에 나타난 '압력' 요약 (매매 권유가 아니라 현재 주문흐름의 서술)
         st = None
@@ -364,12 +369,36 @@ def orderbook_api(request: Request, code: str):
                "at": o1.get("aspr_acpt_hour"),
                "px": _i(o2.get("stck_prpr")),
                "strength": (tk[0].get("tday_rltv") if tk else None),
-               "frg_est": frg, "org_est": org,
+               "frg_est": frg, "org_est": org, "est_series": est_series,
                "score": sc, "label": lab, "parts": parts,
                "ticks": [{"t": x.get("stck_cntg_hour"), "p": _i(x.get("stck_prpr")),
                           "v": _i(x.get("cntg_vol")), "sg": x.get("prdy_vrss_sign")}
                          for x in tk[:30]],
                "src": "KIS(%s) 실시간" % c.get("mode")}
+        # (2026-07-21) 체결별 매수/매도 판정 — 틱 규칙(Lee-Ready).
+        #   KIS 체결 REST 엔 매수/매도 구분 필드가 없다(시각·가격·수량뿐).
+        #   → 직전 체결가보다 '오르며 체결'(업틱)이면 매수 주도, '내리며 체결'(다운틱)이면 매도 주도,
+        #     같으면 직전 판정을 그대로 잇는다. 배열은 최신순이라 옛것(끝)부터 훑는다.
+        _tks = res["ticks"]
+        _prev = None
+        for i in range(len(_tks) - 1, -1, -1):
+            cur = _tks[i]["p"]
+            older = _tks[i + 1]["p"] if i + 1 < len(_tks) else None
+            if cur is None or older is None:
+                d = _prev
+            elif cur > older:
+                d = "buy"
+            elif cur < older:
+                d = "sell"
+            else:
+                d = _prev
+            _tks[i]["side"] = d or "mid"
+            if d in ("buy", "sell"):
+                _prev = d
+        bq = sum(t["v"] or 0 for t in _tks if t["side"] == "buy")
+        sq = sum(t["v"] or 0 for t in _tks if t["side"] == "sell")
+        res["tick_buy"] = bq
+        res["tick_sell"] = sq
         _ob_cache[code] = (now, res)
         if len(_ob_cache) > 200:
             _ob_cache.clear()

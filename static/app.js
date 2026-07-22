@@ -2535,22 +2535,39 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           <div style="font-size:13px;margin-bottom:6px">체결강도
             <b style="font-size:16px">${O.strength??'—'}</b>
             <span class="sbadge ${parseFloat(O.strength)>=100?'buy':'sell'}">${parseFloat(O.strength)>=100?'매수 우위':'매도 우위'}</span></div>
-          <div style="max-height:210px;overflow:auto"><table class="tk">
-          <tr><th>시각</th><th>체결가</th><th>수량</th></tr>`;
+          <div style="font-size:11px;margin-bottom:4px">최근 30체결
+            <b class="up">매수 ${_nf(O.tick_buy)}</b> · <b class="dn">매도 ${_nf(O.tick_sell)}</b></div>
+          <div style="max-height:200px;overflow:auto"><table class="tk">
+          <tr><th>시각</th><th>체결가</th><th>수량</th><th>구분</th></tr>`;
       for(const t of (O.ticks||[])){
         const up=(t.sg==='1'||t.sg==='2');
+        const sd=t.side||'mid';
+        const lab= sd==='buy'?'매수':(sd==='sell'?'매도':'—');
         h+=`<tr><td class="l">${E(String(t.t||'').replace(/(\d{2})(\d{2})(\d{2})/,'$1:$2:$3'))}</td>
-             <td class="${up?'up':'dn'}">${_nf(t.p)}</td><td>${_nf(t.v)}</td></tr>`; }
-      h+=`</table></div><div class="note" style="font-size:11px;margin-top:5px;max-width:250px">
+             <td class="${up?'up':'dn'}">${_nf(t.p)}</td><td>${_nf(t.v)}</td>
+             <td><span class="sbadge ${sd}">${lab}</span></td></tr>`; }
+      h+=`</table></div><div class="note" style="font-size:11px;margin-top:5px;max-width:270px">
           체결강도 = 매수 체결량 ÷ 매도 체결량 × 100. 100 초과면 사는 쪽이 <b>매도호가를 올려 치며</b> 가져간 것.
-          100 미만이면 파는 쪽이 매수호가로 내려 던진 것.</div></div>`;
+          <b>구분</b>은 직전 체결가 대비 오르며 체결(매수)·내리며 체결(매도)로 판정한 것(틱 규칙 — KIS가 체결별 구분값을 안 줘 이 방식으로 추정).</div></div>`;
 
       // ③ 투자자 가집계 + 종합
       h+=`<div class="bkbox" style="flex:1;min-width:280px">
-          <div class="bktit">③ 투자자 가집계 · 종합 <small>장중 잠정치</small></div>
+          <div class="bktit">③ 투자자 가집계 · 종합 <small>장중 잠정치 · 당일 누적</small></div>
           <div style="font-size:12.5px;margin-bottom:6px">
             외국인 <b class="${(O.frg_est||0)>=0?'up':'dn'}">${_sg(O.frg_est)}</b> ·
-            기관 <b class="${(O.org_est||0)>=0?'up':'dn'}">${_sg(O.org_est)}</b></div>
+            기관 <b class="${(O.org_est||0)>=0?'up':'dn'}">${_sg(O.org_est)}</b>
+            <span class="note" style="font-size:10.5px">(당일 누적 · 최신 회차)</span></div>`;
+      if(O.est_series && O.est_series.length>1){
+        h+=`<table class="tk" style="margin-bottom:8px"><tr><th>회차</th><th>외국인(누적)</th><th>기관(누적)</th></tr>`;
+        for(const e of O.est_series){
+          h+=`<tr><td class="l">${e.gb}차</td>
+               <td class="${(e.frg||0)>=0?'up':'dn'}">${_sg(e.frg)}</td>
+               <td class="${(e.org||0)>=0?'up':'dn'}">${_sg(e.org)}</td></tr>`; }
+        h+=`</table><div class="note" style="font-size:10.5px;margin-bottom:8px">
+            KRX 가 장중 5회 발표하는 잠정 집계의 <b>당일 누적</b> 추이 — 회차가 갈수록 외인·기관이
+            더 사들이면(값이 커지면) 매수세가 붙는 중, 줄면 빠지는 중.</div>`;
+      }
+      h+=`
           <div style="font-size:14px;margin:8px 0">현재 압력
             <span class="sbadge ${sc}" style="font-size:13px;padding:3px 10px">${E(O.label)}</span>
             <span class="note" style="font-size:11px">(${O.score>=0?'+':''}${O.score}점)</span></div>
