@@ -326,6 +326,11 @@
   /* (2026-07-18) 우측 버튼 그룹 — 필터 초기화(위) + START·컬럼설정·필터설명(아래) */
   .scrbtns{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
   .scrbtns .scrrst{margin-left:0}
+  .rowspin{width:24px;height:24px;line-height:1;padding:0;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer;font-size:16px;font-weight:700;color:var(--tx2);display:inline-flex;align-items:center;justify-content:center;user-select:none}
+  .rowspin:hover{border-color:var(--dark);color:var(--tx);background:#f2f6fc}
+  .rowspin:active{background:#e4ebf5}
+  #scr_rows::-webkit-inner-spin-button,#scr_rows::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  #scr_rows{-moz-appearance:textfield;appearance:textfield}
   .scrbtns-r{display:flex;gap:8px}
   .scrrst2{border:1px solid var(--line);background:#fff;border-radius:7px;padding:3px 10px;font-size:11px;cursor:pointer;color:var(--tx2)}
   .scrrst2:hover{border-color:var(--dark);color:var(--tx)}
@@ -815,7 +820,7 @@
         <div class="scrbtns" id="scr_btns_grp">
           <div class="scrbtns-r">
             <button class="scrrst" id="scr_autoscroll" title="종목 클릭 시 상세 패널로 화면 자동이동 켜기/끄기">⤓ 자동이동: ON</button>
-            <label class="scrrst" id="scr_rowsbox" title="스크롤 없이 보이는 결과 행 수" style="display:inline-flex;align-items:center;gap:3px;cursor:default">표시 <input type="number" id="scr_rows" min="1" max="60" value="8" style="width:38px;border:none;background:transparent;font-size:12px;font-weight:600;text-align:right;font-family:inherit;color:inherit">행</label>
+            <span class="scrrst" id="scr_rowsbox" title="스크롤 없이 보이는 결과 행 수" style="display:inline-flex;align-items:center;gap:5px;cursor:default;padding:4px 8px">표시 <button type="button" class="rowspin" id="scr_rowsdn" title="한 행 줄이기">−</button><input type="number" id="scr_rows" min="1" max="60" value="8" style="width:28px;border:none;background:transparent;font-size:13px;font-weight:600;text-align:center;font-family:inherit;color:inherit"><button type="button" class="rowspin" id="scr_rowsup" title="한 행 늘리기">＋</button> 행</span>
             <button class="scrrst" id="scr_colbtn">⊞ 컬럼설정</button>
             <button class="scrrst scrgo" id="scr_start">▶ START</button>
           </div>

@@ -3621,7 +3621,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     paint(); ab.onclick=()=>{ autoScroll=!autoScroll; localStorage.setItem('scr_autoscroll',autoScroll?'1':'0'); paint(); }; }}
   /* (2026-07-22) 결과표 표시 행수 */
   {const rn=$('scr_rows'); if(rn){ rn.value=visRows;
-    rn.oninput=()=>{ visRows=Math.max(1,Math.min(60,+rn.value||8)); localStorage.setItem('scr_visrows',visRows); applyTblHeight(); }; }}
+    const setRows=(v,writeInput)=>{ visRows=Math.max(1,Math.min(60,v)); if(writeInput) rn.value=visRows; localStorage.setItem('scr_visrows',visRows); applyTblHeight(); };
+    rn.oninput=()=>setRows(+rn.value||8, false);   // 타이핑 중엔 input 을 덮어쓰지 않음(두 자리 입력 유지)
+    const up=$('scr_rowsup'), dn=$('scr_rowsdn');
+    if(up) up.onclick=()=>setRows(visRows+1, true);
+    if(dn) dn.onclick=()=>setRows(visRows-1, true);
+  }}
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
    if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더
    if(gx&&gp) gx.onclick=()=>{ gp.style.display='none'; };}
