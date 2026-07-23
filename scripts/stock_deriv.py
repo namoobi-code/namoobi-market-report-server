@@ -1,36 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-stock_deriv.py — 종목별 파생 포지셔닝 수집 (파일럿: 삼성전자·SK하이닉스)
+stock_deriv.py — 종목별 파생 포지셔닝 (v2: KR 파생상장 전 종목 + US 옵션 종목)
 
-목적: 인덱스 3.1.13(코스피200 파생)을 종목 단위로 내린다.
-  개별주식 선물·옵션에서 5개 선행지표를 산출해 일별 시계열 + 60거래일 z 를 만든다.
-  ① 선물 베이시스(최근월 선물 − 현물)   ② 선물 미결제약정(OI) 합계·변화
-  ③ 풋콜비율 PCR(OI)                    ④ IV 스큐(OTM 풋 IV − OTM 콜 IV)
-  ⑤ 딜러 감마 GEX(콜 롱감마 + / 풋 숏감마 −)
+v1(파일럿 삼성전자·SK하이닉스, likeItmsNm 종목별 조회) → v2 확장:
+  · KR: FSC 벌크(일자당 선물 1콜 + 옵션 3콜 페이징)로 전 상장 기초자산 수집.
+        itmsNm 에서 기초자산명을 파싱해 screener_pool 의 종목명과 매칭(지수·국채·FX 자동 배제).
+        지표: 베이시스·선물OI·PCR(OI)·IV스큐·GEX + 60일 z (백필 가능 — 2020년까지 조회됨)
+  · US: yfinance 옵션체인(deriv_signals.ingest.option_metrics 재사용 — SPX/NDX와 동일 산식).
+        선물이 없어 베이시스·선물OI는 없음. PCR(OI)·IV스큐(25Δ)·GEX 만.
+        옵션체인은 포인트인타임(백필 불가) → z 는 수집 개시일부터 누적(20일 후 산출).
 
-소스: 금융위원회_파생상품시세정보 (data.go.kr, 무료·T+1 확정치)
-  End Point 에 /service/ 가 반드시 들어간다 (Swagger 기본 URL 에는 빠져 있어 500 남 — 실측).
-  옵션: getOptionsPriceInfo  → iptVlty(내재변동성 %)·opnint(미결제) 직접 제공
-  선물: getStockFuturesPriceInfo → sptPrc(현물가) 포함 → 베이시스 원콜 계산
-  과거 2020년까지 조회됨(실측) → z 는 백필로 즉시 활성 (인덱스처럼 3개월 대기 불필요)
+실행: venv python 권장(US 파트가 yfinance·pandas 필요 — 없으면 US 자동 스킵)
+  /home/ubuntu/namoobi/venv/bin/python scripts/stock_deriv.py            # 증분
+  /home/ubuntu/namoobi/venv/bin/python scripts/stock_deriv.py --backfill # KR 130일 백필
+cron: 40 13 * * 1-6 (KR T+1 반영 후) + 50 6 * * 2-6 (US 마감 후)
 
-주의(실측 근거):
-  - T+1: 기준일 다음 영업일 13시 이후 반영(금요일치=월요일). 백필·저녁 점검용.
-  - 개별주식옵션은 유동성이 얇다 → IV 스큐는 표본조건 미달 시 None(빈칸)으로 두고
-    사유를 남긴다. PCR 도 양쪽 OI 합이 얇으면 None.
-  - 장중(T+0)은 선물 2종(베이시스·OI)만 KIS 로 따로 갱신 예정 — 옵션 3종은 장중
-    호가 공백으로 퇴화(인덱스 실측: 장전 PCR 4,199)라 확정치만 쓴다.
-
-산출물: data/db/stock_deriv.json
-  {"asof":..., "stocks":{code:{"name":..,"days":[{d,spot,fut,basis,basis_pct,fut_oi,
-    pcr_oi,iv_skew,gex}...], "z":{basis_pct:..,fut_oi_chg:..,pcr_oi:..,iv_skew:..,gex:..}}}}
-
-사용: python3 scripts/stock_deriv.py                # 증분(마지막 저장일 다음날~어제)
-      python3 scripts/stock_deriv.py --backfill 130 # 최근 130일 백필
-cron: 40 13 * * 1-6 (FSC 13시 반영 후)
+산출: data/db/stock_deriv.json
+  {"asof","src","stocks":{code:{"name","mkt":"kr|us","days":[...],"z":{...},"latest":{...}}}}
 """
-import json, os, re, sys, time, math, glob
+import json, os, re, sys, time, math
 from datetime import date, datetime, timedelta
 from urllib.parse import urlencode
 import urllib.request
@@ -38,51 +27,46 @@ import urllib.request
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB   = os.path.join(BASE, "data", "db")
 OUT  = os.path.join(DB, "stock_deriv.json")
-
 API  = "https://apis.data.go.kr/1160100/service/GetDerivativeProductInfoService"
 
-# 파일럿 대상 — 파생(주식선물·주식옵션) 상장 종목만 의미가 있다
-STOCKS = {"005930": "삼성전자", "000660": "SK하이닉스"}
+US_STOCKS = {"AAPL": "애플", "NVDA": "엔비디아"}
 
-Z_WIN = 60          # z-score 롤링 창(거래일) — 인덱스 3.1.13 과 동일
-RISK_FREE = 0.03    # GEX 감마 산출용 무위험금리(근사)
+Z_WIN = 60
+RISK_FREE = 0.03
+KEEP_DAYS = 280
 
 
-# ── 인증키 ────────────────────────────────────────────────────────────────
 def _key():
     k = os.environ.get("DATAGOKR_KEY")
     if k: return k.strip()
-    cands = [os.path.expanduser("~/namoobi/secrets/datagokr.key"),
-             "D:/claudeCowork/SECURITY/data.go.kr.txt"]
-    cands += glob.glob("/sessions/*/mnt/*/SECURITY/data.go.kr.txt")
-    for p in cands:
+    for p in [os.path.expanduser("~/namoobi/secrets/datagokr.key"),
+              "D:/claudeCowork/SECURITY/data.go.kr.txt"]:
         try:
             t = open(p, encoding="utf-8").read().strip()
             if t: return t.splitlines()[0].strip()
         except Exception: pass
-    raise SystemExit("data.go.kr 인증키 없음 (~/namoobi/secrets/datagokr.key)")
+    raise SystemExit("data.go.kr 인증키 없음")
 
 KEY = _key()
 
 
 def _get(op, tries=4, **params):
-    p = {"serviceKey": KEY, "resultType": "json", "numOfRows": params.pop("n", 500),
-         "pageNo": 1, **params}
+    p = {"serviceKey": KEY, "resultType": "json", **params}
     url = f"{API}/{op}?{urlencode(p)}"
     last = None
     for _ in range(tries):
         try:
-            with urllib.request.urlopen(url, timeout=30) as r:
+            with urllib.request.urlopen(url, timeout=60) as r:
                 j = json.loads(r.read().decode("utf-8"))
             b = j["response"]["body"]
             its = b.get("items") or {}
             rows = its.get("item") or []
             if isinstance(rows, dict): rows = [rows]
-            return rows
+            return b.get("totalCount", 0), rows
         except Exception as e:
             last = e; time.sleep(2)
     print(f"  [warn] {op} {params.get('basDt')} 실패: {last}")
-    return []
+    return 0, None
 
 
 def _f(v):
@@ -92,95 +76,138 @@ def _f(v):
     except Exception: return None
 
 
-# ── 만기(잔존일) — KRX 주식옵션 최종거래일 = 결제월 두 번째 목요일 ─────────
 def _expiry(yyyymm):
+    """KRX 주식선물·옵션 최종거래일 = 결제월 두 번째 목요일"""
     y, m = int(yyyymm[:4]), int(yyyymm[4:6])
     d = date(y, m, 1)
-    thursdays = [d + timedelta(days=i) for i in range(31)
-                 if (d + timedelta(days=i)).month == m and (d + timedelta(days=i)).weekday() == 3]
-    return thursdays[1]
+    th = [d + timedelta(days=i) for i in range(31)
+          if (d + timedelta(days=i)).month == m and (d + timedelta(days=i)).weekday() == 3]
+    return th[1]
 
 
-# ── BS 감마 (GEX용) ──────────────────────────────────────────────────────
 def _gamma(S, K, T, sigma):
     if not all([S, K, sigma]) or T <= 0 or sigma <= 0: return 0.0
     try:
         d1 = (math.log(S / K) + (RISK_FREE + sigma * sigma / 2) * T) / (sigma * math.sqrt(T))
-        phi = math.exp(-d1 * d1 / 2) / math.sqrt(2 * math.pi)
-        return phi / (S * sigma * math.sqrt(T))
+        return math.exp(-d1 * d1 / 2) / math.sqrt(2 * math.pi) / (S * sigma * math.sqrt(T))
     except Exception: return 0.0
 
 
-# ── 하루치 산출 ──────────────────────────────────────────────────────────
-_OPT_RE = re.compile(r"([CP])\s+(\d{6})\s+([\d,]+)")
+# ── KR: 풀 이름 → 코드 매핑 ─────────────────────────────────────────────
+def _pool_map():
+    p = os.path.join(DB, "screener_pool.json")
+    try:
+        kr = json.load(open(p, encoding="utf-8")).get("kr") or []
+        return {r["n"].strip(): r["c"] for r in kr if r.get("n") and r.get("c")}
+    except Exception as e:
+        raise SystemExit(f"screener_pool.json 로드 실패: {e}")
 
-def one_day(name, basdt):
-    """basdt(YYYYMMDD) 하루의 5지표. 데이터 없으면 None(휴장)."""
-    fut = _get("getStockFuturesPriceInfo", basDt=basdt, likeItmsNm=name, n=50)
-    fut = [r for r in fut if name in (r.get("itmsNm") or "")]
-    if not fut: return None
-    # 최근월 = 만기 yyyymm 최소 (스프레드 상품 제외: 'F 202608' 단일월물만)
-    rows = []
+
+_FUT_RE = re.compile(r"^(.+?)\s+F\s+(\d{6})")
+_OPT_RE = re.compile(r"^(.+?)\s+([CP])\s+(\d{6})\s+([\d,]+)")
+
+
+def kr_bulk_day(basdt, name2code):
+    """하루치 전체 선물+옵션 벌크 → {code: rec}. 데이터 없으면 None(휴장)."""
+    tc, fut = _get("getStockFuturesPriceInfo", basDt=basdt, numOfRows=10000, pageNo=1)
+    if fut is None or not fut: return None
+    opts = []
+    page = 1
+    while True:
+        tc, rows = _get("getOptionsPriceInfo", basDt=basdt, numOfRows=10000, pageNo=page)
+        if rows: opts += rows
+        if not rows or len(opts) >= tc or page >= 5: break
+        page += 1
+
+    F = {}   # name -> [(ym, row)]
     for r in fut:
-        m = re.search(r"F\s+(\d{6})", r.get("itmsNm") or "")
-        if m: rows.append((m.group(1), r))
-    if not rows: return None
-    rows.sort(key=lambda x: x[0])
-    ym, near = rows[0]
-    spot = _f(near.get("sptPrc")); futp = _f(near.get("clpr"))
-    if not spot or not futp: return None
-    basis = futp - spot
-    fut_oi = sum(int(_f(r.get("opnint")) or 0) for _, r in rows)
-
-    opts = _get("getOptionsPriceInfo", basDt=basdt, likeItmsNm=name, n=2000)
-    opts = [r for r in opts if name in (r.get("itmsNm") or "")]
-    coi = poi = 0
-    chain = []          # (side, strike, iv, oi, ym)
-    for r in opts:
-        m = _OPT_RE.search(r.get("itmsNm") or "")
+        m = _FUT_RE.match((r.get("itmsNm") or "").strip())
         if not m: continue
-        side, oym, k = m.group(1), m.group(2), _f(m.group(3))
-        oi = int(_f(r.get("opnint")) or 0)
-        iv = _f(r.get("iptVlty"))
-        if side == "C": coi += oi
-        else:           poi += oi
-        chain.append((side, k, iv, oi, oym))
-    pcr = round(poi / coi, 3) if (coi >= 100 and poi >= 100) else None  # 얇은 날 퇴화 방지
+        nm = m.group(1).strip()
+        if nm in name2code: F.setdefault(nm, []).append((m.group(2), r))
+    O = {}   # name -> [(side, strike, iv, oi, ym)]
+    for r in opts:
+        m = _OPT_RE.match((r.get("itmsNm") or "").strip())
+        if not m: continue
+        nm = m.group(1).strip()
+        if nm not in name2code: continue
+        O.setdefault(nm, []).append((m.group(2), _f(m.group(4)),
+                                     _f(r.get("iptVlty")), int(_f(r.get("opnint")) or 0),
+                                     m.group(3)))
 
-    # IV 스큐 — 최근월 · OTM 5% 지점의 풋 IV − 콜 IV. 표본조건: 목표 행사가 ±3% 내 존재
-    near_ch = [c for c in chain if c[4] == ym and c[2]]
-    iv_skew = None
-    if near_ch and spot:
-        tgt_p, tgt_c = spot * 0.95, spot * 1.05
-        puts  = [c for c in near_ch if c[0] == "P" and c[1] and abs(c[1] - tgt_p) / spot <= 0.03]
-        calls = [c for c in near_ch if c[0] == "C" and c[1] and abs(c[1] - tgt_c) / spot <= 0.03]
-        if puts and calls:
-            pv = min(puts,  key=lambda c: abs(c[1] - tgt_p))[2]
-            cv = min(calls, key=lambda c: abs(c[1] - tgt_c))[2]
-            if pv and cv and abs(pv - cv) <= 30:   # 퇴화 IV(호가 공백) 폐기 — 인덱스와 동일 기준
-                iv_skew = round(pv - cv, 2)
+    out = {}
+    for nm, rows in F.items():
+        rows.sort(key=lambda x: x[0])
+        ym, near = rows[0]
+        spot = _f(near.get("sptPrc")); futp = _f(near.get("clpr"))
+        if not spot or not futp: continue
+        rec = {"d": basdt, "spot": spot, "fut": futp,
+               "basis": round(futp - spot, 1),
+               "basis_pct": round((futp - spot) / spot * 100, 3),
+               "fut_oi": sum(int(_f(r.get("opnint")) or 0) for _, r in rows),
+               "pcr_oi": None, "iv_skew": None, "gex": None}
+        ch = O.get(nm) or []
+        if ch:
+            coi = sum(o[3] for o in ch if o[0] == "C")
+            poi = sum(o[3] for o in ch if o[0] == "P")
+            if coi >= 100 and poi >= 100: rec["pcr_oi"] = round(poi / coi, 3)
+            near_ch = [o for o in ch if o[4] == ym and o[2]]
+            if near_ch:
+                tp, tcs = spot * 0.95, spot * 1.05
+                puts  = [o for o in near_ch if o[0] == "P" and o[1] and abs(o[1] - tp) / spot <= 0.03]
+                calls = [o for o in near_ch if o[0] == "C" and o[1] and abs(o[1] - tcs) / spot <= 0.03]
+                if puts and calls:
+                    pv = min(puts,  key=lambda o: abs(o[1] - tp))[2]
+                    cv = min(calls, key=lambda o: abs(o[1] - tcs))[2]
+                    if pv and cv and abs(pv - cv) <= 30: rec["iv_skew"] = round(pv - cv, 2)
+                T = max((_expiry(ym) - datetime.strptime(basdt, "%Y%m%d").date()).days, 1) / 365.0
+                tot = 0.0; used = 0
+                for side, k, iv, oi, _ym in near_ch:
+                    if not oi: continue
+                    g = _gamma(spot, k, T, (iv or 0) / 100.0)
+                    if g <= 0: continue
+                    tot += (1 if side == "C" else -1) * g * oi * 10 * (spot ** 2) / 100.0
+                    used += 1
+                if used >= 4: rec["gex"] = round(tot / 1e8, 2)   # 억원
+        out[name2code[nm]] = rec
+    return out
 
-    # GEX — 최근월 전 행사가. 주식옵션 계약승수 10주. 단위: 억원
-    gex = None
-    if near_ch and spot:
-        T = max(( _expiry(ym) - datetime.strptime(basdt, "%Y%m%d").date()).days, 1) / 365.0
-        tot = 0.0; used = 0
-        for side, k, iv, oi, _ in near_ch:
-            if not oi: continue
-            g = _gamma(spot, k, T, (iv or 0) / 100.0)
-            if g <= 0: continue
-            tot += (1 if side == "C" else -1) * g * oi * 10 * (spot ** 2) / 100.0
-            used += 1
-        if used >= 4: gex = round(tot / 1e8, 2)
 
-    return {"d": basdt, "spot": spot, "fut": futp,
-            "basis": round(basis, 1), "basis_pct": round(basis / spot * 100, 3),
-            "fut_oi": fut_oi, "pcr_oi": pcr, "iv_skew": iv_skew, "gex": gex}
+# ── US: yfinance 옵션체인 (deriv_signals 산식 재사용) ────────────────────
+def us_day():
+    """AAPL·NVDA 등 스냅샷 → {ticker: rec}. yfinance 없으면 {} (KR만 진행)."""
+    try:
+        sys.path.insert(0, os.path.expanduser("~/namoobi/deriv_signals"))
+        from ingest import option_metrics
+        import yfinance as yf
+    except Exception as e:
+        print(f"  [us] 스킵(yfinance 환경 아님): {e}")
+        return {}
+    out = {}
+    for tk in US_STOCKS:
+        try:
+            m = option_metrics(tk)
+            if not m: continue
+            h = yf.Ticker(tk).history(period="1d")
+            d = h.index[-1].strftime("%Y%m%d") if len(h) else datetime.utcnow().strftime("%Y%m%d")
+            spot = float(h["Close"].iloc[-1]) if len(h) else None
+            out[tk] = {"d": d, "spot": spot, "fut": None, "basis": None, "basis_pct": None,
+                       "fut_oi": None,
+                       "pcr_oi": round(m["pcr_oi"], 3) if m.get("pcr_oi") is not None else None,
+                       # yfinance IV는 소수(0.30) — KR(%)과 표기 통일 위해 %p 로
+                       "iv_skew": round(m["iv_skew_25d"] * 100, 2) if m.get("iv_skew_25d") is not None else None,
+                       # GEX $/1%p → 백만달러(M$)
+                       "gex": round(m["gex"] / 1e6, 1) if m.get("gex") is not None else None,
+                       "expiry": m.get("expiry"), "dte": m.get("dte")}
+            print(f"  [us] {tk}: PCR {out[tk]['pcr_oi']} 스큐 {out[tk]['iv_skew']}%p GEX {out[tk]['gex']}M$ ({m.get('expiry')})")
+        except Exception as e:
+            print(f"  [us] {tk} 실패: {e}")
+        time.sleep(1)
+    return out
 
 
-# ── z-score ──────────────────────────────────────────────────────────────
+# ── z ───────────────────────────────────────────────────────────────────
 def _z(series, win=Z_WIN):
-    """마지막 값의 롤링 z. 표본 20개 미만이면 None."""
     xs = [x for x in series if x is not None]
     if len(xs) < 20: return None
     xs = xs[-win:]
@@ -190,17 +217,19 @@ def _z(series, win=Z_WIN):
 
 
 def finalize(days):
-    """days(오름차순)에서 최신 z 묶음 + 파생 시리즈 계산."""
     get = lambda k: [d.get(k) for d in days]
     oi = get("fut_oi")
-    oi_chg = [None] + [ (oi[i] - oi[i-1]) if (oi[i] is not None and oi[i-1] is not None) else None
-                        for i in range(1, len(oi)) ]
+    oi_chg = [None] + [(oi[i] - oi[i-1]) if (oi[i] is not None and oi[i-1] is not None) else None
+                       for i in range(1, len(oi))]
     z = {"basis_pct": _z(get("basis_pct")), "fut_oi_chg": _z(oi_chg),
          "pcr_oi": _z(get("pcr_oi")), "iv_skew": _z(get("iv_skew")), "gex": _z(get("gex"))}
-    return z, oi_chg
+    latest = dict(days[-1]) if days else {}
+    if len(days) >= 2 and days[-1].get("fut") and days[-2].get("fut"):
+        latest["fut_chg_pct"] = round((days[-1]["fut"] / days[-2]["fut"] - 1) * 100, 2)
+    if oi_chg: latest["fut_oi_chg"] = oi_chg[-1]
+    return z, latest
 
 
-# ── 메인 ─────────────────────────────────────────────────────────────────
 def main():
     back = 0
     for a in sys.argv[1:]:
@@ -212,39 +241,60 @@ def main():
         try: prev = json.load(open(OUT, encoding="utf-8")).get("stocks", {})
         except Exception: pass
 
+    name2code = _pool_map()
     today = date.today()
+
+    # 수집 대상 날짜: 백필이면 range, 증분이면 KR 최종일 다음날~어제
+    kr_days = {c: {d["d"]: d for d in (v.get("days") or [])}
+               for c, v in prev.items() if v.get("mkt", "kr") == "kr"}
+    last = max((max(ds) for ds in kr_days.values() if ds), default=None)
+    start = today - timedelta(days=back) if back else \
+            (datetime.strptime(last, "%Y%m%d").date() + timedelta(days=1) if last
+             else today - timedelta(days=130))
+
+    # (2026-07-24) 벌크 콜이 회당 15~30초라 순차로는 백필이 수 시간 — 날짜 병렬(4워커)
+    from concurrent.futures import ThreadPoolExecutor
+    dates = []
+    d = start
+    while d < today:
+        if d.weekday() < 5: dates.append(d.strftime("%Y%m%d"))
+        d += timedelta(days=1)
+    ndays = 0
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        for bd, got in zip(dates, ex.map(lambda x: kr_bulk_day(x, name2code), dates)):
+            if got:
+                ndays += 1
+                for code, rec in got.items():
+                    kr_days.setdefault(code, {})[bd] = rec
+                print(f"  [kr] {bd}: {len(got)}종목", flush=True)
+    print(f"[stock_deriv] KR 벌크 {ndays}일 수집 · 종목 {len(kr_days)}개", flush=True)
+
+    us = us_day()
+
     out = {}
-    for code, name in STOCKS.items():
-        days = {d["d"]: d for d in (prev.get(code, {}) or {}).get("days", [])}
-        if back:
-            start = today - timedelta(days=back)
-        else:
-            last = max(days) if days else None
-            start = (datetime.strptime(last, "%Y%m%d").date() + timedelta(days=1)) if last \
-                    else today - timedelta(days=130)
-        d = start; got = 0
-        while d < today:                      # 오늘은 아직 미확정(T+1)
-            if d.weekday() < 5:
-                bd = d.strftime("%Y%m%d")
-                if bd not in days:
-                    rec = one_day(name, bd)
-                    if rec: days[bd] = rec; got += 1
-                    time.sleep(0.15)
-            d += timedelta(days=1)
-        arr = [days[k] for k in sorted(days)][-280:]   # 보관 상한(약 1년)
-        z, oi_chg = finalize(arr)
-        # 자동해석용 부가값: 최근일 선물등락·OI변화
-        latest = dict(arr[-1]) if arr else {}
-        if len(arr) >= 2 and arr[-1].get("fut") and arr[-2].get("fut"):
-            latest["fut_chg_pct"] = round((arr[-1]["fut"] / arr[-2]["fut"] - 1) * 100, 2)
-        if oi_chg: latest["fut_oi_chg"] = oi_chg[-1]
-        out[code] = {"name": name, "days": arr, "z": z, "latest": latest}
-        print(f"[stock_deriv] {name}: +{got}일 (총 {len(arr)}일) z={z}")
+    for code, ds in kr_days.items():
+        arr = [ds[k] for k in sorted(ds)][-KEEP_DAYS:]
+        if not arr: continue
+        z, latest = finalize(arr)
+        nm = next((n for n, c in name2code.items() if c == code), code)
+        out[code] = {"name": nm, "mkt": "kr", "days": arr, "z": z, "latest": latest}
+    for tk, rec in us.items():
+        pv = prev.get(tk, {})
+        ds = {x["d"]: x for x in (pv.get("days") or [])}
+        ds[rec["d"]] = rec
+        arr = [ds[k] for k in sorted(ds)][-KEEP_DAYS:]
+        z, latest = finalize(arr)
+        out[tk] = {"name": US_STOCKS.get(tk, tk), "mkt": "us", "days": arr, "z": z, "latest": latest}
+    # US 티커가 이번 실행에서 실패해도 기존 이력은 보존
+    for tk in US_STOCKS:
+        if tk not in out and tk in prev: out[tk] = prev[tk]
 
     os.makedirs(DB, exist_ok=True)
-    json.dump({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"), "src": "금융위 FSC 파생상품시세정보(T+1 확정치)",
+    json.dump({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
+               "src": "KR=금융위 FSC 파생상품시세정보(T+1 확정치) · US=Yahoo 옵션체인(마감 스냅샷·백필 불가→z 누적 중)",
                "stocks": out}, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
-    print(f"[stock_deriv] ✅ 저장 → {OUT}")
+    nkr = sum(1 for v in out.values() if v["mkt"] == "kr")
+    print(f"[stock_deriv] ✅ 저장 — KR {nkr}종목 · US {len(out)-nkr}종목 → {OUT}")
 
 
 if __name__ == "__main__":

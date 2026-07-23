@@ -952,10 +952,10 @@ def investor_api(code: str):
 
 @app.get("/api/stock_deriv/{code}")
 def stock_deriv_api(code: str):
-    """종목별 파생 포지셔닝(파일럿: 005930·000660) — stock_deriv.py 가 FSC T+1 확정치로
-       매일 적재한 5지표(베이시스·선물OI·PCR(OI)·IV스큐·GEX) 시계열 + 60일 z.
-       파생 미상장 종목은 404 → 프론트가 섹션을 숨긴다."""
-    if not re.fullmatch(r"\d{6}", code):
+    """종목별 파생 포지셔닝 — KR 파생상장 전 종목(FSC T+1) + US 옵션 종목(Yahoo, 티커).
+       5지표(베이시스·선물OI·PCR(OI)·IV스큐·GEX — US는 옵션 3종만) 시계열 + 60일 z.
+       미수록 종목은 404 → 프론트가 프록시 카드로 대체."""
+    if not re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
         raise HTTPException(400, "bad code")
     p = DB / "stock_deriv.json"
     if not p.exists():

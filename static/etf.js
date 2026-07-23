@@ -551,7 +551,11 @@
       if(!d||!d.kr) return;
       POOL={kr:d.kr||[],us:d.us||[]};
       const st=$('etf_status'); if(st) st.innerHTML=statusText(d);
+      /* (2026-07-24) 자동 갱신 시 스크롤 최상단 튐 방지 — 위치 저장 후 재렌더, 직후+다음 프레임 복원 */
+      const sy=window.scrollY, sx=window.scrollX, tw=$('etf_tblbox'), ts=tw?tw.scrollTop:0;
       apply();
+      const back=()=>{ window.scrollTo(sx,sy); if(tw) tw.scrollTop=ts; };
+      back(); requestAnimationFrame(back);
     }).catch(()=>{});
   }, 60000);
   /* 시장 토글 */

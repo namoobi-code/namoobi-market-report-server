@@ -2455,22 +2455,37 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const a=Math.abs(z), c=a>=2?'#c0392b':a>=1?'#e67e22':'#889';
     return `<span style="color:${c};font-weight:${a>=1?'700':'400'}">z ${z>0?'+':''}${z.toFixed(1)}</span>`;
   }
+  /* (2026-07-24) KR 주식선물·옵션 만기 = 매월 두 번째 목요일. 기준일이 만기일 ±2영업일이면
+     OI·베이시스는 롤오버 기계적 물량이라 방향 신호로 보지 않는다 — 카드가 자동 경고 */
+  function _krExpiryGap(dstr){
+    if(!dstr||dstr.length!==8) return null;
+    const y=+dstr.slice(0,4), m=+dstr.slice(4,6), day=+dstr.slice(6,8);
+    const secondThu=(yy,mm)=>{ let n=0; for(let i=1;i<=31;i++){ const dt=new Date(yy,mm-1,i); if(dt.getMonth()!==mm-1) break; if(dt.getDay()===4&&++n===2) return dt; } return null; };
+    const cur=new Date(y,m-1,day);
+    let ex=secondThu(y,m);
+    if(ex&&cur>ex){ ex=secondThu(m===12?y+1:y, m===12?1:m+1); }   // 이달 만기 지났으면 다음달
+    if(!ex) return null;
+    return Math.round((ex-cur)/86400000);       // 만기까지 일수(음수 없음)
+  }
   function _drvInterp(L,Z){
     /* 규칙 기반 자동 해석 — 각 행의 한줄 판독 + 종합 1줄. bull/bear 플래그 집계 */
     let bull=0, bear=0; const R={};
     const up = L.fut_chg_pct!=null ? L.fut_chg_pct>0 : null;
     const oiUp = L.fut_oi_chg!=null ? L.fut_oi_chg>0 : null;
+    const gap=_krExpiryGap(L.d), roll=(gap!=null&&gap<=3);   // 만기 3일 이내 = 롤오버 구간
     // ① 베이시스
     const zb=Z.basis_pct;
     R.basis = zb==null?'누적 중':
       zb>=1.5?(bull++,'선물 주도 매수 — 강세 선행 신호'):
       zb<=-1.5?(bear++,'선물 매도 헤지 — 약세 전조'):'평소 범위';
-    // ② 선물 OI × 선물가격 (정석: 선물가 기준)
-    if(up==null||oiUp==null) R.oi='누적 중';
+    // ② 선물 OI × 선물가격 (정석: 선물가 기준) — 만기 3일 이내면 롤오버 물량이라 신호 무효
+    if(roll){ R.oi=`⚠ 만기 주간(D-${gap}) — 롤오버 물량이라 방향 신호로 보지 말 것`; }
+    else if(up==null||oiUp==null) R.oi='누적 중';
     else if(up&&oiUp){bull++;R.oi='선물↑+OI↑ 신규 매수 유입 — 상승 신뢰↑';}
     else if(up&&!oiUp) R.oi='선물↑+OI↓ 숏커버 반등 — 지속성 의심';
     else if(!up&&oiUp){bear++;R.oi='선물↓+OI↑ 신규 매도 — 하락 신뢰↑';}
     else R.oi='선물↓+OI↓ 롱 청산 — 하락 막바지 가능';
+    if(roll&&R.basis&&!/누적/.test(R.basis)) R.basis+=' · ⚠ 만기 주간 — 월물 교체 왜곡 주의';
     // ③ PCR(OI)
     const zp=Z.pcr_oi;
     R.pcr = zp==null?'누적 중':
@@ -2583,34 +2598,36 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   async function loadDeriv(c){
     const box=$('sd_deriv'); if(!box) return;
     box.style.display='none';
-    if(mkt!=='kr') return;
     let D=null;
     try{ const r=await fetch(`/api/stock_deriv/${encodeURIComponent(c)}`); if(!r.ok) D=null; else D=await r.json(); }
     catch(e){ D=null; }
     if(dcode!==c) return;
     if(!D||!D.latest){
-      /* 파생 미상장 → 프록시 카드 (풀 데이터는 이미 로컬에 있음) */
+      /* 파생 미수록 → KR은 프록시 카드(공매도·대차·수급은 KR 전용 필드), US는 숨김 */
+      if(mkt!=='kr') return;
       const r=POOL.kr.find(x=>x.c===c); if(!r) return;
       box.innerHTML=_prxCard(r); box.style.display='';
       {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
       return;
     }
-    const L=D.latest, Z=D.z||{}, I=_drvInterp(L,Z);
+    const L=D.latest, Z=D.z||{}, I=_drvInterp(L,Z), US=(mkt==='us');
     const fmt=(v,d,suf)=>v==null?'<span class="note">—</span>':`${(+v).toLocaleString(undefined,{maximumFractionDigits:d})}${suf||''}`;
     const row=(label,val,z,interp)=>`<div class="si" style="align-items:baseline"><span>${label}</span>`+
       `<b style="text-align:right">${val} <span style="margin-left:6px">${_zBadge(z)}</span>`+
       `<div class="note" style="font-weight:400;text-align:right">${interp}</div></b></div>`;
     const asofD = L.d?`${L.d.slice(4,6)}/${L.d.slice(6,8)}`:'';
+    /* US: 개별주식 선물이 없어 베이시스·선물OI 행은 데이터 있을 때만. GEX 단위도 시장별(억원/M$) */
     box.innerHTML=
       `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
-      `<span>파생 포지셔닝 <span class="note">(${asofD} 확정 · T+1)</span></span>`+
+      `<span>파생 포지셔닝 <span class="note">(${asofD} ${US?'마감 스냅샷':'확정 · T+1'})</span></span>`+
       `<button class="cp-x" id="sd_drvhelp" title="지표 설명">ⓘ 설명</button></div>`+
       `<div style="font-size:12px;margin:2px 0 6px">${I.head}</div>`+
-      row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis)+
-      row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi)+
+      (L.basis!=null? row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis):'')+
+      (L.fut_oi!=null? row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi):'')+
       row('풋콜비율(OI)', fmt(L.pcr_oi,2), Z.pcr_oi, I.rows.pcr)+
       row('IV 스큐', fmt(L.iv_skew,1,'%p'), Z.iv_skew, I.rows.skew)+
-      row('딜러 감마 GEX', fmt(L.gex,1,'억원'), Z.gex, I.rows.gex)+
+      row('딜러 감마 GEX', fmt(L.gex,1,US?'M$':'억원'), Z.gex, I.rows.gex)+
+      (US?`<div class="note" style="margin-top:4px;font-size:11px">미국 개별주식은 선물이 없어 옵션 3종만 · 옵션체인은 과거 조회가 불가해 z는 수집 개시일부터 누적(20거래일 후 산출)</div>`:'')+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
       _helpHTML(_DRV_HELP)+`</div></div>`;
     box.style.display='';
@@ -3864,7 +3881,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(!d||!d.kr||!d.kr.length) return;
       POOL={kr:d.kr||[],us:d.us||[]}; if(s2loaded) S2=POOL;
       $('scr_asof').innerHTML=poolMeta(d);
+      /* (2026-07-24) 자동 갱신이 표·칩을 다시 그리며 스크롤이 최상단으로 튀는 문제 —
+         갱신 전 위치(페이지 + 표 내부)를 저장했다가 재렌더 직후와 다음 프레임에 복원 */
+      const sy=window.scrollY, sx=window.scrollX, tw=$('scr_tblwrap'), ts=tw?tw.scrollTop:0;
       refresh();
+      const back=()=>{ window.scrollTo(sx,sy); if(tw) tw.scrollTop=ts; };
+      back(); requestAnimationFrame(back);
     }).catch(()=>{});
   }, 60000);
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
