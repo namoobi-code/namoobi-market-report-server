@@ -526,7 +526,22 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
       <div class="s"><span class="${String(x.ret1).startsWith('+')?'up':'dn'}">1일 ${esc(x.ret1)}</span> ·
         <span class="${String(x.ret5).startsWith('+')?'up':'dn'}">5일 ${esc(x.ret5)}</span></div></div>`).join('');
     const names=(dv.index||[]).map(x=>x.name);
-    $('deriv_t').innerHTML=`<tr><th>지표</th>${names.map(n=>`<th colspan="2" style="text-align:center">${esc(n)}</th>`).join('')}</tr>
+    /* (2026-07-24) 🤖 자동 판독 — z 매트릭스에서 규칙 기반으로 지수별 종합 1줄 생성.
+       부호는 이미 정규화(z+=주식 우호)돼 있어 라벨 불문 z 부호로 집계하되,
+       '선물 OI 변화'는 조건부(가격과 함께 봐야 함)라 집계에서 제외. |z|≥1 만 셈. */
+    const _autoRow=(()=>{ try{
+      const per=names.map((n,i)=>{ let fav=0,unf=0,hot=[];
+        for(const r of (dv.rows||[])){ if(/OI/.test(r.label||'')) continue;
+          const z=(r.cells||[])[i]&&r.cells[i].z; if(z==null) continue;
+          if(z>=1) fav++; if(z<=-1) unf++;
+          if(Math.abs(z)>=1.5) hot.push(`${r.label} z${z>0?'+':''}${z.toFixed(1)}`); }
+        const v= fav>unf?`<b style="color:#c0392b">강세 우위</b> (우호 ${fav}·비우호 ${unf})`:
+                 unf>fav?`<b style="color:#1e6fd6">약세 우위</b> (비우호 ${unf}·우호 ${fav})`:
+                 `<b>중립·혼조</b> (${fav}:${unf})`;
+        return `<b>${esc(n)}</b>: ${v}${hot.length?` — ${esc(hot.join(' · '))}`:''}`; });
+      return `<tr><td colspan="${1+names.length*2}" style="background:#f6faf6;line-height:1.8;font-size:12.5px">🤖 <b>자동 판독</b> <span class="note">(|z|≥1 부호 집계 — z(+)=우호·z(−)=비우호 · OI는 조건부라 제외 · 규칙 기반 참고용)</span><br>${per.join('<br>')}</td></tr>`;
+    }catch(e){ return ''; } })();
+    $('deriv_t').innerHTML=_autoRow+`<tr><th>지표</th>${names.map(n=>`<th colspan="2" style="text-align:center">${esc(n)}</th>`).join('')}</tr>
       <tr><th></th>${names.map(()=>`<th style="text-align:right">값</th><th style="text-align:right">z</th>`).join('')}</tr>`+
       (dv.rows||[]).map(r=>`<tr><td><b>${esc(r.label)}</b></td>${(r.cells||[]).map(c=>{
         const z=c.z, hot=z!=null&&Math.abs(z)>=1.5;
@@ -2338,6 +2353,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
     $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     renderSum(r);
+    loadDeriv(c);                                // (2026-07-24) 종목 파생 포지셔닝 — 파생 상장 종목만 표시
     const cvs=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
     /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
     const mode = mkt==='kr' ? 'canvas' : chartSrc;
@@ -2428,6 +2444,132 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const items=ks.filter(k=>CDEF[k]&&cAvail(k)).map(k=>`<div class="si"><span>${E(cl(k))}</span><b>${cell(r,k)}</b></div>`).join('');
       return items?`<div class="sg"><div class="sgt">${t}</div>${items}</div>`:'';
     }).join('');
+  }
+
+  /* ── (2026-07-24) 종목 파생 포지셔닝 — 파생 상장 종목만(파일럿 삼성전자·SK하이닉스)
+     FSC T+1 확정치 5지표(값+60일 z) + 규칙 기반 자동 판독. 위치: 요약표(sd_sum) 위. ── */
+  function _zBadge(z){
+    if(z==null) return '<span class="note">z —</span>';
+    const a=Math.abs(z), c=a>=2?'#c0392b':a>=1?'#e67e22':'#889';
+    return `<span style="color:${c};font-weight:${a>=1?'700':'400'}">z ${z>0?'+':''}${z.toFixed(1)}</span>`;
+  }
+  function _drvInterp(L,Z){
+    /* 규칙 기반 자동 해석 — 각 행의 한줄 판독 + 종합 1줄. bull/bear 플래그 집계 */
+    let bull=0, bear=0; const R={};
+    const up = L.fut_chg_pct!=null ? L.fut_chg_pct>0 : null;
+    const oiUp = L.fut_oi_chg!=null ? L.fut_oi_chg>0 : null;
+    // ① 베이시스
+    const zb=Z.basis_pct;
+    R.basis = zb==null?'누적 중':
+      zb>=1.5?(bull++,'선물 주도 매수 — 강세 선행 신호'):
+      zb<=-1.5?(bear++,'선물 매도 헤지 — 약세 전조'):'평소 범위';
+    // ② 선물 OI × 선물가격 (정석: 선물가 기준)
+    if(up==null||oiUp==null) R.oi='누적 중';
+    else if(up&&oiUp){bull++;R.oi='선물↑+OI↑ 신규 매수 유입 — 상승 신뢰↑';}
+    else if(up&&!oiUp) R.oi='선물↑+OI↓ 숏커버 반등 — 지속성 의심';
+    else if(!up&&oiUp){bear++;R.oi='선물↓+OI↑ 신규 매도 — 하락 신뢰↑';}
+    else R.oi='선물↓+OI↓ 롱 청산 — 하락 막바지 가능';
+    // ③ PCR(OI)
+    const zp=Z.pcr_oi;
+    R.pcr = zp==null?'누적 중':
+      zp>=2?(bear++,'헤지 급증 — 경계(극단이면 역발상 바닥 후보)'):
+      zp>=1?(bear++,'하방 경계 증가'):
+      zp<=-1?(bull++,'콜 우위 — 상방 베팅(쏠림 과열은 주의)'):'평소 범위';
+    // ④ IV 스큐
+    const zs=Z.iv_skew;
+    R.skew = zs==null?'표본 부족/누적 중':
+      zs>=1.5?(bear++,'큰손이 폭락 보험 매집 — 겉이 강해도 경고'):
+      zs<=-1.5?(bull++,'하방 공포 완화'):'평소 범위';
+    // ⑤ GEX (방향 아님 — 변동성 체제)
+    R.gex = L.gex==null?'누적 중': L.gex<0?'변동성 증폭 구간 — 급등락 주의':'변동성 억제 구간 — 등락 완만';
+    // 종합
+    let head = bull>bear?`<b style="color:#c0392b">강세 우위</b> (${bull}:${bear}) — 파생이 상승을 지지`:
+               bear>bull?`<b style="color:#2471c9">약세 우위</b> (${bear}:${bull}) — 파생이 하락을 경고`:
+               `<b>중립·혼조</b> (${bull}:${bear})`;
+    if(L.gex!=null&&L.gex<0) head+=' · <span style="color:#e67e22">변동성 증폭 주의</span>';
+    return {rows:R, head};
+  }
+  const _DRV_HELP=[
+   ['선물 베이시스','최근월 선물가격 − 현물가격. 선물은 증거금만 걸고 큰 금액을 움직이는 시장이라, 기관·외국인이 방향을 정하면 현물보다 선물부터 삽니다. 그래서 베이시스가 평소보다 크게 벌어지면(z+) "레버리지 자금이 상승에 베팅 중", 마이너스로 꺾이면(z−) "선물로 미리 파는 중(헤지)"이라는 뜻입니다. 읽는 법: z +1.5↑ 강세 선행 · z −1.5↓ 약세 전조. 주의: 배당락 전후엔 이론적으로 낮아지니 z(평소 대비)로만 판단하세요.'],
+   ['선물 OI(미결제약정)','아직 청산 안 된 선물 계약 수 = "판에 걸려 있는 돈". OI 자체보다 가격과의 조합이 중요합니다. 선물가↑+OI↑ = 새 돈이 들어오며 오름(추세 진짜) · 선물가↑+OI↓ = 숏 청산으로 오름(반짝 가능성) · 선물가↓+OI↑ = 새 돈이 하락에 베팅(하락 진짜) · 선물가↓+OI↓ = 롱 청산(하락 막바지 후보). 주의: 만기(매월 두 번째 목요일) 주간엔 롤오버로 OI가 출렁입니다.'],
+   ['풋콜비율 PCR(OI)','풋(하락 보험) 미결제 ÷ 콜(상승 베팅) 미결제. 높아지면 하락 대비가 늘고 있다는 뜻. 읽는 법: z +1↑ 하방 경계 증가 · z +2↑ 헤지 급증(극단적 공포는 오히려 바닥 신호가 되기도) · z −1↓ 콜 쏠림(상방 베팅 우위, 다만 과열 주의). 주의: 개별주식옵션은 거래가 얇아 하루 값이 튈 수 있어 z(60일 대비)로 봅니다.'],
+   ['IV 스큐','같은 만기에서 "하락 보험(OTM 풋)"의 내재변동성 − "상승 복권(OTM 콜)"의 내재변동성. 폭락 보험료가 비싸질수록 커집니다. 큰손은 주가가 멀쩡할 때 조용히 보험부터 사기 때문에, 주가보다 스큐가 먼저 오르는 경우가 많습니다. 읽는 법: z +1.5↑ 경고(하방 대비 수요 급증) · z −1.5↓ 공포 완화. 주의: 표본(호가)이 부족한 날은 계산하지 않고 —로 둡니다.'],
+   ['딜러 감마 GEX','옵션을 팔아준 증권사(딜러)들이 헤지를 위해 사고파는 방향의 총합. 플러스면 딜러가 "오르면 팔고 내리면 사는" 완충 역할 → 등락이 완만. 마이너스면 반대로 "오르면 더 사고 내리면 더 파는" 증폭 역할 → 급등락이 잘 나옵니다. 방향(상승/하락) 지표가 아니라 변동성 체제 지표입니다. 급락 후 GEX가 −에서 +로 돌아오면 바닥 다지기 신호로 참고.'],
+   ['z-score','오늘 값이 최근 60거래일 평균에서 몇 표준편차 떨어져 있나. 종목마다 체급이 달라 절대값 비교가 안 되므로 "자기 평소 대비 얼마나 이례적인가"로 표준화합니다. |z|≥2 매우 이례적(강한 신호) · |z|≥1 평소보다 뚜렷함 · 그 외 평소 범위.'],
+   ['데이터·갱신','한국거래소 확정치(금융위 공공 API). T+1 — 오늘 보는 값은 어제 마감 기준입니다. 장중 판단용이 아니라 "내일을 위한 저녁 점검"용입니다. 옵션 지표(PCR·스큐·GEX)는 장중 호가가 얇아 왜곡되므로 확정치만 씁니다.']];
+  /* 파생 미상장 종목 폴백 — 이미 풀에 있는 공매도·대차·수급을 '포지셔닝 프록시'로 재구성 + 자동 해석 */
+  const _PRX_HELP=[
+   ['왜 프록시인가','이 종목은 개별 주식선물·옵션이 상장돼 있지 않아 파생 포지셔닝을 직접 잴 수 없습니다. 대신 "누가 하락에 베팅 중인가(공매도·대차잔고)"와 "큰손이 사는 중인가(외국인·기관 순매수)"로 같은 질문에 근사 답을 냅니다.'],
+   ['외인·기관 순매수(20일)','최근 20거래일 누적 순매수 금액. 둘 다 (+)면 큰손 양매수(수급 우호), 둘 다 (−)면 양매도(비우호). 연속매수일이 3일 이상이면 흐름이 이어지는 중이라는 뜻.'],
+   ['공매도비중','최근 거래에서 공매도가 차지한 비율. 5% 이상이면 하락 베팅 압력이 높은 편. 다만 급등 종목의 공매도 급증은 과열 견제일 수도 있어 수급과 같이 봅니다.'],
+   ['대차잔고비율','빌려간 주식(향후 공매도 실탄)의 시총 대비 비율. 10% 이상이면 잠재 매도 압력 큼. 반대로 주가 상승 시 숏커버(되사기) 연료가 되기도 합니다.'],
+   ['한계','파생 지표(베이시스·PCR·IV·GEX)와 달리 "가격에 선행하는 베팅"이 아니라 "이미 실행된 매매"의 집계라 선행성은 한 단계 약합니다. 확정치 기준 T+1~T+2.']];
+  function _prxCard(r){
+    let bull=0,bear=0; const R={};
+    const f=r.fnb20, o=r.onb20;
+    if(f!=null&&o!=null){
+      if(f>0&&o>0){bull++;R.flow='외인·기관 양매수 — 수급 우호';}
+      else if(f<0&&o<0){bear++;R.flow='외인·기관 양매도 — 수급 비우호';}
+      else R.flow=f>0?'외인 매수·기관 매도 — 혼조':'기관 매수·외인 매도 — 혼조';
+      if((r.fst||0)>=3||(r.ost||0)>=3) R.flow+=` (연속매수 ${Math.max(r.fst||0,r.ost||0)}일)`;
+    } else R.flow='집계 대기';
+    R.sr = r.sr==null?'—':
+      r.sr>=5?(bear++,'공매도 압력 높음 — 하락 베팅 큰 편'):
+      r.sr>=2?'공매도 보통':'공매도 낮음 — 하락 베팅 적음';
+    R.lbr = r.lbr==null?'—':
+      r.lbr>=10?(bear++,'대차잔고 과다 — 잠재 매도 압력(상승 시 숏커버 연료)'):
+      r.lbr>=5?'대차잔고 다소 높음':'대차잔고 낮음';
+    const head = bull>bear?`<b style="color:#c0392b">수급 우호</b> (${bull}:${bear})`:
+                 bear>bull?`<b style="color:#2471c9">하방 압력 우위</b> (${bear}:${bull})`:
+                 `<b>중립·혼조</b> (${bull}:${bear})`;
+    const row=(label,val,interp)=>`<div class="si" style="align-items:baseline"><span>${label}</span>`+
+      `<b style="text-align:right">${val}<div class="note" style="font-weight:400;text-align:right">${interp}</div></b></div>`;
+    return `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
+      `<span>포지셔닝 프록시 <span class="note">(파생 미상장 — 공매도·대차·수급으로 근사)</span></span>`+
+      `<button class="cp-x" id="sd_drvhelp" title="설명">ⓘ 설명</button></div>`+
+      `<div style="font-size:12px;margin:2px 0 6px">${head}</div>`+
+      row('외인 순매수(20일)', cell(r,'fnb20')+(r.fst?` <span class="note">연속${r.fst}일</span>`:''), '')+
+      row('기관 순매수(20일)', cell(r,'onb20')+(r.ost?` <span class="note">연속${r.ost}일</span>`:''), R.flow)+
+      row('공매도비중', cell(r,'sr'), R.sr)+
+      row('대차잔고비율', cell(r,'lbr')+(r.lb!=null?` <span class="note">(${cell(r,'lb')})</span>`:''), R.lbr)+
+      `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
+      _PRX_HELP.map(h=>`<div style="margin-bottom:7px;font-size:11.5px;line-height:1.55"><b>${h[0]}</b> — ${h[1]}</div>`).join('')+`</div></div>`;
+  }
+  async function loadDeriv(c){
+    const box=$('sd_deriv'); if(!box) return;
+    box.style.display='none';
+    if(mkt!=='kr') return;
+    let D=null;
+    try{ const r=await fetch(`/api/stock_deriv/${encodeURIComponent(c)}`); if(!r.ok) D=null; else D=await r.json(); }
+    catch(e){ D=null; }
+    if(dcode!==c) return;
+    if(!D||!D.latest){
+      /* 파생 미상장 → 프록시 카드 (풀 데이터는 이미 로컬에 있음) */
+      const r=POOL.kr.find(x=>x.c===c); if(!r) return;
+      box.innerHTML=_prxCard(r); box.style.display='';
+      {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
+      return;
+    }
+    const L=D.latest, Z=D.z||{}, I=_drvInterp(L,Z);
+    const fmt=(v,d,suf)=>v==null?'<span class="note">—</span>':`${(+v).toLocaleString(undefined,{maximumFractionDigits:d})}${suf||''}`;
+    const row=(label,val,z,interp)=>`<div class="si" style="align-items:baseline"><span>${label}</span>`+
+      `<b style="text-align:right">${val} <span style="margin-left:6px">${_zBadge(z)}</span>`+
+      `<div class="note" style="font-weight:400;text-align:right">${interp}</div></b></div>`;
+    const asofD = L.d?`${L.d.slice(4,6)}/${L.d.slice(6,8)}`:'';
+    box.innerHTML=
+      `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
+      `<span>파생 포지셔닝 <span class="note">(${asofD} 확정 · T+1)</span></span>`+
+      `<button class="cp-x" id="sd_drvhelp" title="지표 설명">ⓘ 설명</button></div>`+
+      `<div style="font-size:12px;margin:2px 0 6px">${I.head}</div>`+
+      row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis)+
+      row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi)+
+      row('풋콜비율(OI)', fmt(L.pcr_oi,2), Z.pcr_oi, I.rows.pcr)+
+      row('IV 스큐', fmt(L.iv_skew,1,'%p'), Z.iv_skew, I.rows.skew)+
+      row('딜러 감마 GEX', fmt(L.gex,1,'억원'), Z.gex, I.rows.gex)+
+      `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
+      _DRV_HELP.map(h=>`<div style="margin-bottom:7px;font-size:11.5px;line-height:1.55"><b>${h[0]}</b> — ${h[1]}</div>`).join('')+`</div></div>`;
+    box.style.display='';
+    {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
   }
   // 지표 계산
   const _sma=(a,n)=>a.map((_,i)=>{ if(i<n-1) return null; let s=0; for(let j=i-n+1;j<=i;j++){ const v=a[j]; if(v==null) return null; s+=v; } return s/n; });

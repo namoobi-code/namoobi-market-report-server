@@ -950,6 +950,30 @@ def investor_api(code: str):
         _inv_cache.clear()
     return out
 
+@app.get("/api/stock_deriv/{code}")
+def stock_deriv_api(code: str):
+    """종목별 파생 포지셔닝(파일럿: 005930·000660) — stock_deriv.py 가 FSC T+1 확정치로
+       매일 적재한 5지표(베이시스·선물OI·PCR(OI)·IV스큐·GEX) 시계열 + 60일 z.
+       파생 미상장 종목은 404 → 프론트가 섹션을 숨긴다."""
+    if not re.fullmatch(r"\d{6}", code):
+        raise HTTPException(400, "bad code")
+    p = DB / "stock_deriv.json"
+    if not p.exists():
+        raise HTTPException(404, "stock_deriv 없음")
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(500, f"stock_deriv 파싱 실패: {e}")
+    s = (d.get("stocks") or {}).get(code)
+    if not s or not s.get("days"):
+        raise HTTPException(404, "파생 미상장 종목")
+    out = {"asof": d.get("asof"), "src": d.get("src"), "name": s.get("name"),
+           "z": s.get("z"), "latest": s.get("latest"),
+           # 스파크라인용 최근 60일만 (전송량 절약)
+           "days": s["days"][-60:]}
+    return Response(content=json.dumps(out, ensure_ascii=False),
+                    media_type="application/json", headers={"Cache-Control": "no-cache"})
+
 @app.get("/api/reports")
 def reports():
     out = []

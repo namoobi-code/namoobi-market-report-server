@@ -882,6 +882,8 @@
               <div id="sd_book" style="display:none;margin-top:8px"></div>
               <div id="sd_invt" style="display:none;margin-top:8px"></div>
             </div>
+            <!-- (2026-07-24) 종목 파생 포지셔닝 — 요약표 위(요청 위치). 파생 상장 종목만 표시 -->
+            <div class="box" id="sd_deriv" style="display:none;padding:10px 12px"></div>
             <div class="box" id="sd_sum" style="padding:10px 12px"></div>
           </div>
         </div>
@@ -1082,6 +1084,12 @@
   </style>
   <details id="deriv_guide" open>
     <summary>📖 지표 해석 가이드 — 값과 z 읽는 법 (지표별 의미·해석)</summary>
+    <!-- (2026-07-24) 처음 보는 사람용 3줄 요약 — 표 위 자동 판독과 짝 -->
+    <div style="border:1px solid #cde3cd;background:#f4faf4;border-radius:8px;padding:8px 10px;margin:4px 0 8px;font-size:12px;line-height:1.7">
+      🔰 <b>처음이라면 이 3가지만</b> — ① 위 표의 <b>🤖 자동 판독</b> 한 줄이 결론입니다(우호·비우호 지표 개수 집계).
+      ② 개별 지표는 <b>값이 아니라 z</b>로 읽습니다: z(+)=주식에 우호 · z(−)=비우호, |z|≥1.5부터 신호.
+      ③ 파생시장은 기관·외국인이 레버리지로 <b>먼저 베팅하는 곳</b>이라 현물보다 반 발 앞서는 경향이 있습니다 — 다만 하나의 z가 아니라 <b>여러 z가 같은 방향일 때</b> 믿으세요.
+    </div>
     <div class="note" style="margin:4px 0 8px;line-height:1.65">
       <b>z-score</b> = (당일값 − 최근 60거래일 평균) ÷ 표준편차. 단위가 다른 지표를 같은 척도로 비교하며, <b>|z|≥1.5 주의(신호)·|z|≥2 강함</b>. <b>값</b>은 절대 수준, <b>z</b>는 그 지수의 평소 대비 이탈이라 <u>방향 판단은 z로</u> 한다. 여러 지표 z가 동시에 같은 방향이면 신뢰도↑.
     </div>
