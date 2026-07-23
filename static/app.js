@@ -1681,7 +1681,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
               'ern','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','sec'];
-  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss', qtoby:'qtob', qtobq:'qtob'};   // 필터키 → 컬럼키(값 접근자 공통화)
+  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1898,7 +1898,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
     sr:{l:'공매도비중',n:1,m:'kr'}, lb:{l:'대차잔고',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
     ern:{l:'어닝일',n:1,m:'both'},
-    tob:{l:'흑자전환',n:0,m:'kr'}, qtob:{l:'분기흑자',n:0,m:'both'}, opm:{l:'영업이익률',n:1,m:'both'}, opmch:{l:'마진변화',n:1,m:'both'},
+    tob:{l:'흑자전환',n:0,m:'kr'}, qtoby:{l:'분기흑자YoY',n:0,m:'both'}, qtobq:{l:'분기흑자QoQ',n:0,m:'both'}, opm:{l:'영업이익률',n:1,m:'both'}, opmch:{l:'마진변화',n:1,m:'both'},
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
@@ -1987,7 +1987,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'turn': return r.turn!=null?r.turn*100:null;
       case 'peg': return r.peg; case 'psr': return r.psr;
       case 'tob': return r.tob?1:0;
-      case 'qtob': return (r.qtoby?2:0)+(r.qtobq?1:0);   // 정렬용: YoY전환=2 + QoQ전환=1
+      case 'qtoby': return r.qtoby?1:0;   // 분기 흑자전환(전년동기比)
+      case 'qtobq': return r.qtobq?1:0;   // 분기 흑자전환(직전분기比)
       case 'opmch': return r.opmch!=null?r.opmch*100:null;
       case 'fnb20': return r.fnb20; case 'onb20': return r.onb20;   // 억원
       case 'fst': return r.fst; case 'ost': return r.ost;           // 연속일
@@ -2060,10 +2061,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'turn': return v.toFixed(2)+'%';
       case 'peg': case 'psr': return v.toFixed(2);
       case 'tob': return v?'<span class="up">전환</span>':'<span class="note">—</span>';
-      case 'qtob': { if(!v) return '<span class="note">—</span>';
-        const b=[]; if(r.qtoby) b.push('<span class="up" title="전년동기 적자→당분기 흑자 (계절성 안전)">동기↗</span>');
-        if(r.qtobq) b.push('<span class="up" title="직전분기 적자→당분기 흑자 (가장 빠름·계절성 주의)">직전↗</span>');
-        return b.join(' '); }
+      case 'qtoby': return v?'<span class="up" title="전년동기 적자→당분기 흑자 (계절성 안전)">전환</span>':'<span class="note">—</span>';
+      case 'qtobq': return v?'<span class="up" title="직전분기 적자→당분기 흑자 (가장 빠름·계절성 주의)">전환</span>':'<span class="note">—</span>';
       case 'opmch': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="당분기 영업이익률 − 전년동기 영업이익률 (%p)">${v>0?'+':''}${v.toFixed(1)}%p</span>`;
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
@@ -2299,7 +2298,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       'RSI(14)':'기술적 지표','거래량배수':'기술적 지표','MACD':'기술적 지표','볼린저밴드':'기술적 지표','이평배열':'기술적 지표','200일선':'기술적 지표','20일선':'기술적 지표','50일선':'기술적 지표','고점比':'기술적 지표',
       '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝임박':'컨센서스',
       'PER':'밸류·수익성','PEG':'밸류·수익성','PBR':'밸류·수익성','PSR':'밸류·수익성','ROE':'밸류·수익성','배당성향':'밸류·수익성','배당':'밸류·수익성','영업이익률':'밸류·수익성',
-      '성장':'성장','매출성장':'성장','이익성장':'성장','성장가속':'성장','흑자전환':'성장','분기흑자':'성장','마진변화':'밸류·수익성',
+      '성장':'성장','매출성장':'성장','이익성장':'성장','성장가속':'성장','흑자전환':'성장','분기흑자YoY':'성장','분기흑자QoQ':'성장','마진변화':'밸류·수익성',
       '외인·기관수급(20일)':'수급','외인·기관연속매수':'수급','공매도비중':'수급','대차잔고비율':'수급','대차잔고':'수급','흑자전환·수급·공매도·대차잔고':'수급','외인보유비중':'수급',
       '부채비율':'건전성','유동비율':'건전성','영업적자':'건전성','상장기간':'기타','증권 구분':'기타' });
     return m; })();
