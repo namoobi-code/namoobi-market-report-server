@@ -435,6 +435,9 @@
   #sd_inv{width:100%;height:120px!important;max-height:none!important;display:block;margin-top:2px}   /* 투자자별 누적순매수(KR) / OBV(US) */
   .csrc.on{background:var(--dark);color:#fff;border-color:var(--dark)}
   .sg{margin-bottom:10px}
+  /* (2026-07-24) 요약표 빈 공간 축소 — 폭에 맞춰 자동 다단(최대 3열, 열 최소 180px). 그룹 중간 끊김 방지 */
+  #sd_sum{columns:180px 3;column-gap:24px}
+  #sd_sum .sg{break-inside:avoid;-webkit-column-break-inside:avoid}
   .sgt{font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:4px;border-bottom:1px solid var(--line);padding-bottom:3px}
   .si{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2.5px 0}
   .si span{color:var(--tx2)}
@@ -882,9 +885,13 @@
               <div id="sd_book" style="display:none;margin-top:8px"></div>
               <div id="sd_invt" style="display:none;margin-top:8px"></div>
             </div>
-            <!-- (2026-07-24) 종목 파생 포지셔닝 — 요약표 위(요청 위치). 파생 상장 종목만 표시 -->
-            <div class="box" id="sd_deriv" style="display:none;padding:10px 12px"></div>
-            <div class="box" id="sd_sum" style="padding:10px 12px"></div>
+            <!-- (2026-07-24) 우측 열 = 파생 포지셔닝(위) + 요약표(아래).
+                 dgrid 직계 형제로 두면 그리드 3번째 칸으로 밀려 행 높이만큼 늘어나(빈공간) 컨테이너로 묶고,
+                 align-self:start 로 내용만큼만 차지하게 한다 -->
+            <div style="display:flex;flex-direction:column;gap:9px;align-self:start">
+              <div class="box" id="sd_deriv" style="display:none;padding:10px 12px"></div>
+              <div class="box" id="sd_sum" style="padding:10px 12px"></div>
+            </div>
           </div>
         </div>
         <div id="scr_glspanel" style="display:none">

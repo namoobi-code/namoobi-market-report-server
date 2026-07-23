@@ -530,16 +530,30 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
        부호는 이미 정규화(z+=주식 우호)돼 있어 라벨 불문 z 부호로 집계하되,
        '선물 OI 변화'는 조건부(가격과 함께 봐야 함)라 집계에서 제외. |z|≥1 만 셈. */
     const _autoRow=(()=>{ try{
-      const per=names.map((n,i)=>{ let fav=0,unf=0,hot=[];
-        for(const r of (dv.rows||[])){ if(/OI/.test(r.label||'')) continue;
+      /* (2026-07-24) 지표별 자동 해석문 — 종목 카드와 동일한 규칙 기반 문장. 부호는 정규화(z+=우호) 기준 */
+      const _phr=(label,z)=>{ const P=z>=0;
+        if(/베이시스/.test(label))          return P?'선물 매수 우위 — 강세 선행':'선물 매도·헤지 — 약세 전조';
+        if(/레버리지|외국인/.test(label))    return P?'매수 쏠림 — 추세 동조':'매도·이탈 — 위험 회피';
+        if(/자산운용|기관/.test(label))      return P?'리얼머니 매수 확대':'리얼머니 축소 — 하방 경계';
+        if(/OI/.test(label))                return '조건부 — 가격↑이면 신규자금 유입, 가격↓이면 하락 신뢰↑';
+        if(/풋콜/.test(label))              return P?'공포·헤지 과다 — 컨트라리안 반등 소지':'안주·탐욕 — 상단 리스크';
+        if(/스큐/.test(label))              return P?'위험선호 회복 — 하방 헤지 완화':'헤지 쇄도 — 하락 경계(급락 선행성)';
+        if(/감마|GEX/.test(label))          return P?'롱감마 — 변동성 억제(안정)':'숏감마 — 변동성 증폭(급변 위험)';
+        if(/VKOSPI|VIX/.test(label))        return P?'공포 극단 — 컨트라리안 반등 소지':'변동성 진정(지나치면 안주)';
+        return P?'주식 우호 쏠림':'비우호 쏠림'; };
+      const per=names.map((n,i)=>{ let fav=0,unf=0,lines=[];
+        for(const r of (dv.rows||[])){
           const z=(r.cells||[])[i]&&r.cells[i].z; if(z==null) continue;
-          if(z>=1) fav++; if(z<=-1) unf++;
-          if(Math.abs(z)>=1.5) hot.push(`${r.label} z${z>0?'+':''}${z.toFixed(1)}`); }
+          const cond=/OI/.test(r.label||'');
+          if(!cond){ if(z>=1) fav++; if(z<=-1) unf++; }
+          if(Math.abs(z)>=1){
+            const col=cond?'#b45309':(z>0?'#c0392b':'#1e6fd6');
+            lines.push(`<span style="color:${col}">· ${esc(r.label)} z${z>0?'+':''}${z.toFixed(1)} — ${_phr(r.label,z)}</span>`); } }
         const v= fav>unf?`<b style="color:#c0392b">강세 우위</b> (우호 ${fav}·비우호 ${unf})`:
                  unf>fav?`<b style="color:#1e6fd6">약세 우위</b> (비우호 ${unf}·우호 ${fav})`:
                  `<b>중립·혼조</b> (${fav}:${unf})`;
-        return `<b>${esc(n)}</b>: ${v}${hot.length?` — ${esc(hot.join(' · '))}`:''}`; });
-      return `<tr><td colspan="${1+names.length*2}" style="background:#f6faf6;line-height:1.8;font-size:12.5px">🤖 <b>자동 판독</b> <span class="note">(|z|≥1 부호 집계 — z(+)=우호·z(−)=비우호 · OI는 조건부라 제외 · 규칙 기반 참고용)</span><br>${per.join('<br>')}</td></tr>`;
+        return `<b>${esc(n)}</b>: ${v}${lines.length?`<br><span style="font-size:12px;line-height:1.7">${lines.join('<br>')}</span>`:` — <span class="note">이례적 신호 없음(전 지표 평소 범위)</span>`}`; });
+      return `<tr><td colspan="${1+names.length*2}" style="background:#f6faf6;line-height:1.8;font-size:12.5px">🤖 <b>자동 판독</b> <span class="note">(|z|≥1 지표만 해석문 표시 — z(+)=우호·z(−)=비우호 · OI는 조건부라 집계 제외 · 규칙 기반 참고용)</span><br>${per.join('<br>')}</td></tr>`;
     }catch(e){ return ''; } })();
     $('deriv_t').innerHTML=_autoRow+`<tr><th>지표</th>${names.map(n=>`<th colspan="2" style="text-align:center">${esc(n)}</th>`).join('')}</tr>
       <tr><th></th>${names.map(()=>`<th style="text-align:right">값</th><th style="text-align:right">z</th>`).join('')}</tr>`+
