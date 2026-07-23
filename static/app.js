@@ -1597,6 +1597,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
       gacc:{label:'성장가속',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%p',min:1,reqData:1,presets:[['전체',null],['가속 전환(0%p ↑)',0],['+10%p ↑',10],['+30%p ↑',30],['+50%p ↑',50]],def:[null,null]},
+      qtoby:{label:'분기흑자YoY',tgl:1,def:false,tglLabel:'전년동기 적자→당분기 흑자 전환만 (계절성 안전)'},
+      qtobq:{label:'분기흑자QoQ',tgl:1,def:false,tglLabel:'직전분기 적자→당분기 흑자 전환만 (가장 빠름·계절성 주의)'},
+      opmch:{label:'마진변화',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',min:1,reqData:1,presets:[['전체',null],['개선(0%p ↑)',0],['+3%p ↑',3],['+5%p ↑',5],['+10%p ↑',10]],def:[null,null]},
       tob:{label:'흑자전환',tgl:1,def:false,tglLabel:'적자→흑자 전환 종목만'},
       opm:{label:'영업이익률',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['5% ↑',5],['10% ↑',10],['20% ↑',20]],def:[null,null]},
       peg:{label:'PEG',fmt:v=>v.toFixed(1),reqData:1,presets:[['전체',null,null],['1 ↓',null,1],['1.5 ↓',null,1.5],['2 ↓',null,2]],def:[null,null]},
@@ -1661,6 +1664,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       mgrw:{label:'매출성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       ogrw:{label:'이익성장',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['20% ↑',20],['50% ↑',50],['100% ↑',100]],def:[null,null]},
       gacc:{label:'성장가속',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%p',min:1,reqData:1,presets:[['전체',null],['가속 전환(0%p ↑)',0],['+10%p ↑',10],['+30%p ↑',30],['+50%p ↑',50]],def:[null,null]},
+      qtoby:{label:'분기흑자YoY',tgl:1,def:false,tglLabel:'전년동기 적자→당분기 흑자 전환만 (계절성 안전)'},
+      qtobq:{label:'분기흑자QoQ',tgl:1,def:false,tglLabel:'직전분기 적자→당분기 흑자 전환만 (가장 빠름·계절성 주의)'},
+      opmch:{label:'마진변화',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',min:1,reqData:1,presets:[['전체',null],['개선(0%p ↑)',0],['+3%p ↑',3],['+5%p ↑',5],['+10%p ↑',10]],def:[null,null]},
       frgn:{label:'외인보유비중',fixed:'— (US 미제공)'},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
@@ -1674,8 +1680,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
               'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
               'ern','cov','upside','rec','rev','nan',
-              'grw','mgrw','ogrw','gacc','tob','opm','per','peg','pbr','psr','roe','payout','divy','sec'];
-  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
+              'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','sec'];
+  const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss', qtoby:'qtob', qtobq:'qtob'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -1709,6 +1715,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(f.tgl){ if(!st.on) continue;
         if(k==='cov' && r.tp==null) return false;
         if(k==='tob' && !r.tob) return false;
+        if(k==='qtoby' && !r.qtoby) return false;   // 분기 흑자전환(전년동기比)
+        if(k==='qtobq' && !r.qtobq) return false;   // 분기 흑자전환(직전분기比)
         continue; }
       if(f.cat){ if(st.v!=null && String(r[k]||'')!==st.v) return false; continue; }
       if(f.fin && r.isfin) continue;   // 금융업 면제
@@ -1777,8 +1785,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     // (2026-07-20) "화장품|뷰티"=OR, "삼성&전자"=AND. | 로 그룹 분리(OR), 그룹 안 & 로 모두 요구(AND)
     const groups=findQ.toLowerCase().split('|').map(g=>g.split('&').map(s=>s.trim()).filter(Boolean)).filter(g=>g.length);
     if(!groups.length) return true;
-    const n=String(r.n||'').toLowerCase(), c=String(r.c||'').toLowerCase();
-    return groups.some(g=>g.every(t=>n.includes(t)||c.includes(t)));
+    // (2026-07-23) 미국 종목은 한글명(kn)으로도 검색 — '테슬' → TSLA
+    const n=String(r.n||'').toLowerCase(), c=String(r.c||'').toLowerCase(), k=String(r.kn||'').toLowerCase();
+    return groups.some(g=>g.every(t=>n.includes(t)||c.includes(t)||k.includes(t)));
   }
   function findChipHTML(){
     return findOpen
@@ -1889,7 +1898,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
     sr:{l:'공매도비중',n:1,m:'kr'}, lb:{l:'대차잔고',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
     ern:{l:'어닝일',n:1,m:'both'},
-    tob:{l:'흑자전환',n:0,m:'kr'}, opm:{l:'영업이익률',n:1,m:'both'},
+    tob:{l:'흑자전환',n:0,m:'kr'}, qtob:{l:'분기흑자',n:0,m:'both'}, opm:{l:'영업이익률',n:1,m:'both'}, opmch:{l:'마진변화',n:1,m:'both'},
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
@@ -1976,6 +1985,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'turn': return r.turn!=null?r.turn*100:null;
       case 'peg': return r.peg; case 'psr': return r.psr;
       case 'tob': return r.tob?1:0;
+      case 'qtob': return (r.qtoby?2:0)+(r.qtobq?1:0);   // 정렬용: YoY전환=2 + QoQ전환=1
+      case 'opmch': return r.opmch!=null?r.opmch*100:null;
       case 'fnb20': return r.fnb20; case 'onb20': return r.onb20;   // 억원
       case 'fst': return r.fst; case 'ost': return r.ost;           // 연속일
       case 'sr': return r.sr;                                       // 공매도 비중(%)
@@ -2047,6 +2058,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'turn': return v.toFixed(2)+'%';
       case 'peg': case 'psr': return v.toFixed(2);
       case 'tob': return v?'<span class="up">전환</span>':'<span class="note">—</span>';
+      case 'qtob': { if(!v) return '<span class="note">—</span>';
+        const b=[]; if(r.qtoby) b.push('<span class="up" title="전년동기 적자→당분기 흑자 (계절성 안전)">동기↗</span>');
+        if(r.qtobq) b.push('<span class="up" title="직전분기 적자→당분기 흑자 (가장 빠름·계절성 주의)">직전↗</span>');
+        return b.join(' '); }
+      case 'opmch': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="당분기 영업이익률 − 전년동기 영업이익률 (%p)">${v>0?'+':''}${v.toFixed(1)}%p</span>`;
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
       case 'sr': return `<span class="${v>=5?'dn':''}">${v.toFixed(1)}%</span>`;
@@ -2231,7 +2247,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['영업이익률','영업이익 ÷ 매출액 (최근 연간 실적, 네이버)'],
         ['PEG','PER ÷ 영업이익 성장률 — 1 이하면 성장 대비 저평가 (미국은 EPS 성장률 기준)'],
         ['PSR','시가총액 ÷ 매출액(최근 연간) — 적자 성장주 밸류에이션'],
-        ['흑자전환','직전 연도 영업적자 → 최근 연도 흑자로 전환'],
+        ['흑자전환','직전 연도 영업적자 → 최근 연도 흑자로 전환 (연간 — 확정적이지만 느림)'],
+        ['분기흑자YoY','전년 동분기 적자 → 당분기 흑자 전환 — 연간보다 최대 1년 빠르고 계절성 안전 (분기 실적, 주1회 갱신)'],
+        ['분기흑자QoQ','직전 분기 적자 → 당분기 흑자 전환 — 가장 빠른 포착. 단 특정 분기만 흑자인 계절 패턴을 오인할 수 있음(계절성 주의)'],
+        ['마진변화','당분기 영업이익률 − 전년동기 영업이익률(%p) — 마진 확대/축소 방향. 연간 영업이익률(수준)과 별개의 모멘텀 신호'],
         ['외인·기관수급(20일)','KIS 종목별 투자자 — 최근 20거래일 누적 순매수 금액(억원)'],
         ['외인·기관연속매수','최근 며칠 연속 순매수 중인가(일)'],
         ['공매도비중','최근 거래일 공매도 거래량 ÷ 전체 거래량(%) — 5%↑ 과열 경계 (KIS)'],
@@ -2278,7 +2297,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       'RSI(14)':'기술적 지표','거래량배수':'기술적 지표','MACD':'기술적 지표','볼린저밴드':'기술적 지표','이평배열':'기술적 지표','200일선':'기술적 지표','20일선':'기술적 지표','50일선':'기술적 지표','고점比':'기술적 지표',
       '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝임박':'컨센서스',
       'PER':'밸류·수익성','PEG':'밸류·수익성','PBR':'밸류·수익성','PSR':'밸류·수익성','ROE':'밸류·수익성','배당성향':'밸류·수익성','배당':'밸류·수익성','영업이익률':'밸류·수익성',
-      '성장':'성장','매출성장':'성장','이익성장':'성장','성장가속':'성장','흑자전환':'성장',
+      '성장':'성장','매출성장':'성장','이익성장':'성장','성장가속':'성장','흑자전환':'성장','분기흑자':'성장','마진변화':'밸류·수익성',
       '외인·기관수급(20일)':'수급','외인·기관연속매수':'수급','공매도비중':'수급','대차잔고비율':'수급','대차잔고':'수급','흑자전환·수급·공매도·대차잔고':'수급','외인보유비중':'수급',
       '부채비율':'건전성','유동비율':'건전성','영업적자':'건전성','상장기간':'기타','증권 구분':'기타' });
     return m; })();

@@ -72,6 +72,22 @@ def _kr_one(kis, c, tok, code):
             out["gacc"] = out["racc"]
         elif "oacc" in out:
             out["gacc"] = out["oacc"]
+        # (2026-07-23) 분기 흑자전환 2종 + 분기 마진 YoY 변화 — 같은 분기 시계열로 추가 호출 0
+        if op:
+            per = max(op); mm = per[4:]; yr = int(per[:4])
+            o0 = op.get(per)                                   # 당분기 영업이익
+            oy = op.get(f"{yr-1}{mm}")                         # 전년동기
+            pers = sorted(op)                                  # 직전분기(달력상 바로 앞 결산월)
+            op_prev = op.get(pers[pers.index(per)-1]) if pers.index(per) >= 1 else None
+            if o0 is not None:
+                if oy is not None:
+                    out["qtoby"] = 1 if (oy < 0 and o0 > 0) else 0     # 전년동기 적자→당분기 흑자(계절성 안전)
+                if op_prev is not None:
+                    out["qtobq"] = 1 if (op_prev < 0 and o0 > 0) else 0  # 직전분기 적자→당분기 흑자(가장 빠름·계절성 주의)
+            # 마진 YoY 변화 = 당분기 OPM − 전년동기 OPM (%p, 소수)
+            r0, ry = rv.get(per), rv.get(f"{yr-1}{mm}")
+            if o0 is not None and oy is not None and r0 and ry and r0 > 0 and ry > 0:
+                out["opmch"] = round(o0 / r0 - oy / ry, 4)
         return code, (out or None)
     except Exception:
         return code, None
@@ -102,8 +118,24 @@ _REV_CONCEPTS = ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenue
 _OP_CONCEPTS = ["OperatingIncomeLoss"]
 
 
+_sec_lock = __import__("threading").Lock()
+_sec_last = [0.0]
 def _sec_get(url):
-    return json.loads(urllib.request.urlopen(urllib.request.Request(url, headers=SEC_UA), timeout=20).read())
+    """SEC fair-access(≤10 req/s) 준수 — 전역 스로틀(요청 간 최소 0.12s) + 403/429 백오프.
+       (2026-07-23) 1차 전체 실행에서 무스로틀 6워커로 차단당해 US 59/5192 — 원인 수정."""
+    for att in range(3):
+        with _sec_lock:
+            wait = 0.12 - (time.time() - _sec_last[0])
+            if wait > 0:
+                time.sleep(wait)
+            _sec_last[0] = time.time()
+        try:
+            return json.loads(urllib.request.urlopen(urllib.request.Request(url, headers=SEC_UA), timeout=20).read())
+        except urllib.error.HTTPError as e:
+            if e.code in (403, 429) and att < 2:
+                time.sleep(20 * (att + 1))     # 차단 해제 대기 후 재시도
+                continue
+            raise
 
 
 def _sec_ticker_cik():
@@ -111,8 +143,8 @@ def _sec_ticker_cik():
     return {v["ticker"].upper(): f'{int(v["cik_str"]):010d}' for v in d.values()}
 
 
-def _sec_concept_series(cik, concept):
-    """개념의 분기(3개월) 값을 회계분기(fp,fy) → val 로. 최신·전년·전전년 계산용."""
+def _sec_concept_qtr(cik, concept):
+    """개념의 분기(3개월) 값 → {"by": {fp:{fy:val}}, "latest": (fp,fy), "seq": [(end,val)...날짜순]}."""
     try:
         d = _sec_get(f"https://data.sec.gov/api/xbrl/companyconcept/CIK{cik}/us-gaap/{concept}.json")
     except Exception:
@@ -125,31 +157,51 @@ def _sec_concept_series(cik, concept):
     q = [x for x in usd if x.get("start") and x.get("end") and 80 <= mlen(x["start"], x["end"]) <= 100 and x.get("fp") and x.get("fy")]
     if not q:
         return None
-    by = {}                       # (fp) -> {fy: val}
-    latest = None
+    by, latest, seq = {}, None, {}
     for x in q:
         by.setdefault(x["fp"], {})[x["fy"]] = x["val"]
+        seq[x["end"]] = x["val"]              # end 날짜별(중복 재보고는 마지막 값)
         if latest is None or x["end"] > latest["end"]:
             latest = x
-    fp, fy = latest["fp"], latest["fy"]
-    m = by.get(fp, {})
+    return {"by": by, "latest": (latest["fp"], latest["fy"]), "seq": sorted(seq.items())}
+
+
+def _accel_of(qd):
+    if not qd: return None
+    fp, fy = qd["latest"]; m = qd["by"].get(fp, {})
     return _accel_from_series(m, m.get(fy), m.get(fy - 1), m.get(fy - 2))
 
 
 def _us_one(cik, ticker):
     try:
-        racc = None
+        rq = None
         for cc in _REV_CONCEPTS:
-            racc = _sec_concept_series(cik, cc)
-            if racc is not None:
-                break
-        oacc = _sec_concept_series(cik, _OP_CONCEPTS[0])
+            rq = _sec_concept_qtr(cik, cc)
+            if rq: break
+        oq = _sec_concept_qtr(cik, _OP_CONCEPTS[0])
+        racc, oacc = _accel_of(rq), _accel_of(oq)
         out = {}
         if racc is not None: out["racc"] = round(racc, 4)
         if oacc is not None: out["oacc"] = round(oacc, 4)
         if "racc" in out and "oacc" in out: out["gacc"] = round((out["racc"] + out["oacc"]) / 2, 4)
         elif "racc" in out: out["gacc"] = out["racc"]
         elif "oacc" in out: out["gacc"] = out["oacc"]
+        # (2026-07-23) 분기 흑자전환 2종 + 마진 YoY 변화 (KR 동일 정의)
+        if oq:
+            fp, fy = oq["latest"]; m = oq["by"].get(fp, {})
+            o0, oy = m.get(fy), m.get(fy - 1)
+            seqv = [v for _, v in oq["seq"]]
+            op_prev = seqv[-2] if len(seqv) >= 2 else None
+            if o0 is not None:
+                if oy is not None:
+                    out["qtoby"] = 1 if (oy < 0 and o0 > 0) else 0
+                if op_prev is not None:
+                    out["qtobq"] = 1 if (op_prev < 0 and o0 > 0) else 0
+            if rq:
+                mr = rq["by"].get(fp, {})
+                r0, ry = mr.get(fy), mr.get(fy - 1)
+                if o0 is not None and oy is not None and r0 and ry and r0 > 0 and ry > 0:
+                    out["opmch"] = round(o0 / r0 - oy / ry, 4)
         return ticker, (out or None)
     except Exception:
         return ticker, None
@@ -162,15 +214,14 @@ def collect_us(tickers, workers=6):
         print("[accel] SEC ticker map 실패 — US skip:", repr(e)[:80]); return {}
     pairs = [(t2c[t.upper()], t) for t in tickers if t.upper() in t2c]
     res = {}
-    with ThreadPoolExecutor(max_workers=workers) as ex:     # SEC 레이트리밋 ~10/s
+    with ThreadPoolExecutor(max_workers=3) as ex:           # 전역 스로틀(_sec_get)이 실제 속도 제어(~8 req/s)
         futs = [ex.submit(_us_one, cik, t) for cik, t in pairs]
         for i, f in enumerate(as_completed(futs)):
             t, v = f.result()
             if v:
                 res[t] = v
             if (i + 1) % 500 == 0:
-                print(f"[accel] US {i+1}/{len(pairs)}")
-            time.sleep(0.02)                                # 소폭 스로틀
+                print(f"[accel] US {i+1}/{len(pairs)} (수집 {len(res)})")
     print(f"[accel] US 완료 {len(res)}/{len(pairs)} (SEC 매칭 {len(pairs)}/{len(tickers)})")
     return res
 
@@ -196,6 +247,13 @@ def main():
     print(f"[accel] universe KR {len(kr)} · US {len(us)}  {datetime.datetime.now():%H:%M:%S}")
     KR = collect_kr(kr) if kr else {}
     US = collect_us(us) if us else {}
+    # (2026-07-23) 기존 파일과 병합 — 일시 실패(레이트리밋 등)한 종목은 직전 값 유지
+    try:
+        prev = json.load(open(OUT, encoding="utf-8"))
+        KR = {**(prev.get("kr") or {}), **KR}
+        US = {**(prev.get("us") or {}), **US}
+    except Exception:
+        pass
     obj = {"kr": KR, "us": US, "as_of": datetime.datetime.now().strftime("%Y-%m-%d %H:%M"),
            "desc": "동분기 YoY 성장 가속(이번분기 YoY − 작년동기 YoY). KR=KIS 손익계산서 / US=SEC EDGAR. 값=소수(×100=%p)"}
     os.makedirs(DB, exist_ok=True)

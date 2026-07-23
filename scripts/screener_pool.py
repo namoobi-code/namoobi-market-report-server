@@ -652,7 +652,9 @@ def build():
             _gm=_ga.get(_k) or {}
             for _r in _lst:
                 _v=_gm.get(_r.get("c"))
-                if _v: _r["gacc"]=_v.get("gacc"); _r["racc"]=_v.get("racc"); _r["oacc"]=_v.get("oacc")
+                if _v:
+                    _r["gacc"]=_v.get("gacc"); _r["racc"]=_v.get("racc"); _r["oacc"]=_v.get("oacc")
+                    _r["qtoby"]=_v.get("qtoby"); _r["qtobq"]=_v.get("qtobq"); _r["opmch"]=_v.get("opmch")
         print(f"[pool] growth_accel 병합 KR {len(_ga.get('kr') or {})} · US {len(_ga.get('us') or {})}")
     except Exception as e: print("[pool] growth_accel 병합 skip:", repr(e)[:80])
     _pd=T.kr_price_date()

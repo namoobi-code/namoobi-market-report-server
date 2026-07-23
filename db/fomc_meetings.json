@@ -1,6 +1,6 @@
 {
  "marker": "2026-09-15|19",
- "as_of": "2026-07-22",
+ "as_of": "2026-07-23",
  "data": [
   {
    "date": "2025-07-29~30",
@@ -90,7 +90,7 @@
   {
    "date": "2026-07-29",
    "stance": "예정",
-   "note": "SEP(점도표) 미발표 회의. 6월 SEP 매파적 전환 이후 첫 회의로, CME FedWatch 기준 동결 확률 약 89%(2026-07-14 기준). 7/2 발표 6월 비농업고용은 +5.7만명에 그쳐 노동시장 냉각 신호도 병존. (출처: federalreserve.gov FOMC calendar; Forbes Fed Meeting Tracker 2026-07)"
+   "note": "차기(다음) 회의. SEP(점도표) 미발표 회의. 6월 SEP 매파적 전환 이후 첫 회의로, CME FedWatch 기준 동결 확률 약 89%(2026-07-14 기준). 7/2 발표 6월 비농업고용은 +5.7만명에 그쳐 노동시장 냉각 신호도 병존. (출처: federalreserve.gov FOMC calendar; Forbes Fed Meeting Tracker 2026-07)"
   },
   {
    "date": "2026-09-15~16",

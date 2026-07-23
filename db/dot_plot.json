@@ -1,40 +1,35 @@
 {
  "marker": "2026-07",
- "as_of": "2026-07-22",
+ "as_of": "2026-07-23",
  "data": {
-  "as_of": "2026-07-22",
+  "latest_sep": "2026-06-17 FOMC (2026년 6월 SEP, 최신)",
+  "compare_sep": "2026-03-18 FOMC (2026년 3월 SEP, 직전 비교)",
   "rows": [
    {
-    "year": "2026년말",
+    "item": "2026년말",
     "jun": "3.8%",
     "mar": "3.4%",
-    "change": "미공개"
+    "change": ""
    },
    {
-    "year": "2027년말",
+    "item": "2027년말",
     "jun": "3.6%",
     "mar": "3.1%",
-    "change": "미공개"
+    "change": ""
    },
    {
-    "year": "2028년말",
+    "item": "2028년말",
     "jun": "3.4%",
     "mar": "3.1%",
-    "change": "미공개"
+    "change": ""
    },
    {
-    "year": "장기중립",
+    "item": "장기중립(Longer run)",
     "jun": "3.1%",
     "mar": "3.1%",
-    "change": "미공개"
+    "change": ""
    }
   ],
-  "asof_sep": "2026-06-17(6월 SEP, 최신) / 2026-03-18(3월 SEP)",
-  "verification": "WebSearch로 2026년 6월 SEP(2026-06-17) 이후 신규 FOMC SEP(점도표) 발표가 없음을 확인 — 남은 2026년 회의 중 다음 SEP는 9월 15~16일 회의(분기 공개 주기 3·6·9·12월)에서 예정되고 10월 27~28일 회의는 SEP 미발표. DB(db/dot_plot.json)의 jun·mar 중간값은 변동 없이 그대로 carry-forward.",
-  "sources": [
-   "federalreserve.gov FOMC SEP 2026-06-17",
-   "federalreserve.gov FOMC SEP 2026-03-18",
-   "Yahoo Finance - Fed's 2026 FOMC meeting schedule (2026-07 확인)"
-  ]
+  "note": "2026년 6월 FOMC(6/16~17) SEP은 3월 대비 2026년말 정책금리 중간값이 3.4%→3.8%로 대폭 상향된 매파적 급선회(참가자 18명 중 9명이 연내 1회 이상 인상 전망). 2027·2028년말 중간값도 각각 3.1%→3.6%, 3.1%→3.4%로 동반 상향. 장기중립은 3.1%로 3월과 동일. Kevin Warsh 신임 의장은 6월 회의에서 점도표를 제출하지 않음(18명 중 17명 참여로 집계). (출처: federalreserve.gov, Summary of Economic Projections, fomcprojtabl20260617.htm / fomcprojtabl20260318.htm, 2026-07-23 WebSearch·직접조회 확인)"
  }
 }
