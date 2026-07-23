@@ -1912,8 +1912,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* '추가 가능' 목록 정렬 = 필터가 없는 컬럼 먼저(종목·시장·섹터·등락·목표주가)
      → 그다음은 위 필터 바(KEYS)와 동일한 순서로 나열 */
   const CK2FK={}; for(const fk of KEYS){ const ck=FK2CK[fk]||fk; if(CDEF[ck]) CK2FK[ck]=fk; }
-  const CORDER=CALL.filter(k=>!CK2FK[k])
-                   .concat(KEYS.map(fk=>FK2CK[fk]||fk).filter(ck=>CDEF[ck]));
+  /* (2026-07-23) Set 중복 제거 — qtoby·qtobq 두 필터가 같은 컬럼(qtob=분기흑자)에 매핑돼
+     '분기흑자'가 표·컬럼설정에 2개 생기던 문제 */
+  const CORDER=[...new Set(CALL.filter(k=>!CK2FK[k])
+                   .concat(KEYS.map(fk=>FK2CK[fk]||fk).filter(ck=>CDEF[ck])))];
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
   /* 기본 표시 컬럼 = 초기화 상태에서 '값이 걸린' 필터와 정확히 일치(구성·순서 동일)
      (시가총액·거래대금·저가주=가격·상장기간·부채비율·유동비율 + 종목/등락/컨센서스)
@@ -1933,7 +1935,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const raw=localStorage.getItem(COLKEY); if(!raw) return false;
       const d=JSON.parse(raw);
       if(!d||!Array.isArray(d.kr)||!Array.isArray(d.us)) return false;
-      const kr=d.kr.filter(k=>CDEF[k]), us=d.us.filter(k=>CDEF[k]);   // 모르는/폐기된 키 제거
+      const kr=[...new Set(d.kr.filter(k=>CDEF[k]))], us=[...new Set(d.us.filter(k=>CDEF[k]))];   // 모르는/폐기된 키 제거 + 중복 제거(분기흑자 2개 버그 저장분 정화)
       if(!kr.length||!us.length) return false;
       COLST={kr,us}; colsSaved=true; return true;
     }catch(e){ return false; }
