@@ -318,11 +318,14 @@ def _enrich_us(us):
         for att in range(3):
             try:
                 j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
-                         f"?modules=financialData,assetProfile,earningsTrend,summaryDetail&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                         f"?modules=financialData,assetProfile,earningsTrend,summaryDetail,defaultKeyStatistics&crumb={_up.quote(crumb)}",opener=op,timeout=12)
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
                 fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{}); sd=fd.get("summaryDetail",{})
+                ks=fd.get("defaultKeyStatistics",{})   # (2026-07-24) US 수급 프록시 — 공매도잔량·커버일수·기관보유
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
                 return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),
+                        "sr_f":v(ks.get("shortPercentOfFloat")),"scov":v(ks.get("shortRatio")),
+                        "inst":v(ks.get("heldPercentInstitutions")),
                         "opm":v(fdd.get("operatingMargins")),"psr":v(sd.get("priceToSalesTrailing12Months")),
                         "de":v(fdd.get("debtToEquity")),"cr":v(fdd.get("currentRatio")),
                         "roe":v(fdd.get("returnOnEquity")),"revg":v(fdd.get("revenueGrowth")),

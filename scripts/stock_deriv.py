@@ -29,7 +29,18 @@ DB   = os.path.join(BASE, "data", "db")
 OUT  = os.path.join(DB, "stock_deriv.json")
 API  = "https://apis.data.go.kr/1160100/service/GetDerivativeProductInfoService"
 
-US_STOCKS = {"AAPL": "애플", "NVDA": "엔비디아"}
+US_STOCKS = {"AAPL": "애플", "NVDA": "엔비디아"}   # 폴백 — main()에서 시총 상위 100으로 대체
+
+def _us_universe(n=100):
+    """(2026-07-24) US 옵션 수집 대상 — 스크리너 풀 시총 상위 n종목 (옵션 유동성 대부분 커버)."""
+    try:
+        pool = json.load(open(os.path.join(DB, "screener_pool.json"), encoding="utf-8"))
+        us = sorted((r for r in (pool.get("us") or []) if r.get("cap")),
+                    key=lambda r: -r["cap"])[:n]
+        out = {r["c"]: (r.get("kn") or r.get("n") or r["c"]) for r in us}
+        return out or dict(US_STOCKS)
+    except Exception:
+        return dict(US_STOCKS)
 
 Z_WIN = 60
 RISK_FREE = 0.03
@@ -201,8 +212,8 @@ def us_day():
                        "expiry": m.get("expiry"), "dte": m.get("dte")}
             print(f"  [us] {tk}: PCR {out[tk]['pcr_oi']} 스큐 {out[tk]['iv_skew']}%p GEX {out[tk]['gex']}M$ ({m.get('expiry')})")
         except Exception as e:
-            print(f"  [us] {tk} 실패: {e}")
-        time.sleep(1)
+            print(f"  [us] {tk} 실패: {str(e)[:60]}")
+        time.sleep(0.7)
     return out
 
 
@@ -231,6 +242,8 @@ def finalize(days):
 
 
 def main():
+    global US_STOCKS
+    US_STOCKS = _us_universe(100)
     back = 0
     for a in sys.argv[1:]:
         if a == "--backfill": back = 130
