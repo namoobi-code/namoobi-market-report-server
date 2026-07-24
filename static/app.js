@@ -1627,6 +1627,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       ost:{label:'기관연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
       sr:{label:'공매도비중',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['1% ↓(약함)',null,1],['3% ↓',null,3],['5% ↑(과열)',5,null],['10% ↑',10,null]],def:[null,null]},
       lbr:{label:'대차잔고비율',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['5% ↓',null,5],['10% ↓',null,10],['10% ↑(부담)',10,null],['20% ↑',20,null]],def:[null,null]},
+      drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'점',reqData:1,presets:[['전체',null,null],['강세(+1점 ↑)',1,null],['+0.5점 ↑',0.5,null],['약세(−1점 ↓)',null,-1],['−0.5점 ↓',null,-0.5]],def:[null,null]},
       ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
@@ -1685,6 +1686,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       qtobq:{label:'분기흑자QoQ',tgl:1,def:false,tglLabel:'직전분기 적자→당분기 흑자 전환만 (가장 빠름·계절성 주의)'},
       opmch:{label:'마진변화',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',min:1,reqData:1,presets:[['전체',null],['개선(0%p ↑)',0],['+3%p ↑',3],['+5%p ↑',5],['+10%p ↑',10]],def:[null,null]},
       frgn:{label:'외인보유비중',fixed:'— (US 미제공)'},
+      drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'점',reqData:1,presets:[['전체',null,null],['강세(+1점 ↑)',1,null],['+0.5점 ↑',0.5,null],['약세(−1점 ↓)',null,-1],['−0.5점 ↓',null,-0.5]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
   };
@@ -1695,9 +1697,38 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
                  r1y 와 사실상 동일값이었다(실측 ALKS +98/+97.7 · AEHR +393/+392.7 · NAVN +30/+29.8).
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
-              'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr',
+              'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr','drvj',
               'ern','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','sec'];
+  /* ── (2026-07-24) 파생·수급판정 점수 ──────────────────────────────────
+     파생 z 3종(베이시스·풋콜(OI)·IV스큐)은 |z|≥1.5 에서 ±1점 (방향지표만 — GEX·OI는 제외),
+     현물 프록시 4종은 ±0.5점(선행성이 한 단계 약해 절반 가중):
+       외인 20일 순매수 +0.5/−0.5 · 기관 20일 순매수 +0.5/−0.5 ·
+       공매도비중 ≥5% −0.5 · 대차잔고비율 ≥10% −0.5.
+     파생 미수록 종목은 프록시만으로 계산(표에서 ≈ 표시). */
+  let DRVSC=null, _drvscTried=false;
+  function loadDrvSc(){
+    if(_drvscTried) return; _drvscTried=true;
+    fetch('/api/db/stock_deriv_score').then(r=>r.ok?r.json():null).then(d=>{
+      if(d&&d.s){ DRVSC=d.s; refresh(); }
+    }).catch(()=>{});
+  }
+  function _drvjVal(r){
+    let sc=0, any=false;
+    const d=DRVSC&&DRVSC[r.c];
+    if(d){ any=true;
+      if(d.b!=null){ if(d.b>=1.5)sc+=1; else if(d.b<=-1.5)sc-=1; }
+      if(d.p!=null){ if(d.p>=1.5)sc-=1; else if(d.p<=-1.5)sc+=1; }
+      if(d.s!=null){ if(d.s>=1.5)sc-=1; else if(d.s<=-1.5)sc+=1; }
+    }
+    if(mkt==='kr'){
+      if(r.fnb20!=null){ any=true; sc+=r.fnb20>0?0.5:(r.fnb20<0?-0.5:0); }
+      if(r.onb20!=null){ any=true; sc+=r.onb20>0?0.5:(r.onb20<0?-0.5:0); }
+      if(r.sr!=null&&r.sr>=5) sc-=0.5;
+      if(r.lbr!=null&&r.lbr>=10) sc-=0.5;
+    }
+    return any?Math.round(sc*10)/10:null;
+  }
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
 
@@ -1914,6 +1945,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
     sr:{l:'공매도비중',n:1,m:'kr'}, lb:{l:'대차잔고',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
+    drvj:{l:'파생·수급판정',n:1,m:'both'},   // (2026-07-24) 파생 z(±1점) + 현물 프록시(±0.5점) 합산
     ern:{l:'어닝일',n:1,m:'both'},
     tob:{l:'흑자전환',n:0,m:'kr'}, qtoby:{l:'분기흑자YoY',n:0,m:'both'}, qtobq:{l:'분기흑자QoQ',n:0,m:'both'}, opm:{l:'영업이익률',n:1,m:'both'}, opmch:{l:'마진변화',n:1,m:'both'},
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
@@ -2012,6 +2044,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'sr': return r.sr;                                       // 공매도 비중(%)
       case 'lb': return r.lb;                                        // 대차잔고 금액(억원)
       case 'lbr': return r.lbr;                                      // 대차잔고비율(%)
+      case 'drvj': return _drvjVal(r);                               // 파생·수급판정 점수
       case 'ern': {                                                 // 어닝까지 D-day (지난 발표는 제외)
         if(!r.ed) return null;
         const t=new Date(); t.setHours(0,0,0,0);
@@ -2086,6 +2119,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'sr': return `<span class="${v>=5?'dn':''}">${v.toFixed(1)}%</span>`;
       case 'lb': return v==null?'—':wonF(v*1e8);
       case 'lbr': return `<span class="${v>=10?'dn':''}">${v.toFixed(2)}%</span>`;
+      case 'drvj': { const prx=!(DRVSC&&DRVSC[r.c]);   // 파생 데이터 없으면 프록시만(≈)
+        const lb2=v>=1?'강세':v<=-1?'약세':'중립';
+        return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="파생 z신호 ±1점(베이시스·풋콜·IV스큐, |z|≥1.5) + 수급 프록시 ±0.5점(외인·기관 20일, 공매도≥5%·대차≥10%는 감점)${prx?' — 이 종목은 파생 미수록이라 프록시만(≈)':''}">${prx?'≈':''}${v>0?'+':''}${v.toFixed(1)} ${lb2}</span>`; }
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(MACD_DISP[v]||v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
@@ -2272,6 +2308,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['외인·기관수급(20일)','KIS 종목별 투자자 — 최근 20거래일 누적 순매수 금액(억원)'],
         ['외인·기관연속매수','최근 며칠 연속 순매수 중인가(일)'],
         ['공매도비중','최근 거래일 공매도 거래량 ÷ 전체 거래량(%) — 5%↑ 과열 경계 (KIS)'],
+        ['파생·수급판정','파생 z신호 ±1점(베이시스·풋콜·IV스큐 — 상세 패널의 파생 포지셔닝, |z|≥1.5) + 수급 프록시 ±0.5점(외인·기관 20일 순매수 방향, 공매도 5%↑·대차 10%↑ 감점). +1점↑ 강세 · −1점↓ 약세. 파생 미수록 종목은 프록시만(≈ 표시)'],
         ['대차잔고비율','대차잔여주식수 ÷ 상장주식수(%) — 공매도 대기물량 프록시, 높을수록 하락배팅 부담 (금융위 주식대차정보 · 기준일 +1영업일 13시 갱신)'],
         ['어닝임박','다음 실적발표일까지 D-day (네이버 IR 일정 — 대형주 위주 제공)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
@@ -2306,7 +2343,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
-    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn']],
+    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
   const _catByLabel=(()=>{ const m={};
     for(const [cat,ks] of GCAT) for(const k of ks){ const c=CDEF[k]; if(c) m[c.l]=cat; }
@@ -2439,7 +2476,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
-             ['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn']],
+             ['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn','drvj']],
              ['건전성',['de','cr','oploss']],
              ['기타',['age']]];
     $('sd_sum').innerHTML=G.map(([t,ks])=>{
@@ -2611,6 +2648,24 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       return;
     }
     const L=D.latest, Z=D.z||{}, I=_drvInterp(L,Z), US=(mkt==='us');
+    /* (2026-07-24) 종합 판정점수 — 파생 ±1점 + 수급 프록시 ±0.5점(스크리너 '파생·수급판정' 컬럼과 동일 산식) */
+    let dp=0;
+    if(Z.basis_pct!=null){ if(Z.basis_pct>=1.5)dp+=1; else if(Z.basis_pct<=-1.5)dp-=1; }
+    if(Z.pcr_oi!=null){ if(Z.pcr_oi>=1.5)dp-=1; else if(Z.pcr_oi<=-1.5)dp+=1; }
+    if(Z.iv_skew!=null){ if(Z.iv_skew>=1.5)dp-=1; else if(Z.iv_skew<=-1.5)dp+=1; }
+    let pp=null;
+    if(!US){ const pr=POOL.kr.find(x=>x.c===c);
+      if(pr){ pp=0;
+        if(pr.fnb20!=null) pp+=pr.fnb20>0?0.5:(pr.fnb20<0?-0.5:0);
+        if(pr.onb20!=null) pp+=pr.onb20>0?0.5:(pr.onb20<0?-0.5:0);
+        if(pr.sr!=null&&pr.sr>=5) pp-=0.5;
+        if(pr.lbr!=null&&pr.lbr>=10) pp-=0.5;
+        pp=Math.round(pp*10)/10; } }
+    const tot=Math.round((dp+(pp||0))*10)/10;
+    const _sgn=v=>`${v>0?'+':''}${v}`;
+    const scoreLine=`<div class="note" style="font-size:11.5px;margin:1px 0 5px">판정점수 <b style="color:${tot>=1?'#c0392b':tot<=-1?'#2471c9':'inherit'}">${_sgn(tot)}점</b>`+
+      ` = 파생 ${_sgn(dp)}${pp!=null?` + 수급 프록시 ${_sgn(pp)} <span title="프록시는 선행성이 약해 절반 가중(±0.5점)">(0.5가중)</span>`:''}`+
+      ` · 스크리너 '파생·수급판정' 컬럼과 동일</div>`;
     const fmt=(v,d,suf)=>v==null?'<span class="note">—</span>':`${(+v).toLocaleString(undefined,{maximumFractionDigits:d})}${suf||''}`;
     const row=(label,val,z,interp)=>`<div class="si" style="align-items:baseline"><span>${label}</span>`+
       `<b style="text-align:right">${val} <span style="margin-left:6px">${_zBadge(z)}</span>`+
@@ -2621,7 +2676,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
       `<span>파생 포지셔닝 <span class="note">(${asofD} ${US?'마감 스냅샷':'확정 · T+1'})</span></span>`+
       `<button class="cp-x" id="sd_drvhelp" title="지표 설명">ⓘ 설명</button></div>`+
-      `<div style="font-size:12px;margin:2px 0 6px">${I.head}</div>`+
+      `<div style="font-size:12px;margin:2px 0 2px">${I.head}</div>`+scoreLine+
       (L.basis!=null? row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis):'')+
       (L.fut_oi!=null? row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi):'')+
       /* (2026-07-24) 옵션 미상장(주식선물만 상장) 종목 — '누적 중' 오안내 대신 행을 접고 사유 명시 */
@@ -3794,6 +3849,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_asof').textContent='전종목 풀 불러오는 중…';
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
       d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loaded=true;
+      loadDrvSc();                            // (2026-07-24) 파생·수급판정 점수 소스 (도착하면 refresh)
       $('scr_asof').innerHTML=poolMeta(d);
       {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
       if(gb){gb.disabled=false; gb.textContent='▶ START';}
