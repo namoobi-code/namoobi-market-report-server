@@ -2806,11 +2806,33 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         if(!q||dcode!==c) return;
         const el=$('sd_drvlive'); if(!el) return;
         const s=(v,d)=>v==null?'—':(+v).toLocaleString(undefined,{maximumFractionDigits:d??0});
+        /* (2026-07-24) OI 장중 판독 — 전일마감(기준점) → 장중(현재) → 증감 → 가격×OI 4분면 해석(잠정) */
+        const prevOI=(q.oi!=null&&q.oi_chg!=null)?q.oi-q.oi_chg:null;
+        const up=q.chg_pct>0, oiUp=(q.oi_chg||0)>0;
+        const oisent= q.oi_chg==null?'' :
+          up&&oiUp   ? '<b class="up">선물↑+OI↑</b> 장중 신규 매수 유입 중 — 상승 신뢰↑' :
+          up&&!oiUp  ? '선물↑+OI↓ 장중 숏커버 성격 — 지속성 의심' :
+          !up&&oiUp  ? '<b class="dn">선물↓+OI↑</b> 장중 신규 매도 진입 중 — 하락 신뢰↑' :
+                       '선물↓+OI↓ 장중 롱 청산 성격 — 투매·포지션 정리(막바지 가능성)';
+        /* 베이시스 — 직전 확정(FSC) → 장중, 변화 방향 해석. ±0.05%p 이내는 '비슷' */
+        let bsent='';
+        if(q.basis_pct!=null&&L.basis_pct!=null){
+          const dfb=q.basis_pct-L.basis_pct;
+          bsent = (q.basis_pct<0&&L.basis_pct>=0) ? '<b class="dn">백워데이션 전환</b> — 선물 매도 헤지 경계' :
+                  dfb>0.05  ? '<b class="up">확정치보다 확대</b> — 장중 선물 매수세 강해지는 중' :
+                  dfb<-0.05 ? '<b class="dn">확정치보다 축소</b> — 선물 쪽 힘 빠짐(헤지 매도 성격)' :
+                              '직전 확정치와 비슷 — 특이 신호 없음';
+        }
         el.innerHTML=`⚡ <b>장중 ${E(q.t||'')} 기준</b> (KIS T+0 · 5분 캐시) — `+
           `선물 <b>${s(q.fut)}원</b> <span class="${q.chg_pct>=0?'up':'dn'}">${q.chg_pct>0?'+':''}${s(q.chg_pct,2)}%</span>`+
-          ` · 베이시스 <b>${q.basis>0?'+':''}${s(q.basis)}원${q.basis_pct!=null?` (${q.basis_pct>0?'+':''}${s(q.basis_pct,2)}%)`:''}</b> ${_zBadge(q.z_basis_live)}`+
-          ` · OI <b>${s(q.oi)}</b>${q.oi_chg?` (${q.oi_chg>0?'+':''}${s(q.oi_chg)})`:''} ${_zBadge(q.z_oi_live)}`+
-          ` <span class="note">— 장중 z는 확정 60일 분포에 장중값 대입(실시간 갱신) · OI z는 장 마감 전이라 변화량이 미완성인 점 참고</span>`;
+          ` <span class="note">· 장중 z는 확정 60일 분포에 장중값 대입 · 확정 판독은 위 행들</span>`+
+          `<div style="margin-top:3px">베이시스: 직전확정(${E(asofD)}) <b>${L.basis>0?'+':''}${s(L.basis)}원(${L.basis_pct>0?'+':''}${s(L.basis_pct,2)}%)</b>`+
+          ` → 장중 <b>${q.basis>0?'+':''}${s(q.basis)}원${q.basis_pct!=null?` (${q.basis_pct>0?'+':''}${s(q.basis_pct,2)}%)`:''}</b> ${_zBadge(q.z_basis_live)}`+
+          `${bsent?` — ${bsent}`:''}</div>`+
+          `<div style="margin-top:3px">OI: 전일마감 <b>${s(prevOI)}</b> → 장중 <b>${s(q.oi)}</b>`+
+          `${q.oi_chg!=null?` (<b class="${oiUp?'up':'dn'}">${q.oi_chg>0?'+':''}${s(q.oi_chg)}</b>)`:''} ${_zBadge(q.z_oi_live)}`+
+          `${oisent?` — ${oisent}`:''}`+
+          ` <span class="note">(잠정 — 당일치기 물량이 섞여 마감 때 달라질 수 있음)</span></div>`;
         el.style.display='';
       }).catch(()=>{});
     }
