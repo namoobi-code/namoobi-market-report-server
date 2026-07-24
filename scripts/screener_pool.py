@@ -561,6 +561,11 @@ def _kis_flow(kr):
                       {"FID_COND_MRKT_DIV_CODE":"J","FID_INPUT_ISCD":r["c"],
                        "FID_INPUT_DATE_1":"","FID_INPUT_DATE_2":""},tries=2)
             rows2=j2.get("output2") or []          # 최신→과거
+            # (2026-07-24) 아침 빌드 사고 방지 — 첫 행이 '오늘'인데 아직 집계 전(비중 0·공매도 T+1 공표)이면
+            #   전일 행부터 사용한다. 이걸 안 하면 06:52 빌드에서 전 종목 sr=0.0 이 들어간다(실측).
+            _today=time.strftime("%Y%m%d")
+            if rows2 and str(rows2[0].get("stck_bsop_date"))==_today and not T.num(rows2[0].get("ssts_vol_rlim")):
+                rows2=rows2[1:]
             rl=[T.num(x.get("ssts_vol_rlim")) for x in rows2]
             if rl and rl[0] is not None: r["sr"]=round(rl[0],2)
             v5=[x for x in rl[:5] if x is not None]

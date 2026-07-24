@@ -967,8 +967,12 @@ def stock_deriv_api(code: str):
     s = (d.get("stocks") or {}).get(code)
     if not s or not s.get("days"):
         raise HTTPException(404, "파생 미상장 종목")
+    # (2026-07-24) 주식선물만 상장·옵션 미상장 종목 구분 — 프론트가 '누적 중'이 아니라
+    #   '옵션 미상장'으로 안내하도록 이력 전체에서 옵션값 존재 여부를 내려준다
+    has_opt = any((x.get("pcr_oi") is not None) or (x.get("gex") is not None)
+                  for x in s["days"])
     out = {"asof": d.get("asof"), "src": d.get("src"), "name": s.get("name"),
-           "z": s.get("z"), "latest": s.get("latest"),
+           "z": s.get("z"), "latest": s.get("latest"), "has_opt": has_opt,
            # 스파크라인용 최근 60일만 (전송량 절약)
            "days": s["days"][-60:]}
     return Response(content=json.dumps(out, ensure_ascii=False),

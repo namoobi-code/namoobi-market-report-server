@@ -2488,7 +2488,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(roll&&R.basis&&!/누적/.test(R.basis)) R.basis+=' · ⚠ 만기 주간 — 월물 교체 왜곡 주의';
     // ③ PCR(OI)
     const zp=Z.pcr_oi;
-    R.pcr = zp==null?'누적 중':
+    R.pcr = zp==null?'표본 부족/누적 중':
       zp>=2?(bear++,'헤지 급증 — 경계(극단이면 역발상 바닥 후보)'):
       zp>=1?(bear++,'하방 경계 증가'):
       zp<=-1?(bull++,'콜 우위 — 상방 베팅(쏠림 과열은 주의)'):'평소 범위';
@@ -2498,7 +2498,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       zs>=1.5?(bear++,'큰손이 폭락 보험 매집 — 겉이 강해도 경고'):
       zs<=-1.5?(bull++,'하방 공포 완화'):'평소 범위';
     // ⑤ GEX (방향 아님 — 변동성 체제)
-    R.gex = L.gex==null?'누적 중': L.gex<0?'변동성 증폭 구간 — 급등락 주의':'변동성 억제 구간 — 등락 완만';
+    R.gex = L.gex==null?'표본 부족/누적 중': L.gex<0?'변동성 증폭 구간 — 급등락 주의':'변동성 억제 구간 — 등락 완만';
     // 종합
     let head = bull>bear?`<b style="color:#c0392b">강세 우위</b> (${bull}:${bear}) — 파생이 상승을 지지`:
                bear>bull?`<b style="color:#2471c9">약세 우위</b> (${bear}:${bull}) — 파생이 하락을 경고`:
@@ -2624,9 +2624,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       `<div style="font-size:12px;margin:2px 0 6px">${I.head}</div>`+
       (L.basis!=null? row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis):'')+
       (L.fut_oi!=null? row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi):'')+
-      row('풋콜비율(OI)', fmt(L.pcr_oi,2), Z.pcr_oi, I.rows.pcr)+
-      row('IV 스큐', fmt(L.iv_skew,1,'%p'), Z.iv_skew, I.rows.skew)+
-      row('딜러 감마 GEX', fmt(L.gex,1,US?'M$':'억원'), Z.gex, I.rows.gex)+
+      /* (2026-07-24) 옵션 미상장(주식선물만 상장) 종목 — '누적 중' 오안내 대신 행을 접고 사유 명시 */
+      (D.has_opt===false
+        ? `<div class="note" style="margin-top:4px;font-size:11px">이 종목은 <b>주식선물만 상장·주식옵션 미상장</b>이라 풋콜비율·IV스큐·GEX는 산출 대상이 아닙니다 (KRX 주식옵션은 약 40종목만 상장)</div>`
+        : row('풋콜비율(OI)', fmt(L.pcr_oi,2), Z.pcr_oi, I.rows.pcr)+
+          row('IV 스큐', fmt(L.iv_skew,1,'%p'), Z.iv_skew, I.rows.skew)+
+          row('딜러 감마 GEX', fmt(L.gex,1,US?'M$':'억원'), Z.gex, I.rows.gex))+
       (US?`<div class="note" style="margin-top:4px;font-size:11px">미국 개별주식은 선물이 없어 옵션 3종만 · 옵션체인은 과거 조회가 불가해 z는 수집 개시일부터 누적(20거래일 후 산출)</div>`:'')+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
       _helpHTML(_DRV_HELP)+`</div></div>`;
