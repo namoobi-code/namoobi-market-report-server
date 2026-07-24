@@ -1782,6 +1782,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         if(k==='qtobq' && !r.qtobq) return false;   // 분기 흑자전환(직전분기比)
         continue; }
       if(f.cat){ if(st.v!=null && String(r[k]||'')!==st.v) return false; continue; }
+      /* (2026-07-24) 파생·수급판정 CASE 다중선택 — 값 조건과 별개로 케이스로도 거른다 (KR만) */
+      if(k==='drvj' && Array.isArray(st.cs) && st.cs.length && st.cs.length<3 && mkt==='kr'){
+        const _d=DRVSC&&DRVSC[r.c];
+        const _kz=!_d?3:(_d.o?1:2);
+        if(!st.cs.includes(_kz)) return false;
+      }
       if(f.fin && r.isfin) continue;   // 금융업 면제
       let v=colVal(r, FK2CK[k]||k);   // 필터키 → 컬럼키 매핑 후 공통 접근자 사용
       if(v==null){ if(f.reqData && (st.min!=null||st.max!=null)) return false; continue; }
@@ -1805,6 +1811,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(f.exclGE) return `${L}: <span class="cv">${st.max==null?'전체':st.max+'년이상 제외'}</span>`;
     const lo=st.min, hi=st.max;
     let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
+    /* (2026-07-24) 파생·수급판정 — CASE 다중선택이 걸려 있으면 칩에 표기 */
+    if(k==='drvj'&&Array.isArray(st.cs)&&st.cs.length&&st.cs.length<3)
+      v=(v==='전체'?'':v+' · ')+'CASE'+st.cs.join('·');
     return `${L}: <span class="cv">${E(v)}</span>`; }
 
   /* (2026-07-22) 결과표 UI 옵션 — 종목 클릭 시 상세로 자동이동(기본 ON) · 스크롤 전 표시 행수(기본 8). localStorage 유지. */
@@ -1866,7 +1875,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const f=d[k];
       if(!f) return '';
       if(f.fixed!==undefined) return `<div class="fchip"><button disabled style="opacity:.75;cursor:default">${chipLabel(k)}</button></div>`;
-      const st=F[k]; const active = f.tgl? st.on : (f.cat? st.v!=null : (st.min!=null||st.max!=null));
+      const st=F[k]; const active = f.tgl? st.on : (f.cat? st.v!=null : (st.min!=null||st.max!=null
+        || (k==='drvj'&&Array.isArray(st.cs)&&st.cs.length&&st.cs.length<3)));
       let pop;
       if(f.cat){
         const _opts=f.opts?['',...f.opts]:catOpts(k);   // (2026-07-18) 고정 옵션 지원 — 데이터 도착 전에도 선택지 표시
@@ -1881,7 +1891,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       } else if(f.tgl){
         pop=`<label class="tgl"><input type="checkbox" data-tgl="${k}" ${st.on?'checked':''}> ${E(f.tglLabel)}</label>`;
       } else {
-        pop=`<div class="pl">프리셋</div>`+f.presets.map((p,pi)=>{
+        /* (2026-07-24) 파생·수급판정 — 프리셋 라벨 오른쪽에 CASE1/2/3 다중선택(기본 전체) */
+        const _csBtns = k==='drvj'
+          ? `<span style="float:right;display:inline-flex;gap:4px">${[1,2,3].map(n=>{
+              const on=!Array.isArray(st.cs)||st.cs.includes(n);
+              return `<button class="preset" data-csk="${k}" data-csn="${n}" style="padding:2px 7px;font-size:11px;${on?'background:#2f6fed;color:#fff;border-color:#2f6fed':''}" title="CASE1 선물+옵션 · CASE2 선물만 · CASE3 파생 미상장(프록시) — 눌러서 켜고 끄기(다중선택)">C${n}</button>`;
+            }).join('')}</span>`
+          : '';
+        pop=`<div class="pl">프리셋${_csBtns}</div>`+f.presets.map((p,pi)=>{
           const lo=p[1], hi=p.length>2?p[2]:null;
           const sel=(st.min===lo && (st.max===hi || (f.min&&hi==null)));
           return `<button class="preset ${sel?'sel':''}" data-k="${k}" data-lo="${lo==null?'':lo}" data-hi="${hi==null?'':hi}">${E(p[0])}</button>`;
@@ -1901,8 +1918,21 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     $('scr_fltbar').querySelectorAll('[data-chip]').forEach(b=>b.onclick=e=>{
       e.stopPropagation(); const k=b.dataset.chip; const p=$('pop_'+k); const wasOpen=p.classList.contains('open');
       document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); if(!wasOpen)p.classList.add('open'); });
-    $('scr_fltbar').querySelectorAll('.preset').forEach(b=>b.onclick=()=>{
-      const k=b.dataset.k; F[k]={min:b.dataset.lo===''?null:+b.dataset.lo, max:b.dataset.hi===''?null:+b.dataset.hi}; apply(); });
+    /* CASE 다중선택 — 프리셋과 별개 상태(cs). 토글 후에도 팝업을 다시 열어 연속 선택 편의 */
+    $('scr_fltbar').querySelectorAll('[data-csk]').forEach(b=>b.onclick=e=>{
+      e.stopPropagation();
+      const k=b.dataset.csk, n=+b.dataset.csn;
+      const st=F[k]||(F[k]={min:null,max:null});
+      let cs=Array.isArray(st.cs)?st.cs.slice():[1,2,3];
+      cs=cs.includes(n)?cs.filter(x=>x!==n):cs.concat(n).sort();
+      if(!cs.length) cs=[1,2,3];               // 전부 끄면 의미가 없어 전체로 복귀
+      st.cs=cs.length===3?undefined:cs;
+      apply();
+      const p=$('pop_'+k); if(p) p.classList.add('open');
+    });
+    $('scr_fltbar').querySelectorAll('.preset:not([data-csk])').forEach(b=>b.onclick=()=>{
+      const k=b.dataset.k; const _cs=(F[k]||{}).cs;   // CASE 선택은 프리셋 변경에도 유지
+      F[k]={min:b.dataset.lo===''?null:+b.dataset.lo, max:b.dataset.hi===''?null:+b.dataset.hi, cs:_cs}; apply(); });
     $('scr_fltbar').querySelectorAll('[data-man]').forEach(inp=>inp.oninput=()=>{
       const k=inp.dataset.man; F[k][inp.dataset.mm]= inp.value===''?null:+inp.value;
       const btn=document.querySelector(`[data-chip="${k}"]`);
