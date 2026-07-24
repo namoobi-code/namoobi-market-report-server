@@ -1714,11 +1714,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(d&&d.s){ DRVSC=d.s; refresh(); }
     }).catch(()=>{});
   }
-  /* 파생 점수 — dir: z(+)가 강세인 지표 1, 약세인 지표 -1 */
+  /* (2026-07-24) 부호 통일 — 인덱스 3.1.13처럼 카드·점수 모두 z(+)=강세·z(−)=약세.
+     원지표가 약세 재료(풋콜=풋/콜, 스큐=풋−콜)인 것은 표시 전에 z 부호를 뒤집는다. */
+  const _uz=z=>z==null?null:-z;
+  /* 파생 점수 — 통일 z 3종(전부 z+=강세) 단순 등급 합산 */
   function _drvPts(b,p,s){
-    const g=(z,dir)=>{ if(z==null) return 0; const a=Math.abs(z); if(a<1) return 0;
-      return (z>0?1:-1)*(a>=2?1:0.5)*dir; };
-    return Math.round((g(b,1)+g(p,-1)+g(s,-1))*100)/100;
+    const g=z=>{ if(z==null) return 0; const a=Math.abs(z); if(a<1) return 0;
+      return (z>0?1:-1)*(a>=2?1:0.5); };
+    return Math.round((g(b)+g(p)+g(s))*100)/100;
   }
   /* 프록시 점수 — KR 풀 행에서. 데이터 전무면 null */
   function _prxPts(r){
@@ -1735,7 +1738,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function _drvjVal(r){
     const d=DRVSC&&DRVSC[r.c];
-    const dp=d?_drvPts(d.b,d.p,d.s):null;
+    const dp=d?_drvPts(d.b,_uz(d.p),_uz(d.s)):null;   // slim은 원지표 z — 통일 부호로 변환
     const pp=mkt==='kr'?_prxPts(r):null;
     if(dp==null&&pp==null) return null;
     return Math.round(((dp||0)+(pp||0))*100)/100;
@@ -2538,17 +2541,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     else if(!up&&oiUp){bear++;R.oi='선물↓+OI↑ 신규 매도 — 하락 신뢰↑';}
     else R.oi='선물↓+OI↓ 롱 청산 — 하락 막바지 가능';
     if(roll&&R.basis&&!/누적/.test(R.basis)) R.basis+=' · ⚠ 만기 주간 — 월물 교체 왜곡 주의';
-    // ③ PCR(OI)
+    // ③ PCR(OI) — Z는 부호 통일된 z(+=강세). 원지표 기준으로는 반대 방향
     const zp=Z.pcr_oi;
     R.pcr = zp==null?'표본 부족/누적 중':
-      zp>=2?(bear++,'헤지 급증 — 경계(극단이면 역발상 바닥 후보)'):
-      zp>=1?(bear++,'하방 경계 증가'):
-      zp<=-1?(bull++,'콜 우위 — 상방 베팅(쏠림 과열은 주의)'):'평소 범위';
-    // ④ IV 스큐
+      zp<=-2?(bear++,'헤지 급증 — 경계(극단이면 역발상 바닥 후보)'):
+      zp<=-1?(bear++,'하방 경계 증가'):
+      zp>=1?(bull++,'콜 우위 — 상방 베팅(쏠림 과열은 주의)'):'평소 범위';
+    // ④ IV 스큐 — Z는 부호 통일된 z(+=강세)
     const zs=Z.iv_skew;
     R.skew = zs==null?'표본 부족/누적 중':
-      zs>=1.5?(bear++,'큰손이 폭락 보험 매집 — 겉이 강해도 경고'):
-      zs<=-1.5?(bull++,'하방 공포 완화'):'평소 범위';
+      zs<=-1.5?(bear++,'큰손이 폭락 보험 매집 — 겉이 강해도 경고'):
+      zs>=1.5?(bull++,'하방 공포 완화 — 위험선호 회복'):'평소 범위';
     // ⑤ GEX (방향 아님 — 변동성 체제)
     R.gex = L.gex==null?'표본 부족/누적 중': L.gex<0?'변동성 증폭 구간 — 급등락 주의':'변동성 억제 구간 — 등락 완만';
     // 종합
@@ -2571,14 +2574,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      '읽는 법':'<b class="up">선물↑+OI↑</b> 신규 매수(추세 진짜) · 선물↑+OI↓ 숏커버(반짝 가능성)<br><b class="dn">선물↓+OI↑</b> 신규 매도(하락 진짜) · 선물↓+OI↓ 롱 청산(하락 막바지 후보)',
      '주의':'만기(매월 두 번째 목요일) 주간엔 롤오버로 OI가 출렁임'}],
    ['풋콜비율 PCR(OI)',{
-     '무엇':'풋(하락 보험) 미결제 ÷ 콜(상승 베팅) 미결제',
-     '왜 선행':'높아지면 하락 대비 수요가 늘고 있다는 뜻',
-     '읽는 법':'<b class="dn">z +1↑</b> 하방 경계 증가 · <b class="dn">z +2↑</b> 헤지 급증(극단적 공포는 오히려 바닥 신호가 되기도) · <b class="up">z −1↓</b> 콜 쏠림(상방 베팅 우위 — 과열은 주의)',
-     '주의':'개별주식옵션은 거래가 얇아 하루 값이 튐 → z(60일 대비)로 판단'}],
-   ['IV 스큐',{
-     '무엇':'같은 만기에서 "하락 보험(OTM 풋)" IV − "상승 복권(OTM 콜)" IV = 폭락 보험료의 프리미엄',
-     '왜 선행':'큰손은 주가가 멀쩡할 때 조용히 보험부터 삽니다 → 주가보다 스큐가 먼저 오르는 경우가 많음',
-     '읽는 법':'<b class="dn">z +1.5↑</b> 경고(하방 대비 수요 급증 — 겉이 강해도 주의) · <b class="up">z −1.5↓</b> 공포 완화',
+     '무엇':'풋(하락 보험) 미결제 ÷ 콜(상승 베팅) 미결제. 값이 높을수록 하락 대비가 많다는 뜻',
+     '왜 선행':'하락 대비 수요의 증감이 현물보다 먼저 움직입니다',
+     '읽는 법':'표시 z는 부호 통일(+=강세) — <b class="up">z +1↑</b> 콜 쏠림(상방 베팅 우위 — 과열은 주의) · <b class="dn">z −1↓</b> 하방 경계 증가 · <b class="dn">z −2↓</b> 헤지 급증(극단적 공포는 오히려 바닥 신호가 되기도)',
+     '주의':'값(풋÷콜)은 원지표 그대로라 값↑=풋 증가. z만 방향 통일 · 개별주식옵션은 거래가 얇아 z(60일 대비)로 판단'}],
+   ['IV 스큐 (콜−풋)',{
+     '무엇':'"상승 복권(OTM 콜)" IV − "하락 보험(OTM 풋)" IV. 인덱스 3.1.13과 같은 콜−풋 표기 — 클수록 위험선호',
+     '왜 선행':'큰손은 주가가 멀쩡할 때 조용히 보험부터 삽니다 → 주가보다 스큐가 먼저 움직이는 경우가 많음',
+     '읽는 법':'<b class="up">z +1.5↑</b> 하방 공포 완화 — 위험선호 회복 · <b class="dn">z −1.5↓</b> 폭락 보험료 급등(하방 대비 수요 급증 — 겉이 강해도 경고)',
      '주의':'표본(호가) 부족한 날은 계산하지 않고 — 로 표시'}],
    ['딜러 감마 GEX',{
      '무엇':'옵션 팔아준 증권사(딜러)들이 헤지로 사고파는 방향의 총합 — 방향이 아니라 <b>변동성 체제</b> 지표',
@@ -2597,10 +2600,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const th=_CASE_TH[kase]||1;
     const tbl=(rows)=>`<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0">${rows.map(r=>
       `<tr>${r.map((c,i)=>`<td style="border:1px solid var(--line,#e5e5e5);padding:3px 6px;${i===0?'white-space:nowrap;font-weight:600;background:var(--bg2,#f7f8f9)':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
+    /* (2026-07-24) 부호 통일 후 — 세 지표 모두 같은 규칙: z(+)=강세·z(−)=약세 */
+    const _zrule='z <b>+1~+2</b> → <b class="up">+0.5</b> · z <b>+2↑</b> → <b class="up">+1</b> / z <b>−1~−2</b> → <b class="dn">−0.5</b> · z <b>−2↓</b> → <b class="dn">−1</b>';
     const drvRows=[
-      ['선물 베이시스','z <b>+1~+2</b> → <b class="up">+0.5</b> · z <b>+2↑</b> → <b class="up">+1</b> (선물 매수 우위=강세) / z <b>−1~−2</b> → <b class="dn">−0.5</b> · z <b>−2↓</b> → <b class="dn">−1</b> (선물 매도 헤지=약세)'],
-      ['풋콜비율(OI)','방향 반대 — z <b>−1~−2</b> → <b class="up">+0.5</b> · z <b>−2↓</b> → <b class="up">+1</b> (콜 쏠림=강세) / z <b>+1~+2</b> → <b class="dn">−0.5</b> · z <b>+2↑</b> → <b class="dn">−1</b> (풋 쏠림=약세)'],
-      ['IV 스큐','방향 반대 — z <b>−1~−2</b> → <b class="up">+0.5</b> · z <b>−2↓</b> → <b class="up">+1</b> (하방 공포 완화=강세) / z <b>+1~+2</b> → <b class="dn">−0.5</b> · z <b>+2↑</b> → <b class="dn">−1</b> (폭락 보험료 급등=약세)']];
+      ['선물 베이시스',`${_zrule} <span class="note">(z+ = 선물 매수 우위)</span>`],
+      ['풋콜비율(OI)',`${_zrule} <span class="note">(z+ = 콜 쏠림 · 표시 z는 부호 통일 — 원지표 풋/콜과 반대)</span>`],
+      ['IV 스큐 (콜−풋)',`${_zrule} <span class="note">(z+ = 하방 공포 완화 · 콜−풋으로 반전 표기)</span>`]];
     const prxRows=[
       ['외인 순매수(20일)','매수 +/매도 − · 크기 반영: 20일 순매수가 <b>시총의 0.3%↑면 ±0.5</b> · 미만이면 ±0.25'],
       ['기관 순매수(20일)','외인과 동일 (±0.25 ~ ±0.5)'],
@@ -2710,7 +2715,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
       return;
     }
-    const L=D.latest, Z=D.z||{}, I=_drvInterp(L,Z), US=(mkt==='us');
+    const Zr=D.z||{};
+    /* (2026-07-24) 인덱스식 부호 통일 — 풋콜·스큐 z를 뒤집어 전 지표 z(+)=강세.
+       IV스큐는 값도 콜−풋으로 반전 표기(인덱스와 동일). 풋콜은 값(풋/콜)은 그대로 두고 z만 통일 */
+    const Z={basis_pct:Zr.basis_pct, fut_oi_chg:Zr.fut_oi_chg,
+             pcr_oi:_uz(Zr.pcr_oi), iv_skew:_uz(Zr.iv_skew), gex:Zr.gex};
+    const L=D.latest, I=_drvInterp(L,Z), US=(mkt==='us');
     /* (2026-07-24) 3케이스 — CASE1 선물+옵션 / CASE2 선물만 / (CASE3=프록시 카드는 위 폴백) / US=옵션만 */
     const kase = US?'us':(D.has_opt===false?2:1);
     const pr = US?null:POOL.kr.find(x=>x.c===c);
@@ -2747,8 +2757,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       (D.has_opt===false
         ? `<div class="note" style="margin-top:4px;font-size:11px">이 종목은 <b>주식선물만 상장·주식옵션 미상장</b>이라 풋콜비율·IV스큐·GEX는 산출 대상이 아닙니다 (KRX 주식옵션은 약 40종목만 상장)</div>`
         : row('풋콜비율(OI)', fmt(L.pcr_oi,2), Z.pcr_oi, I.rows.pcr)+
-          row('IV 스큐', fmt(L.iv_skew,1,'%p'), Z.iv_skew, I.rows.skew)+
+          row('IV 스큐 (콜−풋)', fmt(L.iv_skew==null?null:(L.iv_skew===0?0:-L.iv_skew),1,'%p'), Z.iv_skew, I.rows.skew)+
           row('딜러 감마 GEX', fmt(L.gex,1,US?'M$':'억원'), Z.gex, I.rows.gex))+
+      `<div class="note" style="margin-top:3px;font-size:10.5px">✅ 모든 z는 <b class="up">z(+)=강세</b>·<b class="dn">z(−)=약세</b>로 부호 통일(인덱스 3.1.13과 동일) — IV스큐는 콜−풋으로 반전 표기, 풋콜비율은 값(풋÷콜)은 원지표 그대로·z만 통일</div>`+
       (US?`<div class="note" style="margin-top:4px;font-size:11px">미국 개별주식은 선물이 없어 옵션 3종만 · 옵션체인은 과거 조회가 불가해 z는 수집 개시일부터 누적(20거래일 후 산출)</div>`:'')+
       /* (2026-07-24) CASE1·2도 수급 4행을 같은 카드에 — 파생 미상장 카드(CASE3)와 표시 항목 통일 */
       (PX?`<div class="note" style="margin:7px 0 2px;font-size:11px;font-weight:700">현물 수급 (프록시 — 판정점수에 축소가중 반영)</div>`+_prxRows(pr,PX.R):'')+
