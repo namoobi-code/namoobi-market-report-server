@@ -294,7 +294,10 @@ def main():
                "src": "KR=금융위 FSC 파생상품시세정보(T+1 확정치) · US=Yahoo 옵션체인(마감 스냅샷·백필 불가→z 누적 중)",
                "stocks": out}, open(OUT, "w", encoding="utf-8"), ensure_ascii=False)
     # (2026-07-24) 스크리너 '파생·수급판정' 컬럼용 slim 점수 소스 — z 3종만 코드별로 (2.6MB → 수 KB)
-    slim = {c: {"b": v["z"].get("basis_pct"), "p": v["z"].get("pcr_oi"), "s": v["z"].get("iv_skew")}
+    slim = {c: {"b": v["z"].get("basis_pct"), "p": v["z"].get("pcr_oi"), "s": v["z"].get("iv_skew"),
+                # o=옵션 상장 여부(CASE1/2 구분) — 이력에 옵션값이 하루라도 있으면 1
+                "o": 1 if any((x.get("pcr_oi") is not None) or (x.get("gex") is not None)
+                              for x in v["days"]) else 0}
             for c, v in out.items() if v.get("z")}
     json.dump({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"), "s": slim},
               open(os.path.join(DB, "stock_deriv_score.json"), "w", encoding="utf-8"), ensure_ascii=False)

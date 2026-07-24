@@ -2131,9 +2131,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'sr': return `<span class="${v>=5?'dn':''}">${v.toFixed(1)}%</span>`;
       case 'lb': return v==null?'—':wonF(v*1e8);
       case 'lbr': return `<span class="${v>=10?'dn':''}">${v.toFixed(2)}%</span>`;
-      case 'drvj': { const prx=!(DRVSC&&DRVSC[r.c]);   // 파생 데이터 없으면 프록시만(≈)
-        const lb2=v>=1?'강세':v<=-1?'약세':'중립';
-        return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="파생 z(베이시스·풋콜·IV스큐): |z|≥1 ±0.5점·|z|≥2 ±1점 + 수급 프록시: 외인·기관 20일(시총 0.3%↑ ±0.5·미만 ±0.25)·공매도 5%↑ −0.5/2%↓ +0.25·대차 10%↑ −0.5${prx?' — 이 종목은 파생 미수록이라 프록시만(≈)':''}">${prx?'≈':''}${v>0?'+':''}${_fmtPt(v)} ${lb2}</span>`; }
+      case 'drvj': { const d=DRVSC&&DRVSC[r.c];
+        /* 케이스별 문턱 — CASE1(선물+옵션) ±1.5 · CASE2(선물만) ±1 · CASE3(프록시만) ±0.75 · US ±1 */
+        const kz = mkt==='us'?'us':(!d?3:(d.o?1:2));
+        const th=_CASE_TH[kz], prx=(kz===3);
+        const lb2=v>=th?'강세':v<=-th?'약세':'중립';
+        return `<span class="${v>=th?'up':(v<=-th?'dn':'note')}" title="CASE${kz==='us'?' US(옵션만)':kz} · 문턱 ±${th} — 파생 z(베이시스·풋콜·IV스큐): |z|≥1 ±0.5점·|z|≥2 ±1점 + 수급 프록시: 외인·기관 20일(시총 0.3%↑ ±0.5·미만 ±0.25)·공매도 5%↑ −0.5/2%↓ +0.25·대차 10%↑ −0.5${prx?' — 파생 미상장이라 프록시만(≈)':''}">${prx?'≈':''}${v>0?'+':''}${_fmtPt(v)} ${lb2}</span>`; }
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(MACD_DISP[v]||v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
@@ -2613,7 +2616,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      '읽는 법':'<b class="dn">10%↑</b> 잠재 매도 압력 큼 · 반대로 주가 상승 시 숏커버(되사기) 연료가 되기도'}],
    ['한계',{
      '주의':'파생 지표와 달리 "선행 베팅"이 아니라 "이미 실행된 매매"의 집계 → 선행성 한 단계 약함 · 확정치 T+1~T+2'}]];
-  function _prxCard(r){
+  /* (2026-07-24) 3케이스 공용 — 수급 4행의 해석·행HTML을 CASE1·2 파생 카드에서도 재사용 */
+  function _prxParts(r){
     let bull=0,bear=0; const R={};
     const f=r.fnb20, o=r.onb20;
     if(f!=null&&o!=null){
@@ -2628,19 +2632,32 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     R.lbr = r.lbr==null?'—':
       r.lbr>=10?(bear++,'대차잔고 과다 — 잠재 매도 압력(상승 시 숏커버 연료)'):
       r.lbr>=5?'대차잔고 다소 높음':'대차잔고 낮음';
-    const head = bull>bear?`<b style="color:#c0392b">수급 우호</b> (${bull}:${bear})`:
-                 bear>bull?`<b style="color:#2471c9">하방 압력 우위</b> (${bear}:${bull})`:
-                 `<b>중립·혼조</b> (${bull}:${bear})`;
+    return {R,bull,bear};
+  }
+  function _prxRows(r,R){
     const row=(label,val,interp)=>`<div class="si" style="align-items:baseline"><span>${label}</span>`+
       `<b style="text-align:right">${val}<div class="note" style="font-weight:400;text-align:right">${interp}</div></b></div>`;
-    return `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
-      `<span>포지셔닝 프록시 <span class="note">(파생 미상장 — 공매도·대차·수급으로 근사)</span></span>`+
-      `<button class="cp-x" id="sd_drvhelp" title="설명">ⓘ 설명</button></div>`+
-      `<div style="font-size:12px;margin:2px 0 6px">${head}</div>`+
-      row('외인 순매수(20일)', cell(r,'fnb20')+(r.fst?` <span class="note">연속${r.fst}일</span>`:''), '')+
+    return row('외인 순매수(20일)', cell(r,'fnb20')+(r.fst?` <span class="note">연속${r.fst}일</span>`:''), '')+
       row('기관 순매수(20일)', cell(r,'onb20')+(r.ost?` <span class="note">연속${r.ost}일</span>`:''), R.flow)+
       row('공매도비중', cell(r,'sr'), R.sr)+
-      row('대차잔고비율', cell(r,'lbr')+(r.lb!=null?` <span class="note">(${cell(r,'lb')})</span>`:''), R.lbr)+
+      row('대차잔고비율', cell(r,'lbr')+(r.lb!=null?` <span class="note">(${cell(r,'lb')})</span>`:''), R.lbr);
+  }
+  /* 케이스별 강세/약세 문턱 — 항목 수가 달라 만점이 다르므로(만점의 ~35% 지점) */
+  const _CASE_TH={1:1.5, 2:1, 3:0.75, us:1};
+  const _caseBadge=k=>`<span style="font-size:10px;font-weight:700;background:${k===1?'#e8f2ff':k===2?'#eef7ee':'#f4f0e8'};border:1px solid var(--line,#ddd);border-radius:4px;padding:1px 5px;margin-right:5px" title="CASE1 선물+옵션 상장(9행·문턱 ±1.5) · CASE2 선물만 상장(6행·±1) · CASE3 파생 미상장(4행·±0.75)">CASE${k===1?'1 선물+옵션':k===2?'2 선물만':'3 프록시'}</span>`;
+  function _prxCard(r){
+    const P=_prxParts(r), R=P.R;
+    /* (2026-07-24) 판정 통일 — 우호/비우호 개수 대신 점수 기반 한 줄 */
+    const pp=_prxPts(r), th=_CASE_TH[3];
+    const vcol=pp!=null&&pp>=th?'#c0392b':pp!=null&&pp<=-th?'#2471c9':'inherit';
+    const vlb=pp==null?'집계 대기':(pp>=th?'강세':pp<=-th?'약세':'중립');
+    const scoreLine=`<div style="font-size:12.5px;margin:2px 0 6px"><b style="color:${vcol}">${vlb}</b>`+
+      (pp!=null?` <b style="color:${vcol}">${pp>0?'+':''}${_fmtPt(pp)}점</b> <span class="note">(문턱 ±${th} — 프록시 4종뿐이라 낮게 · 스크리너 컬럼과 동일)</span>`:'')+`</div>`;
+    return `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
+      `<span>${_caseBadge(3)}포지셔닝 프록시 <span class="note">(파생 미상장 — 공매도·대차·수급으로 근사)</span></span>`+
+      `<button class="cp-x" id="sd_drvhelp" title="설명">ⓘ 설명</button></div>`+
+      scoreLine+
+      _prxRows(r,R)+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
       _helpHTML(_PRX_HELP)+`</div></div>`;
   }
@@ -2660,14 +2677,25 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       return;
     }
     const L=D.latest, Z=D.z||{}, I=_drvInterp(L,Z), US=(mkt==='us');
-    /* (2026-07-24) 종합 판정점수(등급형) — 스크리너 '파생·수급판정' 컬럼과 동일 산식(_drvPts/_prxPts) */
+    /* (2026-07-24) 3케이스 — CASE1 선물+옵션 / CASE2 선물만 / (CASE3=프록시 카드는 위 폴백) / US=옵션만 */
+    const kase = US?'us':(D.has_opt===false?2:1);
+    const pr = US?null:POOL.kr.find(x=>x.c===c);
+    const PX = pr?_prxParts(pr):null;
+    /* 종합 판정점수(등급형) — 스크리너 '파생·수급판정' 컬럼과 동일 산식(_drvPts/_prxPts) */
     const dp=_drvPts(Z.basis_pct,Z.pcr_oi,Z.iv_skew);
-    const pp=US?null:(()=>{ const pr=POOL.kr.find(x=>x.c===c); return pr?_prxPts(pr):null; })();
+    const pp=pr?_prxPts(pr):null;
     const tot=Math.round((dp+(pp||0))*100)/100;
+    const th=_CASE_TH[kase];
+    /* (2026-07-24) 판정 통일 — 예전 우호/비우호 개수 판정줄 삭제, 점수 기반 한 줄로.
+       변동성 체제(GEX<0)는 점수와 별개의 경고라 뒤에 이어붙인다. */
     const _sgn=v=>`${v>0?'+':''}${_fmtPt(v)}`;
-    const scoreLine=`<div class="note" style="font-size:11.5px;margin:1px 0 5px">판정점수 <b style="color:${tot>=1?'#c0392b':tot<=-1?'#2471c9':'inherit'}">${_sgn(tot)}점</b>`+
-      ` = 파생 ${_sgn(dp)}${pp!=null?` + 수급 프록시 ${_sgn(pp)} <span title="프록시는 선행성이 약해 축소 가중 — 수급은 시총 0.3%↑ ±0.5·미만 ±0.25, 공매도 5%↑ −0.5/2%↓ +0.25, 대차 10%↑ −0.5">(축소가중)</span>`:''}`+
-      ` · 스크리너 '파생·수급판정' 컬럼과 동일</div>`;
+    const vcol=tot>=th?'#c0392b':tot<=-th?'#2471c9':'inherit';
+    const vlb=tot>=th?'강세':tot<=-th?'약세':'중립';
+    const scoreLine=`<div style="font-size:12.5px;margin:2px 0 6px"><b style="color:${vcol}">${vlb}</b> `+
+      `<b style="color:${vcol}">${_sgn(tot)}점</b> <span class="note">(문턱 ±${th})</span>`+
+      ` = 파생 ${_sgn(dp)}${pp!=null?` + 수급 ${_sgn(pp)} <span class="note" title="프록시는 선행성이 약해 축소 가중 — 수급은 시총 0.3%↑ ±0.5·미만 ±0.25, 공매도 5%↑ −0.5/2%↓ +0.25, 대차 10%↑ −0.5">(축소가중)</span>`:''}`+
+      `${L.gex!=null&&L.gex<0?' · <span style="color:#e67e22">변동성 증폭 주의</span>':''}`+
+      ` <span class="note">· 스크리너 컬럼과 동일</span></div>`;
     const fmt=(v,d,suf)=>v==null?'<span class="note">—</span>':`${(+v).toLocaleString(undefined,{maximumFractionDigits:d})}${suf||''}`;
     const row=(label,val,z,interp)=>`<div class="si" style="align-items:baseline"><span>${label}</span>`+
       `<b style="text-align:right">${val} <span style="margin-left:6px">${_zBadge(z)}</span>`+
@@ -2676,9 +2704,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     /* US: 개별주식 선물이 없어 베이시스·선물OI 행은 데이터 있을 때만. GEX 단위도 시장별(억원/M$) */
     box.innerHTML=
       `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
-      `<span>파생 포지셔닝 <span class="note">(${asofD} ${US?'마감 스냅샷':'확정 · T+1'})</span></span>`+
+      `<span>${US?'':_caseBadge(kase)}파생 포지셔닝 <span class="note">(${asofD} ${US?'마감 스냅샷':'확정 · T+1'})</span></span>`+
       `<button class="cp-x" id="sd_drvhelp" title="지표 설명">ⓘ 설명</button></div>`+
-      `<div style="font-size:12px;margin:2px 0 2px">${I.head}</div>`+scoreLine+
+      scoreLine+
       (L.basis!=null? row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis):'')+
       (L.fut_oi!=null? row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi):'')+
       /* (2026-07-24) 옵션 미상장(주식선물만 상장) 종목 — '누적 중' 오안내 대신 행을 접고 사유 명시 */
@@ -2688,8 +2716,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           row('IV 스큐', fmt(L.iv_skew,1,'%p'), Z.iv_skew, I.rows.skew)+
           row('딜러 감마 GEX', fmt(L.gex,1,US?'M$':'억원'), Z.gex, I.rows.gex))+
       (US?`<div class="note" style="margin-top:4px;font-size:11px">미국 개별주식은 선물이 없어 옵션 3종만 · 옵션체인은 과거 조회가 불가해 z는 수집 개시일부터 누적(20거래일 후 산출)</div>`:'')+
+      /* (2026-07-24) CASE1·2도 수급 4행을 같은 카드에 — 파생 미상장 카드(CASE3)와 표시 항목 통일 */
+      (PX?`<div class="note" style="margin:7px 0 2px;font-size:11px;font-weight:700">현물 수급 (프록시 — 판정점수에 축소가중 반영)</div>`+_prxRows(pr,PX.R):'')+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
-      _helpHTML(_DRV_HELP)+`</div></div>`;
+      _helpHTML(_DRV_HELP)+_helpHTML(_PRX_HELP.slice(1))+`</div></div>`;
     box.style.display='';
     {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
   }
