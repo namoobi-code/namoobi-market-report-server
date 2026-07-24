@@ -2823,16 +2823,25 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
                   dfb<-0.05 ? '<b class="dn">확정치보다 축소</b> — 선물 쪽 힘 빠짐(헤지 매도 성격)' :
                               '직전 확정치와 비슷 — 특이 신호 없음';
         }
-        el.innerHTML=`⚡ <b>장중 ${E(q.t||'')} 기준</b> (KIS T+0 · 5분 캐시) — `+
-          `선물 <b>${s(q.fut)}원</b> <span class="${q.chg_pct>=0?'up':'dn'}">${q.chg_pct>0?'+':''}${s(q.chg_pct,2)}%</span>`+
-          ` <span class="note">· 장중 z는 확정 60일 분포에 장중값 대입 · 확정 판독은 위 행들</span>`+
-          `<div style="margin-top:3px">베이시스: 직전확정(${E(asofD)}) <b>${L.basis>0?'+':''}${s(L.basis)}원(${L.basis_pct>0?'+':''}${s(L.basis_pct,2)}%)</b>`+
-          ` → 장중 <b>${q.basis>0?'+':''}${s(q.basis)}원${q.basis_pct!=null?` (${q.basis_pct>0?'+':''}${s(q.basis_pct,2)}%)`:''}</b> ${_zBadge(q.z_basis_live)}`+
-          `${bsent?` — ${bsent}`:''}</div>`+
-          `<div style="margin-top:3px">OI: 전일마감 <b>${s(prevOI)}</b> → 장중 <b>${s(q.oi)}</b>`+
-          `${q.oi_chg!=null?` (<b class="${oiUp?'up':'dn'}">${q.oi_chg>0?'+':''}${s(q.oi_chg)}</b>)`:''} ${_zBadge(q.z_oi_live)}`+
-          `${oisent?` — ${oisent}`:''}`+
-          ` <span class="note">(잠정 — 당일치기 물량이 섞여 마감 때 달라질 수 있음)</span></div>`;
+        /* (2026-07-24) 표 형태 — 항목/직전확정/장중/변화/z/해석 6열로 체계화 */
+        const prevFut=(q.fut!=null&&q.chg_pct!=null)?Math.round(q.fut/(1+q.chg_pct/100)):null;
+        const td=(c,extra)=>`<td style="border:1px solid #cfe3ff;padding:3px 7px;${extra||''}">${c}</td>`;
+        const num='text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap';
+        const rows=[
+          ['선물가', prevFut!=null?s(prevFut)+'원':'—', `<b>${s(q.fut)}원</b>`,
+           `<span class="${q.chg_pct>=0?'up':'dn'}">${q.chg_pct>0?'+':''}${s(q.chg_pct,2)}%</span>`, '', ''],
+          ['베이시스', L.basis!=null?`${L.basis>0?'+':''}${s(L.basis)}원 (${L.basis_pct>0?'+':''}${s(L.basis_pct,2)}%) <span class="note">(${E(asofD)})</span>`:'—',
+           `<b>${q.basis>0?'+':''}${s(q.basis)}원${q.basis_pct!=null?` (${q.basis_pct>0?'+':''}${s(q.basis_pct,2)}%)`:''}</b>`,
+           (q.basis!=null&&L.basis!=null)?`${q.basis-L.basis>0?'+':''}${s(q.basis-L.basis)}원`:'—',
+           _zBadge(q.z_basis_live), bsent||'—'],
+          ['미결제약정(OI)', s(prevOI), `<b>${s(q.oi)}</b>`,
+           q.oi_chg!=null?`<b class="${oiUp?'up':'dn'}">${q.oi_chg>0?'+':''}${s(q.oi_chg)}</b>`:'—',
+           _zBadge(q.z_oi_live), oisent||'—']];
+        el.innerHTML=`<div style="margin-bottom:4px">⚡ <b>장중 ${E(q.t||'')} 기준</b> <span class="note">(KIS T+0 · 5분 캐시 · z는 확정 60일 분포에 장중값 대입 · 잠정치 — 마감 때 달라질 수 있음, 확정 판독은 위 행들)</span></div>`+
+          `<table style="width:100%;border-collapse:collapse;font-size:11.5px;background:#fff">`+
+          `<tr>${['항목','직전 기준(전일마감·베이시스는 최근확정)','장중','변화','z(장중)','해석'].map(h=>`<th style="border:1px solid #cfe3ff;background:#e9f2ff;padding:3px 7px;font-weight:700;white-space:nowrap">${h}</th>`).join('')}</tr>`+
+          rows.map(r=>`<tr>${td(`<b>${r[0]}</b>`,'white-space:nowrap')}${td(r[1],num)}${td(r[2],num)}${td(r[3],num)}${td(r[4],'white-space:nowrap')}${td(r[5])}</tr>`).join('')+
+          `</table>`;
         el.style.display='';
       }).catch(()=>{});
     }
