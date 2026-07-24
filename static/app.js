@@ -2598,9 +2598,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const tbl=(rows)=>`<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0">${rows.map(r=>
       `<tr>${r.map((c,i)=>`<td style="border:1px solid var(--line,#e5e5e5);padding:3px 6px;${i===0?'white-space:nowrap;font-weight:600;background:var(--bg2,#f7f8f9)':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
     const drvRows=[
-      ['선물 베이시스','z <b>+1~2</b> → <b class="up">+0.5</b> · z <b>+2↑</b> → <b class="up">+1</b> / z −1~−2 → <b class="dn">−0.5</b> · z −2↓ → <b class="dn">−1</b>'],
-      ['풋콜비율(OI)','방향 반대 — z <b>+1~2</b> → <b class="dn">−0.5</b> · <b>+2↑</b> → <b class="dn">−1</b> / z −1↓ → <b class="up">+0.5~+1</b> (풋 쏠림=약세 신호)'],
-      ['IV 스큐','방향 반대 — z <b>+1~2</b> → <b class="dn">−0.5</b> · <b>+2↑</b> → <b class="dn">−1</b> / z −1↓ → <b class="up">+0.5~+1</b> (보험료 급등=약세 신호)']];
+      ['선물 베이시스','z <b>+1~+2</b> → <b class="up">+0.5</b> · z <b>+2↑</b> → <b class="up">+1</b> (선물 매수 우위=강세) / z <b>−1~−2</b> → <b class="dn">−0.5</b> · z <b>−2↓</b> → <b class="dn">−1</b> (선물 매도 헤지=약세)'],
+      ['풋콜비율(OI)','방향 반대 — z <b>+1~+2</b> → <b class="dn">−0.5</b> · z <b>+2↑</b> → <b class="dn">−1</b> (풋 쏠림=약세) / z <b>−1~−2</b> → <b class="up">+0.5</b> · z <b>−2↓</b> → <b class="up">+1</b> (콜 쏠림=강세)'],
+      ['IV 스큐','방향 반대 — z <b>+1~+2</b> → <b class="dn">−0.5</b> · z <b>+2↑</b> → <b class="dn">−1</b> (폭락 보험료 급등=약세) / z <b>−1~−2</b> → <b class="up">+0.5</b> · z <b>−2↓</b> → <b class="up">+1</b> (하방 공포 완화=강세)']];
     const prxRows=[
       ['외인 순매수(20일)','매수 +/매도 − · 크기 반영: 20일 순매수가 <b>시총의 0.3%↑면 ±0.5</b> · 미만이면 ±0.25'],
       ['기관 순매수(20일)','외인과 동일 (±0.25 ~ ±0.5)'],
