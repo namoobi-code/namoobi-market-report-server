@@ -200,6 +200,60 @@ def _f(x):
     except Exception:
         return 0.0
 
+# ── (2026-07-24) 개별 주식선물 — 장중 온디맨드 (종목 파생 카드용) ────────────
+#   코드 체계: KIS 주식선물옵션 마스터(fo_stk_code_mts) 전용 코드(예: 삼성전자 8월물 A11608).
+#   FSC/KRX 단축코드(A1168000)와 다르다 — 실측: FSC 코드로 호출하면 output1 이 빈다.
+#   응답에 basis(선물−현물)까지 직접 들어 있어 현물 별도 조회가 필요 없다.
+MASTER_STK = "https://new.real.download.dws.co.kr/common/master/fo_stk_code_mts.mst.zip"
+_mst_stk = {"day": None, "fut": {}}   # fut: {기초종목코드: [(YYYYMM, KIS코드), ...]}
+
+def _stk_master():
+    """주식선물 마스터 — 기초 종목코드 → 월물 리스트. 하루 1회 캐시."""
+    today = datetime.date.today().isoformat()
+    if _mst_stk["day"] == today:
+        return _mst_stk
+    with urllib.request.urlopen(MASTER_STK, timeout=40) as f:
+        z = zipfile.ZipFile(io.BytesIO(f.read()))
+    raw = z.read(z.namelist()[0]).decode("cp949", "ignore").splitlines()
+    fut = {}
+    for l in raw:
+        p = l.split("|")
+        # p[0]=구분(1=선물) p[1]=KIS코드 p[3]=이름("삼성전자   F 202608 (  10)") p[7]=기초 종목코드
+        if len(p) < 9 or p[0].strip() != "1":
+            continue
+        m = re.search(r"F\s+(\d{6})", p[3])
+        und = p[7].strip()
+        if m and und:
+            fut.setdefault(und, []).append((m.group(1), p[1].strip()))
+    for k in fut:
+        fut[k].sort()
+    _mst_stk.update(day=today, fut=fut)
+    return _mst_stk
+
+def stock_futures_quote(stock_code):
+    """개별 주식선물 근월물 T+0 시세 — {fut, basis, spot, oi, oi_chg, chg_pct, expiry} or None.
+       basis 는 KIS 제공값(선물−현물) 그대로, spot 은 fut−basis 로 역산."""
+    c = _creds()
+    if not c:
+        return None
+    tok = _token(c)
+    rows = _stk_master()["fut"].get(str(stock_code)) or []
+    ym = datetime.date.today().strftime("%Y%m")
+    rows = [r for r in rows if r[0] >= ym] or rows
+    if not rows:
+        return None
+    expiry, code = rows[0]
+    j = _get(c, tok, "/uapi/domestic-futureoption/v1/quotations/inquire-price",
+             "FHMIF10000000", {"FID_COND_MRKT_DIV_CODE": "JF", "FID_INPUT_ISCD": code})
+    o = j.get("output1") or {}
+    if not o.get("futs_prpr"):
+        return None
+    fut = _f(o["futs_prpr"]); basis = _f(o.get("basis"))
+    return {"code": code, "expiry": expiry, "fut": fut, "basis": basis,
+            "spot": fut - basis, "chg_pct": _f(o.get("futs_prdy_ctrt")),
+            "oi": _f(o.get("hts_otst_stpl_qty")), "oi_chg": _f(o.get("otst_stpl_qty_icdc")),
+            "vol": _f(o.get("acml_vol"))}
+
 def futures_oi():
     """코스피200 선물 근월물 — 현재가·미결제약정(T+0). {code,name,price,oi,oi_chg,asof} or None."""
     c = _creds()

@@ -2621,10 +2621,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      '무엇':'오늘 값이 최근 60거래일 평균에서 몇 표준편차 떨어져 있나',
      '왜 쓰나':'종목마다 체급이 달라 절대값 비교 불가 → "자기 평소 대비 얼마나 이례적인가"로 표준화',
      '읽는 법':'<b>|z|≥2</b> 매우 이례적(강한 신호) · <b>|z|≥1</b> 평소보다 뚜렷함 · 그 외 평소 범위'}],
-   ['데이터·갱신',{
-     '출처':'한국거래소 확정치(금융위 공공 API)',
-     '주기':'<b>T+1</b> — 오늘 보는 값은 어제 마감 기준. 장중 판단용이 아니라 "내일을 위한 저녁 점검"용',
-     '주의':'옵션 지표(PCR·스큐·GEX)는 장중 호가가 얇아 왜곡 → 확정치만 사용'}]];
+   ['데이터·갱신 (항목별 주기)',{
+     '파생 5종':'한국거래소 확정치(금융위 FSC API) — <b>T+1 공표</b>(기준일 다음 영업일 13시) → 매일 <b>13:40</b> 적재. 헤더의 "MM/DD 확정"이 데이터 기준일, "획득"이 마지막 수집 시각',
+     '장중(T+0)':'<b>베이시스·선물OI만</b> 카드 열 때 KIS 실시간 조회(⚡줄, 5분 캐시). 옵션 3종(풋콜·스큐·GEX)은 장중 호가 공백으로 왜곡이라 확정치만 사용',
+     '수급 4종':'풀 빌드 <b>2회/일(06:52·15:52)</b>에 갱신 — 외인·기관 순매수는 당일 마감 후 확정(아침 빌드=전일치), 공매도 <b>T+1</b>·대차잔고 <b>T+1~2</b> 공표',
+     'US':'Yahoo 옵션체인 마감 스냅샷 — 매일 06:50 KST(미 마감 후) 적재, 백필 불가라 z는 누적 중'}]];
   /* (2026-07-24) 판정점수 계산법 — 케이스별 상세 설명(ⓘ 맨 위에 표시) */
   function _scoreHelpHTML(kase){
     const th=_CASE_TH[kase]||1;
@@ -2778,9 +2779,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     /* US: 개별주식 선물이 없어 베이시스·선물OI 행은 데이터 있을 때만. GEX 단위도 시장별(억원/M$) */
     box.innerHTML=
       `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
-      `<span>${US?'':_caseBadge(kase)}파생 포지셔닝 <span class="note">(${asofD} ${US?'마감 스냅샷':'확정 · T+1'})</span></span>`+
+      `<span>${US?'':_caseBadge(kase)}파생 포지셔닝 <span class="note">(${asofD} ${US?'마감 스냅샷 · 매일 06:50 적재':'확정 · T+1 · 매일 13:40 적재'}${D.asof?` · 획득 ${E(String(D.asof).slice(5,16))}`:''})</span></span>`+
       `<button class="cp-x" id="sd_drvhelp" title="지표 설명">ⓘ 설명</button></div>`+
       scoreLine+
+      `<div id="sd_drvlive" style="display:none;font-size:11.5px;background:#f1f7ff;border:1px solid #cfe3ff;border-radius:6px;padding:5px 8px;margin:2px 0 6px"></div>`+
       (L.basis!=null? row('선물 베이시스', `${fmt(L.basis,0,'원')} (${fmt(L.basis_pct,2,'%')})`, Z.basis_pct, I.rows.basis):'')+
       (L.fut_oi!=null? row('선물 OI', `${fmt(L.fut_oi,0,'계약')}${L.fut_oi_chg!=null?` (${L.fut_oi_chg>0?'+':''}${(+L.fut_oi_chg).toLocaleString()})`:''}`, Z.fut_oi_chg, I.rows.oi):'')+
       /* (2026-07-24) 옵션 미상장(주식선물만 상장) 종목 — '누적 중' 오안내 대신 행을 접고 사유 명시 */
@@ -2792,11 +2794,26 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       `<div class="note" style="margin-top:3px;font-size:10.5px">✅ 모든 z는 <b class="up">z(+)=강세</b>·<b class="dn">z(−)=약세</b>로 부호 통일(인덱스 3.1.13과 동일) — IV스큐는 콜−풋으로 반전 표기, 풋콜비율은 값(풋÷콜)은 원지표 그대로·z만 통일</div>`+
       (US?`<div class="note" style="margin-top:4px;font-size:11px">미국 개별주식은 선물이 없어 옵션 3종만 · 옵션체인은 과거 조회가 불가해 z는 수집 개시일부터 누적(20거래일 후 산출)</div>`:'')+
       /* (2026-07-24) CASE1·2도 수급 4행을 같은 카드에 — 파생 미상장 카드(CASE3)와 표시 항목 통일 */
-      (PX?`<div class="note" style="margin:7px 0 2px;font-size:11px;font-weight:700">현물 수급 (프록시 — 판정점수에 축소가중 반영)</div>`+_prxRows(pr,PX.R):'')+
+      (PX?`<div class="note" style="margin:7px 0 2px;font-size:11px;font-weight:700">현물 수급 <span style="font-weight:400">(프록시 — 판정점수에 축소가중 반영 · 풀 빌드 2회/일 06:52·15:52 — 외인·기관 당일 마감 후 확정, 공매도 T+1·대차 T+1~2 공표)</span></div>`+_prxRows(pr,PX.R):'')+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
       _scoreHelpHTML(kase)+_helpHTML(_DRV_HELP)+_helpHTML(_PRX_HELP.slice(1))+`</div></div>`;
     box.style.display='';
     {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
+    /* (2026-07-24) 장중 온디맨드 — 베이시스·선물OI만 KIS T+0 (서버 5분 캐시).
+       옵션 3종은 장중 호가 공백으로 왜곡이라 확정치 유지. z는 마감 확정 기준 그대로. */
+    if(!US&&(kase===1||kase===2)){
+      fetch(`/api/stock_deriv_live/${encodeURIComponent(c)}`).then(r2=>r2.ok?r2.json():null).then(q=>{
+        if(!q||dcode!==c) return;
+        const el=$('sd_drvlive'); if(!el) return;
+        const s=(v,d)=>v==null?'—':(+v).toLocaleString(undefined,{maximumFractionDigits:d??0});
+        el.innerHTML=`⚡ <b>장중 ${E(q.t||'')} 기준</b> (KIS T+0 · 5분 캐시) — `+
+          `선물 <b>${s(q.fut)}원</b> <span class="${q.chg_pct>=0?'up':'dn'}">${q.chg_pct>0?'+':''}${s(q.chg_pct,2)}%</span>`+
+          ` · 베이시스 <b>${q.basis>0?'+':''}${s(q.basis)}원${q.basis_pct!=null?` (${q.basis_pct>0?'+':''}${s(q.basis_pct,2)}%)`:''}</b> ${_zBadge(q.z_basis_live)}`+
+          ` · OI <b>${s(q.oi)}</b>${q.oi_chg?` (${q.oi_chg>0?'+':''}${s(q.oi_chg)})`:''} ${_zBadge(q.z_oi_live)}`+
+          ` <span class="note">— 장중 z는 확정 60일 분포에 장중값 대입(실시간 갱신) · OI z는 장 마감 전이라 변화량이 미완성인 점 참고</span>`;
+        el.style.display='';
+      }).catch(()=>{});
+    }
   }
   // 지표 계산
   const _sma=(a,n)=>a.map((_,i)=>{ if(i<n-1) return null; let s=0; for(let j=i-n+1;j<=i;j++){ const v=a[j]; if(v==null) return null; s+=v; } return s/n; });

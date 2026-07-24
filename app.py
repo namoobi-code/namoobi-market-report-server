@@ -978,6 +978,53 @@ def stock_deriv_api(code: str):
     return Response(content=json.dumps(out, ensure_ascii=False),
                     media_type="application/json", headers={"Cache-Control": "no-cache"})
 
+_sdl_cache = {}
+@app.get("/api/stock_deriv_live/{code}")
+def stock_deriv_live(code: str):
+    """(2026-07-24) 종목 파생 카드 장중 온디맨드 — 개별 주식선물 T+0 (KIS, 5분 캐시).
+       베이시스·선물OI만 장중 갱신 가능(옵션 3종은 장중 호가 공백으로 왜곡 → 확정치 유지)."""
+    if not re.fullmatch(r"\d{6}", code):
+        raise HTTPException(400, "bad code")
+    now = time.time()
+    hit = _sdl_cache.get(code)
+    if hit and now - hit[0] < 300:
+        return hit[1]
+    try:
+        sys.path.insert(0, str(BASE / "scripts"))
+        import kis_api as K
+        q = K.stock_futures_quote(code)
+    except Exception as e:
+        raise HTTPException(502, f"KIS 조회 실패: {e}")
+    if not q:
+        raise HTTPException(404, "주식선물 미상장")
+    from datetime import timezone, timedelta
+    kst = timezone(timedelta(hours=9))
+    q["t"] = datetime.now(kst).strftime("%H:%M")
+    q["basis_pct"] = round(q["basis"] / q["spot"] * 100, 3) if q.get("spot") else None
+    # (2026-07-24) 장중 z — 확정 60일 분포에 장중값을 대입해 실시간 z 산출 (베이시스% · OI 일간변화)
+    try:
+        sd = json.loads((DB / "stock_deriv.json").read_text(encoding="utf-8"))
+        days = ((sd.get("stocks") or {}).get(code) or {}).get("days") or []
+        def _zlive(series, live):
+            xs = [x for x in series if x is not None][-60:]
+            if live is None or len(xs) < 20:
+                return None
+            mu = sum(xs) / len(xs)
+            sdv = (sum((x - mu) ** 2 for x in xs) / len(xs)) ** 0.5
+            return round((live - mu) / sdv, 2) if sdv > 1e-9 else None
+        bp = [d.get("basis_pct") for d in days]
+        oi = [d.get("fut_oi") for d in days]
+        oic = [(oi[i] - oi[i - 1]) if (oi[i] is not None and oi[i - 1] is not None) else None
+               for i in range(1, len(oi))]
+        q["z_basis_live"] = _zlive(bp, q.get("basis_pct"))
+        q["z_oi_live"] = _zlive(oic, q.get("oi_chg"))
+    except Exception:
+        pass
+    _sdl_cache[code] = (now, q)
+    if len(_sdl_cache) > 300:
+        _sdl_cache.clear()
+    return q
+
 @app.get("/api/reports")
 def reports():
     out = []
