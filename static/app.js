@@ -2827,9 +2827,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         const prevFut=(q.fut!=null&&q.chg_pct!=null)?Math.round(q.fut/(1+q.chg_pct/100)):null;
         const td=(c,extra)=>`<td style="border:1px solid #cfe3ff;padding:3px 7px;${extra||''}">${c}</td>`;
         const num='text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap';
+        /* 현물가 — 풀(1분 갱신)의 현재가·등락으로 전일종가 역산 */
+        const spotNow=pr&&pr.px!=null?pr.px:q.spot;
+        const spotChg=pr&&pr.chg!=null?pr.chg:null;
+        const prevSpot=(spotNow!=null&&spotChg!=null)?Math.round(spotNow/(1+spotChg/100)):null;
         const rows=[
+          ['현물가(주가)', prevSpot!=null?s(prevSpot)+'원':'—', spotNow!=null?`<b>${s(spotNow)}원</b>`:'—',
+           spotChg!=null?`<span class="${spotChg>=0?'up':'dn'}">${spotChg>0?'+':''}${s(spotChg,2)}%</span>`:'—', '', ''],
           ['선물가', prevFut!=null?s(prevFut)+'원':'—', `<b>${s(q.fut)}원</b>`,
-           `<span class="${q.chg_pct>=0?'up':'dn'}">${q.chg_pct>0?'+':''}${s(q.chg_pct,2)}%</span>`, '', ''],
+           `<span class="${q.chg_pct>=0?'up':'dn'}">${q.chg_pct>0?'+':''}${s(q.chg_pct,2)}%</span>`, '',
+           (spotChg!=null&&q.chg_pct!=null)?(q.chg_pct<spotChg-0.15?'현물보다 약함 — 선물 주도 하락':(q.chg_pct>spotChg+0.15?'현물보다 강함 — 선물 주도 상승':'현물과 동행')):''],
           ['베이시스', L.basis!=null?`${L.basis>0?'+':''}${s(L.basis)}원 (${L.basis_pct>0?'+':''}${s(L.basis_pct,2)}%) <span class="note">(${E(asofD)})</span>`:'—',
            `<b>${q.basis>0?'+':''}${s(q.basis)}원${q.basis_pct!=null?` (${q.basis_pct>0?'+':''}${s(q.basis_pct,2)}%)`:''}</b>`,
            (q.basis!=null&&L.basis!=null)?`${q.basis-L.basis>0?'+':''}${s(q.basis-L.basis)}원`:'—',
