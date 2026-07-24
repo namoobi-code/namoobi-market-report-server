@@ -2592,6 +2592,40 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      '출처':'한국거래소 확정치(금융위 공공 API)',
      '주기':'<b>T+1</b> — 오늘 보는 값은 어제 마감 기준. 장중 판단용이 아니라 "내일을 위한 저녁 점검"용',
      '주의':'옵션 지표(PCR·스큐·GEX)는 장중 호가가 얇아 왜곡 → 확정치만 사용'}]];
+  /* (2026-07-24) 판정점수 계산법 — 케이스별 상세 설명(ⓘ 맨 위에 표시) */
+  function _scoreHelpHTML(kase){
+    const th=_CASE_TH[kase]||1;
+    const tbl=(rows)=>`<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0">${rows.map(r=>
+      `<tr>${r.map((c,i)=>`<td style="border:1px solid var(--line,#e5e5e5);padding:3px 6px;${i===0?'white-space:nowrap;font-weight:600;background:var(--bg2,#f7f8f9)':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
+    const drvRows=[
+      ['선물 베이시스','z <b>+1~2</b> → <b class="up">+0.5</b> · z <b>+2↑</b> → <b class="up">+1</b> / z −1~−2 → <b class="dn">−0.5</b> · z −2↓ → <b class="dn">−1</b>'],
+      ['풋콜비율(OI)','방향 반대 — z <b>+1~2</b> → <b class="dn">−0.5</b> · <b>+2↑</b> → <b class="dn">−1</b> / z −1↓ → <b class="up">+0.5~+1</b> (풋 쏠림=약세 신호)'],
+      ['IV 스큐','방향 반대 — z <b>+1~2</b> → <b class="dn">−0.5</b> · <b>+2↑</b> → <b class="dn">−1</b> / z −1↓ → <b class="up">+0.5~+1</b> (보험료 급등=약세 신호)']];
+    const prxRows=[
+      ['외인 순매수(20일)','매수 +/매도 − · 크기 반영: 20일 순매수가 <b>시총의 0.3%↑면 ±0.5</b> · 미만이면 ±0.25'],
+      ['기관 순매수(20일)','외인과 동일 (±0.25 ~ ±0.5)'],
+      ['공매도비중','<b>5%↑ → −0.5</b> (하락 베팅 큼) · <b>2%↓ → +0.25</b> (베팅 적음) · 2~5%는 0'],
+      ['대차잔고비율','<b>10%↑ → −0.5</b> (잠재 매도 실탄) · 그 외 0']];
+    const exclRows=[['선물 OI','점수 제외 — 가격 방향과 같이 봐야만 의미(조건부)라 해석문만'],
+      ['딜러 감마 GEX','점수 제외 — 상승/하락이 아니라 변동성 지표라 "변동성 증폭 주의" 경고만']];
+    const CASES={
+      1:['<b>CASE1 (선물+옵션 상장)</b> = 파생 3종 + 수급 4종 · 점수 범위 약 −5 ~ +4.25', drvRows.concat(prxRows)],
+      2:['<b>CASE2 (선물만 상장)</b> = 베이시스 1종 + 수급 4종 (풋콜·스큐는 옵션 미상장이라 없음) · 범위 약 −3 ~ +2.25', [drvRows[0]].concat(prxRows)],
+      3:['<b>CASE3 (파생 미상장)</b> = 수급 4종만 · 범위 약 −2 ~ +1.25', prxRows],
+      us:['<b>US (옵션만 — 미국은 개별주식 선물 없음)</b> = 풋콜 + IV스큐 · 범위 ±2', [drvRows[1],drvRows[2]]]};
+    const [title,rows]=CASES[kase]||CASES[1];
+    const ex = kase===1?'예) 풋콜 z+1.3→−0.5 · 외인 −11조(시총 0.7%↑)→−0.5 · 기관 +1.4조(0.09%)→+0.25 · 공매도 7.7%→−0.5 ⇒ 합계 −1.25 → |−1.25| < 문턱 1.5 → <b>중립</b>':
+      kase===2?'예) 베이시스 z+1.7→+0.5 · 외인 +0.4%→+0.5 · 기관 소액 매도→−0.25 · 공매도 3%→0 ⇒ 합계 +0.75 → 문턱 1 미달 → <b>중립</b>':
+      kase===3?'예) 외인 +0.5%→+0.5 · 기관 +0.1%→+0.25 · 공매도 1.5%→+0.25 · 대차 3%→0 ⇒ 합계 +1.0 ≥ 문턱 0.75 → <b class="up">강세</b>':
+      '예) 풋콜 z−1.2→+0.5 · 스큐 z+2.1→−1 ⇒ 합계 −0.5 → 문턱 1 미달 → <b>중립</b>';
+    return `<div style="margin-bottom:12px;padding:8px 10px;border:1px solid #cde3cd;background:#f6faf6;border-radius:8px">`+
+      `<b style="font-size:12px">📐 판정점수 계산법 — ${title}</b>`+
+      tbl(rows)+
+      (kase===1?`<div class="note" style="font-size:11px;margin:2px 0">점수에서 빠지는 항목:</div>`+tbl(exclRows):'')+
+      `<div style="font-size:11.5px;line-height:1.6;margin-top:4px">각 항목 점수를 <b>단순 합산</b>합니다. 파생은 ±1점 만점(선행 베팅이라 크게), 수급은 ±0.25~0.5점(이미 실행된 매매라 절반 이하 가중).`+
+      ` 케이스마다 항목 수가 달라 만점이 다르므로 <b>강세/약세 문턱도 케이스별</b>로: 이 종목은 <b>±${th}</b> (만점의 약 35% 지점).</div>`+
+      `<div class="note" style="font-size:11px;margin-top:4px">${ex}</div></div>`;
+  }
   /* 구조화 도움말 렌더러 — 지표 카드 + 항목 라벨 배지 */
   const _helpHTML=H=>H.map(h=>{
     const body=Object.entries(h[1]).map(([k,v])=>
@@ -2659,7 +2693,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       scoreLine+
       _prxRows(r,R)+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
-      _helpHTML(_PRX_HELP)+`</div></div>`;
+      _scoreHelpHTML(3)+_helpHTML(_PRX_HELP)+`</div></div>`;
   }
   async function loadDeriv(c){
     const box=$('sd_deriv'); if(!box) return;
@@ -2719,7 +2753,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       /* (2026-07-24) CASE1·2도 수급 4행을 같은 카드에 — 파생 미상장 카드(CASE3)와 표시 항목 통일 */
       (PX?`<div class="note" style="margin:7px 0 2px;font-size:11px;font-weight:700">현물 수급 (프록시 — 판정점수에 축소가중 반영)</div>`+_prxRows(pr,PX.R):'')+
       `<div id="sd_drvhelpbox" style="display:none;margin-top:8px;border-top:1px solid var(--line,#e5e5e5);padding-top:6px">`+
-      _helpHTML(_DRV_HELP)+_helpHTML(_PRX_HELP.slice(1))+`</div></div>`;
+      _scoreHelpHTML(kase)+_helpHTML(_DRV_HELP)+_helpHTML(_PRX_HELP.slice(1))+`</div></div>`;
     box.style.display='';
     {const b=$('sd_drvhelp'); if(b) b.onclick=()=>{const e=$('sd_drvhelpbox'); if(e) e.style.display=e.style.display==='none'?'':'none';};}
   }
