@@ -2844,7 +2844,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           ['미결제약정(OI)', s(prevOI), `<b>${s(q.oi)}</b>`,
            q.oi_chg!=null?`<b class="${oiUp?'up':'dn'}">${q.oi_chg>0?'+':''}${s(q.oi_chg)}</b>`:'—',
            _zBadge(q.z_oi_live), oisent||'—']];
-        el.innerHTML=`<div style="margin-bottom:4px">⚡ <b>장중 ${E(q.t||'')} 기준</b> <span class="note">(KIS T+0 · 5분 캐시 · z는 확정 60일 분포에 장중값 대입 · 잠정치 — 마감 때 달라질 수 있음, 확정 판독은 위 행들)</span></div>`+
+        /* (2026-07-24) 장중 잠정 판정 — 베이시스만 장중 z로 대체해 재계산(참고용).
+           정본은 확정치 점수(스크리너 컬럼과 동일) — 장중은 노이즈·컬럼 불일치 때문에 참고 병기만 */
+        let liveJdg='';
+        if(q.z_basis_live!=null){
+          const dpL=_drvPts(q.z_basis_live, Z.pcr_oi, Z.iv_skew);
+          const totL=Math.round((dpL+(pp||0))*100)/100;
+          if(totL!==tot){
+            const lb=totL>=th?'<b class="up">강세</b>':totL<=-th?'<b class="dn">약세</b>':'중립';
+            liveJdg=` · <b>장중 잠정 판정 ${totL>0?'+':''}${_fmtPt(totL)}점</b> ${lb} <span class="note">(베이시스만 장중 z 대체 — 정본은 위 확정 점수)</span>`;
+          } else liveJdg=` · 장중 잠정 판정도 동일(${tot>0?'+':''}${_fmtPt(tot)}점)`;
+        }
+        el.innerHTML=`<div style="margin-bottom:4px">⚡ <b>장중 ${E(q.t||'')} 기준</b> <span class="note">(KIS T+0 · 5분 캐시 · z는 확정 60일 분포에 장중값 대입 · 잠정치 — 마감 때 달라질 수 있음, 확정 판독은 위 행들)</span>${liveJdg}</div>`+
           `<table style="width:100%;border-collapse:collapse;font-size:11.5px;background:#fff">`+
           `<tr>${['항목','직전 기준(전일마감·베이시스는 최근확정)','장중','변화','z(장중)','해석'].map(h=>`<th style="border:1px solid #cfe3ff;background:#e9f2ff;padding:3px 7px;font-weight:700;white-space:nowrap">${h}</th>`).join('')}</tr>`+
           rows.map(r=>`<tr>${td(`<b>${r[0]}</b>`,'white-space:nowrap')}${td(r[1],num)}${td(r[2],num)}${td(r[3],num)}${td(r[4],'white-space:nowrap')}${td(r[5])}</tr>`).join('')+
