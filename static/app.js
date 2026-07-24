@@ -1627,7 +1627,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       ost:{label:'기관연속매수',fmt:v=>v.toFixed(0)+'일 ↑',min:1,reqData:1,presets:[['전체',null],['3일 ↑',3],['5일 ↑',5],['10일 ↑',10]],def:[null,null]},
       sr:{label:'공매도비중',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['1% ↓(약함)',null,1],['3% ↓',null,3],['5% ↑(과열)',5,null],['10% ↑',10,null]],def:[null,null]},
       lbr:{label:'대차잔고비율',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['5% ↓',null,5],['10% ↓',null,10],['10% ↑(부담)',10,null],['20% ↑',20,null]],def:[null,null]},
-      drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+parseFloat(v.toFixed(2))+'점',reqData:1,presets:[['전체',null,null],['강세(+1점 ↑)',1,null],['+0.5점 ↑',0.5,null],['약세(−1점 ↓)',null,-1],['−0.5점 ↓',null,-0.5]],def:[null,null]},
+      drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['강세(+35% ↑)',35,null],['+20% ↑',20,null],['약세(−35% ↓)',null,-35],['−20% ↓',null,-20]],def:[null,null]},
       ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
@@ -1686,7 +1686,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       qtobq:{label:'분기흑자QoQ',tgl:1,def:false,tglLabel:'직전분기 적자→당분기 흑자 전환만 (가장 빠름·계절성 주의)'},
       opmch:{label:'마진변화',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',min:1,reqData:1,presets:[['전체',null],['개선(0%p ↑)',0],['+3%p ↑',3],['+5%p ↑',5],['+10%p ↑',10]],def:[null,null]},
       frgn:{label:'외인보유비중',fixed:'— (US 미제공)'},
-      drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+parseFloat(v.toFixed(2))+'점',reqData:1,presets:[['전체',null,null],['강세(+1점 ↑)',1,null],['+0.5점 ↑',0.5,null],['약세(−1점 ↓)',null,-1],['−0.5점 ↓',null,-0.5]],def:[null,null]},
+      drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['강세(+35% ↑)',35,null],['+20% ↑',20,null],['약세(−35% ↓)',null,-35],['−20% ↓',null,-20]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     }
   };
@@ -1741,7 +1741,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const dp=d?_drvPts(d.b,_uz(d.p),_uz(d.s)):null;   // slim은 원지표 z — 통일 부호로 변환
     const pp=mkt==='kr'?_prxPts(r):null;
     if(dp==null&&pp==null) return null;
-    return Math.round(((dp||0)+(pp||0))*100)/100;
+    const sc=Math.round(((dp||0)+(pp||0))*100)/100;
+    const kase=mkt==='us'?'us':(!d?3:(d.o?1:2));
+    return _normPct(sc,kase);                          // 만점 대비 % — 케이스 간 비교·정렬 공정
   }
   const _fmtPt=v=>parseFloat(v.toFixed(2)).toString();
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
@@ -2135,11 +2137,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'lb': return v==null?'—':wonF(v*1e8);
       case 'lbr': return `<span class="${v>=10?'dn':''}">${v.toFixed(2)}%</span>`;
       case 'drvj': { const d=DRVSC&&DRVSC[r.c];
-        /* 케이스별 문턱 — CASE1(선물+옵션) ±1.5 · CASE2(선물만) ±1 · CASE3(프록시만) ±0.75 · US ±1 */
-        const kz = mkt==='us'?'us':(!d?3:(d.o?1:2));
-        const th=_CASE_TH[kz], prx=(kz===3);
-        const lb2=v>=th?'강세':v<=-th?'약세':'중립';
-        return `<span class="${v>=th?'up':(v<=-th?'dn':'note')}" title="CASE${kz==='us'?' US(옵션만)':kz} · 문턱 ±${th} — 파생 z(베이시스·풋콜·IV스큐): |z|≥1 ±0.5점·|z|≥2 ±1점 + 수급 프록시: 외인·기관 20일(시총 0.3%↑ ±0.5·미만 ±0.25)·공매도 5%↑ −0.5/2%↓ +0.25·대차 10%↑ −0.5${prx?' — 파생 미상장이라 프록시만(≈)':''}">${prx?'≈':''}${v>0?'+':''}${_fmtPt(v)} ${lb2}</span>`; }
+        /* v = 케이스 만점 대비 정규화 %(±100) — 문턱 ±35% 공통, 케이스 간 정렬 공정 */
+        const kz = mkt==='us'?'us':(!d?3:(d.o?1:2)), prx=(kz===3);
+        const lb2=v>=_NTH?'강세':v<=-_NTH?'약세':'중립';
+        return `<span class="${v>=_NTH?'up':(v<=-_NTH?'dn':'note')}" title="CASE${kz==='us'?' US(옵션만)':kz} · 케이스 만점 대비 % (문턱 ±${_NTH}% 공통) — 배점: 파생 z |z|≥1 ±0.5·≥2 ±1 + 수급 외인·기관 20일(시총 0.3%↑ ±0.5·미만 ±0.25)·공매도 5%↑ −0.5/2%↓ +0.25·대차 10%↑ −0.5 를 합산 후 만점으로 나눔${prx?' — 파생 미상장이라 프록시만(≈)':''}">${prx?'≈':''}${v>0?'+':''}${v.toFixed(0)}% ${lb2}</span>`; }
       case 'align': return `<span class="${v==='정배열'?'up':(v==='역배열'?'dn':'note')}">${E(v)}</span>`;
       case 'macd': return `<span class="${String(v).startsWith('골든')?'up':'dn'}">${E(MACD_DISP[v]||v)}</span>`;
       case 'rsi': return `<span class="${v>=70?'up':(v<=30?'dn':'')}">${(+v).toFixed(0)}</span>`;
@@ -2597,7 +2598,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      '주의':'옵션 지표(PCR·스큐·GEX)는 장중 호가가 얇아 왜곡 → 확정치만 사용'}]];
   /* (2026-07-24) 판정점수 계산법 — 케이스별 상세 설명(ⓘ 맨 위에 표시) */
   function _scoreHelpHTML(kase){
-    const th=_CASE_TH[kase]||1;
+    const mx=_CASE_MAX[kase]||_CASE_MAX[1];
     const tbl=(rows)=>`<table style="width:100%;border-collapse:collapse;font-size:11.5px;margin:4px 0">${rows.map(r=>
       `<tr>${r.map((c,i)=>`<td style="border:1px solid var(--line,#e5e5e5);padding:3px 6px;${i===0?'white-space:nowrap;font-weight:600;background:var(--bg2,#f7f8f9)':''}">${c}</td>`).join('')}</tr>`).join('')}</table>`;
     /* (2026-07-24) 부호 통일 후 — 세 지표 모두 같은 규칙: z(+)=강세·z(−)=약세 */
@@ -2619,16 +2620,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       3:['<b>CASE3 (파생 미상장)</b> = 수급 4종만 · 범위 약 −2 ~ +1.25', prxRows],
       us:['<b>US (옵션만 — 미국은 개별주식 선물 없음)</b> = 풋콜 + IV스큐 · 범위 ±2', [drvRows[1],drvRows[2]]]};
     const [title,rows]=CASES[kase]||CASES[1];
-    const ex = kase===1?'예) 풋콜 z+1.3→−0.5 · 외인 −11조(시총 0.7%↑)→−0.5 · 기관 +1.4조(0.09%)→+0.25 · 공매도 7.7%→−0.5 ⇒ 합계 −1.25 → |−1.25| < 문턱 1.5 → <b>중립</b>':
-      kase===2?'예) 베이시스 z+1.7→+0.5 · 외인 +0.4%→+0.5 · 기관 소액 매도→−0.25 · 공매도 3%→0 ⇒ 합계 +0.75 → 문턱 1 미달 → <b>중립</b>':
-      kase===3?'예) 외인 +0.5%→+0.5 · 기관 +0.1%→+0.25 · 공매도 1.5%→+0.25 · 대차 3%→0 ⇒ 합계 +1.0 ≥ 문턱 0.75 → <b class="up">강세</b>':
-      '예) 풋콜 z−1.2→+0.5 · 스큐 z+2.1→−1 ⇒ 합계 −0.5 → 문턱 1 미달 → <b>중립</b>';
+    const ex = kase===1?'예) 풋콜 z(통일)−1.3→−0.5 · 외인 −11조(시총 0.7%↑)→−0.5 · 기관 +1.4조(0.09%)→+0.25 · 공매도 7.7%→−0.5 ⇒ 합계 −1.25점 ÷ 만점 −5 = <b>−25%</b> → |−25| < 35 → <b>중립</b>':
+      kase===2?'예) 베이시스 z+1.7→+0.5 · 외인 +0.4%→+0.5 · 기관 소액 매도→−0.25 · 공매도 3%→0 ⇒ 합계 +0.75점 ÷ 만점 +2.25 = <b>+33%</b> → 35 미달 → <b>중립</b>':
+      kase===3?'예) 외인 +0.5%→+0.5 · 기관 +0.1%→+0.25 · 공매도 1.5%→+0.25 · 대차 3%→0 ⇒ 합계 +1.0점 ÷ 만점 +1.25 = <b>+80%</b> ≥ 35 → <b class="up">강세</b>':
+      '예) 풋콜 z(통일)+1.2→+0.5 · 스큐 z(통일)−2.1→−1 ⇒ 합계 −0.5점 ÷ 만점 −2 = <b>−25%</b> → 35 미달 → <b>중립</b>';
     return `<div style="margin-bottom:12px;padding:8px 10px;border:1px solid #cde3cd;background:#f6faf6;border-radius:8px">`+
       `<b style="font-size:12px">📐 판정점수 계산법 — ${title}</b>`+
       tbl(rows)+
       (kase===1?`<div class="note" style="font-size:11px;margin:2px 0">점수에서 빠지는 항목:</div>`+tbl(exclRows):'')+
-      `<div style="font-size:11.5px;line-height:1.6;margin-top:4px">각 항목 점수를 <b>단순 합산</b>합니다. 파생은 ±1점 만점(선행 베팅이라 크게), 수급은 ±0.25~0.5점(이미 실행된 매매라 절반 이하 가중).`+
-      ` 케이스마다 항목 수가 달라 만점이 다르므로 <b>강세/약세 문턱도 케이스별</b>로: 이 종목은 <b>±${th}</b> (만점의 약 35% 지점).</div>`+
+      `<div style="font-size:11.5px;line-height:1.6;margin-top:4px">각 항목 점수를 <b>단순 합산</b>한 뒤, 케이스마다 항목 수(만점)가 달라 비교가 불공정하므로 <b>만점으로 나눠 %로 정규화</b>합니다`+
+      ` — 이 케이스 만점 <b>+${mx.p} / −${mx.n}</b>점 → 표시값 = 원점수 ÷ 만점 × 100 (±100% 스케일). <b>강세/약세 문턱은 전 케이스 공통 ±${_NTH}%</b>.</div>`+
       `<div class="note" style="font-size:11px;margin-top:4px">${ex}</div></div>`;
   }
   /* 구조화 도움말 렌더러 — 지표 카드 + 항목 라벨 배지 */
@@ -2681,17 +2682,22 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       row('공매도비중', cell(r,'sr'), R.sr)+
       row('대차잔고비율', cell(r,'lbr')+(r.lb!=null?` <span class="note">(${cell(r,'lb')})</span>`:''), R.lbr);
   }
-  /* 케이스별 강세/약세 문턱 — 항목 수가 달라 만점이 다르므로(만점의 ~35% 지점) */
-  const _CASE_TH={1:1.5, 2:1, 3:0.75, us:1};
-  const _caseBadge=k=>`<span style="font-size:10px;font-weight:700;background:${k===1?'#e8f2ff':k===2?'#eef7ee':'#f4f0e8'};border:1px solid var(--line,#ddd);border-radius:4px;padding:1px 5px;margin-right:5px" title="CASE1 선물+옵션 상장(9행·문턱 ±1.5) · CASE2 선물만 상장(6행·±1) · CASE3 파생 미상장(4행·±0.75)">CASE${k===1?'1 선물+옵션':k===2?'2 선물만':'3 프록시'}</span>`;
+  /* (2026-07-24) 정규화 — 케이스마다 만점이 달라 원점수 비교·정렬이 불공정(CASE3 +1은 만점의 80%,
+     CASE1 +1은 24%). 점수를 '만점 대비 %'로 환산해 ±100% 스케일로 통일하고 문턱은 ±35% 하나로.
+     만점(양·음 비대칭 — 공매도·대차는 감점 위주): */
+  const _CASE_MAX={1:{p:4.25,n:5}, 2:{p:2.25,n:3}, 3:{p:1.25,n:2}, us:{p:2,n:2}};
+  const _NTH=35;   // 강세/약세 문턱(%) — 전 케이스 공통
+  function _normPct(sc,kase){ const m=_CASE_MAX[kase]; if(sc==null||!m) return null;
+    return Math.round((sc>0?sc/m.p:sc/m.n)*100); }
+  const _caseBadge=k=>`<span style="font-size:10px;font-weight:700;background:${k===1?'#e8f2ff':k===2?'#eef7ee':'#f4f0e8'};border:1px solid var(--line,#ddd);border-radius:4px;padding:1px 5px;margin-right:5px" title="CASE1 선물+옵션 상장(9행) · CASE2 선물만 상장(6행) · CASE3 파생 미상장(4행) — 판정은 케이스 만점 대비 %로 정규화(문턱 ±35% 공통)">CASE${k===1?'1 선물+옵션':k===2?'2 선물만':'3 프록시'}</span>`;
   function _prxCard(r){
     const P=_prxParts(r), R=P.R;
-    /* (2026-07-24) 판정 통일 — 우호/비우호 개수 대신 점수 기반 한 줄 */
-    const pp=_prxPts(r), th=_CASE_TH[3];
-    const vcol=pp!=null&&pp>=th?'#c0392b':pp!=null&&pp<=-th?'#2471c9':'inherit';
-    const vlb=pp==null?'집계 대기':(pp>=th?'강세':pp<=-th?'약세':'중립');
+    /* (2026-07-24) 정규화 % 판정 — 만점 대비 %, 문턱 ±35% 공통 */
+    const pp=_prxPts(r), np=_normPct(pp,3);
+    const vcol=np!=null&&np>=_NTH?'#c0392b':np!=null&&np<=-_NTH?'#2471c9':'inherit';
+    const vlb=np==null?'집계 대기':(np>=_NTH?'강세':np<=-_NTH?'약세':'중립');
     const scoreLine=`<div style="font-size:12.5px;margin:2px 0 6px"><b style="color:${vcol}">${vlb}</b>`+
-      (pp!=null?` <b style="color:${vcol}">${pp>0?'+':''}${_fmtPt(pp)}점</b> <span class="note">(문턱 ±${th} — 프록시 4종뿐이라 낮게 · 스크리너 컬럼과 동일)</span>`:'')+`</div>`;
+      (np!=null?` <b style="color:${vcol}">${np>0?'+':''}${np}%</b> <span class="note">(만점 대비 · 문턱 ±${_NTH}%) = 원점수 ${pp>0?'+':''}${_fmtPt(pp)}점 · 스크리너 컬럼과 동일</span>`:'')+`</div>`;
     return `<div class="sg"><div class="sgt" style="display:flex;justify-content:space-between;align-items:center">`+
       `<span>${_caseBadge(3)}포지셔닝 프록시 <span class="note">(파생 미상장 — 공매도·대차·수급으로 근사)</span></span>`+
       `<button class="cp-x" id="sd_drvhelp" title="설명">ⓘ 설명</button></div>`+
@@ -2729,15 +2735,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const dp=_drvPts(Z.basis_pct,Z.pcr_oi,Z.iv_skew);
     const pp=pr?_prxPts(pr):null;
     const tot=Math.round((dp+(pp||0))*100)/100;
-    const th=_CASE_TH[kase];
-    /* (2026-07-24) 판정 통일 — 예전 우호/비우호 개수 판정줄 삭제, 점수 기반 한 줄로.
+    /* (2026-07-24) 정규화 % 판정 — 만점 대비 %(±100), 문턱 ±35% 공통. 원점수 내역 병기.
        변동성 체제(GEX<0)는 점수와 별개의 경고라 뒤에 이어붙인다. */
+    const np=_normPct(tot,kase);
     const _sgn=v=>`${v>0?'+':''}${_fmtPt(v)}`;
-    const vcol=tot>=th?'#c0392b':tot<=-th?'#2471c9':'inherit';
-    const vlb=tot>=th?'강세':tot<=-th?'약세':'중립';
+    const vcol=np>=_NTH?'#c0392b':np<=-_NTH?'#2471c9':'inherit';
+    const vlb=np>=_NTH?'강세':np<=-_NTH?'약세':'중립';
     const scoreLine=`<div style="font-size:12.5px;margin:2px 0 6px"><b style="color:${vcol}">${vlb}</b> `+
-      `<b style="color:${vcol}">${_sgn(tot)}점</b> <span class="note">(문턱 ±${th})</span>`+
-      ` = 파생 ${_sgn(dp)}${pp!=null?` + 수급 ${_sgn(pp)} <span class="note" title="프록시는 선행성이 약해 축소 가중 — 수급은 시총 0.3%↑ ±0.5·미만 ±0.25, 공매도 5%↑ −0.5/2%↓ +0.25, 대차 10%↑ −0.5">(축소가중)</span>`:''}`+
+      `<b style="color:${vcol}">${np>0?'+':''}${np}%</b> <span class="note">(만점 대비 · 문턱 ±${_NTH}%)</span>`+
+      ` <span class="note">= 원점수 ${_sgn(tot)}점 — 파생 ${_sgn(dp)}${pp!=null?` + 수급 ${_sgn(pp)} <span title="프록시는 선행성이 약해 축소 가중 — 수급은 시총 0.3%↑ ±0.5·미만 ±0.25, 공매도 5%↑ −0.5/2%↓ +0.25, 대차 10%↑ −0.5">(축소가중)</span>`:''}</span>`+
       `${L.gex!=null&&L.gex<0?' · <span style="color:#e67e22">변동성 증폭 주의</span>':''}`+
       ` <span class="note">· 스크리너 컬럼과 동일</span></div>`;
     const fmt=(v,d,suf)=>v==null?'<span class="note">—</span>':`${(+v).toLocaleString(undefined,{maximumFractionDigits:d})}${suf||''}`;
