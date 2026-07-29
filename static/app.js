@@ -2450,7 +2450,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
 
   /* ── 종목 상세: 종가 기준 일봉 차트(기술지표) + 지표 요약 ── */
   let dcode=null;
-  function hideDetail(){ const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
+  function hideDetail(){
+    if(_EXT){ _extClose(); const ed=document.getElementById('etf_detail'); if(ed) ed.style.display='none'; return; }
+    const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
   {const b=$('sd_close'); if(b) b.onclick=hideDetail;}
   /* 차트 소스: canvas(자체) / tv(TradingView 임베드). 네이버는 새창(임베드 시 시세 차단)
      종목을 열면 항상 자체차트로 시작한다 — TradingView 는 그 종목을 보는 동안만 유지(저장 안 함) */
@@ -2470,45 +2472,48 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     let sym=dcode;
     if(mkt==='kr'){ const r=POOL.kr.find(x=>x.c===dcode); sym=dcode+(r&&r.mk==='KOSDAQ'?'.KQ':'.KS'); } // 야후 한국 심볼
     window.open(`https://finance.yahoo.com/chart/${encodeURIComponent(sym)}`,'nmr_yh','width=1150,height=900'); };}
-  async function showDetail(c){
-    const r=POOL[mkt].find(x=>x.c===c); if(!r) return;
-    /* 새 종목을 열 때는 항상 자체차트부터. (같은 종목에서 소스 버튼을 누른 경우는 c===dcode 라 유지) */
-    if(c!==dcode) chartSrc='canvas';
-    dcode=c;
-    $('scr_detail').style.display='';
-    $('sd_name').textContent = mkt==='kr'? (r.n||'') : (r.kn? `${r.c} ${r.kn}` : r.c);
-    $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
-    $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
-    renderSum(r);
-    loadDeriv(c);                                // (2026-07-24) 종목 파생 포지셔닝 — 파생 상장 종목만 표시
-    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
-    /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
-    const mode = mkt==='kr' ? 'canvas' : chartSrc;
+
+  /* ── (2026-07-29) ETF 차트 이식 모드 ─────────────────────────────────
+     ETF 상세가 종목 차트 박스(#sd_chartbox)를 통째로 가져다 쓴다 — 분봉·주기·소스버튼·
+     보조지표·장중 자동갱신을 종목과 동일하게 제공(코드 중복 없음).
+     closure 의 mkt/dcode 를 잠시 ETF 것으로 바꾸며, 종목 상세를 다시 열거나 닫으면 원복. */
+  let _EXT=null;
+  function _extClose(){
+    if(!_EXT) return;
+    const box=$('sd_chartbox');
+    if(box&&_EXT.ph&&_EXT.ph.parentNode) _EXT.ph.parentNode.replaceChild(box,_EXT.ph);
+    mkt=_EXT.prevMkt; dcode=null;
+    _EXT=null;
+  }
+  async function _extShow(m2, code, name, lastHTML){
+    const box=$('sd_chartbox'), mount=document.getElementById('ed_chartmount');
+    if(!box||!mount) return;
+    if(!_EXT){
+      _EXT={prevMkt:mkt, ph:document.createElement('div'), code};
+      box.parentNode.insertBefore(_EXT.ph, box);
+      mount.appendChild(box);
+    }
+    _EXT.code=code;
+    mkt=m2; dcode=code; chartSrc='canvas';
+    $('sd_name').textContent=name||code;
+    $('sd_code').textContent=code;
+    $('sd_last').innerHTML=lastHTML||'';
     {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
-    _bindTF();                                   // 주기 선택(분봉·일·주·월) 배선 — 최초 1회
-    _bindAuto();                                 // 장중 자동 갱신 타이머 — 최초 1회
-    _applyAuthTF();                              // 분봉 잠금 상태 반영
+    _bindTF(); _bindAuto(); _applyAuthTF();
+    /* 이식 모드에선 TV 임베드 토글은 숨김(새창 버튼은 동작) — 자체차트 고정 */
     document.querySelectorAll('.csrc').forEach(b=>{
-      b.style.display = (b.dataset.s==='tv' && mkt==='kr') ? 'none' : '';
-      b.classList.toggle('on', b.dataset.s===mode);
+      b.style.display=(b.dataset.s==='tv')?'none':'';
+      b.classList.toggle('on', b.dataset.s==='canvas');
     });
-    if(mode==='tv'){
-      cvs.forEach(id=>{const e=$(id); if(e)e.style.display='none';});
-      $('sd_naver').style.display='';
-      const wrap=$('sd_nwrap'), ifr=$('sd_nifr');
-      ifr.style.width='100%'; ifr.style.marginTop='0'; ifr.style.transform='none'; ifr.style.height='620px';
-      wrap.style.height='620px';
-      const sym = mkt==='kr' ? 'KRX:'+c : c;
-      const cfg={autosize:true,symbol:sym,interval:'D',theme:'light',style:'1',locale:'kr',
-                 withdateranges:true,hide_side_toolbar:false,allow_symbol_change:false,save_image:false,
-                 hide_volume:false,support_host:'https://www.tradingview.com'};
-      /* 심볼을 쿼리에도 포함 — 해시만 바뀌면 iframe이 리로드되지 않는 문제 방지 */
-      const src=`https://www.tradingview-widget.com/embed-widget/advanced-chart/?locale=kr&sym=${encodeURIComponent(sym)}#${encodeURIComponent(JSON.stringify(cfg))}`;
-      if(ifr.getAttribute('src')!==src) ifr.setAttribute('src',src);
-      $('sd_nlink').href = mkt==='kr' ? `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(c)}`
-                                      : `https://finance.yahoo.com/quote/${encodeURIComponent(c)}`;
-      $('sd_src').textContent='TradingView 인터랙티브 차트 — 상단에서 1분~월봉 전환, 지표 버튼으로 보조지표 추가/삭제, 드래그·휠로 기간 조절.';
-    } else {
+    $('sd_naver').style.display='none';
+    _CVS_IDS.forEach(id=>{const e=$(id); if(e) e.style.display='block';});
+    await _canvasFlow(code);
+  }
+  window.nmrEtfChart={open:_extShow, close:_extClose, active:()=>!!_EXT};
+  /* (2026-07-29) 자체차트 플로우 추출 — 종목 상세와 ETF 상세(이식 모드)가 공유 */
+  const _CVS_IDS=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
+  async function _canvasFlow(c){
+    const cvs=_CVS_IDS;
       $('sd_naver').style.display='none';
       cvs.forEach(id=>{const e=$(id); if(e)e.style.display='block';});
       $('sd_src').textContent='차트 불러오는 중…';
@@ -2554,6 +2559,53 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         loadDisc(c);                              // 공시 마커도 별도 로드
         loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
+  }
+  async function showDetail(c){
+    /* (2026-07-29) ETF 이식 모드 — 주기/소스 버튼이 showDetail(dcode)를 부르므로,
+       같은 코드(=ETF 차트 재조회)면 이식 모드로 재실행하고, 다른 코드(종목 열기)면 원복 */
+    if(_EXT){
+      if(c===_EXT.code) return _extShow(mkt, c, $('sd_name').textContent, $('sd_last').innerHTML);
+      _extClose();
+    }
+    const r=POOL[mkt].find(x=>x.c===c); if(!r) return;
+    /* 새 종목을 열 때는 항상 자체차트부터. (같은 종목에서 소스 버튼을 누른 경우는 c===dcode 라 유지) */
+    if(c!==dcode) chartSrc='canvas';
+    dcode=c;
+    $('scr_detail').style.display='';
+    $('sd_name').textContent = mkt==='kr'? (r.n||'') : (r.kn? `${r.c} ${r.kn}` : r.c);
+    $('sd_code').textContent = mkt==='kr'? r.c : (r.n||'');
+    $('sd_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
+    renderSum(r);
+    loadDeriv(c);                                // (2026-07-24) 종목 파생 포지셔닝 — 파생 상장 종목만 표시
+    const cvs=['sd_main','sd_vol','sd_rsi','sd_macd','sd_inv'];
+    /* KRX 심볼은 TradingView 임베드 위젯에서 거래소 정책상 차단 → KR은 자체차트만 */
+    const mode = mkt==='kr' ? 'canvas' : chartSrc;
+    {const sb=$('sd_srcbtns'); if(sb) sb.style.display='flex';}
+    _bindTF();                                   // 주기 선택(분봉·일·주·월) 배선 — 최초 1회
+    _bindAuto();                                 // 장중 자동 갱신 타이머 — 최초 1회
+    _applyAuthTF();                              // 분봉 잠금 상태 반영
+    document.querySelectorAll('.csrc').forEach(b=>{
+      b.style.display = (b.dataset.s==='tv' && mkt==='kr') ? 'none' : '';
+      b.classList.toggle('on', b.dataset.s===mode);
+    });
+    if(mode==='tv'){
+      cvs.forEach(id=>{const e=$(id); if(e)e.style.display='none';});
+      $('sd_naver').style.display='';
+      const wrap=$('sd_nwrap'), ifr=$('sd_nifr');
+      ifr.style.width='100%'; ifr.style.marginTop='0'; ifr.style.transform='none'; ifr.style.height='620px';
+      wrap.style.height='620px';
+      const sym = mkt==='kr' ? 'KRX:'+c : c;
+      const cfg={autosize:true,symbol:sym,interval:'D',theme:'light',style:'1',locale:'kr',
+                 withdateranges:true,hide_side_toolbar:false,allow_symbol_change:false,save_image:false,
+                 hide_volume:false,support_host:'https://www.tradingview.com'};
+      /* 심볼을 쿼리에도 포함 — 해시만 바뀌면 iframe이 리로드되지 않는 문제 방지 */
+      const src=`https://www.tradingview-widget.com/embed-widget/advanced-chart/?locale=kr&sym=${encodeURIComponent(sym)}#${encodeURIComponent(JSON.stringify(cfg))}`;
+      if(ifr.getAttribute('src')!==src) ifr.setAttribute('src',src);
+      $('sd_nlink').href = mkt==='kr' ? `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(c)}`
+                                      : `https://finance.yahoo.com/quote/${encodeURIComponent(c)}`;
+      $('sd_src').textContent='TradingView 인터랙티브 차트 — 상단에서 1분~월봉 전환, 지표 버튼으로 보조지표 추가/삭제, 드래그·휠로 기간 조절.';
+    } else {
+await _canvasFlow(c);
     }
     if(autoScroll) $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
@@ -3237,7 +3289,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   async function _autoTick(){
     if(!dcode || chartSrc!=='canvas') return;
     if(document.visibilityState!=='visible') return;
-    const dv=$('scr_detail'); if(!dv || dv.style.display==='none') return;
+    if(_EXT){ const ed=document.getElementById('etf_detail'); if(!ed||ed.style.display==='none') return; }
+    else { const dv=$('scr_detail'); if(!dv || dv.style.display==='none') return; }
     if(_DRAG) return;                                   // 드래그 중이면 건너뛴다
     if(!_mktLive()) return;
     const need = _isMin() ? 30000 : 60000;

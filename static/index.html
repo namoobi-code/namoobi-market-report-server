@@ -569,6 +569,7 @@
               <button class="cp-x" id="ed_nvopen" title="네이버/야후 새창">외부 ↗</button>
               <button class="cp-x" id="ed_close">닫기</button></span>
           </div>
+          <div id="ed_chartmount"></div>
           <canvas id="ed_main"></canvas><canvas id="ed_vol"></canvas><canvas id="ed_rsi"></canvas><canvas id="ed_macd"></canvas>
           <div class="src" id="ed_src" style="margin-top:6px"></div>
         </div>
@@ -847,7 +848,8 @@
         <!-- 종목 상세: 일봉 차트(기술지표) + 지표 요약 -->
         <div id="scr_detail" style="display:none;margin-top:9px">
           <div class="dgrid">
-            <div class="box" style="padding:10px 12px">
+            <!-- (2026-07-29) sd_chartbox — ETF 상세가 이 박스를 통째로 이식해 재사용(차트엔진 공유) -->
+            <div class="box" id="sd_chartbox" style="padding:10px 12px">
               <div class="dhead"><b id="sd_name"></b> <span class="note" id="sd_code"></span>
                 <span class="note" id="sd_last" style="margin-left:8px"></span>
                 <span id="sd_srcbtns" style="margin-left:auto;display:flex;gap:4px">

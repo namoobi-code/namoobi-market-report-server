@@ -513,13 +513,21 @@
      fetch(`/api/etf/holdings/${hm}/${encodeURIComponent(hc)}`).then(x=>x.json()).then(D=>{
        if(dcode!==hc) return; hw.innerHTML=holdingsHTML(D);
      }).catch(()=>{ if(dcode===hc) hw.innerHTML='<div class="sgt hold-t">보유비중 Top</div><div class="hold-empty">불러오기 실패</div>'; }); }
-    $('ed_src').textContent='종가 기준 일봉(최근 1년) · '+(mkt==='kr'?'네이버':'Yahoo')+' · MA20 주황·MA60 초록·MA120 보라 · 볼린저(20,2) · RSI(14) · MACD(12,26,9)';
-    fetch(`/api/chart/${mkt}/${encodeURIComponent(r.c)}`).then(x=>x.json()).then(D=>{
-      if(dcode!==r.c) return; drawChart(D);
-    }).catch(()=>{ $('ed_src').textContent='차트 로드 실패'; });
+    /* (2026-07-29) 종목 차트 엔진 이식 — 분봉·일/주/월·소스버튼·보조지표·장중 자동갱신을 종목과 동일하게 */
+    if(window.nmrEtfChart && document.getElementById('ed_chartmount')){
+      ['ed_main','ed_vol','ed_rsi','ed_macd'].forEach(id=>{const e=$(id); if(e) e.style.display='none';});
+      $('ed_src').textContent='';
+      window.nmrEtfChart.open(mkt, r.c, (mkt==='kr'?r.n:(r.n||r.c)), cell(r,'px')+' '+cell(r,'chg'));
+    } else {
+      $('ed_src').textContent='종가 기준 일봉(최근 1년) · '+(mkt==='kr'?'네이버':'Yahoo')+' · MA20 주황·MA60 초록·MA120 보라 · 볼린저(20,2) · RSI(14) · MACD(12,26,9)';
+      fetch(`/api/chart/${mkt}/${encodeURIComponent(r.c)}`).then(x=>x.json()).then(D=>{
+        if(dcode!==r.c) return; drawChart(D);
+      }).catch(()=>{ $('ed_src').textContent='차트 로드 실패'; });
+    }
     if(autoScroll) $('etf_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
-  {const cb=$('ed_close'); if(cb) cb.onclick=()=>{ $('etf_detail').style.display='none'; dcode=null; };}
+  {const cb=$('ed_close'); if(cb) cb.onclick=()=>{ $('etf_detail').style.display='none'; dcode=null;
+    if(window.nmrEtfChart) window.nmrEtfChart.close(); };}
   {const nv=$('ed_nvopen'); if(nv) nv.onclick=()=>{ if(!dcode) return;
     const url = mkt==='kr' ? `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(dcode)}`
                            : `https://finance.yahoo.com/quote/${encodeURIComponent(dcode)}`;
@@ -562,6 +570,8 @@
   document.querySelectorAll('#p_etf .mkt[data-emkt]').forEach(b=>b.onclick=()=>{
     document.querySelectorAll('#p_etf .mkt[data-emkt]').forEach(x=>x.classList.toggle('on',x===b));
     mkt=b.dataset.emkt; loadF(); findQ=''; findOpen=false; sort={k:'cap',d:-1};
+    {const ed=$('etf_detail'); if(ed) ed.style.display='none';} dcode=null;
+    if(window.nmrEtfChart) window.nmrEtfChart.close();
     if(loaded) apply(); else renderChips();
   });
   /* (2026-07-20) 관리자 수동 즉시 갱신 — 로그인 상태에서 로드 후 START 재클릭 시
