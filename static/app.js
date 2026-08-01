@@ -1143,8 +1143,21 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(loaded) return; loaded=true;
     Promise.all([
       fetch('/api/db/fwd_eps').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/db/series_mem_dram_spot').then(r=>r.ok?r.json():null).catch(()=>null)
-    ]).then(([F,D])=>{
+      fetch('/api/db/series_mem_dram_spot').then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('/api/db/margin_debt').then(r=>r.ok?r.json():null).catch(()=>null)
+    ]).then(([F,D,M])=>{
+      /* ⓪ 신용잔고 YoY vs S&P500 — FINRA 월간(1997~), 기사 [표1] 재현 */
+      if(M&&M.t&&M.t.length){
+        const n=340;                                    // 최근 ~28년
+        const mt=M.t.slice(-n), my=M.yoy.slice(-n);
+        dual('ve_mgn',{t:mt.map(x=>x+'-01'),v:my,label:'신용잔고 YoY%',color:'#c0392b'},
+                      {t:(M.spx.t||[]).map(x=>x+'-01'),v:(M.spx.v||[]).map(v=>Math.log(v)),label:'S&P500(로그)',color:'#888'});
+        const i=M.t.length-1, cur=M.yoy[i], pk=Math.max(...M.yoy.slice(-24).filter(v=>v!=null));
+        const turn=cur!=null&&pk!=null&&cur<pk-3;
+        $('ve_mgn_n').innerHTML=`최신 <b>${M.t[i]}</b> — 잔고 <b>$${(M.debit[i]/1e6).toFixed(2)}조</b> · YoY <b class="${cur>=40?'dn':''}">${cur>0?'+':''}${cur}%</b> (최근 2년 고점 ${pk>0?'+':''}${pk}%)`+
+          (turn?` → <b class="dn">고점 대비 꺾임 — 기사 로직상 과열 후 경계 구간(2000·2007·2021 패턴: 고점 후 0~9개월 선행)</b>`:` → 고점 경신·유지 중 — 과열 누적 관찰`)+
+          ` · <span class="note">FINRA 월간(익월 하순 공표) · 1997~ 풀 히스토리 백필</span>`;
+      }
       /* ① 선행이익 vs KOSPI — 누적 데이터 */
       if(F&&F.t&&F.t.length){
         dual('ve_eps',{t:F.t,v:F.e,label:'선행이익(조원)',color:'#c0392b'},
