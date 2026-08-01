@@ -4254,19 +4254,23 @@ await _canvasFlow(c);
     else apply();
   });
   {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else if(stage===2){resetW();renderS2();} else {resetW();renderS3();} };}
-  /* (2026-07-29) 🔄 턴어라운드 프리셋 — "나쁜 실적으로 이미 하락 + 앞으로 좋아질 근거" 조합 원클릭.
-     주의: 분기흑자QoQ(적자→흑자)와 이익성장 부진↓(이익성장 값 필요)은 데이터상 충돌할 수 있어
-     흑자전환 기업이 이익성장 빈값으로 탈락하는 경우가 있음 — 결과가 너무 적으면 QoQ나 이익성장 중 하나를 꺼볼 것 */
+  /* (2026-08-01) 🔄 턴어라운드 프리셋 v2 — 사용자 검증 세팅(KR 21종 통과)으로 교체.
+     "이미 하락(고점 -40%·3M 하락) + 실적 재가속(성장가속 +30%p) + 추정 상향(리비전 10%)
+      + 밸류 여지(상승여력 50%) + 부실 배제(부채 200%↓·영업적자 1년이상 제외)".
+     전부전체 상태에서 이 조합만 걸리도록 먼저 전체 초기화 후 적용. */
   {const tb=$('scr_turn'); if(tb) tb.onclick=()=>{
     if(stage!==1) return;
     const d=DEF[mkt];
-    const set=(k,st)=>{ if(d[k]&&!d[k].fixed) F[k]=st; };
-    set('ogrw',{min:null,max:0});      // 이익성장 부진(0% ↓)
-    set('hi',{min:null,max:-30});      // 고점比 -30% ↓ (낙폭 큼)
-    set('r3m',{min:null,max:0});       // 수익률 3M 하락
-    set('rev',{min:0,max:null});       // 리비전 상향
-    set('upside',{min:30,max:null});   // 상승여력 +30% ↑
-    if(d.qtobq&&d.qtobq.tgl) F.qtobq={on:true};   // 분기흑자 QoQ 전환
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }   // 전부 '전체'로
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('gacc',{min:30,max:null});     // 성장가속 +30%p ↑ (실적 재가속 — 핵심)
+    set('rev',{min:10,max:null});      // 리비전 10% ↑ (추정 상향)
+    set('upside',{min:50,max:null});   // 상승여력 50% ↑
+    set('r3m',{min:null,max:0});       // 수익률 3M 하락 (아직 덜 반영)
+    set('hi',{min:null,max:-40});      // 고점比 -40% ↓ (낙폭 충분)
+    set('de',{min:null,max:200});      // 부채비율 200% ↓ (부실 배제)
+    set('opLoss',{min:null,max:1});    // 영업적자 1년이상 제외
     apply();
   };}
   /* 전부전체 — 하드컷 전부 해제 + 종목 찾기도 해제해 말 그대로 전종목을 띄운다 */
