@@ -992,6 +992,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const sb=document.getElementById('btn_screener'); if(sb) sb.classList.remove('on');
     if(b.dataset.pane==='p_cal') renderCalPane();
     if(b.dataset.pane==='p_estate'&&window.renderEstate) window.renderEstate();
+    if(b.dataset.pane==='p_db'&&window.renderVeps) window.renderVeps();
   }));
   // 사이드바 SCREENER 버튼 → p_screener 페인 (상단 탭과 독립)
   const sbtn=document.getElementById('btn_screener');
@@ -1101,6 +1102,76 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         }
       }catch(e){}
     }).catch(e=>{ const el=$('re_asof'); if(el) el.textContent='데이터 로드 실패 — 수집 전이거나 서버 오류: '+e; loaded=false; });
+  };
+})();
+
+/* ── (2026-08-01) 📐 선행 EPS·DDR5 vs KOSPI — 기사식 이중축 오버레이 (DB 탭) ── */
+(function(){
+  let loaded=false;
+  const $=id=>document.getElementById(id);
+  function dual(cvId, A, B){
+    /* A(좌축)·B(우축) — {t:[YYYYMMDD|YYYY-MM-DD],v:[],label,color}. 날짜 문자열로 정렬·교집합 없이 A축 기준 배치 */
+    const cv=$(cvId); if(!cv) return;
+    const W=cv.clientWidth||700,H=cv.clientHeight||250; cv.width=W; cv.height=H;
+    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    const P={l:46,r:56,t:10,b:18};
+    const norm=t=>String(t).replace(/-/g,'');
+    const ts=[...new Set([...A.t.map(norm),...B.t.map(norm)])].sort();
+    const N=ts.length; if(!N) return;
+    const mapv=(S)=>{const m={}; S.t.forEach((t,i)=>m[norm(t)]=S.v[i]); return ts.map(t=>m[t]??null);};
+    const av=mapv(A), bv=mapv(B);
+    const rng=vs=>{const a=vs.filter(v=>v!=null); let lo=Math.min(...a),hi=Math.max(...a); const p=(hi-lo)*0.07||1; return [lo-p,hi+p];};
+    const [al,ah]=rng(av),[bl,bh]=rng(bv);
+    const X=i=>P.l+(W-P.l-P.r)*i/Math.max(1,N-1);
+    const Ya=v=>P.t+(H-P.t-P.b)*(1-(v-al)/(ah-al)), Yb=v=>P.t+(H-P.t-P.b)*(1-(v-bl)/(bh-bl));
+    x.font='10px sans-serif'; x.strokeStyle='#eceff3';
+    for(let g=0;g<=4;g++){ const y=P.t+(H-P.t-P.b)*g/4;
+      x.beginPath();x.moveTo(P.l,y);x.lineTo(W-P.r,y);x.stroke();
+      x.fillStyle=A.color; x.textAlign='right'; x.fillText((ah-(ah-al)*g/4).toFixed(ah-al<10?1:0),P.l-4,y+3);
+      x.fillStyle=B.color; x.textAlign='left'; x.fillText((bh-(bh-bl)*g/4).toFixed(0),W-P.r+4,y+3); }
+    x.textAlign='left'; x.fillStyle='#98a2ad';
+    let lastM='';
+    for(let i=0;i<N;i++){ const m=ts[i].slice(0,6); if(m!==lastM){ lastM=m; if(+ts[i].slice(4,6)%2===1) x.fillText(`${ts[i].slice(2,4)}.${ts[i].slice(4,6)}`,X(i)-10,H-4); } }
+    const draw=(vs,Y,col,w)=>{ x.strokeStyle=col; x.lineWidth=w; x.beginPath(); let st=false;
+      for(let i=0;i<N;i++){ if(vs[i]==null) continue; st?x.lineTo(X(i),Y(vs[i])):(x.moveTo(X(i),Y(vs[i])),st=true); }
+      x.stroke(); x.lineWidth=1; };
+    draw(bv,Yb,B.color,1.4); draw(av,Ya,A.color,1.8);
+    const leg=(t,c,dx)=>{ x.fillStyle=c; x.fillRect(P.l+dx,P.t+2,10,3); x.fillText(t,P.l+dx+13,P.t+7); };
+    x.fillStyle='#555'; leg(A.label,A.color,4); leg(B.label,B.color,110);
+  }
+  window.renderVeps=function(){
+    if(loaded) return; loaded=true;
+    Promise.all([
+      fetch('/api/db/fwd_eps').then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('/api/db/series_mem_dram_spot').then(r=>r.ok?r.json():null).catch(()=>null)
+    ]).then(([F,D])=>{
+      /* ① 선행이익 vs KOSPI — 누적 데이터 */
+      if(F&&F.t&&F.t.length){
+        dual('ve_eps',{t:F.t,v:F.e,label:'선행이익(조원)',color:'#c0392b'},
+                      {t:F.t,v:F.kospi,label:'KOSPI',color:'#888'});
+        const i=F.t.length-1;
+        const dirE=F.e.length>=2?(F.e[i]>F.e[i-1]?'상향':F.e[i]<F.e[i-1]?'하향':'유지'):'—';
+        const dirK=F.kospi.length>=2&&F.kospi[i]!=null&&F.kospi[i-1]!=null?(F.kospi[i]>F.kospi[i-1]?'상승':'하락'):'—';
+        let verdict='';
+        if(dirE==='상향'&&dirK==='하락') verdict=' → <b class="up">주가 조정 + 이익 상향 = 밸류 부담 해소 성격(기사 로직상 기회 신호)</b>';
+        else if(dirE==='하향'&&dirK==='하락') verdict=' → <b class="dn">이익도 하향 = 실적 우려가 실체</b>';
+        $('ve_eps_n').innerHTML=`최신 ${F.t[i]} — 선행이익 <b>${F.e[i]?.toLocaleString()}조</b>(${dirE}) · 선행PER <b>${F.fper[i]}</b> · KOSPI ${F.kospi[i]?.toLocaleString()??'—'}(${dirK}) · 표본 ${F.n[i]}종${verdict}`+
+          `${F.t.length<15?` <span class="note">— 누적 ${F.t.length}일째(개시 2026-08-01) · 추세선은 수 주 축적 후 유의미</span>`:''}`;
+      } else { $('ve_eps_n').textContent='수집 전 — 매일 16:20 누적 시작'; }
+      /* ② DDR5 vs KOSPI — DDR5 시계열 + ECOS KOSPI 이력 */
+      if(D&&D.data&&F&&F.kospi_hist){
+        const key='DDR5 16Gb (2Gx8) 4800/5600';
+        const dt=D.data.map(r=>r[0]), dv=D.data.map(r=>(r[1]||{})[key]??null);
+        /* KOSPI 이력을 DDR5 수집 구간(-1주 여유)으로 잘라 오버레이 정합 — DDR5 이력이 쌓일수록 창이 자동 확장 */
+        const d0=String(dt[0]||'').replace(/-/g,'');
+        const ki=F.kospi_hist.t.findIndex(t=>t>=d0);
+        const kh={t:F.kospi_hist.t.slice(Math.max(0,ki-5)), v:F.kospi_hist.v.slice(Math.max(0,ki-5))};
+        dual('ve_ddr',{t:dt,v:dv,label:'DDR5 16Gb($)',color:'#c0392b'},
+                      {t:kh.t,v:kh.v,label:'KOSPI',color:'#888'});
+        const lv=dv.filter(v=>v!=null).slice(-1)[0], fv=dv.find(v=>v!=null);
+        $('ve_ddr_n').innerHTML=`DDR5 16Gb 현물 <b>$${lv}</b> (수집 시작가 $${fv} 대비 ${fv?((lv/fv-1)*100).toFixed(1):'—'}%) — 반도체 실적의 최전선. KOSPI 조정에도 가격 강세 유지 여부가 기사 포인트`;
+      }
+    });
   };
 })();
 
