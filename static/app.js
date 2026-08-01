@@ -2042,6 +2042,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     show('scr_glsbtn', stage<=2);                     // 필터설명: 1·2단계
     show('scr_rst', S1);                              // 초기화: 1단계
     show('scr_turn', S1);                             // 턴어라운드 프리셋: 1단계
+    show('scr_lowpbr', S1);                           // 저PBR M&A 프리셋: 1단계
     show('scr_allf', S1);                             // 전부전체: 1단계
     show('scr_autoscroll', S1);
     show('scr_rowsbox', S1, 'inline-flex');
@@ -4444,6 +4445,20 @@ await _canvasFlow(c);
     set('hi',{min:null,max:-40});      // 고점比 -40% ↓ (낙폭 충분)
     set('de',{min:null,max:200});      // 부채비율 200% ↓ (부실 배제)
     set('opLoss',{min:null,max:1});    // 영업적자 1년이상 제외
+    apply();
+  };}
+  /* (2026-08-01) 🎯 저PBR M&A 표적 프리셋 — 기사(DS증권) 조건 그대로:
+     PBR ≤0.4배 · 시총 ≥1,000억(US $300M) · 영업이익 흑자. 결과는 PBR 낮은 순 정렬 */
+  {const pb=$('scr_lowpbr'); if(pb) pb.onclick=()=>{
+    if(stage!==1) return;
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('pbr',{min:null,max:0.4});
+    set('cap',{min:mkt==='kr'?1e11:3e8,max:null});   // 1,000억 / $300M
+    set('opLoss',{min:null,max:1});                  // 흑자(최근 1년 적자 제외)
+    sort={k:'pbr',d:1};                              // PBR 오름차순 — 가장 싼 순
     apply();
   };}
   /* 전부전체 — 하드컷 전부 해제 + 종목 찾기도 해제해 말 그대로 전종목을 띄운다 */
