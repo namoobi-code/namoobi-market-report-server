@@ -973,7 +973,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate'];
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -991,6 +991,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       if(el) el.classList.toggle('on', id===b.dataset.pane);});
     const sb=document.getElementById('btn_screener'); if(sb) sb.classList.remove('on');
     if(b.dataset.pane==='p_cal') renderCalPane();
+    if(b.dataset.pane==='p_estate'&&window.renderEstate) window.renderEstate();
   }));
   // 사이드바 SCREENER 버튼 → p_screener 페인 (상단 탭과 독립)
   const sbtn=document.getElementById('btn_screener');
@@ -1000,6 +1001,107 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     sbtn.classList.add('on');
     if(window.renderScreener) window.renderScreener();
   });
+})();
+
+/* ── (2026-08-01) 🏠 부동산 탭 — ECOS 월간(전망CSI·매매/전세지수·주담대금리) ── */
+(function(){
+  let loaded=false;
+  const $=id=>document.getElementById(id);
+  function line(cvId, arr, opts){
+    /* arr=[{t:[YYYYMM],v:[],label,color}] — 간단 멀티라인: y축 5눈금·연도 x축·기준선·최신값 배지 */
+    const cv=$(cvId); if(!cv) return;
+    const W=cv.clientWidth||700,H=cv.clientHeight||230; cv.width=W; cv.height=H;
+    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    const P={l:8,r:52,t:10,b:18};
+    const N=Math.max(...arr.map(a=>a.v.length));
+    const all=arr.flatMap(a=>a.v).filter(v=>v!=null);
+    let lo=Math.min(...all), hi=Math.max(...all);
+    if(opts&&opts.base!=null){ lo=Math.min(lo,opts.base); hi=Math.max(hi,opts.base); }
+    const pad=(hi-lo)*0.06||1; lo-=pad; hi+=pad;
+    const X=i=>P.l+(W-P.l-P.r)*i/Math.max(1,N-1), Y=v=>P.t+(H-P.t-P.b)*(1-(v-lo)/(hi-lo));
+    x.font='10px sans-serif'; x.strokeStyle='#eceff3'; x.fillStyle='#98a2ad';
+    for(let g=0;g<=4;g++){ const v=lo+(hi-lo)*g/4, y=Y(v);
+      x.beginPath();x.moveTo(P.l,y);x.lineTo(W-P.r,y);x.stroke();
+      x.fillText(v.toFixed(hi-lo<10?1:0),W-P.r+4,y+3); }
+    if(opts&&opts.base!=null){ x.setLineDash([4,3]); x.strokeStyle='#b7860b';
+      x.beginPath();x.moveTo(P.l,Y(opts.base));x.lineTo(W-P.r,Y(opts.base));x.stroke(); x.setLineDash([]);
+      x.fillStyle='#b7860b'; x.fillText(String(opts.base),P.l+2,Y(opts.base)-3); }
+    const t0=arr[0].t;                                  // 연도 눈금
+    x.fillStyle='#98a2ad';
+    for(let i=0;i<t0.length;i++){ if(String(t0[i]).slice(4)==='01') x.fillText(String(t0[i]).slice(0,4),X(i)-12,H-4); }
+    arr.forEach(a=>{ x.strokeStyle=a.color; x.lineWidth=1.6; x.beginPath(); let st=false;
+      for(let i=0;i<a.v.length;i++){ if(a.v[i]==null) continue;
+        st?x.lineTo(X(i),Y(a.v[i])):(x.moveTo(X(i),Y(a.v[i])),st=true); }
+      x.stroke(); x.lineWidth=1;
+      const lv=a.v[a.v.length-1];
+      if(lv!=null){ x.fillStyle=a.color; x.fillText(a.label+' '+lv.toFixed(1),X(a.v.length-1)-60,Y(lv)-5); } });
+  }
+  const yoy=(t,v)=>{ const i=t.length-1, j=t.indexOf(String(+String(t[i]).slice(0,4)-1)+String(t[i]).slice(4));
+    return (i>=0&&j>=0&&v[j])?((v[i]/v[j]-1)*100):null; };
+  const fm=t=>t?`${String(t).slice(0,4)}.${String(t).slice(4)}`:'—';
+  window.renderEstate=function(){
+    if(loaded) return; loaded=true;
+    fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
+      const S=d.series||{};
+      {const e=$('re_asof'); if(e) e.textContent=`한국은행 ECOS · 월간 · 수집 ${d.asof||''} · 매일 07:10 자동 갱신`;}
+      const cut=(a,n)=>({t:a.t.slice(-n),v:a.v.slice(-n)});
+      /* ① 전망CSI — 최근 5년, 100 기준선 */
+      {const a=cut(S.csi||{t:[],v:[]},60);
+       line('re_csi',[{...a,label:'전망CSI',color:'#2f6fed'}],{base:100});
+       const lv=a.v[a.v.length-1], pv=a.v[a.v.length-2];
+       $('re_csi_n').innerHTML=`최신 <b>${fm(a.t[a.t.length-1])} = ${lv??'—'}</b>${pv!=null?` (전월 ${pv>lv?'−':'+'}${Math.abs(lv-pv)}p)`:''} — `+
+         (lv>=100?`<b class="up">100 위 = 상승 예상 우세</b> (심리 회복 국면)`:`<b class="dn">100 아래 = 하락 예상 우세</b>`)+
+         ` · 심리 선행지표라 실제 가격지수보다 몇 달 먼저 도는 경향`;}
+      /* ② 주담대 금리 — 최근 5년 */
+      {const a=cut(S.mtg||{t:[],v:[]},60);
+       line('re_mtg',[{...a,label:'주담대',color:'#d9534f'}]);
+       const lv=a.v[a.v.length-1];
+       $('re_mtg_n').innerHTML=`최신 <b>${fm(a.t[a.t.length-1])} = ${lv!=null?lv.toFixed(2)+'%':'—'}</b> — 전망CSI와 대체로 역방향(금리 하락 → 매수심리 회복)`;}
+      /* ③ 매매지수 — 3선, 최근 5년 */
+      {const n=60, s1=cut(S.sale||{t:[],v:[]},n), s2=cut(S.sale_apt||{t:[],v:[]},n), s3=cut(S.sale_apt_s||{t:[],v:[]},n);
+       line('re_sale',[{...s1,label:'전국',color:'#666'},{...s2,label:'아파트',color:'#2f6fed'},{...s3,label:'서울APT',color:'#d9534f'}]);
+       const y1=yoy(S.sale_apt_s.t,S.sale_apt_s.v), y2=yoy(S.sale_apt.t,S.sale_apt.v);
+       $('re_sale_n').innerHTML=`YoY — 서울아파트 <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> · 전국아파트 <b class="${y2>0?'up':'dn'}">${y2!=null?(y2>0?'+':'')+y2.toFixed(1)+'%':'—'}</b> · 서울이 전국보다 선행하는 경향`;}
+      /* ④ 전세지수 */
+      {const n=60, s1=cut(S.js||{t:[],v:[]},n), s2=cut(S.js_apt||{t:[],v:[]},n), s3=cut(S.js_apt_s||{t:[],v:[]},n);
+       line('re_js',[{...s1,label:'전국',color:'#666'},{...s2,label:'아파트',color:'#2f6fed'},{...s3,label:'서울APT',color:'#27ae60'}]);
+       const y1=yoy(S.js_apt_s.t,S.js_apt_s.v);
+       $('re_js_n').innerHTML=`YoY — 서울아파트 전세 <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> · 전세↑+매매 횡보 = 갭 축소(매매 전환 압력) 참고`;}
+      /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
+      try{
+        const M=d.mcap||{};
+        if(M['전국']&&M['서울']){
+          const ts=M['전국'].t;
+          const shr=ts.map((t,i)=>{ const g=r=>{const j=(M[r]||{}).t.indexOf(t); return j>=0?M[r].v[j]:null;};
+            const su=g('서울'),gy=g('경기'),ic=g('인천'),na=M['전국'].v[i];
+            return (su!=null&&gy!=null&&ic!=null&&na)?(su+gy+ic)/na*100:null; });
+          line('re_mcap',[{t:ts,v:shr,label:'수도권 비중%',color:'#e08e3c'}]);
+          const lv=shr[shr.length-1], nat=M['전국'].v[M['전국'].v.length-1];
+          $('re_mcap_n').innerHTML=`최신 ${ts[ts.length-1]}년 — 전국 <b>${nat!=null?nat.toLocaleString():'—'}조원</b> · 수도권 비중 <b class="up">${lv!=null?lv.toFixed(1)+'%':'—'}</b> (2010년 집계 이후 추이) — 자산의 수도권 집중도`;
+        }
+        /* ⑥ 시도별 증가율 바차트 — 최신 연도 YoY 상위 8 */
+        {const rows=[];
+         for(const nm in M){ if(nm==='전국') continue; const a=M[nm];
+           if(a.v.length>=2&&a.v[a.v.length-2]) rows.push([nm,(a.v[a.v.length-1]/a.v[a.v.length-2]-1)*100]); }
+         rows.sort((x,y)=>y[1]-x[1]);
+         const top=rows.slice(0,8);
+         const cv=$('re_reg');
+         if(cv&&top.length){ const W=cv.clientWidth||700,H=cv.clientHeight||230; cv.width=W;cv.height=H;
+           const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+           const mx=Math.max(...top.map(r=>Math.abs(r[1])))||1, bh=(H-16)/top.length;
+           x.font='11px sans-serif';
+           top.forEach((r,i)=>{ const y=8+i*bh, w=(W-140)*Math.abs(r[1])/mx;
+             x.fillStyle=r[1]>=0?'#5cb85c':'#d9534f';
+             x.fillRect(70,y+3,Math.max(2,w),bh-8);
+             x.fillStyle='#555'; x.textAlign='right'; x.fillText(r[0],64,y+bh/2+3);
+             x.textAlign='left'; x.fillText((r[1]>0?'+':'')+r[1].toFixed(1)+'%',74+w,y+bh/2+3); });
+           x.textAlign='left';
+           const yr=(M['전국']||{}).t.slice(-1)[0];
+           $('re_reg_n').innerHTML=`${yr}년 전년 대비 증가율 상위 — 서울 독주 여부·지방 온기 확산을 한눈에`;}
+        }
+      }catch(e){}
+    }).catch(e=>{ const el=$('re_asof'); if(el) el.textContent='데이터 로드 실패 — 수집 전이거나 서버 오류: '+e; loaded=false; });
+  };
 })();
 
 
