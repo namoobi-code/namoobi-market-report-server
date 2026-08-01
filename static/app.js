@@ -137,7 +137,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('nav').innerHTML=[
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['d316','3.1.6 FactSet'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
-    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],['s78','7.8 네이버'],
+    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['s_veps','3.1.15 선행지표'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],['s78','7.8 네이버'],
     ['sberk','버크셔']]
     .map(([i,t])=>`<a href="#${i}" data-go="${i}">${t}</a>`).join('');
   // 앵커 클릭: 본문 컨테이너 내부 스크롤 (URL 해시 오염 없이)
@@ -1129,9 +1129,23 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       x.beginPath();x.moveTo(P.l,y);x.lineTo(W-P.r,y);x.stroke();
       x.fillStyle=A.color; x.textAlign='right'; x.fillText((ah-(ah-al)*g/4).toFixed(ah-al<10?1:0),P.l-4,y+3);
       x.fillStyle=B.color; x.textAlign='left'; x.fillText((bh-(bh-bl)*g/4).toFixed(0),W-P.r+4,y+3); }
+    /* x축 눈금 — 구간 길이에 따라 연도/월 자동 (라벨 최소 46px 간격 보장) */
     x.textAlign='left'; x.fillStyle='#98a2ad';
-    let lastM='';
-    for(let i=0;i<N;i++){ const m=ts[i].slice(0,6); if(m!==lastM){ lastM=m; if(+ts[i].slice(4,6)%2===1) x.fillText(`${ts[i].slice(2,4)}.${ts[i].slice(4,6)}`,X(i)-10,H-4); } }
+    const spanY=(+ts[N-1].slice(0,4))-(+ts[0].slice(0,4));
+    let lastK='', lastPx=-99;
+    for(let i=0;i<N;i++){
+      let key,lab;
+      if(spanY>=4){ key=ts[i].slice(0,4); lab=key; }                                   // 연 단위: "1997"
+      else { key=ts[i].slice(0,6); lab=`${ts[i].slice(2,4)}.${ts[i].slice(4,6)}`; }    // 월 단위: "26.08"
+      if(key!==lastK){ lastK=key; const px=X(i);
+        if(px-lastPx>=46){ lastPx=px;
+          x.strokeStyle='#f0f2f5'; x.beginPath(); x.moveTo(px,P.t); x.lineTo(px,H-P.b); x.stroke();
+          x.fillText(lab,px-(spanY>=4?12:10),H-4); } } }
+    /* 수직 마커(옵션) — A.marks=[[YYYYMMDD,'라벨'],..] */
+    (A.marks||[]).forEach(([d,lb])=>{ let i=ts.findIndex(t=>t>=String(d)); if(i<0) return;
+      const px=X(i); x.strokeStyle='#c9ced6'; x.setLineDash([3,3]);
+      x.beginPath(); x.moveTo(px,P.t); x.lineTo(px,H-P.b); x.stroke(); x.setLineDash([]);
+      x.fillStyle='#98a2ad'; x.fillText(lb,px+3,P.t+18); x.fillStyle='#98a2ad'; });
     const draw=(vs,Y,col,w)=>{ x.strokeStyle=col; x.lineWidth=w; x.beginPath(); let st=false;
       for(let i=0;i<N;i++){ if(vs[i]==null) continue; st?x.lineTo(X(i),Y(vs[i])):(x.moveTo(X(i),Y(vs[i])),st=true); }
       x.stroke(); x.lineWidth=1; };
@@ -1144,19 +1158,33 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     Promise.all([
       fetch('/api/db/fwd_eps').then(r=>r.ok?r.json():null).catch(()=>null),
       fetch('/api/db/series_mem_dram_spot').then(r=>r.ok?r.json():null).catch(()=>null),
-      fetch('/api/db/margin_debt').then(r=>r.ok?r.json():null).catch(()=>null)
-    ]).then(([F,D,M])=>{
-      /* ⓪ 신용잔고 YoY vs S&P500 — FINRA 월간(1997~), 기사 [표1] 재현 */
+      fetch('/api/db/margin_debt').then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('/api/db/series_hy_oas').then(r=>r.ok?r.json():null).catch(()=>null)
+    ]).then(([F,D,M,HY])=>{
+      /* ⓪ 신용잔고 YoY vs S&P500 — FINRA 월간(1997~ 전기간), 기사 [표1] 재현 */
       if(M&&M.t&&M.t.length){
-        const n=340;                                    // 최근 ~28년
-        const mt=M.t.slice(-n), my=M.yoy.slice(-n);
-        dual('ve_mgn',{t:mt.map(x=>x+'-01'),v:my,label:'신용잔고 YoY%',color:'#c0392b'},
+        const mt=M.t, my=M.yoy;
+        dual('ve_mgn',{t:mt.map(x=>x+'-01'),v:my,label:'신용잔고 YoY%',color:'#c0392b',
+                       marks:[['20000301','00.3'],['20071001','07.10'],['20211101','21.11']]},
                       {t:(M.spx.t||[]).map(x=>x+'-01'),v:(M.spx.v||[]).map(v=>Math.log(v)),label:'S&P500(로그)',color:'#888'});
         const i=M.t.length-1, cur=M.yoy[i], pk=Math.max(...M.yoy.slice(-24).filter(v=>v!=null));
         const turn=cur!=null&&pk!=null&&cur<pk-3;
         $('ve_mgn_n').innerHTML=`최신 <b>${M.t[i]}</b> — 잔고 <b>$${(M.debit[i]/1e6).toFixed(2)}조</b> · YoY <b class="${cur>=40?'dn':''}">${cur>0?'+':''}${cur}%</b> (최근 2년 고점 ${pk>0?'+':''}${pk}%)`+
           (turn?` → <b class="dn">고점 대비 꺾임 — 기사 로직상 과열 후 경계 구간(2000·2007·2021 패턴: 고점 후 0~9개월 선행)</b>`:` → 고점 경신·유지 중 — 과열 누적 관찰`)+
           ` · <span class="note">FINRA 월간(익월 하순 공표) · 1997~ 풀 히스토리 백필</span>`;
+      }
+      /* ⓪-2 하이일드 가산금리 vs S&P500(로그) — 기사 [표2] 재현 (1997~) */
+      if(HY&&HY.data&&HY.data.length&&M&&M.spx){
+        const hd=HY.data.filter((r,i)=>i%3===0||i===HY.data.length-1);   // 일별→3일 샘플(렌더 경량화)
+        dual('ve_hy',{t:hd.map(r=>r[0]),v:hd.map(r=>r[1]),label:'HY 가산금리%',color:'#c0392b',
+                      marks:[['20000301','00.3'],['20071001','07.10'],['20200201','20.2'],['20211201','21.12']]},
+                     {t:(M.spx.t||[]).map(x=>x+'-01'),v:(M.spx.v||[]).map(v=>Math.log(v)),label:'S&P500(로그)',color:'#888'});
+        const last=HY.data[HY.data.length-1], cur=last[1];
+        const yr=HY.data.slice(-252).map(r=>r[1]), y_hi=Math.max(...yr);
+        const lvl=cur<3.5?'<b class="up">낮은 수준에서 안정 — 완화적 금융환경(기사 결론과 동일)</b>'
+                 :cur<5?'<b>보통 수준 — 중립</b>':'<b class="dn">급등 — 긴축적 금융환경, 신용 경계</b>';
+        $('ve_hy_n').innerHTML=`최신 <b>${last[0]}</b> — 가산금리 <b>${cur}%p</b> (최근 1년 고점 ${y_hi}%p) → ${lvl}`+
+          ` · <span class="note">과거 주가 고점(00.3·07.10·20.2·21.12) 전후 급등 동행 — 점선 마커 · FRED BAMLH0A0HYM2 일별 · 1997~ 풀 히스토리</span>`;
       }
       /* ① 선행이익 vs KOSPI — 누적 데이터 */
       if(F&&F.t&&F.t.length){

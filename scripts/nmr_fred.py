@@ -9,7 +9,8 @@ import os, json, subprocess, glob as _g, time as _t
 def fred_key():
     k = os.environ.get('FRED_API_KEY')
     if k: return k.strip()
-    for p in _g.glob('/sessions/*/mnt/claudeCowork/SECURITY/secrets.env') + _g.glob('/sessions/*/mnt/*/SECURITY/secrets.env'):
+    for p in (_g.glob('/sessions/*/mnt/claudeCowork/SECURITY/secrets.env') + _g.glob('/sessions/*/mnt/*/SECURITY/secrets.env')
+              + [os.path.expanduser('~/namoobi/secrets/.env')]):     # (2026-08-01) 서버 로컬 .env — 서버 cron 에서도 키 인식
         try:
             for ln in open(p, encoding='utf-8'):
                 ln = ln.strip()
