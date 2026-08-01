@@ -1868,6 +1868,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(BTNS_GRP) BTNS_GRP.style.display='';           // 그룹은 항상 표시(개별 버튼만 제어)
     show('scr_glsbtn', stage<=2);                     // 필터설명: 1·2단계
     show('scr_rst', S1);                              // 초기화: 1단계
+    show('scr_turn', S1);                             // 턴어라운드 프리셋: 1단계
     show('scr_allf', S1);                             // 전부전체: 1단계
     show('scr_autoscroll', S1);
     show('scr_rowsbox', S1, 'inline-flex');
@@ -4253,6 +4254,21 @@ await _canvasFlow(c);
     else apply();
   });
   {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else if(stage===2){resetW();renderS2();} else {resetW();renderS3();} };}
+  /* (2026-07-29) 🔄 턴어라운드 프리셋 — "나쁜 실적으로 이미 하락 + 앞으로 좋아질 근거" 조합 원클릭.
+     주의: 분기흑자QoQ(적자→흑자)와 이익성장 부진↓(이익성장 값 필요)은 데이터상 충돌할 수 있어
+     흑자전환 기업이 이익성장 빈값으로 탈락하는 경우가 있음 — 결과가 너무 적으면 QoQ나 이익성장 중 하나를 꺼볼 것 */
+  {const tb=$('scr_turn'); if(tb) tb.onclick=()=>{
+    if(stage!==1) return;
+    const d=DEF[mkt];
+    const set=(k,st)=>{ if(d[k]&&!d[k].fixed) F[k]=st; };
+    set('ogrw',{min:null,max:0});      // 이익성장 부진(0% ↓)
+    set('hi',{min:null,max:-30});      // 고점比 -30% ↓ (낙폭 큼)
+    set('r3m',{min:null,max:0});       // 수익률 3M 하락
+    set('rev',{min:0,max:null});       // 리비전 상향
+    set('upside',{min:30,max:null});   // 상승여력 +30% ↑
+    if(d.qtobq&&d.qtobq.tgl) F.qtobq={on:true};   // 분기흑자 QoQ 전환
+    apply();
+  };}
   /* 전부전체 — 하드컷 전부 해제 + 종목 찾기도 해제해 말 그대로 전종목을 띄운다 */
   {const ab=$('scr_allf'); if(ab) ab.onclick=()=>{ if(stage!==1) return;
     allF(); findQ=''; findOpen=false; findIME=false; apply(); };}
