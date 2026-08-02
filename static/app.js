@@ -4641,7 +4641,7 @@ await _canvasFlow(c);
     if(!D) return;
     $('gm_asof').textContent=`수집 ${D.asof} — 10분 자동 갱신 · 국내대표/크립토=실시간 · 해외지수=야후(~15분 지연) · KRX 세부=T+1 종가`;
     let h='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-    h+='<colgroup><col><col style="width:110px">'+ '<col style="width:74px">'.repeat(6)+'<col style="width:140px"></colgroup>';
+    h+='<colgroup><col style="width:220px"><col style="width:104px">'+ '<col style="width:72px">'.repeat(6)+'<col style="width:140px"></colgroup>';
     D.groups.forEach(g=>{
       if(!g.rows.length) return;
       h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
@@ -4669,22 +4669,22 @@ await _canvasFlow(c);
     openSym=sym;
     const r=findRow(sym); if(!r) return;
     if(!HIST){ try{ HIST=await fetch('/api/db/global_hist').then(x=>x.json()); }catch(e){ HIST={}; } }
-    const box=$('gm_detail'); box.style.display='block';
+    const box=$('gm_detail');
     const R=r.ret||{};
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
       <b style="font-size:15px">${r.name}</b><span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
-      <canvas id="gm_cv" style="width:100%;height:320px"></canvas>`;
+      <canvas id="gm_cv" style="width:100%;height:460px"></canvas>`;
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
-    box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.style.display='none';});
+    box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.innerHTML='<div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>';});
     const hset=HIST[sym];
     const cv=$('gm_cv');
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
     const days={'1M':22,'3M':66,'6M':132,'1Y':9999}[box.dataset.p||'1Y'];
     let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
-    const W=cv.clientWidth||436,H=320; cv.width=W; cv.height=H;
+    const W=cv.clientWidth||560,H=460; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const P={l:56,r:8,t:10,b:20};
     const lo=Math.min(...v),hi=Math.max(...v),rg=(hi-lo)||1;
