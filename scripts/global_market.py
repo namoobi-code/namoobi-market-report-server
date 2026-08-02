@@ -9,7 +9,7 @@ global_market.py — 글로벌시황 탭 데이터 (2026-08-01 신설)
   네이버        — KOSPI/KOSDAQ/KOSPI200 실시간(T+0) 현재가 보강 · TOPIX(.TOPX)·베트남 호치민(.VNI)
   업비트        — 암호화폐 KRW 실시간 + 일봉 365
   KRX OPENAPI   — KRX300·BBIG·TOP10 시리즈·코스닥150 등 (T+1 종가, 이력은 매일 누적)
-불가: 러시아 RTS(거래정지)·베트남 하노이·항셍종합(HSCI).
+불가: 러시아 RTS(거래정지)·항셍종합(HSCI)·항셍 레드칩(R). (하노이·상해A/B·심천A/B·CSI100·FTSE MIB·IBEX·OMXS30은 2026-08-02 네이버로 추가)
 
 산출: data/db/global_market.json  (표: 그룹·현재가·등락·기간수익률·스파크60)
       data/db/global_hist.json    (종목 클릭 차트용 1년 일봉 {sym:{t,v}})
@@ -44,14 +44,19 @@ U = [
  ("us","NQ=F","E-mini 나스닥100 선물","Y",1,2), ("us","ES=F","E-mini S&P500 선물","Y",1,2),
  ("as","000001.SS","상해종합","Y",1,2), ("as","399106.SZ","심천종합지수","Y",1,2), ("as","399001.SZ","심천성분지수","Y",1,2),
  ("as","000300.SS","CSI300","Y",1,2), ("as","000688.SS","과창판 50","Y",1,2), ("as","399006.SZ","차이넥스트","Y",1,2),
+ ("as","NAV.SSEA","상해 A","N",1,2), ("as","NAV.SSEB","상해 B","N",1,2),
+ ("as","NAV.SZSA","심천 A","N",1,2), ("as","NAV.SZSB","심천 B","N",1,2), ("as","NAV.CSI100","CSI100","N",1,2),
  ("as","^HSI","항셍","Y",1,2), ("as","^HSCE","항셍 차이나기업(H)","Y",1,2), ("as","HSTECH.HK","항셍 테크지수","Y",1,2),
- ("as","^N225","니케이225","Y",1,2), ("as","NAV.TOPX","TOPIX","N",1,2), ("as","NAV.VNI","베트남 호치민","N",1,2),
+ ("as","^N225","니케이225","Y",1,2), ("as","NAV.TOPX","TOPIX","N",1,2),
+ ("as","NAV.VNI","베트남 호치민","N",1,2), ("as","NAV.HNXI","베트남 하노이","N",1,2),
  ("as","^TWII","대만 가권","Y",1,2), ("as","^BSESN","인도 SENSEX","Y",1,2), ("as","^SET.BK","태국 SET","Y",1,2),
  ("as","^KLSE","말레이시아 KLCI","Y",1,2), ("as","^JKSE","인도네시아 IDX종합","Y",1,2),
  ("as","PSEI.PS","필리핀","Y",1,2), ("as","^AORD","호주 ALL ORDS","Y",1,2),
  ("eu","^STOXX50E","유로스톡스 50","Y",1,2), ("eu","^FTSE","영국 FTSE 100","Y",1,2), ("eu","^GDAXI","독일 DAX 40","Y",1,2),
  ("eu","^FCHI","프랑스 CAC 40","Y",1,2), ("eu","^BFX","벨기에 BEL-20","Y",1,2), ("eu","^AEX","네덜란드 AEX","Y",1,2),
  ("eu","PSI20.LS","포르투갈 PSI20","Y",1,2), ("eu","GD.AT","그리스 종합","Y",1,2),
+ ("eu","FTSEMIB.MI","이탈리아 FTSE MIB","Y",1,2), ("eu","NAV.IBEX","스페인 IBEX 35","N",1,2),
+ ("eu","NAV.OMXS30","스웨덴 OMXS30","N",1,2),
  ("eu","^GSPTSE","캐나다 S&P TSX","Y",1,2), ("eu","^BVSP","브라질 BOVESPA","Y",1,2),
  ("cmd","CL=F","WTI","Y",1,2), ("cmd","BZ=F","브렌트유","Y",1,2), ("cmd","NG=F","천연가스","Y",1,3),
  ("cmd","GC=F","금","Y",1,1), ("cmd","SI=F","은","Y",1,3), ("cmd","HG=F","구리","Y",1,4),
@@ -69,7 +74,9 @@ U = [
  ("cr","KRW-SOL","솔라나","U",1,0), ("cr","KRW-XRP","리플","U",1,0),
 ]
 NAVER_LIVE = {"^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KPI200"}   # T+0 현재가 보강
-NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI"}
+NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI", "NAV.HNXI": ".HNXI", "NAV.SSEA": ".SSEA",
+              "NAV.SSEB": ".SSEB", "NAV.SZSA": ".SZSA", "NAV.SZSB": ".SZSB", "NAV.CSI100": ".CSI100",
+              "NAV.IBEX": ".IBEX", "NAV.OMXS30": ".OMXS30"}
 NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 이력 대체(2026-08-02 실측)
 
 def yahoo_1y(sym):
