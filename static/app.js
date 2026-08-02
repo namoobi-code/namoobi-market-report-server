@@ -4869,6 +4869,16 @@ await _canvasFlow(c);
     x.textAlign='left'; let lastM='';
     for(let i=0;i<t.length;i++){ const mk=t[i].slice(0,6); if(mk!==lastM){ lastM=mk;
       if(t.length<=140||(t.length<=600?+t[i].slice(4,6)%3===1:+t[i].slice(4,6)===1)){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
+    if((box.dataset.p||'3Y')==='3Y'&&t.length>1){  // 3Y 차트 — 1년 전·2년 전 위치에 점선 세로선
+      const last=t[t.length-1], d0=new Date(+last.slice(0,4),+last.slice(4,6)-1,+last.slice(6));
+      [[365,'1년 전'],[730,'2년 전']].forEach(([dd,lb])=>{
+        const tg=new Date(d0); tg.setDate(tg.getDate()-dd);
+        const key=`${tg.getFullYear()}${String(tg.getMonth()+1).padStart(2,'0')}${String(tg.getDate()).padStart(2,'0')}`;
+        const idx=t.findIndex(z=>z>=key);
+        if(idx>0){ x.save(); x.setLineDash([4,4]); x.strokeStyle='#9aa4b0'; x.beginPath(); x.moveTo(X(idx),P.t); x.lineTo(X(idx),H-P.b); x.stroke(); x.restore();
+          x.fillStyle='#8a94a0'; x.textAlign='center'; x.fillText(lb,X(idx),P.t+10); x.textAlign='left'; }
+      });
+    }
     if(ovv){ x.strokeStyle='#6b7280'; x.lineWidth=1.2; x.beginPath(); let st=false;
       ovv.forEach((val,i)=>{ if(val==null) return; st?x.lineTo(X(i),Y(val)):(x.moveTo(X(i),Y(val)),st=true); }); x.stroke();
       x.font='11px sans-serif'; x.fillStyle='#6b7280'; x.fillText('원/달러 환율',P.l+6,P.t+14);
