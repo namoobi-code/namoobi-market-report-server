@@ -1958,7 +1958,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
-  const KEYS=['mk','wics','wics2','sector','usind','px','chg','cap','tv','de','cr','opLoss','age',
+  const KEYS=['mk','wics','wics2','usind','sector','px','chg','cap','tv','de','cr','opLoss','age',
               /* (2026-07-21) 이동평균은 기간 오름차순으로 — 20일 → 50일 → 200일 */
               'v20','v50','v200','align','rsi','adx','volx','turn','macd','bb',
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
@@ -2185,11 +2185,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         /* (2026-07-21) 상태값 옵션에 주식 관점 방향(상승/하락)을 배지로 붙인다.
            '골든↓' 처럼 화살표만 봐서는 우호/비우호가 직관적이지 않다는 지적 반영.
            색은 화면 전체 규칙과 동일 — 빨강=주식 우호, 파랑=비우호, 회색=중립. */
-        pop=`<div class="pl">선택</div>`+_opts.map(o=>{
+        const _srch=_opts.length>8?`<input type="text" class="catq" data-catq="${k}" placeholder="🔎 검색" style="width:95%;margin:2px 0 4px;padding:3px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:5px">`:'';
+        pop=`<div class="pl">선택 ${_opts.length>8?`<span class="note">(${_opts.length-1}개)</span>`:''}</div>`+_srch+`<div class="catlist" style="max-height:300px;overflow:auto">`+_opts.map(o=>{
           const h=(f.hint||{})[o];
           const tag=h?`<span class="ohint ${h[0]}">${E(h[1])}</span>`:'';
           return `<button class="preset ohas ${st.v===(o||null)?'sel':''}" data-cat="${k}" data-v="${E(o)}">${E(dispOpt(f,o)||'전체')}${tag}</button>`;
-        }).join('');
+        }).join('')+`</div>`;
       } else if(f.tgl){
         pop=`<label class="tgl"><input type="checkbox" data-tgl="${k}" ${st.on?'checked':''}> ${E(f.tglLabel)}</label>`;
       } else {
@@ -2240,6 +2241,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       const btn=document.querySelector(`[data-chip="${k}"]`);
       if(btn){ btn.innerHTML=chipLabel(k); btn.classList.toggle('act', F[k].min!=null||F[k].max!=null); }
       applyTable(); });
+    $('scr_fltbar').querySelectorAll('[data-catq]').forEach(inp=>{
+      inp.onclick=e=>e.stopPropagation();
+      inp.oninput=()=>{ const q=inp.value.trim().toLowerCase();
+        inp.closest('.fpop').querySelectorAll('.catlist .preset').forEach(btn=>{
+          btn.style.display=(!q||btn.textContent.toLowerCase().includes(q))?'':'none'; }); }; });
     $('scr_fltbar').querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{
       F[b.dataset.cat].v = b.dataset.v||null; apply(); });
     $('scr_fltbar').querySelectorAll('[data-tgl]').forEach(t=>t.onchange=()=>{ F[t.dataset.tgl].on=t.checked; apply(); });
