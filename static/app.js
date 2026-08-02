@@ -1831,6 +1831,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const DEF={
     kr:{
       mk:{label:'시장',cat:1},
+      wics:{label:'WICS 섹터',cat:1},
       chg:{label:'등락',fmt:v=>v.toFixed(1)+'%',presets:[['전체',null,null],['상승(0% ↑)',0,null],['+3% ↑',3,null],['하락(0% ↓)',null,0],['−3% ↓',null,-3]],def:[null,null]},
       cap:{label:'시가총액',fmt:wonF,presets:[['전체',null,null],['10조 ↑',1e13,null],['1~10조',1e12,1e13],['3,000억~1조',3e11,1e12],['1,000억~3,000억',1e11,3e11],['1,000억 ↓',null,1e11]],def:[3e11,null]},
       tv:{label:'거래대금',fmt:wonF,min:1,presets:[['전체',null],['100억 ↑',1e10],['30억 ↑',3e9],['10억 ↑',1e9],['1억 ↑',1e8]],def:[3e9,null]},
@@ -1955,7 +1956,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
-  const KEYS=['mk','sector','px','chg','cap','tv','de','cr','opLoss','age',
+  const KEYS=['mk','wics','sector','px','chg','cap','tv','de','cr','opLoss','age',
               /* (2026-07-21) 이동평균은 기간 오름차순으로 — 20일 → 50일 → 200일 */
               'v20','v50','v200','align','rsi','adx','volx','turn','macd','bb',
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
@@ -2036,6 +2037,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const _fmtPt=v=>parseFloat(v.toFixed(2)).toString();
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
+  /* (2026-08-02) 업종 분류 맵 — sector_map.py(주1회): KR=KRX·WICS대·WICS세부 / US=세부업종(한글) */
+  let SECMAP=null;
+  function mergeSec(){ if(!SECMAP) return;
+    for(const r of POOL.kr){ const e=(SECMAP.kr||{})[r.code]; if(e){ if(e.krx)r.krx=e.krx; if(e.wics)r.wics=e.wics; if(e.wics2)r.wics2=e.wics2; } }
+    for(const r of POOL.us){ const e=(SECMAP.us||{})[r.sym]; if(e&&e.ind) r.usind=e.ind; } }
+  function loadSecMap(){ if(SECMAP){ mergeSec(); return; }
+    fetch('/api/db/sector_map').then(x=>x.ok?x.json():null).then(d=>{ if(!d) return; SECMAP=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{}); }
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
   function buildF(){ const o={}; const d=DEF[mkt];
@@ -2264,6 +2272,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const CDEF={
     n:{l:'종목',n:0,m:'both'},
     mk:{l:'시장',n:0,m:'kr'}, sector:{l:'섹터',n:0,m:'us'},
+    krx:{l:'KRX 업종',n:0,m:'kr'}, wics:{l:'WICS 섹터',n:0,m:'kr'}, wics2:{l:'WICS 세부',n:0,m:'kr'},
+    usind:{l:'세부업종',n:0,m:'us'},
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
     cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
     de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
@@ -2482,7 +2492,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   }
   function sortVal(r,k){
     if(k==='n') return String(r.n||'');
-    if(k==='mk'||k==='sector') return String(r[k]||'');
+    if(k==='mk'||k==='sector'||k==='krx'||k==='wics'||k==='wics2'||k==='usind') return String(r[k]||'');
     return colVal(r,k)??-Infinity;
   }
   /* ── 컬럼 관리 패널 (표시 On/OFF · 순서 변경) ── */
@@ -4300,7 +4310,7 @@ await _canvasFlow(c);
     // 2단계도 1단계와 같은 전종목 풀(z점수 포함)을 쓴다 — 1단계 필터를 거친 뒤 랭킹(퍼널).
     if(POOL.kr.length||POOL.us.length){ S2=POOL; s2loaded=true; cb&&cb(); return; }
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
-      d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; S2=POOL; s2loaded=true; cb&&cb();
+      d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loadSecMap(); S2=POOL; s2loaded=true; cb&&cb();
     }).catch(()=>{ S2={kr:[],us:[]}; s2loaded=true; cb&&cb(); });
   }
 
@@ -4402,7 +4412,7 @@ await _canvasFlow(c);
     if(gb){gb.disabled=true; gb.textContent='불러오는 중…';}
     $('scr_asof').textContent='전종목 풀 불러오는 중…';
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
-      d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loaded=true;
+      d=d||{}; POOL={kr:d.kr||[],us:d.us||[]}; loaded=true; loadSecMap();
       loadDrvSc();                            // (2026-07-24) 파생·수급판정 점수 소스 (도착하면 refresh)
       $('scr_asof').innerHTML=poolMeta(d);
       {const _e=$('scr_src2'); if(_e) _e.innerHTML='출처: KRX OPEN API + 네이버 전종목 시세 · Yahoo v7(미국) · 하루 2회 갱신.';}
@@ -4448,7 +4458,7 @@ await _canvasFlow(c);
       await new Promise(x=>setTimeout(x,2000));
       try{ const d=await (await fetch('/api/db/screener_pool')).json();
         if(d && d.live_at && d.live_at!==prevLive){
-          POOL={kr:d.kr||[],us:d.us||[]}; if(s2loaded) S2=POOL; $('scr_asof').innerHTML=poolMeta(d); refresh(); break; }
+          POOL={kr:d.kr||[],us:d.us||[]}; mergeSec(); if(s2loaded) S2=POOL; $('scr_asof').innerHTML=poolMeta(d); refresh(); break; }
       }catch(e){}
     }
     if(gb){ gb.disabled=false; gb.textContent='▶ START'; }
@@ -4492,7 +4502,7 @@ await _canvasFlow(c);
     if(!p || !p.classList.contains('on') || document.visibilityState!=='visible') return;
     fetch('/api/db/screener_pool').then(r=>r.json()).then(d=>{
       if(!d||!d.kr||!d.kr.length) return;
-      POOL={kr:d.kr||[],us:d.us||[]}; if(s2loaded) S2=POOL;
+      POOL={kr:d.kr||[],us:d.us||[]}; mergeSec(); if(s2loaded) S2=POOL;
       $('scr_asof').innerHTML=poolMeta(d);
       /* (2026-07-24) 자동 갱신이 표·칩을 다시 그리며 스크롤이 최상단으로 튀는 문제 —
          갱신 전 위치(페이지 + 표 내부)를 저장했다가 재렌더 직후와 다음 프레임에 복원 */
