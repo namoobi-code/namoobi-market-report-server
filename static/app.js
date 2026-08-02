@@ -973,7 +973,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global'];
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -992,6 +992,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const sb=document.getElementById('btn_screener'); if(sb) sb.classList.remove('on');
     if(b.dataset.pane==='p_cal') renderCalPane();
     if(b.dataset.pane==='p_estate'&&window.renderEstate) window.renderEstate();
+    if(b.dataset.pane==='p_global'&&window.renderGlobal) window.renderGlobal();
     if(b.dataset.pane==='p_db'&&window.renderVeps) window.renderVeps();
   }));
   // 사이드바 SCREENER 버튼 → p_screener 페인 (상단 탭과 독립)
@@ -4620,4 +4621,94 @@ await _canvasFlow(c);
   window.addEventListener('resize',()=>{pin=null; spy();},{passive:true});
   document.querySelectorAll('.tab[data-pane]').forEach(t=>t.addEventListener('click',()=>{pin=null; setTimeout(spy,80);}));
   setInterval(spy,1200); setTimeout(spy,900);
+})();
+
+
+/* ── (2026-08-02) 🌐 글로벌시황 — 미래에셋 국내외 주요지수 재현 (10분 수집·global_market.py) ── */
+(function(){
+  let D=null, HIST=null, timer=null, openSym=null;
+  const $=id=>document.getElementById(id);
+  const fmt=(v,dec,mult)=>v==null?'—':(v*(mult||1)).toLocaleString(undefined,{minimumFractionDigits:dec??2,maximumFractionDigits:dec??2});
+  const pc=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':v<0?'dn':''}">${v>0?'+':''}${v.toFixed(2)}%</span>`;
+  function sparkSVG(a,w,h){
+    if(!a||a.length<2) return '<span class="note">누적 중</span>';
+    const lo=Math.min(...a),hi=Math.max(...a),rg=(hi-lo)||1;
+    const pts=a.map((v,i)=>`${(i/(a.length-1)*w).toFixed(1)},${(h-2-(v-lo)/rg*(h-4)).toFixed(1)}`).join(' ');
+    const up=a[a.length-1]>=a[0];
+    return `<svg width="${w}" height="${h}" style="vertical-align:middle"><polyline points="${pts}" fill="none" stroke="${up?'#c0392b':'#1e6fd6'}" stroke-width="1.3"/></svg>`;
+  }
+  function table(){
+    if(!D) return;
+    $('gm_asof').textContent=`수집 ${D.asof} — 10분 자동 갱신 · 국내대표/크립토=실시간 · 해외지수=야후(~15분 지연) · KRX 세부=T+1 종가`;
+    let h='<table style="width:100%;border-collapse:collapse;font-size:12px">';
+    h+='<colgroup><col style="width:210px"><col style="width:110px">'+ '<col style="width:74px">'.repeat(6)+'<col></colgroup>';
+    D.groups.forEach(g=>{
+      if(!g.rows.length) return;
+      h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
+      h+='<tr style="color:#8a94a0">'+['지수/종목','현재가','1일','1주','1개월','3개월','6개월','1년','추세(1Y)'].map((c,i)=>`<td style="padding:2px 6px;text-align:${i==0?'left':'right'};border-bottom:1px solid #eceff3">${c}</td>`).join('')+'</tr>';
+      g.rows.forEach(r=>{
+        const R=r.ret||{}; const d1=R.d1!=null?R.d1:r.ret_d1_live;
+        h+=`<tr class="gmrow" data-s="${r.s}" style="cursor:pointer;border-bottom:1px solid #f2f4f7">`
+         +`<td style="padding:5px 6px"><b>${r.name}</b> <span class="note" style="font-size:10px">${r.at||''}</span></td>`
+         +`<td style="text-align:right;font-weight:600">${fmt(r.px,r.dec,r.mult)}</td>`
+         +`<td style="text-align:right">${pc(d1)}</td><td style="text-align:right">${pc(R.w1)}</td>`
+         +`<td style="text-align:right">${pc(R.m1)}</td><td style="text-align:right">${pc(R.m3)}</td>`
+         +`<td style="text-align:right">${pc(R.m6)}</td><td style="text-align:right">${pc(R.y1)}</td>`
+         +`<td style="text-align:right;padding:2px 6px">${sparkSVG(r.spark,120,26)}</td></tr>`;
+      });
+    });
+    h+='</table>';
+    const sc=document.querySelector('#p_global').scrollTop;
+    $('gm_body').innerHTML=h;
+    document.querySelectorAll('.gmrow').forEach(tr=>tr.addEventListener('click',()=>openDetail(tr.dataset.s)));
+    document.querySelector('#p_global').scrollTop=sc;
+    if(openSym) openDetail(openSym,true);
+  }
+  function findRow(sym){ for(const g of D.groups){ const r=g.rows.find(x=>x.s===sym); if(r) return r; } return null; }
+  async function openDetail(sym,keep){
+    openSym=sym;
+    const r=findRow(sym); if(!r) return;
+    if(!HIST){ try{ HIST=await fetch('/api/db/global_hist').then(x=>x.json()); }catch(e){ HIST={}; } }
+    const box=$('gm_detail'); box.style.display='block';
+    const R=r.ret||{};
+    box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
+      <b style="font-size:15px">${r.name}</b><span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
+      <span class="note">${r.at||''}</span>
+      <span style="margin-left:auto">${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
+      <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
+      <canvas id="gm_cv" style="width:100%;height:260px"></canvas>`;
+    box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
+    box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.style.display='none';});
+    const hset=HIST[sym];
+    const cv=$('gm_cv');
+    if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; if(!keep) box.scrollIntoView({block:'nearest'}); return; }
+    const days={'1M':22,'3M':66,'6M':132,'1Y':9999}[box.dataset.p||'1Y'];
+    let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
+    const W=cv.clientWidth||900,H=260; cv.width=W; cv.height=H;
+    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    const P={l:64,r:10,t:10,b:20};
+    const lo=Math.min(...v),hi=Math.max(...v),rg=(hi-lo)||1;
+    const X=i=>P.l+(W-P.l-P.r)*i/(t.length-1), Y=val=>P.t+(H-P.t-P.b)*(1-(val-lo)/rg);
+    x.font='10px sans-serif';
+    for(let g2=0;g2<=4;g2++){ const y=P.t+(H-P.t-P.b)*g2/4;
+      x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,y); x.lineTo(W-P.r,y); x.stroke();
+      x.fillStyle='#8a94a0'; x.textAlign='right'; x.fillText((hi-rg*g2/4).toLocaleString(undefined,{maximumFractionDigits:r.dec}),P.l-5,y+3); }
+    x.textAlign='left'; let lastM='';
+    for(let i=0;i<t.length;i++){ const mk=t[i].slice(0,6); if(mk!==lastM){ lastM=mk;
+      if(t.length<=140||+t[i].slice(4,6)%3===1){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
+    const up=v[v.length-1]>=v[0];
+    x.strokeStyle=up?'#c0392b':'#1e6fd6'; x.lineWidth=1.6; x.beginPath();
+    v.forEach((val,i)=>i?x.lineTo(X(i),Y(val)):x.moveTo(X(i),Y(val))); x.stroke(); x.lineWidth=1;
+    if(!keep) box.scrollIntoView({block:'nearest'});
+  }
+  async function load(){
+    try{ D=await fetch('/api/db/global_market').then(r=>r.json()); }catch(e){ $('gm_body').innerHTML='<div class="note">로드 실패 — 잠시 후 재시도</div>'; return; }
+    table();
+  }
+  window.renderGlobal=function(){
+    load();
+    if(timer) clearInterval(timer);
+    timer=setInterval(()=>{ const p=document.getElementById('p_global');
+      if(p&&p.style.display!=='none'&&p.offsetParent!==null){ HIST=null; load(); } },300000);
+  };
 })();

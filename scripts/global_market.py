@@ -1,0 +1,287 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+global_market.py — 글로벌시황 탭 데이터 (2026-08-01 신설)
+미래에셋 '국내외 주요지수' 리스트 재현: 지수·선물·상품·환율·암호화폐 + KRX 세부지수(T+1).
+
+소스 (전 심볼 2026-08-01 실측):
+  야후 v8 chart  — 해외지수·선물·상품·환율 (지수 ~15분 지연 · 선물/환율 실시간급) + 1년 일봉 이력
+  네이버        — KOSPI/KOSDAQ/KOSPI200 실시간(T+0) 현재가 보강 · TOPIX(.TOPX)·베트남 호치민(.VNI)
+  업비트        — 암호화폐 KRW 실시간 + 일봉 365
+  KRX OPENAPI   — KRX300·BBIG·TOP10 시리즈·코스닥150 등 (T+1 종가, 이력은 매일 누적)
+불가: 러시아 RTS(거래정지)·베트남 하노이·항셍종합(HSCI).
+
+산출: data/db/global_market.json  (표: 그룹·현재가·등락·기간수익률·스파크60)
+      data/db/global_hist.json    (종목 클릭 차트용 1년 일봉 {sym:{t,v}})
+      data/db/global_krx_hist.json (KRX 세부지수 일별 누적)
+cron: */10 * * * *  (야후 ~75콜/회·스레드 12 — 1분 내 완료)
+"""
+import json, time, urllib.request, urllib.parse
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, date, timedelta
+from pathlib import Path
+
+BASE = Path(__file__).resolve().parent.parent
+DB = BASE / "data" / "db"
+H = {"User-Agent": "Mozilla/5.0 (namoobi)"}
+
+def jget(url, timeout=15, tries=2):
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers=H)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except Exception:
+            if i == tries - 1: return None
+            time.sleep(0.5)
+
+# (그룹, 심볼, 이름, 소스, 표시배수, 소수점)  src: Y=야후 N=네이버(이력은 야후 병행 시 심볼)
+U = [
+ ("kr","^KS11","KOSPI","NY",1,2), ("kr","^KQ11","KOSDAQ","NY",1,2), ("kr","^KS200","KOSPI200","NY",1,2),
+ ("us","^DJI","다우 산업","Y",1,2), ("us","^DJT","다우 운송","Y",1,2), ("us","^IXIC","나스닥 종합","Y",1,2),
+ ("us","^NDX","나스닥 100","Y",1,2), ("us","^GSPC","S&P 500","Y",1,2), ("us","^SOX","필라델피아 반도체","Y",1,2),
+ ("us","^NYA","NYSE 종합","Y",1,2), ("us","^XAX","아멕스 종합","Y",1,2), ("us","^VIX","VIX","Y",1,2),
+ ("us","NQ=F","E-mini 나스닥100 선물","Y",1,2), ("us","ES=F","E-mini S&P500 선물","Y",1,2),
+ ("as","000001.SS","상해종합","Y",1,2), ("as","399106.SZ","심천종합지수","Y",1,2), ("as","399001.SZ","심천성분지수","Y",1,2),
+ ("as","000300.SS","CSI300","Y",1,2), ("as","000688.SS","과창판 50","Y",1,2), ("as","399006.SZ","차이넥스트","Y",1,2),
+ ("as","^HSI","항셍","Y",1,2), ("as","^HSCE","항셍 차이나기업(H)","Y",1,2), ("as","HSTECH.HK","항셍 테크지수","Y",1,2),
+ ("as","^N225","니케이225","Y",1,2), ("as","NAV.TOPX","TOPIX","N",1,2), ("as","NAV.VNI","베트남 호치민","N",1,2),
+ ("as","^TWII","대만 가권","Y",1,2), ("as","^BSESN","인도 SENSEX","Y",1,2), ("as","^SET.BK","태국 SET","Y",1,2),
+ ("as","^KLSE","말레이시아 KLCI","Y",1,2), ("as","^JKSE","인도네시아 IDX종합","Y",1,2),
+ ("as","PSEI.PS","필리핀","Y",1,2), ("as","^AORD","호주 ALL ORDS","Y",1,2),
+ ("eu","^STOXX50E","유로스톡스 50","Y",1,2), ("eu","^FTSE","영국 FTSE 100","Y",1,2), ("eu","^GDAXI","독일 DAX 40","Y",1,2),
+ ("eu","^FCHI","프랑스 CAC 40","Y",1,2), ("eu","^BFX","벨기에 BEL-20","Y",1,2), ("eu","^AEX","네덜란드 AEX","Y",1,2),
+ ("eu","PSI20.LS","포르투갈 PSI20","Y",1,2), ("eu","GD.AT","그리스 종합","Y",1,2),
+ ("eu","^GSPTSE","캐나다 S&P TSX","Y",1,2), ("eu","^BVSP","브라질 BOVESPA","Y",1,2),
+ ("cmd","CL=F","WTI","Y",1,2), ("cmd","BZ=F","브렌트유","Y",1,2), ("cmd","NG=F","천연가스","Y",1,3),
+ ("cmd","GC=F","금","Y",1,1), ("cmd","SI=F","은","Y",1,3), ("cmd","HG=F","구리","Y",1,4),
+ ("cmd","ZC=F","옥수수","Y",1,1), ("cmd","ZS=F","대두","Y",1,1), ("cmd","ZW=F","소맥","Y",1,1),
+ ("cmd","ZR=F","쌀","Y",1,3), ("cmd","ZO=F","귀리","Y",1,1),
+ ("fx","DX-Y.NYB","US Dollar Index","Y",1,3), ("fx","KRW=X","원/달러","Y",1,2),
+ ("fx","JPYKRW=X","원/일본 엔(100)","Y",100,2), ("fx","CNYKRW=X","원/중국 위안","Y",1,2),
+ ("fx","EURKRW=X","원/유로","Y",1,2), ("fx","GBPKRW=X","원/영국 파운드","Y",1,2),
+ ("fx","HKDKRW=X","원/홍콩 달러","Y",1,2), ("fx","AUDKRW=X","원/호주 달러","Y",1,2),
+ ("fx","SGDKRW=X","원/싱가폴 달러","Y",1,2), ("fx","CADKRW=X","원/캐나다 달러","Y",1,2),
+ ("fx","INRKRW=X","원/인도 루피","Y",1,2), ("fx","IDRKRW=X","원/인니 루피아(100)","Y",100,3),
+ ("fx","BRLKRW=X","원/브라질 레알","Y",1,2), ("fx","EURUSD=X","유로/달러","Y",1,4),
+ ("fx","GBPUSD=X","파운드/달러","Y",1,4), ("fx","JPY=X","달러/엔","Y",1,2), ("fx","AUDUSD=X","호주달러/달러","Y",1,4),
+ ("cr","KRW-BTC","비트코인","U",1,0), ("cr","KRW-ETH","이더리움","U",1,0),
+ ("cr","KRW-SOL","솔라나","U",1,0), ("cr","KRW-XRP","리플","U",1,0),
+]
+NAVER_LIVE = {"^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KPI200"}   # T+0 현재가 보강
+NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI"}
+
+def yahoo_1y(sym):
+    j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=1y&interval=1d")
+    try:
+        r = j["chart"]["result"][0]; m = r["meta"]
+        ts = r["timestamp"]; cl = r["indicators"]["quote"][0]["close"]
+        t, v = [], []
+        for k, c in zip(ts, cl):
+            if c is None: continue
+            t.append(datetime.utcfromtimestamp(k).strftime("%Y%m%d")); v.append(round(c, 6))
+        px = m.get("regularMarketPrice"); pc = m.get("chartPreviousClose") or m.get("previousClose")
+        if px is not None and (not v or t[-1] < datetime.utcnow().strftime("%Y%m%d")):
+            pass
+        ptime = m.get("regularMarketTime")
+        return {"t": t, "v": v, "px": px, "pc": pc,
+                "at": datetime.utcfromtimestamp(ptime).strftime("%m/%d %H:%M") + "Z" if ptime else None}
+    except Exception:
+        return None
+
+def naver_idx(code):
+    j = jget(f"https://api.stock.naver.com/index/{urllib.parse.quote(code)}/basic")
+    try:
+        f = lambda s: float(str(s).replace(",", ""))
+        return {"px": f(j["closePrice"]), "chg": f(j.get("compareToPreviousClosePrice") or 0),
+                "at": (j.get("localTradedAt") or "")[5:16].replace("T", " ")}
+    except Exception:
+        return None
+
+def naver_kr(code):
+    j = jget(f"https://m.stock.naver.com/api/index/{code}/basic")
+    try:
+        f = lambda s: float(str(s).replace(",", ""))
+        return {"px": f(j["closePrice"]), "chg": f(j.get("compareToPreviousClosePrice") or 0)}
+    except Exception:
+        return None
+
+def naver_kr_hist(code, pages=6):
+    """국내지수 일봉 이력(최근 ~1.2년) — 야후 ^KS200 결측 대체 (2026-08-02)."""
+    t, v = [], []
+    f = lambda s: float(str(s).replace(",", ""))
+    for pg in range(1, pages + 1):
+        j = jget(f"https://m.stock.naver.com/api/index/{code}/price?pageSize=50&page={pg}") or []
+        if not j: break
+        for x in j:
+            try: t.append(x["localTradedAt"].replace("-", "")); v.append(f(x["closePrice"]))
+            except Exception: pass
+        if len(j) < 50: break
+    pair = sorted(zip(t, v))
+    return {"t": [a for a, b in pair], "v": [b for a, b in pair]}
+
+
+def naver_world_hist(code, pages=6):
+    """해외지수(worldstock) 일봉 이력 — TOPIX(.TOPX)·베트남(.VNI) 등."""
+    import urllib.parse as up
+    t, v = [], []
+    f = lambda x: float(str(x).replace(",", ""))
+    for pg in range(1, pages + 1):
+        j = jget(f"https://api.stock.naver.com/index/{up.quote(code)}/price?pageSize=50&page={pg}") or []
+        if not j: break
+        for x in j:
+            try: t.append(x["localTradedAt"][:10].replace("-", "")); v.append(f(x["closePrice"]))
+            except Exception: pass
+        if len(j) < 50: break
+    pair = sorted(zip(t, v))
+    return {"t": [a for a, b in pair], "v": [b for a, b in pair]}
+
+def upbit(markets):
+    j = jget("https://api.upbit.com/v1/ticker?markets=" + ",".join(markets)) or []
+    out = {}
+    for x in j:
+        out[x["market"]] = {"px": x["trade_price"], "pc": x["prev_closing_price"],
+                            "at": "실시간"}
+    return out
+
+def upbit_hist(market):
+    j = jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=365") or []
+    t = [x["candle_date_time_kst"][:10].replace("-", "") for x in reversed(j)]
+    v = [x["trade_price"] for x in reversed(j)]
+    return {"t": t, "v": v}
+
+def rets(t, v, px):
+    """기간수익률: 최근가(px) 대비 과거 최근접 종가."""
+    if not t or px is None: return {}
+    last = datetime.strptime(t[-1], "%Y%m%d").date()
+    today = datetime.now().strftime("%Y%m%d")
+    out = {}
+    for k, days in [("d1", 1), ("w1", 7), ("m1", 30), ("m3", 91), ("m6", 182), ("y1", 364)]:
+        if k == "d1":
+            # 직전 거래일 종가 대비. 휴장(현재가=마지막 봉)이면 마지막 거래일의 등락을 표시(미래에셋과 동일)
+            same_bar = t[-1] == today or (v[-1] and abs(px - v[-1]) / abs(v[-1]) < 5e-3)
+            base = (v[-2] if len(v) >= 2 else None) if same_bar else v[-1]
+        else:
+            tgt = (last - timedelta(days=days)).strftime("%Y%m%d")
+            base = None
+            for i in range(len(t) - 1, -1, -1):
+                if t[i] <= tgt: base = v[i]; break
+        out[k] = round((px / base - 1) * 100, 2) if base else None
+    return out
+
+def spark(v, n=60):
+    if not v: return []
+    if len(v) <= n: return [round(x, 4) for x in v]
+    step = (len(v) - 1) / (n - 1)
+    return [round(v[int(i * step)], 4) for i in range(n)]
+
+def krx_fetch(hist):
+    """KRX 세부지수 T+1 — krx/kospi/kosdaq 일별시세 3콜, 원하는 지수만 필터·일별 누적."""
+    try:
+        key = (BASE / "secrets" / "krx.key").read_text(encoding="utf-8").strip()
+    except Exception:
+        return [], hist
+    # (실측 2026-08-01) BBIG·2차전지 등 K-뉴딜 TOP10 시리즈는 KRX OPENAPI 미제공 → 제공 지수로 구성
+    WANT = ["KRX 300", "KRX 100", "코리아 밸류업 지수", "KRX 300 정보기술", "KRX 300 금융",
+            "KRX 300 헬스케어", "KRX 300 자유소비재", "코스닥 150", "코스닥 글로벌",
+            "코스피 200 정보기술", "코스피 200 금융"]
+    rows = []
+    for d_off in range(1, 6):                       # 직전 영업일 탐색
+        bas = (date.today() - timedelta(days=d_off)).strftime("%Y%m%d")
+        got = []
+        for ep in ("krx_dd_trd", "kospi_dd_trd", "kosdaq_dd_trd"):
+            try:
+                req = urllib.request.Request(f"http://data-dbg.krx.co.kr/svc/apis/idx/{ep}?basDd={bas}",
+                                             headers={"AUTH_KEY": key})
+                j = json.loads(urllib.request.urlopen(req, timeout=20).read())
+                got += j.get("OutBlock_1") or []
+            except Exception:
+                pass
+        if got:
+            byname = {x.get("IDX_NM", "").strip(): x for x in got}
+            for nm in WANT:
+                x = byname.get(nm)
+                if not x: continue
+                try:
+                    _f = lambda s: float(str(s).replace(",", ""))          # KRX는 천단위 콤마 포함
+                    px = _f(x["CLSPRC_IDX"]); chg = _f(x.get("CMPPREVDD_IDX") or 0)
+                    rows.append({"s": "KRX:" + nm, "name": nm.replace(" K-뉴딜지수", " TOP10"),
+                                 "px": px, "chg_abs": chg, "at": bas[4:6] + "/" + bas[6:] + " 종가(T+1)"})
+                    h = hist.setdefault(nm, {"t": [], "v": []})
+                    if not h["t"] or h["t"][-1] != bas:
+                        h["t"].append(bas); h["v"].append(px)
+                        h["t"] = h["t"][-500:]; h["v"] = h["v"][-500:]
+                except Exception:
+                    pass
+            break
+    return rows, hist
+
+def main():
+    t0 = time.time()
+    ysyms = [s for g, s, n, src, m, d in U if "Y" in src]
+    with ThreadPoolExecutor(12) as ex:
+        ydata = dict(zip(ysyms, ex.map(yahoo_1y, ysyms)))
+    nlive = {s: naver_kr(c) for s, c in NAVER_LIVE.items()}
+    nidx = {s: naver_idx(c) for s, c in NAVER_IDX.items()}
+    ups = upbit([s for g, s, n, src, m, d in U if src == "U"])
+    uph = {}
+    for g, s, n, src, m, d in U:
+        if src == "U": uph[s] = upbit_hist(s); time.sleep(0.15)
+
+    hist_all = {}
+    rows_by_grp = {}
+    for g, s, name, src, mult, dec in U:
+        r = {"s": s, "name": name, "mult": mult, "dec": dec}
+        series = None
+        if src == "U":
+            series = uph.get(s); q = ups.get(s) or {}
+            r["px"] = q.get("px"); r["at"] = q.get("at")
+            if q.get("pc"): r["ret_d1_live"] = round((q["px"] / q["pc"] - 1) * 100, 2)
+        else:
+            y = ydata.get(s)
+            if y: series = {"t": y["t"], "v": y["v"]}; r["px"] = y["px"]; r["at"] = y["at"]
+            if src == "NY" and nlive.get(s):                     # 국내 3종: 네이버 실시간 + 네이버 이력(야후 결측 대체)
+                r["px"] = nlive[s]["px"]; r["at"] = "실시간(네이버)"
+                nh = naver_kr_hist(NAVER_LIVE[s])
+                if nh["t"]: series = nh
+            if src == "N" and nidx.get(s):
+                q = nidx[s]; r["px"] = q["px"]; r["at"] = q["at"]
+                nh = naver_world_hist(NAVER_IDX[s])
+                series = nh if nh["t"] else {"t": [], "v": []}
+        if series and series["t"]:
+            # 장중 현재가를 시리즈 말미에 반영해 기간수익률 일관성 확보
+            if r.get("px") is not None:
+                today = datetime.now().strftime("%Y%m%d")
+                if series["t"][-1] == today: series["v"][-1] = r["px"]
+            r["ret"] = rets(series["t"], series["v"], r.get("px"))
+            r["spark"] = spark(series["v"])
+            hist_all[s] = series
+        rows_by_grp.setdefault(g, []).append(r)
+
+    krx_hist = {}
+    try: krx_hist = json.loads((DB / "global_krx_hist.json").read_text(encoding="utf-8"))
+    except Exception: pass
+    krx_rows, krx_hist = krx_fetch(krx_hist)
+    for r in krx_rows:
+        h = krx_hist.get(r["name"].replace(" TOP10", " K-뉴딜지수")) or krx_hist.get(r["name"]) or {"t": [], "v": []}
+        r["mult"] = 1; r["dec"] = 2
+        r["ret"] = rets(h["t"], h["v"], r["px"]) if len(h["t"]) > 1 else {}
+        r["spark"] = spark(h["v"])
+        pc = h["v"][-2] if len(h["v"]) >= 2 else None
+        if pc: r["ret"]["d1"] = round((r["px"] / pc - 1) * 100, 2)
+    rows_by_grp["krx"] = krx_rows
+
+    GRP = [("kr", "국내 대표 (실시간)"), ("krx", "국내 세부지수 (KRX · T+1 종가)"), ("us", "미국"),
+           ("as", "아시아·중화권"), ("eu", "유럽·기타"), ("cmd", "상품"), ("fx", "환율"), ("cr", "암호화폐 (업비트 실시간)")]
+    out = {"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
+           "src": "야후(지수 ~15분 지연·선물/환율 실시간급)+네이버(국내 T+0·TOPIX·VNI)+업비트(실시간)+KRX(T+1)",
+           "groups": [{"key": k, "label": lb, "rows": rows_by_grp.get(k, [])} for k, lb in GRP]}
+    DB.mkdir(parents=True, exist_ok=True)
+    (DB / "global_market.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    (DB / "global_hist.json").write_text(json.dumps(hist_all, ensure_ascii=False), encoding="utf-8")
+    (DB / "global_krx_hist.json").write_text(json.dumps(krx_hist, ensure_ascii=False), encoding="utf-8")
+    n = sum(len(v) for v in rows_by_grp.values())
+    print(f"[global] ✅ {n}종 · KRX {len(krx_rows)}종 · hist {len(hist_all)}종 · {time.time()-t0:.0f}s")
+
+if __name__ == "__main__":
+    main()
