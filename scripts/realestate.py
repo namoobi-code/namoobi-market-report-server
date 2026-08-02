@@ -43,6 +43,7 @@ SERIES = [
     ("js_apt",     "901Y063", "P64AC",      None),
     ("js_apt_s",   "901Y063", "P64ACA",     None),
     ("mtg",        "121Y006", "BECBLA0302", None),
+    ("tdep",       "104Y015", "BDAA31",     None),   # (2026-08-02) 은행 정기예금 말잔(십억원) — 증시 자금이동 참고
 ]
 
 def fetch(stat, item1, item2):

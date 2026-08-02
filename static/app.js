@@ -1069,6 +1069,15 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
        line('re_js',[{...s1,label:'전국',color:'#666'},{...s2,label:'아파트',color:'#2f6fed'},{...s3,label:'서울APT',color:'#27ae60'}]);
        const y1=yoy(S.js_apt_s.t,S.js_apt_s.v);
        $('re_js_n').innerHTML=`YoY — 서울아파트 전세 <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> · 전세↑+매매 횡보 = 갭 축소(매매 전환 압력) 참고`;}
+      /* ⑦ 은행 정기예금 잔액 — 월별 10년(조원) · 증시 예탁금과의 자금이동 참고 (2026-08-02) */
+      {const a=cut(S.tdep||{t:[],v:[]},120);
+       if(a.t.length){
+         const tv={t:a.t,v:a.v.map(v=>v!=null?v/1000:null)};      // 십억원 → 조원
+         line('re_tdep',[{...tv,label:'정기예금(조원)',color:'#047857'}]);
+         const lv=tv.v[tv.v.length-1], pv=tv.v[tv.v.length-2];
+         const y1=yoy(a.t,a.v);
+         $('re_tdep_n').innerHTML=`최신 <b>${fm(a.t[a.t.length-1])} 월말 = ${lv!=null?Math.round(lv).toLocaleString()+'조원':'—'}</b>${pv!=null?` (전월 ${lv-pv>0?'+':''}${(lv-pv).toFixed(1)}조)`:''} · YoY <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> — 예금금리 매력이 높거나 위험회피 국면에서 증가. 증시 투자자예탁금·부동산 매수세와 반대로 움직이는 경향(12월 법인자금 유입 등 계절성 있음) · ECOS 공표 ~1개월+ 지연`;
+       }}
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
       try{
         const M=d.mcap||{};
