@@ -2870,6 +2870,15 @@ await _canvasFlow(c);
     if(autoScroll) $('scr_detail').scrollIntoView({block:'nearest',behavior:'smooth'});
   }
   function renderSum(r){
+    // (2026-08-02) 기업개요 — 네이버 온디맨드(/api/overview, 서버 24h 캐시), 요약표 위에 표시
+    { const ov=$('sd_ov');
+      if(ov){ const oc=String(r.code||r.symbol||''); ov.style.display='none'; ov.dataset.c=oc;
+        if(oc) fetch(`/api/overview?mkt=${mkt}&code=${encodeURIComponent(oc)}`).then(x=>x.ok?x.json():null).then(o=>{
+          if(!o||!(o.lines||[]).length||ov.dataset.c!==oc) return;   // 응답 도착 전 다른 종목 선택 시 무시
+          ov.style.display='';
+          ov.innerHTML=`<div class="sgt">기업개요 <span class="note" style="font-weight:400">(네이버)</span></div>
+            <div style="font-size:12px;line-height:1.65;padding:2px 2px 0">${o.lines.slice(0,6).map(t=>'· '+E(t)).join('<br>')}</div>`;
+        }).catch(()=>{}); } }
     const G=[['시세',['px','chg','cap','tv','turn']],
              ['기간수익률',['r1m','r3m','r6m','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],

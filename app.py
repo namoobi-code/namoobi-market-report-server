@@ -128,6 +128,58 @@ def deriv_live():
     return Response(content=json.dumps(d, ensure_ascii=False),
                     media_type="application/json", headers={"Cache-Control": "no-store"})
 
+_ov_cache = {}
+@app.get("/api/overview")
+def stock_overview(mkt: str, code: str):
+    """(2026-08-02) 종목 기업개요 — 네이버 온디맨드 프록시 + 24h 캐시.
+       KR: finance.naver PC main summary_info(cp949) · US: api.stock.naver.com /stock/{sym}.O|.N/overview"""
+    import re as _re, urllib.request as _ur
+    key = f"{mkt}:{code}".lower()
+    hit = _ov_cache.get(key)
+    if hit and time.time() - hit[0] < 86400:
+        return hit[1]
+    out = {"lines": [], "src": "네이버"}
+    try:
+        if mkt == "kr":
+            if not _re.fullmatch(r"\d{6}", code):
+                raise HTTPException(400, "bad code")
+            raw = _ur.urlopen(_ur.Request(f"https://finance.naver.com/item/main.naver?code={code}",
+                                          headers={"User-Agent": "Mozilla/5.0"}), timeout=10).read()
+            try: d = raw.decode("utf-8")          # 2026 현재 UTF-8 (구 euc-kr에서 전환)
+            except UnicodeDecodeError: d = raw.decode("cp949", "ignore")
+            i = d.find("summary_info")
+            if i > 0:
+                seg = d[i:i + 3000]
+                for pm in _re.findall(r"<p>(.*?)</p>", seg, _re.S):
+                    t = _re.sub(r"\s+", " ", _re.sub(r"<[^>]+>", "", pm)).strip()
+                    if t and "MY STOCK" not in t and len(t) > 15:
+                        out["lines"].append(t)
+        else:
+            if not _re.fullmatch(r"[A-Za-z0-9.\-]{1,12}", code):
+                raise HTTPException(400, "bad code")
+            for suf in ("", ".O", ".N", ".K"):    # NYSE=무접미사·나스닥=.O (실측)
+                try:
+                    j = json.loads(_ur.urlopen(_ur.Request(
+                        f"https://api.stock.naver.com/stock/{code}{suf}/overview",
+                        headers={"User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/",
+                                 "Accept": "application/json"}), timeout=10).read())
+                    s = (j or {}).get("summary")
+                    if s:
+                        s = _re.sub(r"<br\s*/?>", "\n", s).replace("\r", "")
+                        out["lines"] = [_re.sub(r"<[^>]+>", "", x).strip() for x in s.split("\n") if x.strip()]
+                        out["name"] = j.get("companyName")
+                        break
+                except Exception:
+                    continue
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+    _ov_cache[key] = (time.time(), out)
+    if len(_ov_cache) > 3000:
+        _ov_cache.clear()
+    return out
+
 @app.get("/api/policyrates")
 def policyrates():
     """주요 6개국 정책금리 월별 시계열"""
