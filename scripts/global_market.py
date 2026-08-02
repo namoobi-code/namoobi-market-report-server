@@ -486,20 +486,7 @@ def main():
             hist_all[s] = series
         rows_by_grp.setdefault(g, []).append(r)
 
-    krx_hist = {}
-    try: krx_hist = json.loads((DB / "global_krx_hist.json").read_text(encoding="utf-8"))
-    except Exception: pass
-    krx_rows, krx_hist = krx_fetch(krx_hist)
-    for r in krx_rows:
-        h = krx_hist.get(r["name"].replace(" TOP10", " K-뉴딜지수")) or krx_hist.get(r["name"]) or {"t": [], "v": []}
-        r["mult"] = 1; r["dec"] = 2
-        r["ret"] = rets(h["t"], h["v"], r["px"]) if len(h["t"]) > 1 else {}
-        r["spark"] = spark(h["v"])
-        pc = h["v"][-2] if len(h["v"]) >= 2 else None
-        if pc: r["ret"]["d1"] = round((r["px"] / pc - 1) * 100, 2)
-    rows_by_grp["krx"] = krx_rows
-
-    GRP = [("kr", "국내 대표 (실시간)"), ("krx", "국내 세부지수 (KRX · T+1 종가)"), ("us", "미국"),
+    GRP = [("kr", "국내 대표 (실시간)"), ("us", "미국"),
            ("as", "아시아·중화권"), ("eu", "유럽·미주"), ("me", "중동·아프리카"), ("cmd", "상품"), ("fx", "환율 — 주요 통화"), ("fx2", "환율 — 기타 통화"), ("cr", "암호화폐 (업비트 실시간)")]
     out = {"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
            "src": "야후(지수 ~15분 지연·선물/환율 실시간급)+네이버(국내 T+0·TOPIX·VNI)+업비트(실시간)+KRX(T+1)",
@@ -507,10 +494,9 @@ def main():
     DB.mkdir(parents=True, exist_ok=True)
     (DB / "global_market.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     (DB / "global_hist.json").write_text(json.dumps(hist_all, ensure_ascii=False), encoding="utf-8")
-    (DB / "global_krx_hist.json").write_text(json.dumps(krx_hist, ensure_ascii=False), encoding="utf-8")
     (DB / "global_acc_hist.json").write_text(json.dumps(acc, ensure_ascii=False), encoding="utf-8")
     n = sum(len(v) for v in rows_by_grp.values())
-    print(f"[global] ✅ {n}종 · KRX {len(krx_rows)}종 · hist {len(hist_all)}종 · {time.time()-t0:.0f}s")
+    print(f"[global] ✅ {n}종 · hist {len(hist_all)}종 · {time.time()-t0:.0f}s")
 
 if __name__ == "__main__":
     main()
