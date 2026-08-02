@@ -96,6 +96,23 @@ def deriv_live():
     d["built_at"] = datetime.fromtimestamp(p.stat().st_mtime, kst).strftime("%Y-%m-%d %H:%M:%S")
     d["cadence"] = ("장중 5분 자동취득(정규장·장전·시간외·야간 中 데이터 제공 구간) · "
                     "옵션 PCR·IV스큐·GEX는 장중 1시간+장마감 캡처 · 매일 새벽 정산치로 z 재계산")
+    # (2026-08-02) 프로그램 차익 순매수(KOSPI200 전용·참고) — program_trading.json에서 z(60일) 계산해 행 주입.
+    #   차익거래는 베이시스와 같은 맥락의 확인 지표라 베이시스 행 바로 아래 배치, 자동 판독 집계에선 제외(참고 표기).
+    try:
+        pg = json.loads((DB / "program_trading.json").read_text(encoding="utf-8"))
+        _k = pg.get("kospi") or {}
+        arb, ts_ = _k.get("arb") or [], _k.get("t") or []
+        if len(arb) >= 60 and d.get("rows"):
+            import statistics
+            w = [x for x in arb[-60:] if x is not None]
+            mu = statistics.fmean(w); sd = statistics.pstdev(w) or 1.0
+            zv = round((arb[-1] - mu) / sd, 2)
+            cells = [{"v": None, "z": None} if "KOSPI" not in (ix.get("name") or "")
+                     else {"v": f"{arb[-1]:+,.0f} 억원 ({ts_[-1][4:6]}-{ts_[-1][6:]})", "z": zv}
+                     for ix in (d.get("index") or [])]
+            d["rows"].insert(1, {"label": "프로그램 차익 순매수 (참고)", "cells": cells})
+    except Exception:
+        pass
     # (2026-07-20) 야간선물(KRX 18:00~06:00) — night_ws 웹소켓 데몬(H0MFCNT0)이 기록한 실시간가.
     #   현물은 야간에 멈춰 있어 베이시스로 쓰면 왜곡 → 별도 '야간선물' 정보로만 노출한다.
     nfp = BASE / "data" / "night_fut.json"
