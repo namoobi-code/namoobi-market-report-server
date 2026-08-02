@@ -4849,7 +4849,7 @@ await _canvasFlow(c);
     const hset=HIST[sym];
     const cv=$('gm_cv');
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
-    const days={'1M':22,'3M':66,'6M':132,'1Y':9999}[box.dataset.p||'1Y'];
+    const days={'1M':22,'3M':66,'6M':132,'1Y':252}[box.dataset.p||'1Y'];  // 소스별 보유이력(야후2y·시나3y·네이버1y)이 달라 1Y도 252봉으로 통일
     let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
     const W=cv.clientWidth||560,H=600; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
