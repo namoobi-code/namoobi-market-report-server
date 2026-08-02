@@ -4654,7 +4654,7 @@ await _canvasFlow(c);
       g.rows.forEach(r=>{
         const R=r.ret||{}; const d1=R.d1!=null?R.d1:r.ret_d1_live;
         h+=`<tr class="gmrow" data-s="${r.s}" style="cursor:pointer;border-bottom:1px solid #f2f4f7">`
-         +`<td style="padding:5px 6px"><b>${r.name}</b> <span class="note" style="font-size:10px">${r.at||''}</span></td>`
+         +`<td style="padding:5px 6px"><b>${r.name}</b>${r.s.startsWith('KRW-')?` <span class="note" style="font-size:10px;font-weight:600">${r.s.split('-')[1]}/KRW</span>`:''} <span class="note" style="font-size:10px">${r.at||''}</span></td>`
          +`<td style="text-align:right;font-weight:600">${fmt(r.px,r.dec,r.mult)}</td>`
          +`<td style="text-align:right">${pc(d1)}</td><td style="text-align:right">${pc(R.w1)}</td>`
          +`<td style="text-align:right">${pc(R.m1)}</td><td style="text-align:right">${pc(R.m3)}</td>`
@@ -4807,7 +4807,7 @@ await _canvasFlow(c);
     const box=$('gm_detail');
     const R=r.ret||{};
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
-      <b style="font-size:15px">${r.name}</b><span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
+      <b style="font-size:15px">${r.name}</b>${r.s.startsWith('KRW-')?`<span class="note" style="font-size:11px"> ${r.s.split('-')[1]}/KRW</span>`:''}<span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
