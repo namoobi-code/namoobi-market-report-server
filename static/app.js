@@ -4833,10 +4833,11 @@ await _canvasFlow(c);
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
       <b style="font-size:15px">${r.name}</b>${subCode(r.s)?`<span class="note" style="font-size:11px"> ${subCode(r.s)}</span>`:''}${r.en?`<span class="note" style="font-size:11px"> ${r.en}</span>`:''}<span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
       <span class="note">${r.at||''}</span>
-      <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y','3Y','10Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'3Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'3Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
+      <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1Y','3Y','10Y','MAX'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'3Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'3Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
       <canvas id="gm_cv" style="width:100%;height:600px"></canvas>`;
-    box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
+    box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; delete box._vn; delete box._vo; openDetail(sym,true);}));
+    if(!keep){ delete box._vn; delete box._vo; }
     box.querySelectorAll('.gme').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation(); window.open(b.dataset.u,'gm_pop','width=1280,height=860');}));
     box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.innerHTML='<div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>';});
     let ov=null, prem=null;
@@ -4852,40 +4853,70 @@ await _canvasFlow(c);
     const hset=HIST[sym];
     const cv=$('gm_cv');
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
-    const days={'1M':22,'3M':66,'6M':132,'1Y':252,'3Y':756,'10Y':2520}[box.dataset.p||'3Y'];  // 기본 3Y — 소스별 보유이력이 달라 기간별 봉수로 통일(야후 10y·시나 3y·네이버 3y~)
-    let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
+    const L=hset.t.length;
+    const baseN={'1Y':252,'3Y':756,'10Y':2520,'MAX':1e9}[box.dataset.p||'3Y'];  // 기본 3Y
+    let viewN=Math.max(20,Math.min(box._vn||baseN,L));       // 표시 봉수(휠 확대/축소로 변경)
+    let viewOff=Math.max(0,Math.min(box._vo||0,L-viewN));    // 오른쪽 끝에서 숨긴 봉수(드래그 이동)
     const W=cv.clientWidth||560,H=600; cv.width=W; cv.height=H;
-    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    const x=cv.getContext('2d');
     const P={l:56,r:8,t:10,b:20};
-    let ovv=null;
-    if(ov&&ov.t){ const om={}; ov.t.forEach((d,i)=>om[d]=ov.v[i]); ovv=t.map(d=>om[d]??null); }
-    const allv=ovv?v.concat(ovv.filter(x=>x!=null)):v;
-    const lo=Math.min(...allv),hi=Math.max(...allv),rg=(hi-lo)||1;
-    const X=i=>P.l+(W-P.l-P.r)*i/(t.length-1), Y=val=>P.t+(H-P.t-P.b)*(1-(val-lo)/rg);
-    x.font='10px sans-serif';
-    for(let g2=0;g2<=4;g2++){ const y=P.t+(H-P.t-P.b)*g2/4;
-      x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,y); x.lineTo(W-P.r,y); x.stroke();
-      x.fillStyle='#8a94a0'; x.textAlign='right'; x.fillText((hi-rg*g2/4).toLocaleString(undefined,{maximumFractionDigits:r.dec}),P.l-5,y+3); }
-    x.textAlign='left'; let lastM='';
-    for(let i=0;i<t.length;i++){ const mk=t[i].slice(0,6); if(mk!==lastM){ lastM=mk;
-      if(t.length<=140||(t.length<=600?+t[i].slice(4,6)%3===1:+t[i].slice(4,6)===1)){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
-    if((box.dataset.p||'3Y')==='3Y'&&t.length>1){  // 3Y 차트 — 1년 전·2년 전 위치에 점선 세로선
-      const last=t[t.length-1], d0=new Date(+last.slice(0,4),+last.slice(4,6)-1,+last.slice(6));
-      [[365,'1년 전'],[730,'2년 전']].forEach(([dd,lb])=>{
-        const tg=new Date(d0); tg.setDate(tg.getDate()-dd);
+    let om=null;
+    if(ov&&ov.t){ om={}; ov.t.forEach((d,i)=>om[d]=ov.v[i]); }
+    function draw(){
+      const end=L-viewOff, start=Math.max(0,end-viewN);
+      const t=hset.t.slice(start,end), v=hset.v.slice(start,end).map(z=>z*(r.mult||1));
+      if(t.length<2) return;
+      x.clearRect(0,0,W,H);
+      const ovv=om?t.map(d=>om[d]??null):null;
+      const allv=ovv?v.concat(ovv.filter(z=>z!=null)):v;
+      const lo=Math.min(...allv),hi=Math.max(...allv),rg=(hi-lo)||1;
+      const X=i=>P.l+(W-P.l-P.r)*i/(t.length-1), Y=val=>P.t+(H-P.t-P.b)*(1-(val-lo)/rg);
+      x.font='10px sans-serif';
+      for(let g2=0;g2<=4;g2++){ const y=P.t+(H-P.t-P.b)*g2/4;
+        x.strokeStyle='#eceff3'; x.beginPath(); x.moveTo(P.l,y); x.lineTo(W-P.r,y); x.stroke();
+        x.fillStyle='#8a94a0'; x.textAlign='right'; x.fillText((hi-rg*g2/4).toLocaleString(undefined,{maximumFractionDigits:r.dec}),P.l-5,y+3); }
+      x.textAlign='left'; let lastM='';
+      for(let i=0;i<t.length;i++){ const mk=t[i].slice(0,6); if(mk!==lastM){ lastM=mk;
+        if(t.length<=140||(t.length<=600?+t[i].slice(4,6)%3===1:+t[i].slice(4,6)===1)){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
+      // 표시 구간이 1년을 넘으면 — 지금(전체 이력 마지막 봉) 기준 1년 전·2년 전·… 점선 세로선
+      const dl=hset.t[L-1], d0=new Date(+dl.slice(0,4),+dl.slice(4,6)-1,+dl.slice(6));
+      for(let k=1;k<=20;k++){
+        const tg=new Date(d0); tg.setDate(tg.getDate()-365*k);
         const key=`${tg.getFullYear()}${String(tg.getMonth()+1).padStart(2,'0')}${String(tg.getDate()).padStart(2,'0')}`;
+        if(key<=t[0]||key>t[t.length-1]) continue;
         const idx=t.findIndex(z=>z>=key);
         if(idx>0){ x.save(); x.setLineDash([4,4]); x.strokeStyle='#9aa4b0'; x.beginPath(); x.moveTo(X(idx),P.t); x.lineTo(X(idx),H-P.b); x.stroke(); x.restore();
-          x.fillStyle='#8a94a0'; x.textAlign='center'; x.fillText(lb,X(idx),P.t+10); x.textAlign='left'; }
-      });
+          x.fillStyle='#8a94a0'; x.textAlign='center'; x.fillText(`${k}년 전`,X(idx),P.t+10); x.textAlign='left'; }
+      }
+      if(ovv){ x.strokeStyle='#6b7280'; x.lineWidth=1.2; x.beginPath(); let st=false;
+        ovv.forEach((val,i)=>{ if(val==null) return; st?x.lineTo(X(i),Y(val)):(x.moveTo(X(i),Y(val)),st=true); }); x.stroke();
+        x.font='11px sans-serif'; x.fillStyle='#6b7280'; x.fillText('원/달러 환율',P.l+6,P.t+14);
+        x.fillStyle='#c0392b'; x.fillText('테더 USDT/KRW',P.l+6,P.t+28); x.font='10px sans-serif'; }
+      const up=v[v.length-1]>=v[0];
+      x.strokeStyle=up?'#c0392b':'#1e6fd6'; x.lineWidth=1.6; x.beginPath();
+      v.forEach((val,i)=>i?x.lineTo(X(i),Y(val)):x.moveTo(X(i),Y(val))); x.stroke(); x.lineWidth=1;
     }
-    if(ovv){ x.strokeStyle='#6b7280'; x.lineWidth=1.2; x.beginPath(); let st=false;
-      ovv.forEach((val,i)=>{ if(val==null) return; st?x.lineTo(X(i),Y(val)):(x.moveTo(X(i),Y(val)),st=true); }); x.stroke();
-      x.font='11px sans-serif'; x.fillStyle='#6b7280'; x.fillText('원/달러 환율',P.l+6,P.t+14);
-      x.fillStyle='#c0392b'; x.fillText('테더 USDT/KRW',P.l+6,P.t+28); }
-    const up=v[v.length-1]>=v[0];
-    x.strokeStyle=up?'#c0392b':'#1e6fd6'; x.lineWidth=1.6; x.beginPath();
-    v.forEach((val,i)=>i?x.lineTo(X(i),Y(val)):x.moveTo(X(i),Y(val))); x.stroke(); x.lineWidth=1;
+    draw();
+    cv.addEventListener('wheel',e=>{                          // 휠 = X축 확대/축소(마우스 위치 고정)
+      e.preventDefault();
+      const rect=cv.getBoundingClientRect();
+      const fr=Math.min(1,Math.max(0,(e.clientX-rect.left-P.l)/(W-P.l-P.r)));
+      const end=L-viewOff, start=Math.max(0,end-viewN), n0=end-start;
+      const anchor=start+fr*(n0-1);
+      const n1=Math.max(20,Math.min(L,Math.round(n0*(e.deltaY<0?0.8:1.25))));
+      let s1=Math.round(anchor-fr*(n1-1));
+      s1=Math.max(0,Math.min(L-n1,s1));
+      viewN=n1; viewOff=L-s1-n1; box._vn=viewN; box._vo=viewOff;
+      draw();
+    },{passive:false});
+    let drag=null;                                            // 드래그 = 좌우 이동
+    cv.addEventListener('mousedown',e=>{ drag={x0:e.clientX,off0:viewOff}; });
+    cv.addEventListener('mousemove',e=>{ if(!drag) return;
+      const barw=(W-P.l-P.r)/Math.max(1,viewN);
+      viewOff=Math.max(0,Math.min(L-viewN,drag.off0+Math.round((e.clientX-drag.x0)/barw)));
+      box._vo=viewOff; draw(); });
+    cv.addEventListener('mouseup',()=>{ drag=null; });
+    cv.addEventListener('mouseleave',()=>{ drag=null; });
   }
   async function load(){
     try{ D=await fetch('/api/db/global_market').then(r=>r.json()); }catch(e){ $('gm_body').innerHTML='<div class="note">로드 실패 — 잠시 후 재시도</div>'; return; }
