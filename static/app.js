@@ -4643,6 +4643,7 @@ await _canvasFlow(c);
     if(sym.startsWith('NAV.')) return sym.slice(3);       // 네이버 월드지수 코드 (.TOPX 등)
     if(sym.startsWith('NAVKR.')) return sym.slice(6);     // 네이버 국내지수 코드 (KVALUE 등)
     if(sym.startsWith('NF.')) return sym.slice(3);        // 네이버 선물 코드 (HSIc1 등)
+    if(sym.startsWith('DV.')) return sym.slice(3);        // 내부 DB 소스 (VKOSPI)
     if(sym.startsWith('ND.')) return '';                  // 네이버 내부코드 — 생략
     return sym;                                           // 야후 심볼 그대로 (^GSPC·399001.SZ·CL=F 등)
   }
@@ -4758,7 +4759,8 @@ await _canvasFlow(c);
     'TRY=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDTRY',
     'UAH=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDUAH'};
   const TV={'^KS11':'KRX:KOSPI','^KQ11':'KRX:KOSDAQ','^DJI':'DJ:DJI','^DJT':'DJ:DJT','^IXIC':'NASDAQ:IXIC','^NDX':'NASDAQ:NDX',
-    '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!','^RUT':'TVC:RUT','YM=F':'CBOT_MINI:YM1!','RTY=F':'CME_MINI:RTY1!',
+    '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!',
+    'XLK':'AMEX:XLK','XLV':'AMEX:XLV','XLC':'AMEX:XLC','XLY':'AMEX:XLY','XLF':'AMEX:XLF','XLI':'AMEX:XLI','XLP':'AMEX:XLP','XLB':'AMEX:XLB','XLRE':'AMEX:XLRE','XLE':'AMEX:XLE','XLU':'AMEX:XLU','^RUT':'TVC:RUT','YM=F':'CBOT_MINI:YM1!','RTY=F':'CME_MINI:RTY1!',
     '000001.SS':'SSE:000001','399106.SZ':'SZSE:399106','399001.SZ':'SZSE:399001','000300.SS':'SSE:000300',
     '000688.SS':'SSE:000688','399006.SZ':'SZSE:399006','^HSI':'TVC:HSI','^HSCE':'HSI:HSCEI','HSTECH.HK':'HSI:HSTECH',
     '^N225':'TVC:NI225','^STOXX50E':'TVC:SX5E','^FTSE':'TVC:UKX','^GDAXI':'XETR:DAX','^FCHI':'TVC:CAC40',
@@ -4804,7 +4806,7 @@ await _canvasFlow(c);
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
     const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
-    if(!s.startsWith('KRX:')&&!s.startsWith('NAV')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!NOY.includes(s)){
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!s.startsWith('DV.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }

@@ -39,10 +39,17 @@ def jget(url, timeout=15, tries=2):
 U = [
  ("kr","^KS11","KOSPI","NY",1,2), ("kr","^KQ11","KOSDAQ","NY",1,2), ("kr","^KS200","KOSPI200","NY",1,2),
  ("kr","NAVKR.KPI100","코스피 100","NK",1,2), ("kr","NAVKR.KVALUE","코리아 밸류업 지수","NK",1,2),
+ ("kr","DV.VKOSPI","KOSPI 변동성(VKOSPI)","DV",1,2),
  ("us","^DJI","다우 산업","Y",1,2), ("us","^DJT","다우 운송","Y",1,2), ("us","^IXIC","나스닥 종합","Y",1,2),
  ("us","^NDX","나스닥 100","Y",1,2), ("us","^GSPC","S&P 500","Y",1,2), ("us","^SOX","필라델피아 반도체","Y",1,2),
  ("us","^NYA","NYSE 종합","Y",1,2), ("us","^XAX","아멕스 종합","Y",1,2), ("us","^VIX","VIX","Y",1,2),
  ("us","^RUT","러셀 2000","Y",1,2),
+ ("us","XLK","기술 섹터","Y",1,2), ("us","XLV","헬스케어 섹터","Y",1,2),
+ ("us","XLC","통신 섹터","Y",1,2), ("us","XLY","임의소비재 섹터","Y",1,2),
+ ("us","XLF","금융 섹터","Y",1,2), ("us","XLI","산업재 섹터","Y",1,2),
+ ("us","XLP","필수소비재 섹터","Y",1,2), ("us","XLB","소재 섹터","Y",1,2),
+ ("us","XLRE","부동산 섹터","Y",1,2), ("us","XLE","에너지 섹터","Y",1,2),
+ ("us","XLU","유틸리티 섹터","Y",1,2),
  ("us","NQ=F","E-mini 나스닥100 선물","Y",1,2), ("us","ES=F","E-mini S&P500 선물","Y",1,2),
  ("us","YM=F","다우 선물","Y",1,2), ("us","RTY=F","러셀2000 선물","Y",1,2),
  ("as","000001.SS","상해종합","Y",1,2), ("as","399106.SZ","심천종합지수","Y",1,2), ("as","399001.SZ","심천성분지수","Y",1,2),
@@ -149,6 +156,12 @@ NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 
 EM_HIST = {"399006.SZ": "sz399006", "000688.SS": "sh000688", "HSTECH.HK": "hkHSTECH"}
 # (2026-08-02) 선물 만기 주기 메타 — 표의 취득시점 옆에 표기(연속선물이라 롤오버는 소스가 자동)
 EN_NAME = {  # (2026-08-02) 야후 shortName이 없는 종목의 영문 정식명
+    "XLK": "Technology Select Sector SPDR", "XLV": "Health Care Select Sector SPDR",
+    "XLC": "Communication Services SPDR", "XLY": "Consumer Discretionary SPDR",
+    "XLF": "Financial Select Sector SPDR", "XLI": "Industrial Select Sector SPDR",
+    "XLP": "Consumer Staples SPDR", "XLB": "Materials Select Sector SPDR",
+    "XLRE": "Real Estate Select Sector SPDR", "XLE": "Energy Select Sector SPDR",
+    "XLU": "Utilities Select Sector SPDR",
     "ND.CMDT_GO": "ICE Gas Oil Futures", "ND.OIL_DU": "Dubai Crude Oil (spot)",
     "ND.GOLD_KR": "KRX Gold Market (KRW/g)", "ND.CMDT_PDY": "LME Lead (cash)",
     "ND.CMDT_ZDY": "LME Zinc (cash)", "ND.CMDT_NDY": "LME Nickel (cash)",
@@ -422,6 +435,19 @@ def main():
             series = uph.get(s); q = ups.get(s) or {}
             r["px"] = q.get("px"); r["at"] = q.get("at")
             if q.get("pc"): r["ret_d1_live"] = round((q["px"] / q["pc"] - 1) * 100, 2)
+        elif src == "DV":
+            # VKOSPI — 기존 3.1.13 파이프라인 deriv_signals.db (KRX T+1, 05:50 cron이 매일 적재)
+            try:
+                import sqlite3
+                con = sqlite3.connect(str(BASE / "data" / "deriv_signals.db"))
+                rows_ = list(con.execute("SELECT date, vkospi FROM kr_derivatives_daily WHERE vkospi IS NOT NULL ORDER BY date"))
+                con.close()
+                if rows_:
+                    series = {"t": [d.replace("-", "") for d, _ in rows_], "v": [float(x) for _, x in rows_]}
+                    r["px"] = series["v"][-1]
+                    r["at"] = rows_[-1][0][5:].replace("-", "/") + " 종가(KRX T+1)"
+            except Exception:
+                pass
         elif src == "NK":
             q = naver_kr(NK_CODES[s])
             nh = naver_kr_hist(NK_CODES[s])
