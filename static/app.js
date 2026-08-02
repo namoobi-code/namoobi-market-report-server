@@ -4781,7 +4781,8 @@ await _canvasFlow(c);
     'BRL=X':'FX_IDC:USDBRL',
     'TRY=X':'FX_IDC:USDTRY',
     'UAH=X':'FX_IDC:USDUAH',
-    'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW'};
+    'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW',
+    'KRW-ADA':'UPBIT:ADAKRW','KRW-DOGE':'UPBIT:DOGEKRW','KRW-TRX':'UPBIT:TRXKRW','KRW-LINK':'UPBIT:LINKKRW','KRW-AVAX':'UPBIT:AVAXKRW','KRW-SUI':'UPBIT:SUIKRW','KRW-USDT':'UPBIT:USDTKRW'};
   const TX={'399006.SZ':'https://gu.qq.com/sz399006/zs','000688.SS':'https://gu.qq.com/sh000688/zs','HSTECH.HK':'https://gu.qq.com/hkHSTECH/zs'};  // 야후 1년 이력 미제공 3종 — 텐센트로 대체
   function extLinks(r){
     const s=r.s, L=[];
