@@ -70,9 +70,10 @@ U = [
 ]
 NAVER_LIVE = {"^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KPI200"}   # T+0 현재가 보강
 NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI"}
+NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 이력 대체(2026-08-02 실측)
 
 def yahoo_1y(sym):
-    j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=1y&interval=1d")
+    j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=2y&interval=1d")
     try:
         r = j["chart"]["result"][0]; m = r["meta"]
         ts = r["timestamp"]; cl = r["indicators"]["quote"][0]["close"]
@@ -172,6 +173,9 @@ def rets(t, v, px):
             base = None
             for i in range(len(t) - 1, -1, -1):
                 if t[i] <= tgt: base = v[i]; break
+            if base is None and t:                      # 이력 시작이 목표일 직후면 근사(+35일 허용)
+                lim = (datetime.strptime(tgt, "%Y%m%d") + timedelta(days=35)).strftime("%Y%m%d")
+                if t[0] <= lim: base = v[0]
         out[k] = round((px / base - 1) * 100, 2) if base else None
     return out
 
@@ -250,6 +254,10 @@ def main():
 
     hist_all = {}
     rows_by_grp = {}
+    acc = {}                                            # (2026-08-02) 이력 미제공 심볼 일별 자동누적
+    try: acc = json.loads((DB / "global_acc_hist.json").read_text(encoding="utf-8"))
+    except Exception: pass
+    today_s = datetime.now().strftime("%Y%m%d")
     for g, s, name, src, mult, dec in U:
         r = {"s": s, "name": name, "mult": mult, "dec": dec}
         series = None
@@ -268,13 +276,24 @@ def main():
                 q = nidx[s]; r["px"] = q["px"]; r["at"] = q["at"]
                 nh = naver_world_hist(NAVER_IDX[s])
                 series = nh if nh["t"] else {"t": [], "v": []}
+        # 이력 부족(소스가 시세만 제공) → ① 네이버 대체 이력 ② 일별 자동누적으로 시간이 지나며 자동 표시
+        if (not series or len(series["t"]) < 30) and NAVER_HIST_FB.get(s):
+            nh = naver_world_hist(NAVER_HIST_FB[s])
+            if nh["t"]: series = nh
+        if (not series or len(series["t"]) < 30) and r.get("px") is not None:
+            a = acc.get(s) or {"t": [], "v": []}
+            m = dict(zip(a["t"], a["v"]))
+            if series: m.update(dict(zip(series["t"], series["v"])))
+            m[today_s] = r["px"]
+            ts_ = sorted(m)
+            series = {"t": ts_, "v": [m[k] for k in ts_]}
+            acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
         if series and series["t"]:
             # 장중 현재가를 시리즈 말미에 반영해 기간수익률 일관성 확보
             if r.get("px") is not None:
-                today = datetime.now().strftime("%Y%m%d")
-                if series["t"][-1] == today: series["v"][-1] = r["px"]
+                if series["t"][-1] == today_s: series["v"][-1] = r["px"]
             r["ret"] = rets(series["t"], series["v"], r.get("px"))
-            r["spark"] = spark(series["v"])
+            r["spark"] = spark(series["v"][-252:])
             hist_all[s] = series
         rows_by_grp.setdefault(g, []).append(r)
 
@@ -300,6 +319,7 @@ def main():
     (DB / "global_market.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     (DB / "global_hist.json").write_text(json.dumps(hist_all, ensure_ascii=False), encoding="utf-8")
     (DB / "global_krx_hist.json").write_text(json.dumps(krx_hist, ensure_ascii=False), encoding="utf-8")
+    (DB / "global_acc_hist.json").write_text(json.dumps(acc, ensure_ascii=False), encoding="utf-8")
     n = sum(len(v) for v in rows_by_grp.values())
     print(f"[global] ✅ {n}종 · KRX {len(krx_rows)}종 · hist {len(hist_all)}종 · {time.time()-t0:.0f}s")
 
