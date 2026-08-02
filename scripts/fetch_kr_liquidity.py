@@ -9,6 +9,7 @@
     · 코스피/코스닥 지수·거래대금                              (다음금융, T+0)
   [월별 kr_liq_monthly]
     · M2(평잔, 161Y006/BBHA00) · 코스피 종가(901Y014/1070000) · 코스닥 종가(901Y014/2090000)  (ECOS, ~2개월 지연)
+    · 정기예금 말잔(104Y015/BDAA31, 십억원 — 예탁금과의 자금이동 대비용, ~1개월 지연)
 
 cron 슬롯 (deploy/crontab.txt):
   06:35 안전망(전일 재시도+ECOS 월별 체크) · 14:10 금융위 T+2 신규분(13시 갱신) · 16:10 다음 T+0 당일 종가
@@ -54,6 +55,8 @@ def init():
         kospi REAL, kospi_trdval REAL, kosdaq REAL, kosdaq_trdval REAL)""")
     c.execute("""CREATE TABLE IF NOT EXISTS kr_liq_monthly(
         month TEXT PRIMARY KEY, m2 REAL, kospi REAL, kosdaq REAL)""")
+    try: c.execute("ALTER TABLE kr_liq_monthly ADD COLUMN tdep REAL")   # (2026-08-02) 정기예금 말잔(십억원)
+    except Exception: pass
     return c
 
 def up(c, date, **cols):
@@ -126,7 +129,8 @@ def fetch_ecos(c, key):
     n = 0
     for stat, item, col in (("161Y006", "BBHA00", "m2"),
                             ("901Y014", "1070000", "kospi"),
-                            ("901Y014", "2090000", "kosdaq")):
+                            ("901Y014", "2090000", "kosdaq"),
+                            ("104Y015", "BDAA31", "tdep")):   # 예금은행 정기예금 말잔(십억원, 2026-08-02)
         try:
             d = get(f"https://ecos.bok.or.kr/api/StatisticSearch/{key}/json/kr/1/400/"
                     f"{stat}/M/201501/{end}/{item}/")

@@ -1135,7 +1135,7 @@ def krliq(days: int = 420):
             "kospi,kospi_trdval,kosdaq,kosdaq_trdval FROM kr_liq_daily "
             "ORDER BY date DESC LIMIT ?", (days,)).fetchall()[::-1]
         monthly = c.execute(
-            "SELECT month,m2,kospi,kosdaq FROM kr_liq_monthly ORDER BY month").fetchall()
+            "SELECT month,m2,kospi,kosdaq,tdep FROM kr_liq_monthly ORDER BY month").fetchall()
         vrows = c.execute(         # 판정은 days 파라미터와 무관하게 최근 40행에서 계산
             "SELECT date,deposit,kospi_trdval FROM kr_liq_daily "
             "WHERE deposit IS NOT NULL AND kospi_trdval IS NOT NULL "
