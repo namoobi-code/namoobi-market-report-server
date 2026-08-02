@@ -99,6 +99,28 @@ U = [
  ("cr","KRW-BTC","비트코인","U",1,0), ("cr","KRW-ETH","이더리움","U",1,0),
  ("cr","KRW-SOL","솔라나","U",1,0), ("cr","KRW-XRP","리플","U",1,0),
 ]
+# (2026-08-02) 환율 — 기타 통화(네이버 국제시장 4페이지 전체) · 표는 접힘(더보기), 소수점은 값 크기 자동
+FX2 = [("JOD","요르단 디나르"),("MAD","모로코 디르함"),("MOP","마카오 파타카"),("GMD","감비아 달라시"),
+ ("GTQ","과테말라 케트살"),("GNF","기니 프랑"),("NAD","나미비아 달러"),("NGN","나이지리아 나이라"),
+ ("NPR","네팔 루피"),("NIO","니카라과 코르도바"),("XCD","동카리브 달러"),("DJF","지부티 프랑"),
+ ("LAK","라오스 킵"),("LBP","레바논 파운드"),("LSL","레소토 로티"),("RON","루마니아 레우"),
+ ("RWF","르완다 프랑"),("MGA","마다가스카르 아리아리"),("MWK","말라위 콰차"),("MKD","마케도니아 디나르"),
+ ("MUR","모리셔스 루피"),("MDL","몰도바 레우"),("MVR","몰디브 루피야"),("BHD","바레인 디나르"),
+ ("BBD","바베이도스 달러"),("BSD","바하마 달러"),("BDT","방글라데시 타카"),("BZD","벨리즈 달러"),
+ ("BWP","보츠와나 풀라"),("BOB","볼리비아 볼리비아노"),("BIF","부룬디 프랑"),("BND","브루나이 달러"),
+ ("LYD","리비아 디나르"),("SCR","세이셸 루피"),("SOS","소말리아 실링"),("LKR","스리랑카 루피"),
+ ("SZL","에스와티니 릴랑게니"),("ISK","아이슬란드 크로나"),("HTG","아이티 구르드"),("ALL","알바니아 렉"),
+ ("DZD","알제리 디나르"),("ETB","에티오피아 비르"),("SVC","엘살바도르 콜론"),("YER","예멘 리얄"),
+ ("OMR","오만 리알"),("HNL","온두라스 렘피라"),("UGX","우간다 실링"),("UYU","우루과이 페소"),
+ ("UZS","우즈베키스탄 숨"),("IQD","이라크 디나르"),("JMD","자메이카 달러"),("XAF","중앙아프리카 프랑"),
+ ("KZT","카자흐스탄 텡게"),("QAR","카타르 리얄"),("KES","케냐 실링"),("CVE","카보베르데 에스쿠도"),
+ ("KMF","코모로 프랑"),("CRC","코스타리카 콜론"),("CUP","쿠바 페소"),("KWD","쿠웨이트 디나르"),
+ ("TZS","탄자니아 실링"),("TND","튀니지 디나르"),("TTD","트리니다드 달러"),("PAB","파나마 발보아"),
+ ("PYG","파라과이 과라니"),("PKR","파키스탄 루피"),("PGK","파푸아뉴기니 키나"),("PEN","페루 솔"),
+ ("XPF","태평양 프랑"),("FJD","피지 달러"),("EGP","이집트 파운드"),("IRR","이란 리얄")]
+U += [("fx2", c + "=X", "달러/" + n, "Y", 1, None) for c, n in FX2]
+U += [("fx2", "ND.FX_USDGEL", "달러/조지아 라리", "ND", 1, None)]   # 야후 미제공 — 네이버 일별시세
+
 NAVER_LIVE = {"^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KPI200"}   # T+0 현재가 보강
 NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI", "NAV.HNXI": ".HNXI", "NAV.SSEA": ".SSEA",
               "NAV.SSEB": ".SSEB", "NAV.SZSA": ".SZSA", "NAV.SZSB": ".SZSB", "NAV.CSI100": ".CSI100",
@@ -127,7 +149,8 @@ ND_CODES = {"ND.CMDT_GO": ("worldDailyQuote", "CMDT_GO", 2), "ND.OIL_DU": ("worl
             "ND.OIL_GSL": ("oilDailyQuote", "OIL_GSL", None), "ND.OIL_LO": ("oilDailyQuote", "OIL_LO", None),
             "CNYKRW=X": ("exchangeDailyQuote", "FX_CNYKRW", None), "BRLKRW=X": ("exchangeDailyQuote", "FX_BRLKRW", None),
             "SEKKRW=X": ("exchangeDailyQuote", "FX_SEKKRW", None), "CZKKRW=X": ("exchangeDailyQuote", "FX_CZKKRW", None),
-            "CLPKRW=X": ("exchangeDailyQuote", "FX_CLPKRW", None), "TRYKRW=X": ("exchangeDailyQuote", "FX_TRYKRW", None)}
+            "CLPKRW=X": ("exchangeDailyQuote", "FX_CLPKRW", None), "TRYKRW=X": ("exchangeDailyQuote", "FX_TRYKRW", None),
+            "ND.FX_USDGEL": ("worldDailyQuote", "FX_USDGEL", 2)}
 
 def yahoo_1y(sym):
     j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=2y&interval=1d")
@@ -369,6 +392,9 @@ def main():
             ts_ = sorted(m)
             series = {"t": ts_, "v": [m[k] for k in ts_]}
             acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+        if r.get("dec") is None:                          # fx2: 소수점 자동
+            px0 = r.get("px")
+            r["dec"] = (0 if px0 >= 1000 else 2 if px0 >= 10 else 4) if px0 else 2
         if s in INVERT:
             if r.get("px"): r["px"] = round(1.0 / r["px"], 6)
             if series and series.get("v"):
@@ -399,7 +425,7 @@ def main():
     rows_by_grp["krx"] = krx_rows
 
     GRP = [("kr", "국내 대표 (실시간)"), ("krx", "국내 세부지수 (KRX · T+1 종가)"), ("us", "미국"),
-           ("as", "아시아·중화권"), ("eu", "유럽·기타"), ("cmd", "상품"), ("fx", "환율"), ("cr", "암호화폐 (업비트 실시간)")]
+           ("as", "아시아·중화권"), ("eu", "유럽·기타"), ("cmd", "상품"), ("fx", "환율 — 주요 통화"), ("fx2", "환율 — 기타 통화"), ("cr", "암호화폐 (업비트 실시간)")]
     out = {"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
            "src": "야후(지수 ~15분 지연·선물/환율 실시간급)+네이버(국내 T+0·TOPIX·VNI)+업비트(실시간)+KRX(T+1)",
            "groups": [{"key": k, "label": lb, "rows": rows_by_grp.get(k, [])} for k, lb in GRP]}

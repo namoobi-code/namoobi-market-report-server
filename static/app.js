@@ -4644,7 +4644,12 @@ await _canvasFlow(c);
     h+='<colgroup><col style="width:220px"><col style="width:104px">'+ '<col style="width:72px">'.repeat(6)+'<col style="width:140px"></colgroup>';
     D.groups.forEach(g=>{
       if(!g.rows.length) return;
-      h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
+      if(g.key==='fx2'){
+        h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea;cursor:pointer" onclick="window.__gmFx2=!window.__gmFx2; window.__gmTblRe&&window.__gmTblRe()">${g.label} <span class="note">(${g.rows.length}종) ${window.__gmFx2?'▲ 접기':'▼ 더보기 — 전체 통화 표시'}</span></td></tr>`;
+        if(!window.__gmFx2) return;
+      } else {
+        h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
+      }
       h+='<tr style="color:#8a94a0">'+['지수/종목','현재가','1일','1주','1개월','3개월','6개월','1년','추세(1Y)'].map((c,i)=>`<td style="padding:2px 6px;text-align:${i==0?'left':'right'};border-bottom:1px solid #eceff3">${c}</td>`).join('')+'</tr>';
       g.rows.forEach(r=>{
         const R=r.ret||{}; const d1=R.d1!=null?R.d1:r.ret_d1_live;
@@ -4656,12 +4661,17 @@ await _canvasFlow(c);
          +`<td style="text-align:right">${pc(R.m6)}</td><td style="text-align:right">${pc(R.y1)}</td>`
          +`<td style="text-align:right;padding:2px 6px">${sparkSVG(r.spark,120,26)}</td></tr>`;
       });
+      if(g.key==='kr'){
+        h+=`<tr><td colspan="9" style="padding:8px 6px 2px;font-weight:700;font-size:13px">🔥 인기 검색 종목 <span class="note" id="gm_pop_t">(네이버 · 3분 갱신)</span></td></tr>`
+         +`<tr><td colspan="9" style="padding:0 6px 6px"><div id="gm_pop"><div class="note">불러오는 중…</div></div></td></tr>`;
+      }
     });
     h+='</table>';
     const sc=document.querySelector('#p_global').scrollTop;
     $('gm_body').innerHTML=h;
     document.querySelectorAll('.gmrow').forEach(tr=>tr.addEventListener('click',()=>openDetail(tr.dataset.s)));
     document.querySelector('#p_global').scrollTop=sc;
+    if(typeof loadPop==='function') loadPop();
     if(openSym) openDetail(openSym,true);
   }
 
@@ -4771,7 +4781,7 @@ await _canvasFlow(c);
   function extLinks(r){
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
-    const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','399006.SZ','000688.SS','HSTECH.HK','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
+    const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
     if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
@@ -4781,6 +4791,7 @@ await _canvasFlow(c);
     if(s.startsWith('KRW-')) L.push(['업비트',`https://upbit.com/exchange?code=CRIX.UPBIT.${s}`]);
     return L;
   }
+  window.__gmTblRe=table;
   function findRow(sym){ for(const g of D.groups){ const r=g.rows.find(x=>x.s===sym); if(r) return r; } return null; }
   async function openDetail(sym,keep){
     openSym=sym;
@@ -4793,7 +4804,7 @@ await _canvasFlow(c);
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
-      <canvas id="gm_cv" style="width:100%;height:460px"></canvas>`;
+      <canvas id="gm_cv" style="width:100%;height:600px"></canvas>`;
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
     box.querySelectorAll('.gme').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation(); window.open(b.dataset.u,'gm_pop','width=1280,height=860');}));
     box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.innerHTML='<div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>';});
@@ -4802,7 +4813,7 @@ await _canvasFlow(c);
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
     const days={'1M':22,'3M':66,'6M':132,'1Y':9999}[box.dataset.p||'1Y'];
     let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
-    const W=cv.clientWidth||560,H=460; cv.width=W; cv.height=H;
+    const W=cv.clientWidth||560,H=600; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const P={l:56,r:8,t:10,b:20};
     const lo=Math.min(...v),hi=Math.max(...v),rg=(hi-lo)||1;
@@ -4824,6 +4835,7 @@ await _canvasFlow(c);
   window.__gmPopRe=null;
   async function loadPop(){
     window.__gmPopRe=loadPop;
+    if(!$('gm_pop')) return;
     try{
       const P=await fetch('/api/popular').then(r=>r.json());
       if(!P.rows||!P.rows.length) return;

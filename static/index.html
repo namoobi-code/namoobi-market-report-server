@@ -53,6 +53,7 @@
   canvas{height:200px!important;max-height:200px!important;width:100%!important}
   .cbox{position:relative}
   .cbox canvas{height:100%!important;max-height:none!important}
+  #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
   a{color:var(--dn);text-decoration:none}a:hover{text-decoration:underline}
   .links{display:flex;flex-wrap:wrap;gap:7px}
   .links a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--tx)}
@@ -589,10 +590,6 @@
       <div style="flex:1;min-width:420px;position:sticky;top:8px">
       <div id="gm_detail" class="box" style="padding:10px 14px">
         <div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>
-      </div>
-      <div class="box" style="margin-top:12px;padding:10px 14px">
-        <b style="font-size:13px">🔥 인기 검색 종목 <span class="note" id="gm_pop_t">(네이버 · 3분 갱신)</span></b>
-        <div id="gm_pop" style="margin-top:6px"><div class="note">불러오는 중…</div></div>
       </div>
       </div>
     </div>
