@@ -148,6 +148,16 @@ NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 
 #   이스트머니는 서버(해외 IP)에서 차단되어 텐센트(web.ifzq.gtimg.cn)로 확정 — 서버 실측 정상.
 EM_HIST = {"399006.SZ": "sz399006", "000688.SS": "sh000688", "HSTECH.HK": "hkHSTECH"}
 # (2026-08-02) 선물 만기 주기 메타 — 표의 취득시점 옆에 표기(연속선물이라 롤오버는 소스가 자동)
+EN_NAME = {  # (2026-08-02) 야후 shortName이 없는 종목의 영문 정식명
+    "ND.CMDT_GO": "ICE Gas Oil Futures", "ND.OIL_DU": "Dubai Crude Oil (spot)",
+    "ND.GOLD_KR": "KRX Gold Market (KRW/g)", "ND.CMDT_PDY": "LME Lead (cash)",
+    "ND.CMDT_ZDY": "LME Zinc (cash)", "ND.CMDT_NDY": "LME Nickel (cash)",
+    "ND.CMDT_AAY": "LME Aluminium Alloy (cash)", "ND.CMDT_SDY": "LME Tin (cash)",
+    "ND.OIL_GSL": "Korea Retail Gasoline (KRW/L)", "ND.OIL_LO": "Korea Retail Diesel (KRW/L)",
+    "NF.HSIc1": "Hang Seng Index Futures", "NF.HCEIc1": "Hang Seng China Ent. Futures",
+    "NF.SFCc1": "SGX FTSE China A50 Futures", "NF.SSIcm1": "SGX Nikkei 225 Futures",
+    "NF.STXEc1": "Euro Stoxx 50 Futures (Eurex)", "NF.FDXc1": "DAX Futures (Eurex)"}
+
 FUT_CYCLE = {
     "ES=F": "분기물(3·6·9·12월)", "NQ=F": "분기물(3·6·9·12월)", "YM=F": "분기물(3·6·9·12월)", "RTY=F": "분기물(3·6·9·12월)",
     "CL=F": "매월물", "BZ=F": "매월물", "NG=F": "매월물", "HO=F": "매월물", "ND.CMDT_GO": "매월물",
@@ -438,6 +448,8 @@ def main():
         else:
             y = ydata.get(s)
             if y: series = {"t": y["t"], "v": y["v"]}; r["px"] = y["px"]; r["at"] = y["at"]
+            if y and y.get("sn") and (g == "cmd" or s.endswith("=F")):
+                r["en"] = y["sn"]                          # 영문 정식명(예: Soybean Oil Futures,Dec-2026)
             if y and s.endswith("=F") and y.get("sn"):
                 # 월물 표기(예: "Nasdaq 100 Sep 26" → 26.09월물) — 야후 =F는 최근월 연속이라 롤오버 자동 반영
                 import re as _re2
@@ -469,6 +481,8 @@ def main():
             ts_ = sorted(m)
             series = {"t": ts_, "v": [m[k] for k in ts_]}
             acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+        if s in EN_NAME:
+            r["en"] = EN_NAME[s]
         if FUT_CYCLE.get(s):                              # 선물 만기 주기 표기
             r["at"] = ((r.get("at") + " · ") if r.get("at") else "") + FUT_CYCLE[s]
         if r.get("dec") is None:                          # fx2: 소수점 자동
