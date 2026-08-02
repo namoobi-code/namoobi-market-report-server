@@ -4664,6 +4664,51 @@ await _canvasFlow(c);
     document.querySelector('#p_global').scrollTop=sc;
     if(openSym) openDetail(openSym,true);
   }
+
+  /* 외부 차트 링크 — 실측 검증된 코드만 버튼 노출(2026-08-02 전수 프로브). 팝업으로 표시 */
+  const NAVER={'^KS11':'domestic/index/KOSPI/total','^KQ11':'domestic/index/KOSDAQ/total','^KS200':'domestic/index/KPI200/total',
+    '^DJI':'worldstock/index/.DJI/total','^DJT':'worldstock/index/.DJT/total','^IXIC':'worldstock/index/.IXIC/total',
+    '^NDX':'worldstock/index/.NDX/total','^GSPC':'worldstock/index/.INX/total','^SOX':'worldstock/index/.SOX/total',
+    '^VIX':'worldstock/index/.VIX/total','^HSI':'worldstock/index/.HSI/total','^HSCE':'worldstock/index/.HSCE/total',
+    '000001.SS':'worldstock/index/.SSEC/total','399106.SZ':'worldstock/index/.SZSC/total','000300.SS':'worldstock/index/.CSI300/total',
+    '^N225':'worldstock/index/.N225/total','NAV.TOPX':'worldstock/index/.TOPX/total','NAV.VNI':'worldstock/index/.VNI/total',
+    '^TWII':'worldstock/index/.TWII/total','^BSESN':'worldstock/index/.BSESN/total','^KLSE':'worldstock/index/.KLSE/total',
+    '^JKSE':'worldstock/index/.JKSE/total','^STOXX50E':'worldstock/index/.STOXX50E/total','^FTSE':'worldstock/index/.FTSE/total',
+    '^GDAXI':'worldstock/index/.GDAXI/total','^FCHI':'worldstock/index/.FCHI/total','^BFX':'worldstock/index/.BFX/total',
+    '^AEX':'worldstock/index/.AEX/total','PSI20.LS':'worldstock/index/.PSI20/total','GD.AT':'worldstock/index/.ATG/total',
+    '^BVSP':'worldstock/index/.BVSP/total',
+    'CL=F':'marketindex/energy/CLcv1','BZ=F':'marketindex/energy/LCOcv1','NG=F':'marketindex/energy/NGcv1',
+    'GC=F':'marketindex/metals/GCcv1','SI=F':'marketindex/metals/SIcv1','HG=F':'marketindex/metals/HGcv1',
+    'ZC=F':'marketindex/agricultural/Ccv1','ZS=F':'marketindex/agricultural/Scv1','ZW=F':'marketindex/agricultural/Wcv1',
+    'ZR=F':'marketindex/agricultural/RRcv1',
+    'KRW=X':'marketindex/exchange/FX_USDKRW','JPYKRW=X':'marketindex/exchange/FX_JPYKRW','CNYKRW=X':'marketindex/exchange/FX_CNYKRW',
+    'EURKRW=X':'marketindex/exchange/FX_EURKRW','GBPKRW=X':'marketindex/exchange/FX_GBPKRW','HKDKRW=X':'marketindex/exchange/FX_HKDKRW',
+    'AUDKRW=X':'marketindex/exchange/FX_AUDKRW','SGDKRW=X':'marketindex/exchange/FX_SGDKRW','CADKRW=X':'marketindex/exchange/FX_CADKRW',
+    'INRKRW=X':'marketindex/exchange/FX_INRKRW','IDRKRW=X':'marketindex/exchange/FX_IDRKRW','BRLKRW=X':'marketindex/exchange/FX_BRLKRW'};
+  const TV={'^KS11':'KRX:KOSPI','^KQ11':'KRX:KOSDAQ','^DJI':'DJ:DJI','^DJT':'DJ:DJT','^IXIC':'NASDAQ:IXIC','^NDX':'NASDAQ:NDX',
+    '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!',
+    '000001.SS':'SSE:000001','399106.SZ':'SZSE:399106','399001.SZ':'SZSE:399001','000300.SS':'SSE:000300',
+    '000688.SS':'SSE:000688','399006.SZ':'SZSE:399006','^HSI':'TVC:HSI','^HSCE':'HSI:HSCEI','HSTECH.HK':'HSI:HSTECH',
+    '^N225':'TVC:NI225','^STOXX50E':'TVC:SX5E','^FTSE':'TVC:UKX','^GDAXI':'XETR:DAX','^FCHI':'TVC:CAC40',
+    '^BSESN':'BSE:SENSEX','DX-Y.NYB':'TVC:DXY',
+    'CL=F':'NYMEX:CL1!','BZ=F':'NYMEX:BZ1!','NG=F':'NYMEX:NG1!','GC=F':'COMEX:GC1!','SI=F':'COMEX:SI1!','HG=F':'COMEX:HG1!',
+    'ZC=F':'CBOT:ZC1!','ZS=F':'CBOT:ZS1!','ZW=F':'CBOT:ZW1!','ZR=F':'CBOT:ZR1!','ZO=F':'CBOT:ZO1!',
+    'KRW=X':'FX_IDC:USDKRW','JPYKRW=X':'FX_IDC:JPYKRW','CNYKRW=X':'FX_IDC:CNYKRW','EURKRW=X':'FX_IDC:EURKRW',
+    'GBPKRW=X':'FX_IDC:GBPKRW','HKDKRW=X':'FX_IDC:HKDKRW','AUDKRW=X':'FX_IDC:AUDKRW','SGDKRW=X':'FX_IDC:SGDKRW',
+    'CADKRW=X':'FX_IDC:CADKRW','INRKRW=X':'FX_IDC:INRKRW','IDRKRW=X':'FX_IDC:IDRKRW','BRLKRW=X':'FX_IDC:BRLKRW',
+    'EURUSD=X':'FX:EURUSD','GBPUSD=X':'FX:GBPUSD','JPY=X':'FX:USDJPY','AUDUSD=X':'FX:AUDUSD',
+    'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW'};
+  function extLinks(r){
+    const s=r.s, L=[];
+    if(NAVER[s]) L.push(['네이버',`https://m.stock.naver.com/${NAVER[s]}`]);
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')){
+      const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
+      L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
+    }
+    if(TV[s]) L.push(['TradingView',`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(TV[s])}`]);
+    if(s.startsWith('KRW-')) L.push(['업비트',`https://upbit.com/exchange?code=CRIX.UPBIT.${s}`]);
+    return L;
+  }
   function findRow(sym){ for(const g of D.groups){ const r=g.rows.find(x=>x.s===sym); if(r) return r; } return null; }
   async function openDetail(sym,keep){
     openSym=sym;
@@ -4674,10 +4719,11 @@ await _canvasFlow(c);
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
       <b style="font-size:15px">${r.name}</b><span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
       <span class="note">${r.at||''}</span>
-      <span style="margin-left:auto">${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
+      <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
       <canvas id="gm_cv" style="width:100%;height:460px"></canvas>`;
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
+    box.querySelectorAll('.gme').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation(); window.open(b.dataset.u,'gm_pop','width=1280,height=860');}));
     box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.innerHTML='<div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>';});
     const hset=HIST[sym];
     const cv=$('gm_cv');
