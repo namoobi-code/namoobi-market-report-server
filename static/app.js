@@ -4640,7 +4640,11 @@ await _canvasFlow(c);
     if(/^[A-Z]{3}=X$/.test(sym)) return 'USD/'+sym.slice(0,3);
     if(sym==='ND.FX_USDGEL') return 'USD/GEL';
     if(sym.startsWith('ND.FX_')) return sym.slice(6,9)+'/'+sym.slice(9);
-    return '';
+    if(sym.startsWith('NAV.')) return sym.slice(4);       // 네이버 월드지수 코드 (.TOPX 등)
+    if(sym.startsWith('NAVKR.')) return sym.slice(6);     // 네이버 국내지수 코드 (KVALUE 등)
+    if(sym.startsWith('NF.')) return sym.slice(3);        // 네이버 선물 코드 (HSIc1 등)
+    if(sym.startsWith('ND.')) return '';                  // 네이버 내부코드 — 생략
+    return sym;                                           // 야후 심볼 그대로 (^GSPC·399001.SZ·CL=F 등)
   }
   function sparkSVG(a,w,h){
     if(!a||a.length<2) return '<span class="note">누적 중</span>';
