@@ -72,15 +72,15 @@ U = [
  ("cmd","CC=F","코코아","Y",1,0),
  ("cmd","ND.OIL_GSL","휘발유(국내 원/L)","ND",1,2), ("cmd","ND.OIL_LO","경유(국내 원/L)","ND",1,2),
  ("fx","DX-Y.NYB","US Dollar Index","Y",1,3), ("fx","KRW=X","원/달러","Y",1,2),
- ("fx","JPYKRW=X","원/일본 엔(100)","Y",100,2), ("fx","CNYKRW=X","원/중국 위안","Y",1,2),
+ ("fx","JPYKRW=X","원/일본 엔(100)","Y",100,2), ("fx","CNYKRW=X","원/중국 위안","ND",1,2),
  ("fx","EURKRW=X","원/유로","Y",1,2), ("fx","GBPKRW=X","원/영국 파운드","Y",1,2),
  ("fx","HKDKRW=X","원/홍콩 달러","Y",1,2), ("fx","AUDKRW=X","원/호주 달러","Y",1,2),
  ("fx","SGDKRW=X","원/싱가폴 달러","Y",1,2), ("fx","CADKRW=X","원/캐나다 달러","Y",1,2),
  ("fx","INRKRW=X","원/인도 루피","Y",1,2), ("fx","IDRKRW=X","원/인니 루피아(100)","Y",100,3),
- ("fx","BRLKRW=X","원/브라질 레알","Y",1,2), ("fx","TWDKRW=X","원/대만 달러","Y",1,2),
+ ("fx","BRLKRW=X","원/브라질 레알","ND",1,2), ("fx","TWDKRW=X","원/대만 달러","Y",1,2),
  ("fx","CHFKRW=X","원/스위스 프랑","Y",1,2), ("fx","NZDKRW=X","원/뉴질랜드 달러","Y",1,2),
- ("fx","SEKKRW=X","원/스웨덴 크로나","Y",1,2), ("fx","CZKKRW=X","원/체코 코루나","Y",1,2),
- ("fx","CLPKRW=X","원/칠레 페소","Y",1,3), ("fx","TRYKRW=X","원/튀르키예 리라","Y",1,2),
+ ("fx","SEKKRW=X","원/스웨덴 크로나","ND",1,2), ("fx","CZKKRW=X","원/체코 코루나","ND",1,2),
+ ("fx","CLPKRW=X","원/칠레 페소","ND",1,3), ("fx","TRYKRW=X","원/튀르키예 리라","ND",1,2),
  ("fx","EURUSD=X","유로/달러","Y",1,4),
  ("fx","GBPUSD=X","파운드/달러","Y",1,4), ("fx","JPY=X","달러/엔","Y",1,2), ("fx","AUDUSD=X","호주달러/달러","Y",1,4),
  ("cr","KRW-BTC","비트코인","U",1,0), ("cr","KRW-ETH","이더리움","U",1,0),
@@ -96,7 +96,10 @@ ND_CODES = {"ND.CMDT_GO": ("worldDailyQuote", "CMDT_GO", 2), "ND.OIL_DU": ("worl
             "ND.CMDT_PDY": ("worldDailyQuote", "CMDT_PDY", 2), "ND.CMDT_ZDY": ("worldDailyQuote", "CMDT_ZDY", 2),
             "ND.CMDT_NDY": ("worldDailyQuote", "CMDT_NDY", 2), "ND.CMDT_AAY": ("worldDailyQuote", "CMDT_AAY", 2),
             "ND.CMDT_SDY": ("worldDailyQuote", "CMDT_SDY", 2), "ND.GOLD_KR": ("goldDailyQuote", "CMDT_GC", None),
-            "ND.OIL_GSL": ("oilDailyQuote", "OIL_GSL", None), "ND.OIL_LO": ("oilDailyQuote", "OIL_LO", None)}
+            "ND.OIL_GSL": ("oilDailyQuote", "OIL_GSL", None), "ND.OIL_LO": ("oilDailyQuote", "OIL_LO", None),
+            "CNYKRW=X": ("exchangeDailyQuote", "FX_CNYKRW", None), "BRLKRW=X": ("exchangeDailyQuote", "FX_BRLKRW", None),
+            "SEKKRW=X": ("exchangeDailyQuote", "FX_SEKKRW", None), "CZKKRW=X": ("exchangeDailyQuote", "FX_CZKKRW", None),
+            "CLPKRW=X": ("exchangeDailyQuote", "FX_CLPKRW", None), "TRYKRW=X": ("exchangeDailyQuote", "FX_TRYKRW", None)}
 
 def yahoo_1y(sym):
     j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=2y&interval=1d")
@@ -278,25 +281,9 @@ def krx_fetch(hist):
 def main():
     t0 = time.time()
     ysyms = [s for g, s, n, src, m, d in U if "Y" in src]
-    CROSS_LEGS = ["CNY=X", "BRL=X", "SEK=X", "CZK=X", "CLP=X", "TRY=X"]                     # 원화 크로스 이력 합성용(야후가 KRW크로스 이력 미제공)
+    # (2026-08-02) 야후 이력 미제공 원화 크로스는 합성 대신 네이버 고시환율(ND 소스)로 전환 — 합성 로직 제거
     with ThreadPoolExecutor(12) as ex:
-        ydata = dict(zip(ysyms + CROSS_LEGS, ex.map(yahoo_1y, ysyms + CROSS_LEGS)))
-    # (2026-08-02) CNYKRW·BRLKRW: 야후 이력이 1봉뿐 → USDKRW÷USDCNY / USDKRW÷USDBRL 날짜교집합으로 합성
-    for cs, leg in [("CNYKRW=X", "CNY=X"), ("BRLKRW=X", "BRL=X"), ("SEKKRW=X", "SEK=X"),
-                    ("CZKKRW=X", "CZK=X"), ("CLPKRW=X", "CLP=X"), ("TRYKRW=X", "TRY=X")]:
-        y = ydata.get(cs); k = ydata.get("KRW=X"); l = ydata.get(leg)
-        if y is None:
-            y = ydata[cs] = {"t": [], "v": [], "px": None, "pc": None, "at": None}
-        if k and l and len(y["t"]) < 30:
-            lm = dict(zip(l["t"], l["v"]))
-            t2, v2 = [], []
-            for d_, kv in zip(k["t"], k["v"]):
-                if d_ in lm and lm[d_]:
-                    t2.append(d_); v2.append(round(kv / lm[d_], 4))
-            if t2:
-                y["t"], y["v"] = t2, v2
-                if y.get("px") is None:
-                    y["px"] = v2[-1]; y["at"] = t2[-1][4:6] + "/" + t2[-1][6:] + " 합성종가"
+        ydata = dict(zip(ysyms, ex.map(yahoo_1y, ysyms)))
     nlive = {s: naver_kr(c) for s, c in NAVER_LIVE.items()}
     nidx = {s: naver_idx(c) for s, c in NAVER_IDX.items()}
     ups = upbit([s for g, s, n, src, m, d in U if src == "U"])
@@ -327,7 +314,7 @@ def main():
             acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
             if ts_:
                 r["px"] = series["v"][-1]
-                r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + " 종가(네이버)"
+                r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + (" 고시(네이버)" if ep == "exchangeDailyQuote" else " 종가(네이버)")
         else:
             y = ydata.get(s)
             if y: series = {"t": y["t"], "v": y["v"]}; r["px"] = y["px"]; r["at"] = y["at"]

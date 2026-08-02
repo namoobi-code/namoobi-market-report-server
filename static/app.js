@@ -4719,7 +4719,8 @@ await _canvasFlow(c);
   function extLinks(r){
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
-    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')){
+    const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X'];  // 네이버 고시환율 소스 — 야후 미상장
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }
