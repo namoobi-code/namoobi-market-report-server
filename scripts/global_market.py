@@ -75,13 +75,13 @@ U = [
  ("eu","^ISEQ","아일랜드 ISEQ","Y",1,2), ("eu","NAV.OMXC20","덴마크 OMXC20","N",1,2),
  ("eu","^OMXH25","핀란드 OMXH25","Y",1,2), ("eu","NAV.BUX","헝가리 BUX","N",1,2),
  ("eu","^GSPTSE","캐나다 S&P TSX","Y",1,2), ("eu","^BVSP","브라질 BOVESPA","Y",1,2),
- ("eu","^MXX","멕시코 IPC","Y",1,2), ("eu","^MERV","아르헨티나 MERVAL","Y",1,1), ("eu","^IPSA","칠레 IPSA","Y",1,2),
+ ("eu","^MXX","멕시코 IPC","Y",1,2), ("eu","^MERV","아르헨티나 MERVAL","Y",1,1),
  ("cmd","CL=F","WTI","Y",1,2), ("cmd","BZ=F","브렌트유","Y",1,2), ("cmd","NG=F","천연가스","Y",1,3),
  ("cmd","GC=F","금","Y",1,1), ("cmd","SI=F","은","Y",1,3), ("cmd","HG=F","구리","Y",1,4),
  ("cmd","ZC=F","옥수수","Y",1,1), ("cmd","ZS=F","대두","Y",1,1), ("cmd","ZW=F","소맥","Y",1,1),
  ("cmd","ZR=F","쌀","Y",1,3), ("cmd","ZO=F","귀리","Y",1,1),
  ("cmd","HO=F","난방유","Y",1,3), ("cmd","ND.CMDT_GO","가스오일(ICE)","ND",1,2), ("cmd","ND.OIL_DU","두바이유","ND",1,2),
- ("cmd","UX=F","우라늄 선물(UxC U3O8)","Y",1,2), ("cmd","SRUUF","우라늄 현물(스프로트 신탁)","Y",1,2),
+ ("cmd","SRUUF","우라늄 현물(스프로트 신탁)","Y",1,2),
  ("cmd","PL=F","백금","Y",1,1), ("cmd","PA=F","팔라듐","Y",1,1), ("cmd","ND.GOLD_KR","국내 금(원/g)","ND",1,2),
  ("cmd","ND.CMDT_PDY","납(LME)","ND",1,2), ("cmd","ND.CMDT_ZDY","아연(LME)","ND",1,2),
  ("cmd","ND.CMDT_NDY","니켈(LME)","ND",1,2), ("cmd","ND.CMDT_AAY","알루미늄합금(LME)","ND",1,2),
@@ -119,7 +119,6 @@ U = [
  ("me","^TASI.SR","사우디 TASI","Y",1,2), ("me","XU100.IS","튀르키예 BIST 100","Y",1,2),
  ("me","^TA125.TA","이스라엘 TA-125","Y",1,2),
  ("me","DFMGI.AE","두바이 DFM","Y",1,2), ("me","^J203.JO","남아공 JSE 올셰어","Y",1,2),
- ("me","^CASE30","이집트 EGX30","Y",1,2),
  ("cr","KRW-BTC","비트코인","U",1,0), ("cr","KRW-ETH","이더리움","U",1,0),
  ("cr","KRW-SOL","솔라나","U",1,0), ("cr","KRW-XRP","리플","U",1,0),
  ("cr","KRW-ADA","에이다","U",1,0), ("cr","KRW-DOGE","도지코인","U",1,1),
@@ -174,7 +173,7 @@ EN_NAME = {  # (2026-08-02) 야후 shortName이 없는 종목의 영문 정식�
     "NF.HSIc1": "Hang Seng Index Futures", "NF.HCEIc1": "Hang Seng China Ent. Futures",
     "NF.SFCc1": "SGX FTSE China A50 Futures", "NF.SSIcm1": "SGX Nikkei 225 Futures",
     "NF.STXEc1": "Euro Stoxx 50 Futures (Eurex)", "NF.FDXc1": "DAX Futures (Eurex)",
-    "SN.LC0": "Lithium Carbonate Futures (GFEX, CNY/t)", "UX=F": "UxC Uranium U3O8 Futures (NYMEX)"}
+    "SN.LC0": "Lithium Carbonate Futures (GFEX, CNY/t)"}
 
 FUT_CYCLE = {
     "ES=F": "분기물(3·6·9·12월)", "NQ=F": "분기물(3·6·9·12월)", "YM=F": "분기물(3·6·9·12월)", "RTY=F": "분기물(3·6·9·12월)",
@@ -187,7 +186,7 @@ FUT_CYCLE = {
     "OJ=F": "액티브월(1·3·5·7·9·11월)", "KC=F": "액티브월(3·5·7·9·12월)", "CC=F": "액티브월(3·5·7·9·12월)",
     "NF.HSIc1": "매월물", "NF.HCEIc1": "매월물", "NF.SFCc1": "매월물",
     "NF.SSIcm1": "분기물(3·6·9·12월)", "NF.STXEc1": "분기물(3·6·9·12월)", "NF.FDXc1": "분기물(3·6·9·12월)",
-    "SN.LC0": "매월물(주력 연속)", "UX=F": "매월물"}
+    "SN.LC0": "매월물(주력 연속)"}
 
 # (2026-08-02) 네이버 해외선물 — 항셍·홍콩H·A50·니케이·유로스톡스·DAX 선물 (야후 미제공)
 NF_CODES = {"NF.HSIc1": "HSIc1", "NF.HCEIc1": "HCEIc1", "NF.SFCc1": "SFCc1",
