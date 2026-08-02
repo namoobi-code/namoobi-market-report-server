@@ -1069,14 +1069,29 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
        line('re_js',[{...s1,label:'전국',color:'#666'},{...s2,label:'아파트',color:'#2f6fed'},{...s3,label:'서울APT',color:'#27ae60'}]);
        const y1=yoy(S.js_apt_s.t,S.js_apt_s.v);
        $('re_js_n').innerHTML=`YoY — 서울아파트 전세 <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> · 전세↑+매매 횡보 = 갭 축소(매매 전환 압력) 참고`;}
-      /* ⑦ 은행 정기예금 잔액 — 월별 10년(조원) · 증시 예탁금과의 자금이동 참고 (2026-08-02) */
-      {const a=cut(S.tdep||{t:[],v:[]},120);
-       if(a.t.length){
-         const tv={t:a.t,v:a.v.map(v=>v!=null?v/1000:null)};      // 십억원 → 조원
-         line('re_tdep',[{...tv,label:'정기예금(조원)',color:'#047857'}]);
-         const lv=tv.v[tv.v.length-1], pv=tv.v[tv.v.length-2];
-         const y1=yoy(a.t,a.v);
-         $('re_tdep_n').innerHTML=`최신 <b>${fm(a.t[a.t.length-1])} 월말 = ${lv!=null?Math.round(lv).toLocaleString()+'조원':'—'}</b>${pv!=null?` (전월 ${lv-pv>0?'+':''}${(lv-pv).toFixed(1)}조)`:''} · YoY <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> — 예금금리 매력이 높거나 위험회피 국면에서 증가. 증시 투자자예탁금·부동산 매수세와 반대로 움직이는 경향(12월 법인자금 유입 등 계절성 있음) · ECOS 공표 ~1개월+ 지연`;
+      /* ⑦ 은행 정기예금 잔액 — 월별(조원) · 휠=X축 확대/축소·드래그=이동 (2026-08-02) */
+      {const a0=S.tdep||{t:[],v:[]};
+       if(a0.t.length){
+         const T=a0.t, V=a0.v.map(v=>v!=null?v/1000:null), L=T.length;   // 십억원 → 조원
+         let vn=Math.min(120,L), off=0;                                  // 기본 최근 10년
+         const draw=()=>{const end=L-off, st=Math.max(0,end-vn);
+           line('re_tdep',[{t:T.slice(st,end),v:V.slice(st,end),label:'정기예금(조원)',color:'#047857'}]);};
+         draw();
+         const cv=$('re_tdep');
+         cv.addEventListener('wheel',e=>{e.preventDefault();
+           const r=cv.getBoundingClientRect(), fr=Math.min(1,Math.max(0,(e.clientX-r.left)/r.width));
+           const end=L-off, st=Math.max(0,end-vn), n0=end-st, anchor=st+fr*(n0-1);
+           const n1=Math.max(12,Math.min(L,Math.round(n0*(e.deltaY<0?0.8:1.25))));
+           let s1=Math.round(anchor-fr*(n1-1)); s1=Math.max(0,Math.min(L-n1,s1));
+           vn=n1; off=L-s1-n1; draw();},{passive:false});
+         let dr=null;
+         cv.addEventListener('mousedown',e=>{dr={x:e.clientX,o:off};});
+         cv.addEventListener('mousemove',e=>{if(!dr)return;
+           const bw=(cv.clientWidth||700)/Math.max(1,vn);
+           off=Math.max(0,Math.min(L-vn,dr.o+Math.round((e.clientX-dr.x)/bw))); draw();});
+         cv.addEventListener('mouseup',()=>{dr=null;}); cv.addEventListener('mouseleave',()=>{dr=null;});
+         const lv=V[L-1], pv=V[L-2], y1=yoy(T,a0.v);
+         $('re_tdep_n').innerHTML=`최신 <b>${fm(T[L-1])} 월말 = ${lv!=null?Math.round(lv).toLocaleString()+'조원':'—'}</b>${pv!=null?` (전월 ${lv-pv>0?'+':''}${(lv-pv).toFixed(1)}조)`:''} · YoY <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> — 예금금리 매력이 높거나 위험회피 국면에서 증가. 증시 투자자예탁금·부동산 매수세와 반대로 움직이는 경향(12월 법인자금 유입 등 계절성 있음) · ECOS 공표 ~1개월+ 지연 · 🖱 휠=확대/축소(전체 2010~), 드래그=좌우 이동`;
        }}
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
       try{
