@@ -4700,6 +4700,7 @@ await _canvasFlow(c);
     'INRKRW=X':'marketindex/exchange/FX_INRKRW','IDRKRW=X':'marketindex/exchange/FX_IDRKRW','BRLKRW=X':'marketindex/exchange/FX_BRLKRW',
     'TWDKRW=X':'marketindex/exchange/FX_TWDKRW','CHFKRW=X':'marketindex/exchange/FX_CHFKRW','NZDKRW=X':'marketindex/exchange/FX_NZDKRW','SEKKRW=X':'marketindex/exchange/FX_SEKKRW',
     'CZKKRW=X':'marketindex/exchange/FX_CZKKRW','CLPKRW=X':'marketindex/exchange/FX_CLPKRW','TRYKRW=X':'marketindex/exchange/FX_TRYKRW',
+    'EURUSD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDEUR','GBPUSD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDGBP','AUDUSD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDAUD',
     'MXN=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDMXN',
     'ZAR=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDZAR',
     'NOK=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDNOK',
@@ -4739,7 +4740,7 @@ await _canvasFlow(c);
     'CADKRW=X':'FX_IDC:CADKRW','INRKRW=X':'FX_IDC:INRKRW','IDRKRW=X':'FX_IDC:IDRKRW','BRLKRW=X':'FX_IDC:BRLKRW',
     'TWDKRW=X':'FX_IDC:TWDKRW','CHFKRW=X':'FX_IDC:CHFKRW','NZDKRW=X':'FX_IDC:NZDKRW','SEKKRW=X':'FX_IDC:SEKKRW',
     'CZKKRW=X':'FX_IDC:CZKKRW','CLPKRW=X':'FX_IDC:CLPKRW','TRYKRW=X':'FX_IDC:TRYKRW',
-    'EURUSD=X':'FX:EURUSD','GBPUSD=X':'FX:GBPUSD','JPY=X':'FX:USDJPY','AUDUSD=X':'FX:AUDUSD',
+    'EURUSD=X':'FX_IDC:USDEUR','GBPUSD=X':'FX_IDC:USDGBP','JPY=X':'FX:USDJPY','AUDUSD=X':'FX_IDC:USDAUD',
     'MXN=X':'FX_IDC:USDMXN',
     'ZAR=X':'FX_IDC:USDZAR',
     'NOK=X':'FX_IDC:USDNOK',
@@ -4766,14 +4767,16 @@ await _canvasFlow(c);
     'TRY=X':'FX_IDC:USDTRY',
     'UAH=X':'FX_IDC:USDUAH',
     'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW'};
+  const TX={'399006.SZ':'https://gu.qq.com/sz399006/zs','000688.SS':'https://gu.qq.com/sh000688/zs','HSTECH.HK':'https://gu.qq.com/hkHSTECH/zs'};  // 야후 1년 이력 미제공 3종 — 텐센트로 대체
   function extLinks(r){
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
-    const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X'];  // 네이버 고시환율 소스 — 야후 미상장
+    const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','399006.SZ','000688.SS','HSTECH.HK','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
     if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }
+    if(TX[s]) L.push(['텐센트',TX[s]]);
     if(TV[s]) L.push(['TradingView',`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(TV[s])}`]);
     if(s.startsWith('KRW-')) L.push(['업비트',`https://upbit.com/exchange?code=CRIX.UPBIT.${s}`]);
     return L;

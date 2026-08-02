@@ -81,8 +81,8 @@ U = [
  ("fx","CHFKRW=X","원/스위스 프랑","Y",1,2), ("fx","NZDKRW=X","원/뉴질랜드 달러","Y",1,2),
  ("fx","SEKKRW=X","원/스웨덴 크로나","ND",1,2), ("fx","CZKKRW=X","원/체코 코루나","ND",1,2),
  ("fx","CLPKRW=X","원/칠레 페소","ND",1,3), ("fx","TRYKRW=X","원/튀르키예 리라","ND",1,2),
- ("fx","EURUSD=X","유로/달러","Y",1,4),
- ("fx","GBPUSD=X","파운드/달러","Y",1,4), ("fx","JPY=X","달러/엔","Y",1,2), ("fx","AUDUSD=X","호주달러/달러","Y",1,4),
+ ("fx","EURUSD=X","달러/유로","Y",1,4),
+ ("fx","GBPUSD=X","달러/영국 파운드","Y",1,4), ("fx","JPY=X","달러/엔","Y",1,2), ("fx","AUDUSD=X","달러/호주 달러","Y",1,4),
  ("fx","MXN=X","달러/멕시코 페소","Y",1,2), ("fx","ZAR=X","달러/남아공 랜드","Y",1,2),
  ("fx","NOK=X","달러/노르웨이 크로네","Y",1,4), ("fx","DKK=X","달러/덴마크 크로네","Y",1,4),
  ("fx","PLN=X","달러/폴란드 즈워티","Y",1,4), ("fx","THB=X","달러/태국 바트","Y",1,2),
@@ -107,6 +107,8 @@ NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 
 # (2026-08-02) 텐센트 kline — 야후·네이버 모두 이력 미제공(차이넥스트·과창판50·항셍테크).
 #   이스트머니는 서버(해외 IP)에서 차단되어 텐센트(web.ifzq.gtimg.cn)로 확정 — 서버 실측 정상.
 EM_HIST = {"399006.SZ": "sz399006", "000688.SS": "sh000688", "HSTECH.HK": "hkHSTECH"}
+# (2026-08-02) 표기 통일 — 야후는 EURUSD 등 "xx/달러"만 제공 → 달러/xx 기준으로 역수 변환
+INVERT = {"EURUSD=X", "GBPUSD=X", "AUDUSD=X"}
 
 def em_hist(code):
     j = jget(f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={code},day,,,500,qfq") or {}
@@ -367,6 +369,13 @@ def main():
             ts_ = sorted(m)
             series = {"t": ts_, "v": [m[k] for k in ts_]}
             acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+        if s in INVERT:
+            if r.get("px"): r["px"] = round(1.0 / r["px"], 6)
+            if series and series.get("v"):
+                t3, v3 = [], []
+                for d3, x3 in zip(series["t"], series["v"]):
+                    if x3: t3.append(d3); v3.append(round(1.0 / x3, 6))
+                series = {"t": t3, "v": v3}
         if series and series["t"]:
             # 장중 현재가를 시리즈 말미에 반영해 기간수익률 일관성 확보
             if r.get("px") is not None:
