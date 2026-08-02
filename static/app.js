@@ -1831,8 +1831,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const DEF={
     kr:{
       mk:{label:'시장',cat:1},
-      wics:{label:'WICS 섹터',cat:1},
+      krx:{label:'KRX 업종',cat:1},
       wics2:{label:'WICS 세부',cat:1},
+      wics:{label:'WICS 섹터',cat:1},
       chg:{label:'등락',fmt:v=>v.toFixed(1)+'%',presets:[['전체',null,null],['상승(0% ↑)',0,null],['+3% ↑',3,null],['하락(0% ↓)',null,0],['−3% ↓',null,-3]],def:[null,null]},
       cap:{label:'시가총액',fmt:wonF,presets:[['전체',null,null],['10조 ↑',1e13,null],['1~10조',1e12,1e13],['3,000억~1조',3e11,1e12],['1,000억~3,000억',1e11,3e11],['1,000억 ↓',null,1e11]],def:[3e11,null]},
       tv:{label:'거래대금',fmt:wonF,min:1,presets:[['전체',null],['100억 ↑',1e10],['30억 ↑',3e9],['10억 ↑',1e9],['1억 ↑',1e8]],def:[3e9,null]},
@@ -1958,7 +1959,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
-  const KEYS=['mk','wics','wics2','usind','sector','px','chg','cap','tv','de','cr','opLoss','age',
+  const KEYS=['mk','krx','wics2','wics','usind','sector','px','chg','cap','tv','de','cr','opLoss','age',
               /* (2026-07-21) 이동평균은 기간 오름차순으로 — 20일 → 50일 → 200일 */
               'v20','v50','v200','align','rsi','adx','volx','turn','macd','bb',
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
@@ -2280,7 +2281,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const CDEF={
     n:{l:'종목',n:0,m:'both'},
     mk:{l:'시장',n:0,m:'kr'}, sector:{l:'섹터',n:0,m:'us'},
-    krx:{l:'KRX 업종',n:0,m:'kr'}, wics:{l:'WICS 섹터',n:0,m:'kr'}, wics2:{l:'WICS 세부',n:0,m:'kr'},
+    krx:{l:'KRX 업종',n:0,m:'kr'}, wics2:{l:'WICS 세부',n:0,m:'kr'}, wics:{l:'WICS 섹터',n:0,m:'kr'},
     usind:{l:'세부업종',n:0,m:'us'},
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
     cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
@@ -2299,7 +2300,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
-    sr:{l:'공매도비중',n:1,m:'kr'}, lb:{l:'대차잔고',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
+    sr:{l:'공매도비중',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
     drvj:{l:'파생·수급판정',n:1,m:'both'},   // (2026-07-24) 파생 z(±1점) + 현물 프록시(±0.5점) 합산
     /* (2026-07-24) US 수급 프록시 — FINRA 공매도(2주 주기)·기관보유 (Yahoo defaultKeyStatistics) */
     srf:{l:'공매도잔량비율',n:1,m:'us'}, scov:{l:'커버일수',n:1,m:'us'}, inst:{l:'기관보유비중',n:1,m:'us'},
@@ -2710,7 +2711,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
-    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn','drvj']],
+    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
   const _catByLabel=(()=>{ const m={};
     for(const [cat,ks] of GCAT) for(const k of ks){ const c=CDEF[k]; if(c) m[c.l]=cat; }
@@ -2904,7 +2905,7 @@ await _canvasFlow(c);
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
-             ['수급',['fnb20','onb20','fst','ost','sr','lb','lbr','frgn','drvj']],
+             ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','drvj']],
              ['건전성',['de','cr','oploss']],
              ['기타',['age']]];
     $('sd_sum').innerHTML=G.map(([t,ks])=>{
