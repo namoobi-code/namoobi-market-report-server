@@ -567,6 +567,8 @@ def main():
                 if series["t"][-1] == today_s: series["v"][-1] = r["px"]
             r["ret"] = rets(series["t"], series["v"], r.get("px"))
             r["spark"] = spark(series["v"][-252:])
+            if len(series["v"]) >= 300:                  # 3년 추세 — 이력 1년 남짓뿐이면 생략(1Y와 중복 방지)
+                r["spark3"] = spark(series["v"][-756:])
             hist_all[s] = series
         rows_by_grp.setdefault(g, []).append(r)
 
