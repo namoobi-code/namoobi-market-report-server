@@ -145,10 +145,16 @@ def upbit(markets):
     return out
 
 def upbit_hist(market):
-    j = jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=365") or []
-    t = [x["candle_date_time_kst"][:10].replace("-", "") for x in reversed(j)]
-    v = [x["trade_price"] for x in reversed(j)]
-    return {"t": t, "v": v}
+    """업비트 일봉 — 1콜 최대 200개라 to 파라미터로 2페이지 페이징(약 400일)."""
+    j = jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=200") or []
+    if j:
+        to = j[-1]["candle_date_time_utc"]
+        j += jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=200&to={to}") or []
+    seen = {}
+    for x in j:
+        seen[x["candle_date_time_kst"][:10].replace("-", "")] = x["trade_price"]
+    ts = sorted(seen)
+    return {"t": ts, "v": [seen[k] for k in ts]}
 
 def rets(t, v, px):
     """기간수익률: 최근가(px) 대비 과거 최근접 종가."""
@@ -219,8 +225,22 @@ def krx_fetch(hist):
 def main():
     t0 = time.time()
     ysyms = [s for g, s, n, src, m, d in U if "Y" in src]
+    CROSS_LEGS = ["CNY=X", "BRL=X"]                     # 원화 크로스 이력 합성용(야후가 KRW크로스 이력 미제공)
     with ThreadPoolExecutor(12) as ex:
-        ydata = dict(zip(ysyms, ex.map(yahoo_1y, ysyms)))
+        ydata = dict(zip(ysyms + CROSS_LEGS, ex.map(yahoo_1y, ysyms + CROSS_LEGS)))
+    # (2026-08-02) CNYKRW·BRLKRW: 야후 이력이 1봉뿐 → USDKRW÷USDCNY / USDKRW÷USDBRL 날짜교집합으로 합성
+    for cs, leg in [("CNYKRW=X", "CNY=X"), ("BRLKRW=X", "BRL=X")]:
+        y = ydata.get(cs); k = ydata.get("KRW=X"); l = ydata.get(leg)
+        if y is None:
+            y = ydata[cs] = {"t": [], "v": [], "px": None, "pc": None, "at": None}
+        if k and l and len(y["t"]) < 30:
+            lm = dict(zip(l["t"], l["v"]))
+            t2, v2 = [], []
+            for d_, kv in zip(k["t"], k["v"]):
+                if d_ in lm and lm[d_]:
+                    t2.append(d_); v2.append(round(kv / lm[d_], 4))
+            if t2:
+                y["t"], y["v"] = t2, v2
     nlive = {s: naver_kr(c) for s, c in NAVER_LIVE.items()}
     nidx = {s: naver_idx(c) for s, c in NAVER_IDX.items()}
     ups = upbit([s for g, s, n, src, m, d in U if src == "U"])
