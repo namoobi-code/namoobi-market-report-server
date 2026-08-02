@@ -2431,6 +2431,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       :`<b>${E(r.c)}</b> ${r.kn?`<b class="uskn">${E(r.kn)}</b> `:''}<span class="note">${E(r.n)}</span>`;
     if(key==='mk') return E(r.mk||'');
     if(key==='sector') return `<span class="note">${E(r.sector||'—')}</span>`;
+    if(key==='krx'||key==='wics'||key==='wics2'||key==='usind') return `<span class="note">${E(r[key]||'—')}</span>`;   // (2026-08-02) 업종 분류
     if(key==='px') return mkt==='kr'?(r.px?Math.round(r.px).toLocaleString()+'원':'—'):'$'+(r.px?(+r.px).toFixed(2):'—');
     if(key==='chg'){const v=r.chg; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(2)}%</span>`;}
     if(key==='cap') return mkt==='kr'?wonF(r.cap):usdF(r.cap);
