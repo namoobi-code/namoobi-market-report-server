@@ -62,6 +62,15 @@ U = [
  ("cmd","GC=F","금","Y",1,1), ("cmd","SI=F","은","Y",1,3), ("cmd","HG=F","구리","Y",1,4),
  ("cmd","ZC=F","옥수수","Y",1,1), ("cmd","ZS=F","대두","Y",1,1), ("cmd","ZW=F","소맥","Y",1,1),
  ("cmd","ZR=F","쌀","Y",1,3), ("cmd","ZO=F","귀리","Y",1,1),
+ ("cmd","HO=F","난방유","Y",1,3), ("cmd","ND.CMDT_GO","가스오일(ICE)","ND",1,2), ("cmd","ND.OIL_DU","두바이유","ND",1,2),
+ ("cmd","PL=F","백금","Y",1,1), ("cmd","PA=F","팔라듐","Y",1,1), ("cmd","ND.GOLD_KR","국내 금(원/g)","ND",1,2),
+ ("cmd","ND.CMDT_PDY","납(LME)","ND",1,2), ("cmd","ND.CMDT_ZDY","아연(LME)","ND",1,2),
+ ("cmd","ND.CMDT_NDY","니켈(LME)","ND",1,2), ("cmd","ND.CMDT_AAY","알루미늄합금(LME)","ND",1,2),
+ ("cmd","ND.CMDT_SDY","주석(LME)","ND",1,2),
+ ("cmd","SB=F","설탕","Y",1,2), ("cmd","ZM=F","대두박","Y",1,1), ("cmd","ZL=F","대두유","Y",1,2),
+ ("cmd","CT=F","면화","Y",1,2), ("cmd","OJ=F","오렌지주스","Y",1,2), ("cmd","KC=F","커피","Y",1,1),
+ ("cmd","CC=F","코코아","Y",1,0),
+ ("cmd","ND.OIL_GSL","휘발유(국내 원/L)","ND",1,2), ("cmd","ND.OIL_LO","경유(국내 원/L)","ND",1,2),
  ("fx","DX-Y.NYB","US Dollar Index","Y",1,3), ("fx","KRW=X","원/달러","Y",1,2),
  ("fx","JPYKRW=X","원/일본 엔(100)","Y",100,2), ("fx","CNYKRW=X","원/중국 위안","Y",1,2),
  ("fx","EURKRW=X","원/유로","Y",1,2), ("fx","GBPKRW=X","원/영국 파운드","Y",1,2),
@@ -78,6 +87,12 @@ NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI", "NAV.HNXI": ".HNXI", "NAV.
               "NAV.SSEB": ".SSEB", "NAV.SZSA": ".SZSA", "NAV.SZSB": ".SZSB", "NAV.CSI100": ".CSI100",
               "NAV.IBEX": ".IBEX", "NAV.OMXS30": ".OMXS30"}
 NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 이력 대체(2026-08-02 실측)
+# (2026-08-02) 네이버 marketindex 일별시세(HTML) — 야후 미제공 상품(LME 현물·가스오일·두바이유·국내금·국내유가)
+ND_CODES = {"ND.CMDT_GO": ("worldDailyQuote", "CMDT_GO", 2), "ND.OIL_DU": ("worldDailyQuote", "OIL_DU", 2),
+            "ND.CMDT_PDY": ("worldDailyQuote", "CMDT_PDY", 2), "ND.CMDT_ZDY": ("worldDailyQuote", "CMDT_ZDY", 2),
+            "ND.CMDT_NDY": ("worldDailyQuote", "CMDT_NDY", 2), "ND.CMDT_AAY": ("worldDailyQuote", "CMDT_AAY", 2),
+            "ND.CMDT_SDY": ("worldDailyQuote", "CMDT_SDY", 2), "ND.GOLD_KR": ("goldDailyQuote", "CMDT_GC", None),
+            "ND.OIL_GSL": ("oilDailyQuote", "OIL_GSL", None), "ND.OIL_LO": ("oilDailyQuote", "OIL_LO", None)}
 
 def yahoo_1y(sym):
     j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=2y&interval=1d")
@@ -143,6 +158,29 @@ def naver_world_hist(code, pages=6):
         if len(j) < 50: break
     pair = sorted(zip(t, v))
     return {"t": [a for a, b in pair], "v": [b for a, b in pair]}
+
+import re as _re
+_MI_PAT = _re.compile(r'class="date">\s*([\d.]+)\s*</td>\s*<td class="num">\s*([\d,.]+)')
+def naver_mi_hist(ep, cd, fdtc, pages):
+    """네이버 marketindex 일별시세 HTML 파싱(euc-kr) — 첫 실행 pages=40 백필, 이후 2페이지 증분."""
+    rows = {}
+    for pg in range(1, pages + 1):
+        u = (f"https://finance.naver.com/marketindex/{ep}.naver?marketindexCd={cd}"
+             + (f"&fdtc={fdtc}" if fdtc is not None else "") + f"&page={pg}")
+        try:
+            req = urllib.request.Request(u, headers=H)
+            h = urllib.request.urlopen(req, timeout=12).read().decode("euc-kr", "ignore")
+        except Exception:
+            break
+        found = _MI_PAT.findall(h)
+        if not found: break
+        for d_, v_ in found:
+            try: rows[d_.replace(".", "")] = float(v_.replace(",", ""))
+            except Exception: pass
+        if len(found) < 5: break
+        time.sleep(0.05)
+    ts = sorted(rows)
+    return {"t": ts, "v": [rows[k] for k in ts]}
 
 def upbit(markets):
     j = jget("https://api.upbit.com/v1/ticker?markets=" + ",".join(markets)) or []
@@ -272,6 +310,17 @@ def main():
             series = uph.get(s); q = ups.get(s) or {}
             r["px"] = q.get("px"); r["at"] = q.get("at")
             if q.get("pc"): r["ret_d1_live"] = round((q["px"] / q["pc"] - 1) * 100, 2)
+        elif src == "ND":
+            ep, cd, fdtc = ND_CODES[s]
+            a = acc.get(s) or {"t": [], "v": []}
+            nh = naver_mi_hist(ep, cd, fdtc, pages=60 if len(a["t"]) < 380 else 2)   # 1년 수익률에 ~380거래일 필요
+            m2 = dict(zip(a["t"], a["v"])); m2.update(dict(zip(nh["t"], nh["v"])))
+            ts_ = sorted(m2)
+            series = {"t": ts_, "v": [m2[k] for k in ts_]}
+            acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+            if ts_:
+                r["px"] = series["v"][-1]
+                r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + " 종가(네이버)"
         else:
             y = ydata.get(s)
             if y: series = {"t": y["t"], "v": y["v"]}; r["px"] = y["px"]; r["at"] = y["at"]

@@ -4684,6 +4684,16 @@ await _canvasFlow(c);
     'GC=F':'marketindex/metals/GCcv1','SI=F':'marketindex/metals/SIcv1','HG=F':'marketindex/metals/HGcv1',
     'ZC=F':'marketindex/agricultural/Ccv1','ZS=F':'marketindex/agricultural/Scv1','ZW=F':'marketindex/agricultural/Wcv1',
     'ZR=F':'marketindex/agricultural/RRcv1',
+    'HO=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_HO','PL=F':'https://finance.naver.com/marketindex/worldGoldDetail.naver?marketindexCd=CMDT_PL',
+    'PA=F':'https://finance.naver.com/marketindex/worldGoldDetail.naver?marketindexCd=CMDT_PA','SB=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_SB',
+    'ZM=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_SM','ZL=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_BO',
+    'CT=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_CT','OJ=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_OJ',
+    'KC=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_KC','CC=F':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_CC',
+    'ND.CMDT_GO':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_GO','ND.OIL_DU':'https://finance.naver.com/marketindex/worldOilDetail.naver?marketindexCd=OIL_DU',
+    'ND.CMDT_PDY':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_PDY','ND.CMDT_ZDY':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_ZDY',
+    'ND.CMDT_NDY':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_NDY','ND.CMDT_AAY':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_AAY',
+    'ND.CMDT_SDY':'https://finance.naver.com/marketindex/materialDetail.naver?marketindexCd=CMDT_SDY','ND.GOLD_KR':'https://finance.naver.com/marketindex/goldDetail.naver',
+    'ND.OIL_GSL':'https://finance.naver.com/marketindex/oilDetail.naver?marketindexCd=OIL_GSL','ND.OIL_LO':'https://finance.naver.com/marketindex/oilDetail.naver?marketindexCd=OIL_LO',
     'KRW=X':'marketindex/exchange/FX_USDKRW','JPYKRW=X':'marketindex/exchange/FX_JPYKRW','CNYKRW=X':'marketindex/exchange/FX_CNYKRW',
     'EURKRW=X':'marketindex/exchange/FX_EURKRW','GBPKRW=X':'marketindex/exchange/FX_GBPKRW','HKDKRW=X':'marketindex/exchange/FX_HKDKRW',
     'AUDKRW=X':'marketindex/exchange/FX_AUDKRW','SGDKRW=X':'marketindex/exchange/FX_SGDKRW','CADKRW=X':'marketindex/exchange/FX_CADKRW',
@@ -4696,6 +4706,7 @@ await _canvasFlow(c);
     '^BSESN':'BSE:SENSEX','DX-Y.NYB':'TVC:DXY',
     'CL=F':'NYMEX:CL1!','BZ=F':'NYMEX:BZ1!','NG=F':'NYMEX:NG1!','GC=F':'COMEX:GC1!','SI=F':'COMEX:SI1!','HG=F':'COMEX:HG1!',
     'ZC=F':'CBOT:ZC1!','ZS=F':'CBOT:ZS1!','ZW=F':'CBOT:ZW1!','ZR=F':'CBOT:ZR1!','ZO=F':'CBOT:ZO1!',
+    'HO=F':'NYMEX:HO1!','PL=F':'NYMEX:PL1!','PA=F':'NYMEX:PA1!','SB=F':'ICEUS:SB1!','ZM=F':'CBOT:ZM1!','ZL=F':'CBOT:ZL1!','CT=F':'ICEUS:CT1!','OJ=F':'ICEUS:OJ1!','KC=F':'ICEUS:KC1!','CC=F':'ICEUS:CC1!',
     'KRW=X':'FX_IDC:USDKRW','JPYKRW=X':'FX_IDC:JPYKRW','CNYKRW=X':'FX_IDC:CNYKRW','EURKRW=X':'FX_IDC:EURKRW',
     'GBPKRW=X':'FX_IDC:GBPKRW','HKDKRW=X':'FX_IDC:HKDKRW','AUDKRW=X':'FX_IDC:AUDKRW','SGDKRW=X':'FX_IDC:SGDKRW',
     'CADKRW=X':'FX_IDC:CADKRW','INRKRW=X':'FX_IDC:INRKRW','IDRKRW=X':'FX_IDC:IDRKRW','BRLKRW=X':'FX_IDC:BRLKRW',
@@ -4703,8 +4714,8 @@ await _canvasFlow(c);
     'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW'};
   function extLinks(r){
     const s=r.s, L=[];
-    if(NAVER[s]) L.push(['네이버',`https://m.stock.naver.com/${NAVER[s]}`]);
-    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')){
+    if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }
