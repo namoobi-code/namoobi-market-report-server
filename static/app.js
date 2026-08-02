@@ -4800,7 +4800,8 @@ await _canvasFlow(c);
   async function openDetail(sym,keep){
     openSym=sym;
     const r=findRow(sym); if(!r) return;
-    if(!HIST){ try{ HIST=await fetch('/api/db/global_hist').then(x=>x.json()); }catch(e){ HIST={}; } }
+    if(!HIST) HIST={};
+    if(!HIST[sym]){ try{ HIST[sym]=await fetch('/api/global_hist_one?s='+encodeURIComponent(sym)).then(x=>x.ok?x.json():null); }catch(e){} }
     const box=$('gm_detail');
     const R=r.ret||{};
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">

@@ -978,6 +978,24 @@ def stock_deriv_api(code: str):
     return Response(content=json.dumps(out, ensure_ascii=False),
                     media_type="application/json", headers={"Cache-Control": "no-cache"})
 
+@app.get("/api/global_hist_one")
+def global_hist_one(s: str):
+    """(2026-08-02) 글로벌시황 차트 — 종목 1개 이력만(전체 2.5MB 전송 제거, 회선 병목 해소)."""
+    if not re.fullmatch(r"[A-Za-z0-9.^=\-_: ]{1,20}", s):
+        raise HTTPException(400, "bad sym")
+    p = DB / "global_hist.json"
+    if not p.exists():
+        raise HTTPException(404, "no hist")
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    h = d.get(s)
+    if not h:
+        raise HTTPException(404, "sym 없음")
+    return Response(content=json.dumps(h, ensure_ascii=False),
+                    media_type="application/json", headers={"Cache-Control": "max-age=300"})
+
 _pop_cache = {"t": 0, "data": None}
 @app.get("/api/popular")
 def popular():
