@@ -1362,7 +1362,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   { const _kc=document.getElementById('d_kinv');
     if(_kc && !document.getElementById('kr_candles')){
       const _div=document.createElement('div'); _div.id='kr_candles'; _div.style.cssText='grid-column:1/-1';
-      _div.innerHTML=['kospi','kosdaq'].map(k=>`<a href="/charts/${k}_tech.png" target="_blank"><img src="/charts/${k}_tech.png" style="width:100%;max-width:860px;border:1px solid var(--line,#ddd);border-radius:6px;margin:6px 0" loading="lazy" alt="${k} 일봉 캔들·수급" onerror="this.parentElement.style.display='none'"></a>`).join('');
+      _div.innerHTML=['kospi','kosdaq'].map(k=>`<a href="/charts/${k}_tech.png" target="_blank"><img src="/charts/${k}_tech.png" style="width:100%;max-width:860px;border:1px solid var(--line,#ddd);border-radius:6px;margin:6px 0 0" loading="lazy" alt="${k} 일봉 캔들·수급" onerror="this.parentElement.style.display='none'"></a>
+        <canvas id="pgbig_${k}" style="width:100%;max-width:860px;display:block;height:180px;border:1px solid var(--line,#ddd);border-radius:6px;margin:2px 0 2px"></canvas>
+        <div class="note" id="pgn_${k}" style="max-width:860px;margin:0 0 10px"></div>`).join('');
       _kc.parentElement.insertBefore(_div,_kc); } }
   const KI=M.korea_investors||{};
   $$('d_kinv').innerHTML=['kospi','kosdaq'].filter(k=>KI[k]).map(k=>{
@@ -1387,24 +1389,32 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
          <div class="fo"><span class="fl">프로그램 비차익</span><span class="fv">${eok(a.nonarb[i])}</span></div>
          <div class="fo"><span class="fl">프로그램 전체</span><span class="fv">${eok(a.whole[i])}</span></div>`+
         (ud?`<div class="fo"><span class="fl">등락종목</span><span class="fv"><span class="up">상승 ${ud.up}</span> · 보합 ${ud.flat} · <span class="dn">하락 ${ud.down}</span>${ud.uplm?` · 상한 ${ud.uplm}`:''}${ud.lslm?` · 하한 ${ud.lslm}`:''}</span></div>`:'')+
-        `<div class="note" style="margin-top:2px">프로그램 ${a.t[i].slice(4,6)}/${a.t[i].slice(6)} 종가(네이버·억원)${ud?` · 등락종목 ${E(P.updown_asof||'')} 기준(KIS)`:''}</div>
-         <canvas id="pgc_${k}" style="width:100%;height:150px;margin-top:6px"></canvas>
-         <div class="note"><span style="color:#e08e3c;font-weight:700">━ 차익</span>(선물-현물 괴리 연계·기계적 수급) · <span style="color:#1f6feb;font-weight:700">━ 비차익</span>(기관 방향성 현물: 바스켓·ETF 설정 등) — 순매수 추세 최근 60거래일. 비차익이 규모·지속성 면에서 지수 방향 설명력이 높고, 차익은 베이시스·외국인 선물과 함께 볼 것</div>`;
-      const cv=document.getElementById('pgc_'+k);
-      const n=Math.min(60,a.t.length), t=a.t.slice(-n), s1=a.arb.slice(-n), s2=a.nonarb.slice(-n);
-      const W=cv.clientWidth||420,Hh=150; cv.width=W; cv.height=Hh;
-      const x=cv.getContext('2d'); const Pd={l:6,r:46,t:6,b:14};
+        `<div class="note" style="margin-top:2px">프로그램 ${a.t[i].slice(4,6)}/${a.t[i].slice(6)} 종가(네이버·억원)${ud?` · 등락종목 ${E(P.updown_asof||'')} 기준(KIS)`:''} · 차익/비차익 추세는 위 캔들차트 아래 1년 차트 참조</div>`;
+      // 기존 캔들차트(PNG) 아래 — 차익/비차익 1년(252거래일, 이력 부족 시 있는 만큼) 추세 차트
+      const cv=document.getElementById('pgbig_'+k); if(!cv) return;
+      const n=Math.min(252,a.t.length), t=a.t.slice(-n), s1=a.arb.slice(-n), s2=a.nonarb.slice(-n);
+      const W=cv.clientWidth||860,Hh=180; cv.width=W; cv.height=Hh;
+      const x=cv.getContext('2d'); const Pd={l:8,r:52,t:16,b:16};
       const all=s1.concat(s2); let lo=Math.min.apply(null,all.concat([0])), hi=Math.max.apply(null,all.concat([0]));
       const pad=(hi-lo)*0.06||1; lo-=pad; hi+=pad;
       const X=j2=>Pd.l+(W-Pd.l-Pd.r)*j2/Math.max(1,n-1), Y=v=>Pd.t+(Hh-Pd.t-Pd.b)*(1-(v-lo)/(hi-lo));
-      x.font='9px sans-serif';
-      x.strokeStyle='#c9d1da'; x.setLineDash([3,3]); x.beginPath(); x.moveTo(Pd.l,Y(0)); x.lineTo(W-Pd.r,Y(0)); x.stroke(); x.setLineDash([]);
-      x.fillStyle='#98a2ad'; x.fillText('0',W-Pd.r+3,Y(0)+3);
-      x.fillText(Math.round(hi).toLocaleString(),W-Pd.r+3,Y(hi)+8); x.fillText(Math.round(lo).toLocaleString(),W-Pd.r+3,Y(lo)-2);
-      [0,Math.floor(n/2),n-1].forEach(j2=>{ x.fillText(t[j2].slice(4,6)+'/'+t[j2].slice(6),X(j2)-10,Hh-3); });
-      const lineS=(s,col)=>{ x.strokeStyle=col; x.lineWidth=1.4; x.beginPath();
+      x.font='10px sans-serif';
+      for(let g2=0;g2<=4;g2++){ const v=lo+(hi-lo)*g2/4, y=Y(v);
+        x.strokeStyle='#f0f2f5'; x.beginPath(); x.moveTo(Pd.l,y); x.lineTo(W-Pd.r,y); x.stroke();
+        x.fillStyle='#98a2ad'; x.fillText(Math.round(v).toLocaleString(),W-Pd.r+4,y+3); }
+      x.strokeStyle='#b7bec7'; x.setLineDash([3,3]); x.beginPath(); x.moveTo(Pd.l,Y(0)); x.lineTo(W-Pd.r,Y(0)); x.stroke(); x.setLineDash([]);
+      let lastM='';
+      for(let j2=0;j2<n;j2++){ const mk=t[j2].slice(0,6);
+        if(mk!==lastM){ lastM=mk; x.fillStyle='#98a2ad'; x.fillText(t[j2].slice(2,4)+'.'+t[j2].slice(4,6),X(j2)-10,Hh-3); } }
+      const lineS=(s,col)=>{ x.strokeStyle=col; x.lineWidth=1.3; x.beginPath();
         s.forEach((v,j2)=>j2?x.lineTo(X(j2),Y(v)):x.moveTo(X(j2),Y(v))); x.stroke(); x.lineWidth=1; };
       lineS(s1,'#e08e3c'); lineS(s2,'#1f6feb');
+      x.font='bold 11px sans-serif';
+      x.fillStyle='#334155'; x.fillText(`${k.toUpperCase()} 프로그램 순매수(억원/일) — 1년`,Pd.l+4,12);
+      x.fillStyle='#e08e3c'; x.fillText(`차익 ${Math.round(s1[n-1]).toLocaleString()}`,Pd.l+250,12);
+      x.fillStyle='#1f6feb'; x.fillText(`비차익 ${Math.round(s2[n-1]).toLocaleString()}`,Pd.l+330,12);
+      const nn2=document.getElementById('pgn_'+k);
+      if(nn2) nn2.innerHTML=`<span style="color:#e08e3c;font-weight:700">━ 차익</span>(선물-현물 괴리 연계·기계적 수급) · <span style="color:#1f6feb;font-weight:700">━ 비차익</span>(기관 방향성 현물: 바스켓·ETF 설정 등) — 일별 순매수 ${n}거래일${n<250?' (이력 누적 중)':''} · 네이버 종가 기준. 비차익이 규모·지속성 면에서 지수 방향 설명력이 높고, 차익은 베이시스·외국인 선물과 함께 볼 것`;
     });
   }
 
