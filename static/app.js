@@ -4697,7 +4697,8 @@ await _canvasFlow(c);
     'KRW=X':'marketindex/exchange/FX_USDKRW','JPYKRW=X':'marketindex/exchange/FX_JPYKRW','CNYKRW=X':'marketindex/exchange/FX_CNYKRW',
     'EURKRW=X':'marketindex/exchange/FX_EURKRW','GBPKRW=X':'marketindex/exchange/FX_GBPKRW','HKDKRW=X':'marketindex/exchange/FX_HKDKRW',
     'AUDKRW=X':'marketindex/exchange/FX_AUDKRW','SGDKRW=X':'marketindex/exchange/FX_SGDKRW','CADKRW=X':'marketindex/exchange/FX_CADKRW',
-    'INRKRW=X':'marketindex/exchange/FX_INRKRW','IDRKRW=X':'marketindex/exchange/FX_IDRKRW','BRLKRW=X':'marketindex/exchange/FX_BRLKRW'};
+    'INRKRW=X':'marketindex/exchange/FX_INRKRW','IDRKRW=X':'marketindex/exchange/FX_IDRKRW','BRLKRW=X':'marketindex/exchange/FX_BRLKRW',
+    'TWDKRW=X':'marketindex/exchange/FX_TWDKRW','CHFKRW=X':'marketindex/exchange/FX_CHFKRW','NZDKRW=X':'marketindex/exchange/FX_NZDKRW','SEKKRW=X':'marketindex/exchange/FX_SEKKRW'};
   const TV={'^KS11':'KRX:KOSPI','^KQ11':'KRX:KOSDAQ','^DJI':'DJ:DJI','^DJT':'DJ:DJT','^IXIC':'NASDAQ:IXIC','^NDX':'NASDAQ:NDX',
     '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!',
     '000001.SS':'SSE:000001','399106.SZ':'SZSE:399106','399001.SZ':'SZSE:399001','000300.SS':'SSE:000300',
@@ -4710,6 +4711,7 @@ await _canvasFlow(c);
     'KRW=X':'FX_IDC:USDKRW','JPYKRW=X':'FX_IDC:JPYKRW','CNYKRW=X':'FX_IDC:CNYKRW','EURKRW=X':'FX_IDC:EURKRW',
     'GBPKRW=X':'FX_IDC:GBPKRW','HKDKRW=X':'FX_IDC:HKDKRW','AUDKRW=X':'FX_IDC:AUDKRW','SGDKRW=X':'FX_IDC:SGDKRW',
     'CADKRW=X':'FX_IDC:CADKRW','INRKRW=X':'FX_IDC:INRKRW','IDRKRW=X':'FX_IDC:IDRKRW','BRLKRW=X':'FX_IDC:BRLKRW',
+    'TWDKRW=X':'FX_IDC:TWDKRW','CHFKRW=X':'FX_IDC:CHFKRW','NZDKRW=X':'FX_IDC:NZDKRW','SEKKRW=X':'FX_IDC:SEKKRW',
     'EURUSD=X':'FX:EURUSD','GBPUSD=X':'FX:GBPUSD','JPY=X':'FX:USDJPY','AUDUSD=X':'FX:AUDUSD',
     'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW'};
   function extLinks(r){

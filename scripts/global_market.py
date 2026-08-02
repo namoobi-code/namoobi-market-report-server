@@ -77,7 +77,9 @@ U = [
  ("fx","HKDKRW=X","원/홍콩 달러","Y",1,2), ("fx","AUDKRW=X","원/호주 달러","Y",1,2),
  ("fx","SGDKRW=X","원/싱가폴 달러","Y",1,2), ("fx","CADKRW=X","원/캐나다 달러","Y",1,2),
  ("fx","INRKRW=X","원/인도 루피","Y",1,2), ("fx","IDRKRW=X","원/인니 루피아(100)","Y",100,3),
- ("fx","BRLKRW=X","원/브라질 레알","Y",1,2), ("fx","EURUSD=X","유로/달러","Y",1,4),
+ ("fx","BRLKRW=X","원/브라질 레알","Y",1,2), ("fx","TWDKRW=X","원/대만 달러","Y",1,2),
+ ("fx","CHFKRW=X","원/스위스 프랑","Y",1,2), ("fx","NZDKRW=X","원/뉴질랜드 달러","Y",1,2),
+ ("fx","SEKKRW=X","원/스웨덴 크로나","Y",1,2), ("fx","EURUSD=X","유로/달러","Y",1,4),
  ("fx","GBPUSD=X","파운드/달러","Y",1,4), ("fx","JPY=X","달러/엔","Y",1,2), ("fx","AUDUSD=X","호주달러/달러","Y",1,4),
  ("cr","KRW-BTC","비트코인","U",1,0), ("cr","KRW-ETH","이더리움","U",1,0),
  ("cr","KRW-SOL","솔라나","U",1,0), ("cr","KRW-XRP","리플","U",1,0),
@@ -274,11 +276,11 @@ def krx_fetch(hist):
 def main():
     t0 = time.time()
     ysyms = [s for g, s, n, src, m, d in U if "Y" in src]
-    CROSS_LEGS = ["CNY=X", "BRL=X"]                     # 원화 크로스 이력 합성용(야후가 KRW크로스 이력 미제공)
+    CROSS_LEGS = ["CNY=X", "BRL=X", "SEK=X"]                     # 원화 크로스 이력 합성용(야후가 KRW크로스 이력 미제공)
     with ThreadPoolExecutor(12) as ex:
         ydata = dict(zip(ysyms + CROSS_LEGS, ex.map(yahoo_1y, ysyms + CROSS_LEGS)))
     # (2026-08-02) CNYKRW·BRLKRW: 야후 이력이 1봉뿐 → USDKRW÷USDCNY / USDKRW÷USDBRL 날짜교집합으로 합성
-    for cs, leg in [("CNYKRW=X", "CNY=X"), ("BRLKRW=X", "BRL=X")]:
+    for cs, leg in [("CNYKRW=X", "CNY=X"), ("BRLKRW=X", "BRL=X"), ("SEKKRW=X", "SEK=X")]:
         y = ydata.get(cs); k = ydata.get("KRW=X"); l = ydata.get(leg)
         if y is None:
             y = ydata[cs] = {"t": [], "v": [], "px": None, "pc": None, "at": None}
