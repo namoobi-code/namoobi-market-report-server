@@ -4676,17 +4676,17 @@ await _canvasFlow(c);
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
-      <canvas id="gm_cv" style="width:100%;height:260px"></canvas>`;
+      <canvas id="gm_cv" style="width:100%;height:320px"></canvas>`;
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
     box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.style.display='none';});
     const hset=HIST[sym];
     const cv=$('gm_cv');
-    if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; if(!keep) box.scrollIntoView({block:'nearest'}); return; }
+    if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
     const days={'1M':22,'3M':66,'6M':132,'1Y':9999}[box.dataset.p||'1Y'];
     let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
-    const W=cv.clientWidth||900,H=260; cv.width=W; cv.height=H;
+    const W=cv.clientWidth||436,H=320; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
-    const P={l:64,r:10,t:10,b:20};
+    const P={l:56,r:8,t:10,b:20};
     const lo=Math.min(...v),hi=Math.max(...v),rg=(hi-lo)||1;
     const X=i=>P.l+(W-P.l-P.r)*i/(t.length-1), Y=val=>P.t+(H-P.t-P.b)*(1-(val-lo)/rg);
     x.font='10px sans-serif';
@@ -4699,7 +4699,6 @@ await _canvasFlow(c);
     const up=v[v.length-1]>=v[0];
     x.strokeStyle=up?'#c0392b':'#1e6fd6'; x.lineWidth=1.6; x.beginPath();
     v.forEach((val,i)=>i?x.lineTo(X(i),Y(val)):x.moveTo(X(i),Y(val))); x.stroke(); x.lineWidth=1;
-    if(!keep) box.scrollIntoView({block:'nearest'});
   }
   async function load(){
     try{ D=await fetch('/api/db/global_market').then(r=>r.json()); }catch(e){ $('gm_body').innerHTML='<div class="note">로드 실패 — 잠시 후 재시도</div>'; return; }
