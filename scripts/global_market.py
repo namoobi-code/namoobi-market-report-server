@@ -141,6 +141,19 @@ NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 
 # (2026-08-02) 텐센트 kline — 야후·네이버 모두 이력 미제공(차이넥스트·과창판50·항셍테크).
 #   이스트머니는 서버(해외 IP)에서 차단되어 텐센트(web.ifzq.gtimg.cn)로 확정 — 서버 실측 정상.
 EM_HIST = {"399006.SZ": "sz399006", "000688.SS": "sh000688", "HSTECH.HK": "hkHSTECH"}
+# (2026-08-02) 선물 만기 주기 메타 — 표의 취득시점 옆에 표기(연속선물이라 롤오버는 소스가 자동)
+FUT_CYCLE = {
+    "ES=F": "분기물(3·6·9·12월)", "NQ=F": "분기물(3·6·9·12월)", "YM=F": "분기물(3·6·9·12월)", "RTY=F": "분기물(3·6·9·12월)",
+    "CL=F": "매월물", "BZ=F": "매월물", "NG=F": "매월물", "HO=F": "매월물", "ND.CMDT_GO": "매월물",
+    "GC=F": "격월물(2·4·6·8·10·12월)", "SI=F": "액티브월(1·3·5·7·9·12월)", "HG=F": "액티브월(3·5·7·9·12월)",
+    "PL=F": "액티브월(1·4·7·10월)", "PA=F": "액티브월(3·6·9·12월)",
+    "ZC=F": "액티브월(3·5·7·9·12월)", "ZW=F": "액티브월(3·5·7·9·12월)", "ZO=F": "액티브월(3·5·7·9·12월)",
+    "ZS=F": "액티브월(1·3·5·7·8·9·11월)", "ZM=F": "액티브월(연 8회)", "ZL=F": "액티브월(연 8회)",
+    "ZR=F": "액티브월(1·3·5·7·9·11월)", "SB=F": "액티브월(3·5·7·10월)", "CT=F": "액티브월(3·5·7·10·12월)",
+    "OJ=F": "액티브월(1·3·5·7·9·11월)", "KC=F": "액티브월(3·5·7·9·12월)", "CC=F": "액티브월(3·5·7·9·12월)",
+    "NF.HSIc1": "매월물", "NF.HCEIc1": "매월물", "NF.SFCc1": "매월물",
+    "NF.SSIcm1": "분기물(3·6·9·12월)", "NF.STXEc1": "분기물(3·6·9·12월)", "NF.FDXc1": "분기물(3·6·9·12월)"}
+
 # (2026-08-02) 네이버 해외선물 — 항셍·홍콩H·A50·니케이·유로스톡스·DAX 선물 (야후 미제공)
 NF_CODES = {"NF.HSIc1": "HSIc1", "NF.HCEIc1": "HCEIc1", "NF.SFCc1": "SFCc1",
             "NF.SSIcm1": "SSIcm1", "NF.STXEc1": "STXEc1", "NF.FDXc1": "FDXc1"}
@@ -202,7 +215,8 @@ def yahoo_1y(sym):
         if px is not None and (not v or t[-1] < datetime.utcnow().strftime("%Y%m%d")):
             pass
         ptime = m.get("regularMarketTime")
-        return {"t": t, "v": v, "px": px, "pc": pc,
+        sn = m.get("shortName") or ""
+        return {"t": t, "v": v, "px": px, "pc": pc, "sn": sn,
                 "at": datetime.utcfromtimestamp(ptime).strftime("%m/%d %H:%M") + "Z" if ptime else None}
     except Exception:
         return None
@@ -412,6 +426,14 @@ def main():
         else:
             y = ydata.get(s)
             if y: series = {"t": y["t"], "v": y["v"]}; r["px"] = y["px"]; r["at"] = y["at"]
+            if y and s.endswith("=F") and y.get("sn"):
+                # 월물 표기(예: "Nasdaq 100 Sep 26" → 26.09월물) — 야후 =F는 최근월 연속이라 롤오버 자동 반영
+                import re as _re2
+                _mm = _re2.search(r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{2})\b", y["sn"])
+                if _mm:
+                    _mon = {"Jan": 1, "Feb": 2, "Mar": 3, "Apr": 4, "May": 5, "Jun": 6,
+                            "Jul": 7, "Aug": 8, "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12}[_mm.group(1)]
+                    r["at"] = f"{_mm.group(2)}.{_mon:02d}월물 · " + (r.get("at") or "")
             if src == "NY" and nlive.get(s):                     # 국내 3종: 네이버 실시간 + 네이버 이력(야후 결측 대체)
                 r["px"] = nlive[s]["px"]; r["at"] = "실시간(네이버)"
                 nh = naver_kr_hist(NAVER_LIVE[s])
@@ -435,6 +457,8 @@ def main():
             ts_ = sorted(m)
             series = {"t": ts_, "v": [m[k] for k in ts_]}
             acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+        if FUT_CYCLE.get(s):                              # 선물 만기 주기 표기
+            r["at"] = ((r.get("at") + " · ") if r.get("at") else "") + FUT_CYCLE[s]
         if r.get("dec") is None:                          # fx2: 소수점 자동
             px0 = r.get("px")
             r["dec"] = (0 if px0 >= 1000 else 2 if px0 >= 10 else 4) if px0 else 2
