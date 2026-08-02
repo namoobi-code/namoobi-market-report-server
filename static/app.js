@@ -4817,12 +4817,28 @@ await _canvasFlow(c);
   }
   async function load(){
     try{ D=await fetch('/api/db/global_market').then(r=>r.json()); }catch(e){ $('gm_body').innerHTML='<div class="note">로드 실패 — 잠시 후 재시도</div>'; return; }
-    table();
+    table();  }
+  window.__gmPopRe=null;
+  async function loadPop(){
+    window.__gmPopRe=loadPop;
+    try{
+      const P=await fetch('/api/popular').then(r=>r.json());
+      if(!P.rows||!P.rows.length) return;
+      const lim=window.__gmPopAll?30:10;
+      $('gm_pop_t').textContent=`(네이버 · ${P.asof||''} 기준 · 3분 갱신)`;
+      $('gm_pop').innerHTML='<table style="width:100%;border-collapse:collapse;font-size:12px">'+
+        P.rows.slice(0,lim).map((r,i)=>`<tr style="cursor:pointer;border-bottom:1px solid #f2f4f7" onclick="window.open('https://m.stock.naver.com/domestic/stock/${r.code}/total','gm_pop_w','width=480,height=860')">
+          <td style="padding:4px 4px;width:22px;color:#8a94a0">${i+1}</td>
+          <td style="padding:4px 2px"><b>${r.name}</b></td>
+          <td style="text-align:right;font-weight:600">${r.px!=null?r.px.toLocaleString():'—'}</td>
+          <td style="text-align:right;width:76px"><span class="${r.pct>0?'up':r.pct<0?'dn':''}">${r.pct>0?'+':''}${r.pct??'—'}%</span></td></tr>`).join('')+'</table>'+(P.rows.length>10?`<div style="text-align:center;margin-top:4px"><button onclick="window.__gmPopAll=!window.__gmPopAll" id="gm_pop_more" style="padding:2px 12px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">${window.__gmPopAll?'접기 ▲':'더보기(30위까지) ▼'}</button></div>`:'');
+    }catch(e){}
   }
   window.renderGlobal=function(){
-    load();
+    load(); loadPop();
     if(timer) clearInterval(timer);
     timer=setInterval(()=>{ const p=document.getElementById('p_global');
       if(p&&p.style.display!=='none'&&p.offsetParent!==null){ HIST=null; load(); } },300000);
+    setInterval(()=>{ const p=document.getElementById('p_global'); if(p&&p.offsetParent!==null) loadPop(); },180000);
   };
 })();

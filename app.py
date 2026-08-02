@@ -978,6 +978,29 @@ def stock_deriv_api(code: str):
     return Response(content=json.dumps(out, ensure_ascii=False),
                     media_type="application/json", headers={"Cache-Control": "no-cache"})
 
+_pop_cache = {"t": 0, "data": None}
+@app.get("/api/popular")
+def popular():
+    """(2026-08-02) 네이버 인기 검색 종목 TOP10 프록시 — 3분 캐시. 글로벌시황 우측 패널용."""
+    import time as _t, urllib.request as _ur
+    now = _t.time()
+    if _pop_cache["data"] and now - _pop_cache["t"] < 180:
+        return _pop_cache["data"]
+    try:
+        req = _ur.Request("https://m.stock.naver.com/api/stocks/searchTop?page=1&pageSize=30",
+                          headers={"User-Agent": "Mozilla/5.0 (namoobi)"})
+        j = json.loads(_ur.urlopen(req, timeout=10).read().decode("utf-8"))
+        f = lambda s: float(str(s).replace(",", "")) if s not in (None, "") else None
+        rows = [{"name": x.get("stockName"), "code": x.get("itemCode"),
+                 "px": f(x.get("closePrice")), "chg": f(x.get("compareToPreviousClosePrice")),
+                 "pct": f(x.get("fluctuationsRatio")), "mkt": x.get("marketStatus")}
+                for x in (j.get("stocks") or [])[:30]]
+        out = {"asof": __import__("datetime").datetime.now().strftime("%H:%M"), "rows": rows}
+        _pop_cache["t"] = now; _pop_cache["data"] = out
+        return out
+    except Exception:
+        return _pop_cache["data"] or {"asof": None, "rows": []}
+
 _sdl_cache = {}
 @app.get("/api/stock_deriv_live/{code}")
 def stock_deriv_live(code: str):
