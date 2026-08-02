@@ -4641,6 +4641,7 @@ await _canvasFlow(c);
     if(sym==='ND.FX_USDGEL') return 'USD/GEL';
     if(sym.startsWith('ND.FX_')) return sym.slice(6,9)+'/'+sym.slice(9);
     if(sym.startsWith('NAV.')) return sym.slice(3);       // 네이버 월드지수 코드 (.TOPX 등)
+    if(sym.startsWith('SN.')) return sym.slice(3);        // 시나 중국선물 코드 (LC0 등)
     if(sym.startsWith('NAVKR.')) return sym.slice(6);     // 네이버 국내지수 코드 (KVALUE 등)
     if(sym.startsWith('NF.')) return sym.slice(3);        // 네이버 선물 코드 (HSIc1 등)
     if(sym.startsWith('DV.')) return sym.slice(3);        // 내부 DB 소스 (VKOSPI)
@@ -4802,15 +4803,17 @@ await _canvasFlow(c);
     'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW',
     'KRW-ADA':'UPBIT:ADAKRW','KRW-DOGE':'UPBIT:DOGEKRW','KRW-TRX':'UPBIT:TRXKRW','KRW-LINK':'UPBIT:LINKKRW','KRW-AVAX':'UPBIT:AVAXKRW','KRW-SUI':'UPBIT:SUIKRW','KRW-USDT':'UPBIT:USDTKRW'};
   const TX={'399006.SZ':'https://gu.qq.com/sz399006/zs','000688.SS':'https://gu.qq.com/sh000688/zs','HSTECH.HK':'https://gu.qq.com/hkHSTECH/zs'};  // 야후 1년 이력 미제공 3종 — 텐센트로 대체
+  const SINA={'SN.LC0':'https://finance.sina.com.cn/futures/quotes/LC0.shtml'};  // GFEX 탄산리튬 — 시나 차트
   function extLinks(r){
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
     const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
-    if(!s.startsWith('KRX:')&&!s.startsWith('NAV')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!s.startsWith('DV.')&&!NOY.includes(s)){
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!s.startsWith('DV.')&&!s.startsWith('SN.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }
     if(TX[s]) L.push(['텐센트',TX[s]]);
+    if(SINA[s]) L.push(['시나',SINA[s]]);
     if(TV[s]) L.push(['TradingView',`https://www.tradingview.com/chart/?symbol=${encodeURIComponent(TV[s])}`]);
     if(s.startsWith('KRW-')) L.push(['업비트',`https://upbit.com/exchange?code=CRIX.UPBIT.${s}`]);
     return L;
