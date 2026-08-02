@@ -1028,9 +1028,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(opts&&opts.base!=null){ x.setLineDash([4,3]); x.strokeStyle='#b7860b';
       x.beginPath();x.moveTo(P.l,Y(opts.base));x.lineTo(W-P.r,Y(opts.base));x.stroke(); x.setLineDash([]);
       x.fillStyle='#b7860b'; x.fillText(String(opts.base),P.l+2,Y(opts.base)-3); }
-    const t0=arr[0].t;                                  // 연도 눈금
+    const t0=arr[0].t;                                  // X축 눈금 — 연간(YYYY)·월간(YYYYMM) 모두 지원
     x.fillStyle='#98a2ad';
-    for(let i=0;i<t0.length;i++){ if(String(t0[i]).slice(4)==='01') x.fillText(String(t0[i]).slice(0,4),X(i)-12,H-4); }
+    for(let i=0;i<t0.length;i++){ const s=String(t0[i]);
+      if(s.length===4){ if(+s%2===0) x.fillText(s,X(i)-12,H-4); }                                  // 연간: 짝수 해
+      else if(s.slice(4)==='01'){ x.fillText(s.slice(0,4),X(i)-12,H-4); }                          // 월간: 매년 1월=연도
+      else if(t0.length<=30&&+s.slice(4)%3===1){ x.fillText(s.slice(2,4)+'.'+s.slice(4),X(i)-10,H-4); } }  // 확대 시 분기 보조 눈금
     arr.forEach(a=>{ x.strokeStyle=a.color; x.lineWidth=1.6; x.beginPath(); let st=false;
       for(let i=0;i<a.v.length;i++){ if(a.v[i]==null) continue;
         st?x.lineTo(X(i),Y(a.v[i])):(x.moveTo(X(i),Y(a.v[i])),st=true); }
