@@ -4641,7 +4641,7 @@ await _canvasFlow(c);
     if(!D) return;
     $('gm_asof').textContent=`수집 ${D.asof} — 10분 자동 갱신 · 국내대표/크립토=실시간 · 해외지수=야후(~15분 지연) · KRX 세부=T+1 종가`;
     let h='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-    h+='<colgroup><col style="width:210px"><col style="width:110px">'+ '<col style="width:74px">'.repeat(6)+'<col></colgroup>';
+    h+='<colgroup><col><col style="width:110px">'+ '<col style="width:74px">'.repeat(6)+'<col style="width:140px"></colgroup>';
     D.groups.forEach(g=>{
       if(!g.rows.length) return;
       h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
