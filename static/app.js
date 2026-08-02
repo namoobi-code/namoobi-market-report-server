@@ -4715,7 +4715,16 @@ await _canvasFlow(c);
     'ARS=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDARS',
     'COP=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDCOP',
     'HUF=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDHUF',
-    'RUB=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDRUB'};
+    'RUB=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDRUB',
+    'CNY=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDCNY',
+    'HKD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDHKD',
+    'TWD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDTWD',
+    'SGD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDSGD',
+    'CHF=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDCHF',
+    'CAD=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDCAD',
+    'BRL=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDBRL',
+    'TRY=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDTRY',
+    'UAH=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDUAH'};
   const TV={'^KS11':'KRX:KOSPI','^KQ11':'KRX:KOSDAQ','^DJI':'DJ:DJI','^DJT':'DJ:DJT','^IXIC':'NASDAQ:IXIC','^NDX':'NASDAQ:NDX',
     '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!',
     '000001.SS':'SSE:000001','399106.SZ':'SZSE:399106','399001.SZ':'SZSE:399001','000300.SS':'SSE:000300',
@@ -4747,6 +4756,15 @@ await _canvasFlow(c);
     'COP=X':'FX_IDC:USDCOP',
     'HUF=X':'FX_IDC:USDHUF',
     'RUB=X':'FX_IDC:USDRUB',
+    'CNY=X':'FX_IDC:USDCNY',
+    'HKD=X':'FX_IDC:USDHKD',
+    'TWD=X':'FX_IDC:USDTWD',
+    'SGD=X':'FX_IDC:USDSGD',
+    'CHF=X':'FX_IDC:USDCHF',
+    'CAD=X':'FX_IDC:USDCAD',
+    'BRL=X':'FX_IDC:USDBRL',
+    'TRY=X':'FX_IDC:USDTRY',
+    'UAH=X':'FX_IDC:USDUAH',
     'KRW-BTC':'UPBIT:BTCKRW','KRW-ETH':'UPBIT:ETHKRW','KRW-SOL':'UPBIT:SOLKRW','KRW-XRP':'UPBIT:XRPKRW'};
   function extLinks(r){
     const s=r.s, L=[];
