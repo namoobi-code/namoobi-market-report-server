@@ -104,6 +104,19 @@ NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI", "NAV.HNXI": ".HNXI", "NAV.
               "NAV.SSEB": ".SSEB", "NAV.SZSA": ".SZSA", "NAV.SZSB": ".SZSB", "NAV.CSI100": ".CSI100",
               "NAV.IBEX": ".IBEX", "NAV.OMXS30": ".OMXS30"}
 NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 이력 대체(2026-08-02 실측)
+# (2026-08-02) 텐센트 kline — 야후·네이버 모두 이력 미제공(차이넥스트·과창판50·항셍테크).
+#   이스트머니는 서버(해외 IP)에서 차단되어 텐센트(web.ifzq.gtimg.cn)로 확정 — 서버 실측 정상.
+EM_HIST = {"399006.SZ": "sz399006", "000688.SS": "sh000688", "HSTECH.HK": "hkHSTECH"}
+
+def em_hist(code):
+    j = jget(f"https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param={code},day,,,500,qfq") or {}
+    d = (j.get("data") or {}).get(code) or {}
+    kl = d.get("day") or d.get("qfqday") or []
+    t, v = [], []
+    for p in kl:
+        try: t.append(str(p[0]).replace("-", "")); v.append(float(p[2]))   # [date,open,close,...]
+        except Exception: pass
+    return {"t": t, "v": v}
 # (2026-08-02) 네이버 marketindex 일별시세(HTML) — 야후 미제공 상품(LME 현물·가스오일·두바이유·국내금·국내유가)
 ND_CODES = {"ND.CMDT_GO": ("worldDailyQuote", "CMDT_GO", 2), "ND.OIL_DU": ("worldDailyQuote", "OIL_DU", 2),
             "ND.CMDT_PDY": ("worldDailyQuote", "CMDT_PDY", 2), "ND.CMDT_ZDY": ("worldDailyQuote", "CMDT_ZDY", 2),
@@ -343,6 +356,9 @@ def main():
         if (not series or len(series["t"]) < 30) and NAVER_HIST_FB.get(s):
             nh = naver_world_hist(NAVER_HIST_FB[s])
             if nh["t"]: series = nh
+        if (not series or len(series["t"]) < 30) and EM_HIST.get(s):
+            eh = em_hist(EM_HIST[s])
+            if eh["t"]: series = eh
         if (not series or len(series["t"]) < 30) and r.get("px") is not None:
             a = acc.get(s) or {"t": [], "v": []}
             m = dict(zip(a["t"], a["v"]))
