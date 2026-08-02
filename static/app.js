@@ -4685,6 +4685,10 @@ await _canvasFlow(c);
     'NAV.HNXI':'worldstock/index/.HNXI/total','NAV.SSEA':'worldstock/index/.SSEA/total','NAV.SSEB':'worldstock/index/.SSEB/total',
     'NAV.SZSA':'worldstock/index/.SZSA/total','NAV.SZSB':'worldstock/index/.SZSB/total','NAV.CSI100':'worldstock/index/.CSI100/total',
     'NAV.IBEX':'worldstock/index/.IBEX/total','NAV.OMXS30':'worldstock/index/.OMXS30/total','FTSEMIB.MI':'worldstock/index/.FTMIB/total',
+    'NAV.OMXC20':'worldstock/index/.OMXC20/total','NAV.BUX':'worldstock/index/.BUX/total',
+    '^ISEQ':'worldstock/index/.ISEQ/total','^AXJO':'worldstock/index/.AXJO/total','^MXX':'worldstock/index/.MXX/total','^MERV':'worldstock/index/.MERV/total',
+    'NF.HSIc1':'worldstock/futures/HSIc1/total','NF.HCEIc1':'worldstock/futures/HCEIc1/total','NF.SFCc1':'worldstock/futures/SFCc1/total',
+    'NF.SSIcm1':'worldstock/futures/SSIcm1/total','NF.STXEc1':'worldstock/futures/STXEc1/total','NF.FDXc1':'worldstock/futures/FDXc1/total',
     '^TWII':'worldstock/index/.TWII/total','^BSESN':'worldstock/index/.BSESN/total','^KLSE':'worldstock/index/.KLSE/total',
     '^JKSE':'worldstock/index/.JKSE/total','^STOXX50E':'worldstock/index/.STOXX50E/total','^FTSE':'worldstock/index/.FTSE/total',
     '^GDAXI':'worldstock/index/.GDAXI/total','^FCHI':'worldstock/index/.FCHI/total','^BFX':'worldstock/index/.BFX/total',
@@ -4737,7 +4741,7 @@ await _canvasFlow(c);
     'TRY=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDTRY',
     'UAH=X':'https://finance.naver.com/marketindex/worldExchangeDetail.naver?marketindexCd=FX_USDUAH'};
   const TV={'^KS11':'KRX:KOSPI','^KQ11':'KRX:KOSDAQ','^DJI':'DJ:DJI','^DJT':'DJ:DJT','^IXIC':'NASDAQ:IXIC','^NDX':'NASDAQ:NDX',
-    '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!',
+    '^GSPC':'SP:SPX','^SOX':'NASDAQ:SOX','^VIX':'TVC:VIX','ES=F':'CME_MINI:ES1!','NQ=F':'CME_MINI:NQ1!','^RUT':'TVC:RUT','YM=F':'CBOT_MINI:YM1!','RTY=F':'CME_MINI:RTY1!',
     '000001.SS':'SSE:000001','399106.SZ':'SZSE:399106','399001.SZ':'SZSE:399001','000300.SS':'SSE:000300',
     '000688.SS':'SSE:000688','399006.SZ':'SZSE:399006','^HSI':'TVC:HSI','^HSCE':'HSI:HSCEI','HSTECH.HK':'HSI:HSTECH',
     '^N225':'TVC:NI225','^STOXX50E':'TVC:SX5E','^FTSE':'TVC:UKX','^GDAXI':'XETR:DAX','^FCHI':'TVC:CAC40',
@@ -4782,7 +4786,7 @@ await _canvasFlow(c);
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
     const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
-    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')&&!NOY.includes(s)){
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }

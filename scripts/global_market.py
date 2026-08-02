@@ -41,23 +41,32 @@ U = [
  ("us","^DJI","다우 산업","Y",1,2), ("us","^DJT","다우 운송","Y",1,2), ("us","^IXIC","나스닥 종합","Y",1,2),
  ("us","^NDX","나스닥 100","Y",1,2), ("us","^GSPC","S&P 500","Y",1,2), ("us","^SOX","필라델피아 반도체","Y",1,2),
  ("us","^NYA","NYSE 종합","Y",1,2), ("us","^XAX","아멕스 종합","Y",1,2), ("us","^VIX","VIX","Y",1,2),
+ ("us","^RUT","러셀 2000","Y",1,2),
  ("us","NQ=F","E-mini 나스닥100 선물","Y",1,2), ("us","ES=F","E-mini S&P500 선물","Y",1,2),
+ ("us","YM=F","다우 선물","Y",1,2), ("us","RTY=F","러셀2000 선물","Y",1,2),
  ("as","000001.SS","상해종합","Y",1,2), ("as","399106.SZ","심천종합지수","Y",1,2), ("as","399001.SZ","심천성분지수","Y",1,2),
  ("as","000300.SS","CSI300","Y",1,2), ("as","000688.SS","과창판 50","Y",1,2), ("as","399006.SZ","차이넥스트","Y",1,2),
  ("as","NAV.SSEA","상해 A","N",1,2), ("as","NAV.SSEB","상해 B","N",1,2),
  ("as","NAV.SZSA","심천 A","N",1,2), ("as","NAV.SZSB","심천 B","N",1,2), ("as","NAV.CSI100","CSI100","N",1,2),
- ("as","^HSI","항셍","Y",1,2), ("as","^HSCE","항셍 차이나기업(H)","Y",1,2), ("as","HSTECH.HK","항셍 테크지수","Y",1,2),
- ("as","^N225","니케이225","Y",1,2), ("as","NAV.TOPX","TOPIX","N",1,2),
+ ("as","NF.SFCc1","China A50 선물","NF",1,2),
+ ("as","^HSI","항셍","Y",1,2), ("as","NF.HSIc1","항셍 선물","NF",1,2),
+ ("as","^HSCE","항셍 차이나기업(H)","Y",1,2), ("as","NF.HCEIc1","홍콩H 선물","NF",1,2),
+ ("as","HSTECH.HK","항셍 테크지수","Y",1,2),
+ ("as","^N225","니케이225","Y",1,2), ("as","NF.SSIcm1","니케이225 선물","NF",1,2), ("as","NAV.TOPX","TOPIX","N",1,2),
  ("as","NAV.VNI","베트남 호치민","N",1,2), ("as","NAV.HNXI","베트남 하노이","N",1,2),
  ("as","^TWII","대만 가권","Y",1,2), ("as","^BSESN","인도 SENSEX","Y",1,2), ("as","^SET.BK","태국 SET","Y",1,2),
  ("as","^KLSE","말레이시아 KLCI","Y",1,2), ("as","^JKSE","인도네시아 IDX종합","Y",1,2),
- ("as","PSEI.PS","필리핀","Y",1,2), ("as","^AORD","호주 ALL ORDS","Y",1,2),
- ("eu","^STOXX50E","유로스톡스 50","Y",1,2), ("eu","^FTSE","영국 FTSE 100","Y",1,2), ("eu","^GDAXI","독일 DAX 40","Y",1,2),
+ ("as","PSEI.PS","필리핀","Y",1,2), ("as","^AORD","호주 ALL ORDS","Y",1,2), ("as","^AXJO","호주 ASX 200","Y",1,2),
+ ("eu","^STOXX50E","유로스톡스 50","Y",1,2), ("eu","NF.STXEc1","유로스톡스50 선물","NF",1,2),
+ ("eu","^FTSE","영국 FTSE 100","Y",1,2), ("eu","^GDAXI","독일 DAX 40","Y",1,2), ("eu","NF.FDXc1","독일 DAX 선물","NF",1,2),
  ("eu","^FCHI","프랑스 CAC 40","Y",1,2), ("eu","^BFX","벨기에 BEL-20","Y",1,2), ("eu","^AEX","네덜란드 AEX","Y",1,2),
  ("eu","PSI20.LS","포르투갈 PSI20","Y",1,2), ("eu","GD.AT","그리스 종합","Y",1,2),
  ("eu","FTSEMIB.MI","이탈리아 FTSE MIB","Y",1,2), ("eu","NAV.IBEX","스페인 IBEX 35","N",1,2),
  ("eu","NAV.OMXS30","스웨덴 OMXS30","N",1,2),
+ ("eu","^ISEQ","아일랜드 ISEQ","Y",1,2), ("eu","NAV.OMXC20","덴마크 OMXC20","N",1,2),
+ ("eu","^OMXH25","핀란드 OMXH25","Y",1,2), ("eu","NAV.BUX","헝가리 BUX","N",1,2),
  ("eu","^GSPTSE","캐나다 S&P TSX","Y",1,2), ("eu","^BVSP","브라질 BOVESPA","Y",1,2),
+ ("eu","^MXX","멕시코 IPC","Y",1,2), ("eu","^MERV","아르헨티나 MERVAL","Y",1,1), ("eu","^IPSA","칠레 IPSA","Y",1,2),
  ("cmd","CL=F","WTI","Y",1,2), ("cmd","BZ=F","브렌트유","Y",1,2), ("cmd","NG=F","천연가스","Y",1,3),
  ("cmd","GC=F","금","Y",1,1), ("cmd","SI=F","은","Y",1,3), ("cmd","HG=F","구리","Y",1,4),
  ("cmd","ZC=F","옥수수","Y",1,1), ("cmd","ZS=F","대두","Y",1,1), ("cmd","ZW=F","소맥","Y",1,1),
@@ -96,6 +105,9 @@ U = [
  ("fx","CHF=X","달러/스위스 프랑","Y",1,4), ("fx","CAD=X","달러/캐나다 달러","Y",1,4),
  ("fx","BRL=X","달러/브라질 레알","Y",1,4), ("fx2","TRY=X","달러/튀르키예 리라","Y",1,2),
  ("fx2","UAH=X","달러/우크라이나 흐리브냐","Y",1,2),
+ ("me","^TASI.SR","사우디 TASI","Y",1,2), ("me","^TA125.TA","이스라엘 TA-125","Y",1,2),
+ ("me","DFMGI.AE","두바이 DFM","Y",1,2), ("me","^J203.JO","남아공 JSE 올셰어","Y",1,2),
+ ("me","^CASE30","이집트 EGX30","Y",1,2),
  ("cr","KRW-BTC","비트코인","U",1,0), ("cr","KRW-ETH","이더리움","U",1,0),
  ("cr","KRW-SOL","솔라나","U",1,0), ("cr","KRW-XRP","리플","U",1,0),
 ]
@@ -124,11 +136,36 @@ U += [("fx2", "ND.FX_USDGEL", "달러/조지아 라리", "ND", 1, None)]   # 야
 NAVER_LIVE = {"^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KPI200"}   # T+0 현재가 보강
 NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI", "NAV.HNXI": ".HNXI", "NAV.SSEA": ".SSEA",
               "NAV.SSEB": ".SSEB", "NAV.SZSA": ".SZSA", "NAV.SZSB": ".SZSB", "NAV.CSI100": ".CSI100",
-              "NAV.IBEX": ".IBEX", "NAV.OMXS30": ".OMXS30"}
+              "NAV.IBEX": ".IBEX", "NAV.OMXS30": ".OMXS30", "NAV.OMXC20": ".OMXC20", "NAV.BUX": ".BUX"}
 NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 이력 대체(2026-08-02 실측)
 # (2026-08-02) 텐센트 kline — 야후·네이버 모두 이력 미제공(차이넥스트·과창판50·항셍테크).
 #   이스트머니는 서버(해외 IP)에서 차단되어 텐센트(web.ifzq.gtimg.cn)로 확정 — 서버 실측 정상.
 EM_HIST = {"399006.SZ": "sz399006", "000688.SS": "sh000688", "HSTECH.HK": "hkHSTECH"}
+# (2026-08-02) 네이버 해외선물 — 항셍·홍콩H·A50·니케이·유로스톡스·DAX 선물 (야후 미제공)
+NF_CODES = {"NF.HSIc1": "HSIc1", "NF.HCEIc1": "HCEIc1", "NF.SFCc1": "SFCc1",
+            "NF.SSIcm1": "SSIcm1", "NF.STXEc1": "STXEc1", "NF.FDXc1": "FDXc1"}
+
+def naver_fut(code):
+    j = jget(f"https://api.stock.naver.com/futures/{urllib.parse.quote(code)}/basic")
+    try:
+        f = lambda x: float(str(x).replace(",", ""))
+        return {"px": f(j["closePrice"]), "at": (j.get("localTradedAt") or "")[5:10].replace("-", "/") + " 종가(네이버)"}
+    except Exception:
+        return None
+
+def naver_fut_hist(code, pages=9):
+    t, v = [], []
+    f = lambda x: float(str(x).replace(",", ""))
+    for pg in range(1, pages + 1):
+        j = jget(f"https://api.stock.naver.com/futures/{urllib.parse.quote(code)}/price?pageSize=50&page={pg}") or []
+        if not j: break
+        for x in j:
+            try: t.append(x["localTradedAt"][:10].replace("-", "")); v.append(f(x["closePrice"]))
+            except Exception: pass
+        if len(j) < 50: break
+    pair = sorted(zip(t, v))
+    return {"t": [a for a, b in pair], "v": [b for a, b in pair]}
+
 # (2026-08-02) 표기 통일 — 야후는 EURUSD 등 "xx/달러"만 제공 → 달러/xx 기준으로 역수 변환
 INVERT = {"EURUSD=X", "GBPUSD=X", "AUDUSD=X"}
 
@@ -355,6 +392,12 @@ def main():
             series = uph.get(s); q = ups.get(s) or {}
             r["px"] = q.get("px"); r["at"] = q.get("at")
             if q.get("pc"): r["ret_d1_live"] = round((q["px"] / q["pc"] - 1) * 100, 2)
+        elif src == "NF":
+            q = naver_fut(NF_CODES[s])
+            nh = naver_fut_hist(NF_CODES[s])
+            series = nh if nh["t"] else None
+            if q: r["px"] = q["px"]; r["at"] = q["at"]
+            elif series: r["px"] = series["v"][-1]
         elif src == "ND":
             ep, cd, fdtc = ND_CODES[s]
             a = acc.get(s) or {"t": [], "v": []}
@@ -425,7 +468,7 @@ def main():
     rows_by_grp["krx"] = krx_rows
 
     GRP = [("kr", "국내 대표 (실시간)"), ("krx", "국내 세부지수 (KRX · T+1 종가)"), ("us", "미국"),
-           ("as", "아시아·중화권"), ("eu", "유럽·기타"), ("cmd", "상품"), ("fx", "환율 — 주요 통화"), ("fx2", "환율 — 기타 통화"), ("cr", "암호화폐 (업비트 실시간)")]
+           ("as", "아시아·중화권"), ("eu", "유럽·미주"), ("me", "중동·아프리카"), ("cmd", "상품"), ("fx", "환율 — 주요 통화"), ("fx2", "환율 — 기타 통화"), ("cr", "암호화폐 (업비트 실시간)")]
     out = {"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
            "src": "야후(지수 ~15분 지연·선물/환율 실시간급)+네이버(국내 T+0·TOPIX·VNI)+업비트(실시간)+KRX(T+1)",
            "groups": [{"key": k, "label": lb, "rows": rows_by_grp.get(k, [])} for k, lb in GRP]}
