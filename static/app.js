@@ -2872,7 +2872,7 @@ await _canvasFlow(c);
   function renderSum(r){
     // (2026-08-02) 기업개요 — 네이버 온디맨드(/api/overview, 서버 24h 캐시), 요약표 위에 표시
     { const ov=$('sd_ov');
-      if(ov){ const oc=String(r.code||r.symbol||''); ov.style.display='none'; ov.dataset.c=oc;
+      if(ov){ const oc=String(r.code||r.sym||r.symbol||''); ov.style.display='none'; ov.dataset.c=oc;   // KR=code · US=sym
         if(oc) fetch(`/api/overview?mkt=${mkt}&code=${encodeURIComponent(oc)}`).then(x=>x.ok?x.json():null).then(o=>{
           if(!o||!(o.lines||[]).length||ov.dataset.c!==oc) return;   // 응답 도착 전 다른 종목 선택 시 무시
           ov.style.display='';
