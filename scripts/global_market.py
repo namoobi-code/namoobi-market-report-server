@@ -400,7 +400,8 @@ def spark(v, n=60):
     if not v: return []
     if len(v) <= n: return [round(x, 4) for x in v]
     step = (len(v) - 1) / (n - 1)
-    return [round(v[int(i * step)], 4) for i in range(n)]
+    # int() 내림이면 부동소수 오차로 마지막 샘플이 끝봉 직전 봉이 될 수 있어 색이 수익률과 뒤집힘 → 반올림+클램프
+    return [round(v[min(len(v) - 1, int(round(i * step)))], 4) for i in range(n)]
 
 def krx_fetch(hist):
     """KRX 세부지수 T+1 — krx/kospi/kosdaq 일별시세 3콜, 원하는 지수만 필터·일별 누적."""
@@ -566,9 +567,20 @@ def main():
             if r.get("px") is not None:
                 if series["t"][-1] == today_s: series["v"][-1] = r["px"]
             r["ret"] = rets(series["t"], series["v"], r.get("px"))
-            r["spark"] = spark(series["v"][-252:])
-            if len(series["v"]) >= 300:                  # 3년 추세 — 이력 1년 남짓뿐이면 생략(1Y와 중복 방지)
-                r["spark3"] = spark(series["v"][-756:])
+            # 추세 창은 기간수익률(rets)과 완전 동일 기준: 기준봉(달력 N일 전 이전의 마지막 봉) → 현재가.
+            # 경계봉이 하나만 달라도 ±1% 부근에서 색(상승/하락)이 수익률과 뒤집히므로 정확히 맞춘다.
+            def _win(days):
+                lim = (datetime.strptime(series["t"][-1], "%Y%m%d") - timedelta(days=days)).strftime("%Y%m%d")
+                bi = 0
+                for i2 in range(len(series["t"]) - 1, -1, -1):
+                    if series["t"][i2] <= lim: bi = i2; break
+                w = list(series["v"][bi:])
+                if r.get("px") is not None: w[-1] = r["px"]      # 끝값도 수익률처럼 현재가로
+                return w
+            r["spark"] = spark(_win(364))
+            lim400 = (datetime.strptime(series["t"][-1], "%Y%m%d") - timedelta(days=400)).strftime("%Y%m%d")
+            if series["t"][0] <= lim400:                 # 이력이 1년 남짓뿐이면 3Y 추세 생략(1Y와 중복)
+                r["spark3"] = spark(_win(1092))
             hist_all[s] = series
         rows_by_grp.setdefault(g, []).append(r)
 

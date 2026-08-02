@@ -4854,7 +4854,11 @@ await _canvasFlow(c);
     const cv=$('gm_cv');
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
     const L=hset.t.length;
-    const baseN={'1Y':252,'3Y':756,'10Y':2520,'MAX':1e9}[box.dataset.p||'3Y'];  // 기본 3Y
+    const dl0=hset.t[L-1];                                   // 기간은 달력 기준(코인은 연 365봉이라 봉수 고정이면 어긋남)
+    const nBack=y=>{ const d=new Date(+dl0.slice(0,4),+dl0.slice(4,6)-1,+dl0.slice(6)); d.setDate(d.getDate()-365*y);
+      const key=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}`;
+      let i=hset.t.findIndex(z=>z>=key); if(i<0) i=L-1; return Math.max(20,L-i); };
+    const baseN={'1Y':nBack(1),'3Y':nBack(3),'10Y':nBack(10),'MAX':L}[box.dataset.p||'3Y'];  // 기본 3Y
     let viewN=Math.max(20,Math.min(box._vn||baseN,L));       // 표시 봉수(휠 확대/축소로 변경)
     let viewOff=Math.max(0,Math.min(box._vo||0,L-viewN));    // 오른쪽 끝에서 숨긴 봉수(드래그 이동)
     const W=cv.clientWidth||560,H=600; cv.width=W; cv.height=H;
