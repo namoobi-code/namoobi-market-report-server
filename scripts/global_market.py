@@ -200,7 +200,7 @@ def naver_fut(code):
     except Exception:
         return None
 
-def naver_fut_hist(code, pages=9):
+def naver_fut_hist(code, pages=16):
     t, v = [], []
     f = lambda x: float(str(x).replace(",", ""))
     for pg in range(1, pages + 1):
@@ -262,7 +262,7 @@ ND_CODES = {"ND.CMDT_GO": ("worldDailyQuote", "CMDT_GO", 2), "ND.OIL_DU": ("worl
             "ND.FX_USDGEL": ("worldDailyQuote", "FX_USDGEL", 2)}
 
 def yahoo_1y(sym):
-    j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=2y&interval=1d")
+    j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range=10y&interval=1d")
     try:
         r = j["chart"]["result"][0]; m = r["meta"]
         ts = r["timestamp"]; cl = r["indicators"]["quote"][0]["close"]
@@ -297,7 +297,7 @@ def naver_kr(code):
     except Exception:
         return None
 
-def naver_kr_hist(code, pages=6):
+def naver_kr_hist(code, pages=16):
     """국내지수 일봉 이력(최근 ~1.2년) — 야후 ^KS200 결측 대체 (2026-08-02)."""
     t, v = [], []
     f = lambda s: float(str(s).replace(",", ""))
@@ -312,7 +312,7 @@ def naver_kr_hist(code, pages=6):
     return {"t": [a for a, b in pair], "v": [b for a, b in pair]}
 
 
-def naver_world_hist(code, pages=6):
+def naver_world_hist(code, pages=16):
     """해외지수(worldstock) 일봉 이력 — TOPIX(.TOPX)·베트남(.VNI) 등."""
     import urllib.parse as up
     t, v = [], []
@@ -359,11 +359,15 @@ def upbit(markets):
     return out
 
 def upbit_hist(market):
-    """업비트 일봉 — 1콜 최대 200개라 to 파라미터로 2페이지 페이징(약 400일)."""
+    """업비트 일봉 — 1콜 최대 200개라 to 파라미터 페이징. 상장 이후 전체(최대 19페이지 ≈ 10년)."""
     j = jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=200") or []
-    if j:
+    for _ in range(18):
+        if not j or len(j) % 200 != 0: break               # 마지막 페이지가 200 미만이면 소진
         to = j[-1]["candle_date_time_utc"]
-        j += jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=200&to={to}") or []
+        nxt = jget(f"https://api.upbit.com/v1/candles/days?market={market}&count=200&to={to}") or []
+        if not nxt: break
+        j += nxt
+        time.sleep(0.12)                                   # 업비트 초당 요청 제한 회피
     seen = {}
     for x in j:
         seen[x["candle_date_time_kst"][:10].replace("-", "")] = x["trade_price"]
@@ -376,7 +380,7 @@ def rets(t, v, px):
     last = datetime.strptime(t[-1], "%Y%m%d").date()
     today = datetime.now().strftime("%Y%m%d")
     out = {}
-    for k, days in [("d1", 1), ("w1", 7), ("m1", 30), ("m3", 91), ("m6", 182), ("y1", 364)]:
+    for k, days in [("d1", 1), ("w1", 7), ("m1", 30), ("m3", 91), ("m6", 182), ("y1", 364), ("y3", 1092), ("y10", 3640)]:
         if k == "d1":
             # 직전 거래일 종가 대비. 휴장(현재가=마지막 봉)이면 마지막 거래일의 등락을 표시(미래에셋과 동일)
             same_bar = t[-1] == today or (v[-1] and abs(px - v[-1]) / abs(v[-1]) < 5e-3)
@@ -499,11 +503,11 @@ def main():
         elif src == "ND":
             ep, cd, fdtc = ND_CODES[s]
             a = acc.get(s) or {"t": [], "v": []}
-            nh = naver_mi_hist(ep, cd, fdtc, pages=60 if len(a["t"]) < 380 else 2)   # 1년 수익률에 ~380거래일 필요
+            nh = naver_mi_hist(ep, cd, fdtc, pages=120 if len(a["t"]) < 800 else 2)   # 3년 수익률에 ~750거래일 필요(120페이지 ≈ 1200일)
             m2 = dict(zip(a["t"], a["v"])); m2.update(dict(zip(nh["t"], nh["v"])))
             ts_ = sorted(m2)
             series = {"t": ts_, "v": [m2[k] for k in ts_]}
-            acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+            acc[s] = {"t": ts_[-2600:], "v": series["v"][-2600:]}
             if ts_:
                 r["px"] = series["v"][-1]
                 r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + (" 고시(네이버)" if ep == "exchangeDailyQuote" else " 종가(네이버)")
@@ -542,7 +546,7 @@ def main():
             m[today_s] = r["px"]
             ts_ = sorted(m)
             series = {"t": ts_, "v": [m[k] for k in ts_]}
-            acc[s] = {"t": ts_[-600:], "v": series["v"][-600:]}
+            acc[s] = {"t": ts_[-2600:], "v": series["v"][-2600:]}
         if s in EN_NAME:
             r["en"] = EN_NAME[s]
         if FUT_CYCLE.get(s):                              # 선물 만기 주기 표기

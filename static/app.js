@@ -4659,16 +4659,16 @@ await _canvasFlow(c);
     if(!D) return;
     $('gm_asof').textContent=`수집 ${D.asof} — 10분 자동 갱신 · 국내대표/크립토=실시간 · 해외지수=야후(~15분 지연) · KRX 세부=T+1 종가`;
     let h='<table style="width:100%;border-collapse:collapse;font-size:12px">';
-    h+='<colgroup><col style="width:220px"><col style="width:104px">'+ '<col style="width:72px">'.repeat(6)+'<col style="width:140px"></colgroup>';
+    h+='<colgroup><col style="width:220px"><col style="width:104px">'+ '<col style="width:66px">'.repeat(8)+'<col style="width:140px"></colgroup>';
     D.groups.forEach(g=>{
       if(!g.rows.length) return;
       if(g.key==='fx2'){
-        h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea;cursor:pointer" onclick="window.__gmFx2=!window.__gmFx2; window.__gmTblRe&&window.__gmTblRe()">${g.label} <span class="note">(${g.rows.length}종) ${window.__gmFx2?'▲ 접기':'▼ 더보기 — 전체 통화 표시'}</span></td></tr>`;
+        h+=`<tr><td colspan="11" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea;cursor:pointer" onclick="window.__gmFx2=!window.__gmFx2; window.__gmTblRe&&window.__gmTblRe()">${g.label} <span class="note">(${g.rows.length}종) ${window.__gmFx2?'▲ 접기':'▼ 더보기 — 전체 통화 표시'}</span></td></tr>`;
         if(!window.__gmFx2) return;
       } else {
-        h+=`<tr><td colspan="9" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
+        h+=`<tr><td colspan="11" style="padding:10px 6px 4px;font-weight:700;font-size:13px;border-bottom:2px solid #dfe4ea">${g.label}</td></tr>`;
       }
-      h+='<tr style="color:#8a94a0">'+['지수/종목','현재가','1일','1주','1개월','3개월','6개월','1년','추세(1Y)'].map((c,i)=>`<td style="padding:2px 6px;text-align:${i==0?'left':'right'};border-bottom:1px solid #eceff3">${c}</td>`).join('')+'</tr>';
+      h+='<tr style="color:#8a94a0">'+['지수/종목','현재가','1일','1주','1개월','3개월','6개월','1년','3년','10년','추세(1Y)'].map((c,i)=>`<td style="padding:2px 6px;text-align:${i==0?'left':'right'};border-bottom:1px solid #eceff3">${c}</td>`).join('')+'</tr>';
       g.rows.forEach(r=>{
         const R=r.ret||{}; const d1=R.d1!=null?R.d1:r.ret_d1_live;
         h+=`<tr class="gmrow" data-s="${r.s}" style="cursor:pointer;border-bottom:1px solid #f2f4f7">`
@@ -4677,11 +4677,12 @@ await _canvasFlow(c);
          +`<td style="text-align:right">${pc(d1)}</td><td style="text-align:right">${pc(R.w1)}</td>`
          +`<td style="text-align:right">${pc(R.m1)}</td><td style="text-align:right">${pc(R.m3)}</td>`
          +`<td style="text-align:right">${pc(R.m6)}</td><td style="text-align:right">${pc(R.y1)}</td>`
+         +`<td style="text-align:right">${pc(R.y3)}</td><td style="text-align:right">${pc(R.y10)}</td>`
          +`<td style="text-align:right;padding:2px 6px">${sparkSVG(r.spark,120,26)}</td></tr>`;
       });
       if(g.key==='kr'){
-        h+=`<tr><td colspan="9" style="padding:8px 6px 2px;font-weight:700;font-size:13px">🔥 인기 검색 종목 <span class="note" id="gm_pop_t">(네이버 · 3분 갱신)</span></td></tr>`
-         +`<tr><td colspan="9" style="padding:0 6px 6px"><div id="gm_pop"><div class="note">불러오는 중…</div></div></td></tr>`;
+        h+=`<tr><td colspan="11" style="padding:8px 6px 2px;font-weight:700;font-size:13px">🔥 인기 검색 종목 <span class="note" id="gm_pop_t">(네이버 · 3분 갱신)</span></td></tr>`
+         +`<tr><td colspan="11" style="padding:0 6px 6px"><div id="gm_pop"><div class="note">불러오는 중…</div></div></td></tr>`;
       }
     });
     h+='</table>';
@@ -4830,7 +4831,7 @@ await _canvasFlow(c);
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
       <b style="font-size:15px">${r.name}</b>${subCode(r.s)?`<span class="note" style="font-size:11px"> ${subCode(r.s)}</span>`:''}${r.en?`<span class="note" style="font-size:11px"> ${r.en}</span>`:''}<span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
       <span class="note">${r.at||''}</span>
-      <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
+      <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y','3Y','10Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
       <canvas id="gm_cv" style="width:100%;height:600px"></canvas>`;
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
@@ -4849,7 +4850,7 @@ await _canvasFlow(c);
     const hset=HIST[sym];
     const cv=$('gm_cv');
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
-    const days={'1M':22,'3M':66,'6M':132,'1Y':252}[box.dataset.p||'1Y'];  // 소스별 보유이력(야후2y·시나3y·네이버1y)이 달라 1Y도 252봉으로 통일
+    const days={'1M':22,'3M':66,'6M':132,'1Y':252,'3Y':756,'10Y':2520}[box.dataset.p||'1Y'];  // 소스별 보유이력이 달라 기간별 봉수로 통일(야후 10y·시나 3y·네이버 3y~)
     let t=hset.t.slice(-days), v=hset.v.slice(-days).map(x=>x*(r.mult||1));
     const W=cv.clientWidth||560,H=600; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
@@ -4865,7 +4866,7 @@ await _canvasFlow(c);
       x.fillStyle='#8a94a0'; x.textAlign='right'; x.fillText((hi-rg*g2/4).toLocaleString(undefined,{maximumFractionDigits:r.dec}),P.l-5,y+3); }
     x.textAlign='left'; let lastM='';
     for(let i=0;i<t.length;i++){ const mk=t[i].slice(0,6); if(mk!==lastM){ lastM=mk;
-      if(t.length<=140||+t[i].slice(4,6)%3===1){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
+      if(t.length<=140||(t.length<=600?+t[i].slice(4,6)%3===1:+t[i].slice(4,6)===1)){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
     if(ovv){ x.strokeStyle='#6b7280'; x.lineWidth=1.2; x.beginPath(); let st=false;
       ovv.forEach((val,i)=>{ if(val==null) return; st?x.lineTo(X(i),Y(val)):(x.moveTo(X(i),Y(val)),st=true); }); x.stroke();
       x.font='11px sans-serif'; x.fillStyle='#6b7280'; x.fillText('원/달러 환율',P.l+6,P.t+14);
