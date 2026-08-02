@@ -38,6 +38,7 @@ def jget(url, timeout=15, tries=2):
 # (그룹, 심볼, 이름, 소스, 표시배수, 소수점)  src: Y=야후 N=네이버(이력은 야후 병행 시 심볼)
 U = [
  ("kr","^KS11","KOSPI","NY",1,2), ("kr","^KQ11","KOSDAQ","NY",1,2), ("kr","^KS200","KOSPI200","NY",1,2),
+ ("kr","NAVKR.KPI100","코스피 100","NK",1,2), ("kr","NAVKR.KVALUE","코리아 밸류업 지수","NK",1,2),
  ("us","^DJI","다우 산업","Y",1,2), ("us","^DJT","다우 운송","Y",1,2), ("us","^IXIC","나스닥 종합","Y",1,2),
  ("us","^NDX","나스닥 100","Y",1,2), ("us","^GSPC","S&P 500","Y",1,2), ("us","^SOX","필라델피아 반도체","Y",1,2),
  ("us","^NYA","NYSE 종합","Y",1,2), ("us","^XAX","아멕스 종합","Y",1,2), ("us","^VIX","VIX","Y",1,2),
@@ -137,6 +138,7 @@ NAVER_LIVE = {"^KS11": "KOSPI", "^KQ11": "KOSDAQ", "^KS200": "KPI200"}   # T+0 �
 NAVER_IDX  = {"NAV.TOPX": ".TOPX", "NAV.VNI": ".VNI", "NAV.HNXI": ".HNXI", "NAV.SSEA": ".SSEA",
               "NAV.SSEB": ".SSEB", "NAV.SZSA": ".SZSA", "NAV.SZSB": ".SZSB", "NAV.CSI100": ".CSI100",
               "NAV.IBEX": ".IBEX", "NAV.OMXS30": ".OMXS30", "NAV.OMXC20": ".OMXC20", "NAV.BUX": ".BUX"}
+NK_CODES = {"NAVKR.KPI100": "KPI100", "NAVKR.KVALUE": "KVALUE"}   # 네이버 국내지수(실시간+이력) — 2026-08-02 실측
 NAVER_HIST_FB = {"399106.SZ": ".SZSC"}   # 야후가 시세만 주는 심볼의 이력 대체(2026-08-02 실측)
 # (2026-08-02) 텐센트 kline — 야후·네이버 모두 이력 미제공(차이넥스트·과창판50·항셍테크).
 #   이스트머니는 서버(해외 IP)에서 차단되어 텐센트(web.ifzq.gtimg.cn)로 확정 — 서버 실측 정상.
@@ -346,7 +348,7 @@ def krx_fetch(hist):
     except Exception:
         return [], hist
     # (실측 2026-08-01) BBIG·2차전지 등 K-뉴딜 TOP10 시리즈는 KRX OPENAPI 미제공 → 제공 지수로 구성
-    WANT = ["KRX 300", "KRX 100", "코리아 밸류업 지수", "KRX 300 정보기술", "KRX 300 금융",
+    WANT = ["KRX 300", "KRX 100", "KRX 300 정보기술", "KRX 300 금융",
             "KRX 300 헬스케어", "KRX 300 자유소비재", "코스닥 150", "코스닥 글로벌",
             "코스피 200 정보기술", "코스피 200 금융"]
     rows = []
@@ -406,6 +408,12 @@ def main():
             series = uph.get(s); q = ups.get(s) or {}
             r["px"] = q.get("px"); r["at"] = q.get("at")
             if q.get("pc"): r["ret_d1_live"] = round((q["px"] / q["pc"] - 1) * 100, 2)
+        elif src == "NK":
+            q = naver_kr(NK_CODES[s])
+            nh = naver_kr_hist(NK_CODES[s])
+            series = nh if nh["t"] else None
+            if q: r["px"] = q["px"]; r["at"] = "실시간(네이버)"
+            elif series: r["px"] = series["v"][-1]
         elif src == "NF":
             q = naver_fut(NF_CODES[s])
             nh = naver_fut_hist(NF_CODES[s])

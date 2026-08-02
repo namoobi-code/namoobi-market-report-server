@@ -4677,6 +4677,7 @@ await _canvasFlow(c);
 
   /* 외부 차트 링크 — 실측 검증된 코드만 버튼 노출(2026-08-02 전수 프로브). 팝업으로 표시 */
   const NAVER={'^KS11':'domestic/index/KOSPI/total','^KQ11':'domestic/index/KOSDAQ/total','^KS200':'domestic/index/KPI200/total',
+    'NAVKR.KPI100':'domestic/index/KPI100/total','NAVKR.KVALUE':'domestic/index/KVALUE/total',
     '^DJI':'worldstock/index/.DJI/total','^DJT':'worldstock/index/.DJT/total','^IXIC':'worldstock/index/.IXIC/total',
     '^NDX':'worldstock/index/.NDX/total','^GSPC':'worldstock/index/.INX/total','^SOX':'worldstock/index/.SOX/total',
     '^VIX':'worldstock/index/.VIX/total','^HSI':'worldstock/index/.HSI/total','^HSCE':'worldstock/index/.HSCE/total',
@@ -4786,7 +4787,7 @@ await _canvasFlow(c);
     const s=r.s, L=[];
     if(NAVER[s]) L.push(['네이버', NAVER[s].startsWith('http')?NAVER[s]:`https://m.stock.naver.com/${NAVER[s]}`]);
     const NOY=['CNYKRW=X','BRLKRW=X','SEKKRW=X','CZKKRW=X','CLPKRW=X','TRYKRW=X','EURUSD=X','GBPUSD=X','AUDUSD=X'];  // 네이버 고시환율 소스 — 야후 미상장
-    if(!s.startsWith('KRX:')&&!s.startsWith('NAV.')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!NOY.includes(s)){
+    if(!s.startsWith('KRX:')&&!s.startsWith('NAV')&&!s.startsWith('ND.')&&!s.startsWith('NF.')&&!NOY.includes(s)){
       const y=s.startsWith('KRW-')?s.split('-')[1]+'-KRW':s;
       L.push(['야후',`https://finance.yahoo.com/quote/${encodeURIComponent(y)}`]);
     }
