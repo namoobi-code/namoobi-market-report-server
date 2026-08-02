@@ -4630,6 +4630,18 @@ await _canvasFlow(c);
   const $=id=>document.getElementById(id);
   const fmt=(v,dec,mult)=>v==null?'—':(v*(mult||1)).toLocaleString(undefined,{minimumFractionDigits:dec??2,maximumFractionDigits:dec??2});
   const pc=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':v<0?'dn':''}">${v>0?'+':''}${v.toFixed(2)}%</span>`;
+  function subCode(sym){
+    if(sym.startsWith('KRW-')) return sym.split('-')[1]+'/KRW';
+    if(sym==='KRW=X') return 'KRW/USD';
+    if(/^[A-Z]{3}KRW=X$/.test(sym)) return 'KRW/'+sym.slice(0,3);
+    if(sym==='EURUSD=X') return 'USD/EUR';
+    if(sym==='GBPUSD=X') return 'USD/GBP';
+    if(sym==='AUDUSD=X') return 'USD/AUD';
+    if(/^[A-Z]{3}=X$/.test(sym)) return 'USD/'+sym.slice(0,3);
+    if(sym==='ND.FX_USDGEL') return 'USD/GEL';
+    if(sym.startsWith('ND.FX_')) return sym.slice(6,9)+'/'+sym.slice(9);
+    return '';
+  }
   function sparkSVG(a,w,h){
     if(!a||a.length<2) return '<span class="note">누적 중</span>';
     const lo=Math.min(...a),hi=Math.max(...a),rg=(hi-lo)||1;
@@ -4654,7 +4666,7 @@ await _canvasFlow(c);
       g.rows.forEach(r=>{
         const R=r.ret||{}; const d1=R.d1!=null?R.d1:r.ret_d1_live;
         h+=`<tr class="gmrow" data-s="${r.s}" style="cursor:pointer;border-bottom:1px solid #f2f4f7">`
-         +`<td style="padding:5px 6px"><b>${r.name}</b>${r.s.startsWith('KRW-')?` <span class="note" style="font-size:10px;font-weight:600">${r.s.split('-')[1]}/KRW</span>`:''} <span class="note" style="font-size:10px">${r.at||''}</span></td>`
+         +`<td style="padding:5px 6px"><b>${r.name}</b>${subCode(r.s)?` <span class="note" style="font-size:10px;font-weight:600">${subCode(r.s)}</span>`:''} <span class="note" style="font-size:10px">${r.at||''}</span></td>`
          +`<td style="text-align:right;font-weight:600">${fmt(r.px,r.dec,r.mult)}</td>`
          +`<td style="text-align:right">${pc(d1)}</td><td style="text-align:right">${pc(R.w1)}</td>`
          +`<td style="text-align:right">${pc(R.m1)}</td><td style="text-align:right">${pc(R.m3)}</td>`
@@ -4807,7 +4819,7 @@ await _canvasFlow(c);
     const box=$('gm_detail');
     const R=r.ret||{};
     box.innerHTML=`<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:2px 4px">
-      <b style="font-size:15px">${r.name}</b>${r.s.startsWith('KRW-')?`<span class="note" style="font-size:11px"> ${r.s.split('-')[1]}/KRW</span>`:''}<span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
+      <b style="font-size:15px">${r.name}</b>${subCode(r.s)?`<span class="note" style="font-size:11px"> ${subCode(r.s)}</span>`:''}<span style="font-size:15px;font-weight:600">${fmt(r.px,r.dec,r.mult)}</span>${pc(R.d1!=null?R.d1:r.ret_d1_live)}
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1M','3M','6M','1Y'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'1Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'1Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
@@ -4815,6 +4827,16 @@ await _canvasFlow(c);
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; openDetail(sym,true);}));
     box.querySelectorAll('.gme').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation(); window.open(b.dataset.u,'gm_pop','width=1280,height=860');}));
     box.querySelector('#gm_x').addEventListener('click',()=>{openSym=null; box.innerHTML='<div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>';});
+    let ov=null, prem=null;
+    if(sym==='KRW-USDT'){
+      if(!HIST['KRW=X']){ try{ HIST['KRW=X']=await fetch('/api/global_hist_one?s='+encodeURIComponent('KRW=X')).then(x=>x.ok?x.json():null); }catch(e){} }
+      ov=HIST['KRW=X'];
+      const kr=findRow('KRW=X');
+      if(kr&&kr.px&&r.px!=null){ prem=(r.px/kr.px-1)*100;
+        const hd=box.querySelector('div');
+        if(hd) hd.insertAdjacentHTML('beforeend',`<span class="note" style="font-size:12px">원/달러 ${kr.px.toLocaleString()} 대비 프리미엄 <b class="${prem>1?'up':prem<-1?'dn':''}">${prem>0?'+':''}${prem.toFixed(2)}%</b></span>`);
+      }
+    }
     const hset=HIST[sym];
     const cv=$('gm_cv');
     if(!hset||!hset.t||hset.t.length<2){ cv.outerHTML='<div class="note" style="padding:14px">이력 없음 — KRX 세부지수는 일별 누적 개시(2026-08-02) 후 차오릅니다.</div>'; return; }
@@ -4823,7 +4845,10 @@ await _canvasFlow(c);
     const W=cv.clientWidth||560,H=600; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const P={l:56,r:8,t:10,b:20};
-    const lo=Math.min(...v),hi=Math.max(...v),rg=(hi-lo)||1;
+    let ovv=null;
+    if(ov&&ov.t){ const om={}; ov.t.forEach((d,i)=>om[d]=ov.v[i]); ovv=t.map(d=>om[d]??null); }
+    const allv=ovv?v.concat(ovv.filter(x=>x!=null)):v;
+    const lo=Math.min(...allv),hi=Math.max(...allv),rg=(hi-lo)||1;
     const X=i=>P.l+(W-P.l-P.r)*i/(t.length-1), Y=val=>P.t+(H-P.t-P.b)*(1-(val-lo)/rg);
     x.font='10px sans-serif';
     for(let g2=0;g2<=4;g2++){ const y=P.t+(H-P.t-P.b)*g2/4;
@@ -4832,6 +4857,10 @@ await _canvasFlow(c);
     x.textAlign='left'; let lastM='';
     for(let i=0;i<t.length;i++){ const mk=t[i].slice(0,6); if(mk!==lastM){ lastM=mk;
       if(t.length<=140||+t[i].slice(4,6)%3===1){ x.fillStyle='#8a94a0'; x.fillText(`${t[i].slice(2,4)}.${t[i].slice(4,6)}`,X(i)-8,H-6); } } }
+    if(ovv){ x.strokeStyle='#6b7280'; x.lineWidth=1.2; x.beginPath(); let st=false;
+      ovv.forEach((val,i)=>{ if(val==null) return; st?x.lineTo(X(i),Y(val)):(x.moveTo(X(i),Y(val)),st=true); }); x.stroke();
+      x.font='11px sans-serif'; x.fillStyle='#6b7280'; x.fillText('원/달러 환율',P.l+6,P.t+14);
+      x.fillStyle='#c0392b'; x.fillText('테더 USDT/KRW',P.l+6,P.t+28); }
     const up=v[v.length-1]>=v[0];
     x.strokeStyle=up?'#c0392b':'#1e6fd6'; x.lineWidth=1.6; x.beginPath();
     v.forEach((val,i)=>i?x.lineTo(X(i),Y(val)):x.moveTo(X(i),Y(val))); x.stroke(); x.lineWidth=1;
