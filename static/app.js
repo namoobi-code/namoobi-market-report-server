@@ -1373,7 +1373,40 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         <div class="fo"><span class="fl">외국인</span><span class="fv ${String(v.foreign).startsWith('-')?'dn':'up'}">${E(v.foreign)}</span></div>
         <div class="fo"><span class="fl">기관</span><span class="fv ${String(v.institution).startsWith('-')?'dn':'up'}">${E(v.institution)}</span></div>
         <div class="fo"><span class="fl">개인</span><span class="fv ${String(v.individual).startsWith('-')?'dn':'up'}">${E(v.individual)}</span></div>
+        <div id="pg_${k}"></div>
       </div><div class="src">${E(v.comment||'')}</div></div>`;}).join('');
+  renderProgram();                                     // 프로그램(차익·비차익)·등락종목 — 서버 실시간 (2026-08-02)
+  async function renderProgram(){
+    let P; try{ P=await (await fetch('/api/db/program_trading')).json(); }catch(e){ return; }
+    const eok=v=>v==null?'—':`<span class="${v>0?'up':v<0?'dn':''}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
+    ['kospi','kosdaq'].forEach(k=>{
+      const el=document.getElementById('pg_'+k); if(!el||!P[k]||!(P[k].t||[]).length) return;
+      const a=P[k], i=a.t.length-1, ud=(P.updown||{})[k];
+      el.innerHTML=
+        `<div class="fo"><span class="fl">프로그램 차익</span><span class="fv">${eok(a.arb[i])}</span></div>
+         <div class="fo"><span class="fl">프로그램 비차익</span><span class="fv">${eok(a.nonarb[i])}</span></div>
+         <div class="fo"><span class="fl">프로그램 전체</span><span class="fv">${eok(a.whole[i])}</span></div>`+
+        (ud?`<div class="fo"><span class="fl">등락종목</span><span class="fv"><span class="up">상승 ${ud.up}</span> · 보합 ${ud.flat} · <span class="dn">하락 ${ud.down}</span>${ud.uplm?` · 상한 ${ud.uplm}`:''}${ud.lslm?` · 하한 ${ud.lslm}`:''}</span></div>`:'')+
+        `<div class="note" style="margin-top:2px">프로그램 ${a.t[i].slice(4,6)}/${a.t[i].slice(6)} 종가(네이버·억원)${ud?` · 등락종목 ${E(P.updown_asof||'')} 기준(KIS)`:''}</div>
+         <canvas id="pgc_${k}" style="width:100%;height:150px;margin-top:6px"></canvas>
+         <div class="note"><span style="color:#e08e3c;font-weight:700">━ 차익</span>(선물-현물 괴리 연계·기계적 수급) · <span style="color:#1f6feb;font-weight:700">━ 비차익</span>(기관 방향성 현물: 바스켓·ETF 설정 등) — 순매수 추세 최근 60거래일. 비차익이 규모·지속성 면에서 지수 방향 설명력이 높고, 차익은 베이시스·외국인 선물과 함께 볼 것</div>`;
+      const cv=document.getElementById('pgc_'+k);
+      const n=Math.min(60,a.t.length), t=a.t.slice(-n), s1=a.arb.slice(-n), s2=a.nonarb.slice(-n);
+      const W=cv.clientWidth||420,Hh=150; cv.width=W; cv.height=Hh;
+      const x=cv.getContext('2d'); const Pd={l:6,r:46,t:6,b:14};
+      const all=s1.concat(s2); let lo=Math.min.apply(null,all.concat([0])), hi=Math.max.apply(null,all.concat([0]));
+      const pad=(hi-lo)*0.06||1; lo-=pad; hi+=pad;
+      const X=j2=>Pd.l+(W-Pd.l-Pd.r)*j2/Math.max(1,n-1), Y=v=>Pd.t+(Hh-Pd.t-Pd.b)*(1-(v-lo)/(hi-lo));
+      x.font='9px sans-serif';
+      x.strokeStyle='#c9d1da'; x.setLineDash([3,3]); x.beginPath(); x.moveTo(Pd.l,Y(0)); x.lineTo(W-Pd.r,Y(0)); x.stroke(); x.setLineDash([]);
+      x.fillStyle='#98a2ad'; x.fillText('0',W-Pd.r+3,Y(0)+3);
+      x.fillText(Math.round(hi).toLocaleString(),W-Pd.r+3,Y(hi)+8); x.fillText(Math.round(lo).toLocaleString(),W-Pd.r+3,Y(lo)-2);
+      [0,Math.floor(n/2),n-1].forEach(j2=>{ x.fillText(t[j2].slice(4,6)+'/'+t[j2].slice(6),X(j2)-10,Hh-3); });
+      const lineS=(s,col)=>{ x.strokeStyle=col; x.lineWidth=1.4; x.beginPath();
+        s.forEach((v,j2)=>j2?x.lineTo(X(j2),Y(v)):x.moveTo(X(j2),Y(v))); x.stroke(); x.lineWidth=1; };
+      lineS(s1,'#e08e3c'); lineS(s2,'#1f6feb');
+    });
+  }
 
   const KS=M.korea_investor_stocks||{};
   const KSL={kospi_foreign_buy:'코스피 외국인 순매수',kospi_foreign_sell:'코스피 외국인 순매도',
