@@ -4831,7 +4831,7 @@ await _canvasFlow(c);
           <td style="padding:4px 4px;width:22px;color:#8a94a0">${i+1}</td>
           <td style="padding:4px 2px"><b>${r.name}</b></td>
           <td style="text-align:right;font-weight:600">${r.px!=null?r.px.toLocaleString():'—'}</td>
-          <td style="text-align:right;width:76px"><span class="${r.pct>0?'up':r.pct<0?'dn':''}">${r.pct>0?'+':''}${r.pct??'—'}%</span></td></tr>`).join('')+'</table>'+(P.rows.length>10?`<div style="text-align:center;margin-top:4px"><button onclick="window.__gmPopAll=!window.__gmPopAll" id="gm_pop_more" style="padding:2px 12px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">${window.__gmPopAll?'접기 ▲':'더보기(30위까지) ▼'}</button></div>`:'');
+          <td style="text-align:right;width:76px"><span class="${r.pct>0?'up':r.pct<0?'dn':''}">${r.pct>0?'+':''}${r.pct??'—'}%</span></td></tr>`).join('')+'</table>'+(P.rows.length>10?`<div style="text-align:center;margin-top:4px"><button onclick="window.__gmPopAll=!window.__gmPopAll; window.__gmPopRe&&window.__gmPopRe()" id="gm_pop_more" style="padding:2px 12px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">${window.__gmPopAll?'접기 ▲':'더보기(30위까지) ▼'}</button></div>`:'');
     }catch(e){}
   }
   window.renderGlobal=function(){
