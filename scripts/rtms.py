@@ -21,6 +21,11 @@ MONTHS = 24 if "--backfill" in sys.argv else 3
 if "--months" in sys.argv:
     MONTHS = int(sys.argv[sys.argv.index("--months") + 1])
 EXTEND = "--extend" in sys.argv        # 이미 수집된 달은 건너뛰고 과거만 채움(최근 3개월은 항상 재수집)
+BUDGET = None                          # --budget N: 이번 실행 API 호출 상한(심층 백필 분할용)
+if "--budget" in sys.argv:
+    BUDGET = int(sys.argv[sys.argv.index("--budget") + 1])
+CALLS = 0
+class _Stop(Exception): pass
 ONLY = None
 if "--only" in sys.argv:
     ONLY = set(sys.argv[sys.argv.index("--only") + 1].split(","))
@@ -119,8 +124,12 @@ def months_back(n):
 
 def fetch(svc, op, lawd, ym):
     """전 페이지 수집 — item dict 리스트."""
+    global CALLS
     rows, page = [], 1
     while True:
+        CALLS += 1
+        if BUDGET and CALLS > BUDGET:
+            raise _Stop("호출 예산 소진")
         u = (f"https://apis.data.go.kr/1613000/{svc}/{op}"
              f"?serviceKey={KEY}&LAWD_CD={lawd}&DEAL_YMD={ym}&numOfRows=1000&pageNo={page}")
         try:
@@ -134,7 +143,7 @@ def fetch(svc, op, lawd, ym):
                 return rows
         rc = (root.findtext(".//resultCode") or "").strip()
         if rc == "22":
-            print("⚠ 일일 트래픽 한도 초과 — 중단(내일 --backfill --only 로 이어서)"); sys.exit(2)
+            raise _Stop("일일 트래픽 한도 초과")
         if rc not in ("000", "00"):
             return rows
         items = root.findall(".//item")
@@ -178,17 +187,24 @@ def main():
         r_ = {t: (rent.get(code) or {}).get("m", {}).get(t) for t in (rent.get(code) or {}).get("m", {})} \
             if isinstance((rent.get(code) or {}).get("m"), dict) else {}
         recent = set(months_back(3)) | {datetime.now().strftime("%Y%m")}
-        for ym in yms:
-            if EXTEND and ym not in recent and (ym in s or ym in r_):
-                continue
-            a = agg_sale(fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym))
-            if a: s[ym] = a
-            time.sleep(0.12)
-            b = agg_rent(fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym))
-            if b: r_[ym] = b
-            time.sleep(0.12)
+        stopped = None
+        try:
+            for ym in (reversed(yms) if EXTEND else yms):    # 심층 백필은 최신→과거 순(가까운 과거부터 완성)
+                if EXTEND and ym not in recent and (ym in s or ym in r_):
+                    continue
+                a = agg_sale(fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym))
+                if a: s[ym] = a
+                time.sleep(0.12)
+                b = agg_rent(fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym))
+                if b: r_[ym] = b
+                time.sleep(0.12)
+        except _Stop as e:
+            stopped = str(e)
         sale[code] = {"m": s}; rent[code] = {"m": r_}
-        print(f"  [{i+1}/{len(REGIONS)}] {name}: 매매 {len(s)}개월 · 전세 {len(r_)}개월")
+        print(f"  [{i+1}/{len(REGIONS)}] {name}: 매매 {len(s)}개월 · 전세 {len(r_)}개월"
+              + (f"  ⚠ {stopped} — 진행분 저장 후 종료" if stopped else ""))
+        if stopped:
+            break
     # 합산 의사지역 — 서울(25구)·부산(16구군)
     def agg_region(codes, key_avg):
         allm = sorted({t for c in codes for t in ((sale if key_avg == "avg" else rent).get(c) or {}).get("m", {})})
