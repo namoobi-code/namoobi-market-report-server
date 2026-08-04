@@ -1100,8 +1100,19 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       fetch('/api/db/rtms').then(x=>x.ok?x.json():null).then(R=>{
         if(!R||!R.sale) return;
         const sel=$('re_rt_sel'); if(!sel) return;
-        const codes=[...['SEOUL','BUSAN'].filter(c=>(R.names||{})[c]),...Object.keys(R.names||{}).filter(c=>c!=='SEOUL'&&c!=='BUSAN')];
-        sel.innerHTML=codes.map(c=>`<option value="${c}">${(R.names||{})[c]||c}</option>`).join('');
+        // (2026-08-02) 전국 시군구 — 시도 합산(A11 서울 전체 등) 그룹 + 시도별 optgroup
+        {const N=R.names||{};
+         const aggs=Object.keys(N).filter(c=>c.startsWith('A')).sort();
+         const regs=Object.keys(N).filter(c=>!c.startsWith('A')).sort();
+         let html=`<optgroup label="시도 전체(합산)">${aggs.map(c=>`<option value="${c}">${N[c]}</option>`).join('')}</optgroup>`;
+         const SIDONM={'11':'서울','26':'부산','27':'대구','28':'인천','30':'대전','31':'울산','36':'세종','41':'경기','51':'강원','43':'충북','44':'충남','52':'전북','46':'전남','47':'경북','48':'경남','50':'제주'};
+         for(const pfx of Object.keys(SIDONM)){
+           const grp=regs.filter(c=>c.startsWith(pfx));
+           if(grp.length) html+=`<optgroup label="${SIDONM[pfx]}">${grp.map(c=>`<option value="${c}">${N[c]}</option>`).join('')}</optgroup>`;
+         }
+         if(!aggs.length) html=Object.keys(N).map(c=>`<option value="${c}">${N[c]}</option>`).join('');   // 구버전 데이터 호환
+         sel.innerHTML=html;
+         if(N['A11']) sel.value='A11'; else if(N['SEOUL']) sel.value='SEOUL';}
         const draw=()=>{
           const c=sel.value, sm=(R.sale[c]||{}).m||{}, rm=((R.rent||{})[c]||{}).m||{};
           const ts=Object.keys(sm).sort(); if(!ts.length) return;
