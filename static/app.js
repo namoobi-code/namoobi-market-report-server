@@ -3871,6 +3871,19 @@ await _canvasFlow(c);
     const sl=a=>(a||[]).slice(off), pad=(a,d)=>a.map((x,i)=>x==null?(d[i]):x);
     const c=sl(full), o=pad(sl(D.o),c), hh=pad(sl(D.h),c), ll=pad(sl(D.l),c), v=sl(D.v).map(x=>x||0), t=sl(D.t);
     _CT=t; _CHD=String(t[HI]||'').replace(/-/g,'');   // 수급 패널과 '날짜'로 동기화(t 선언 이후여야 함)
+    /* (2026-08-04) 분봉 등락 기준 = '전일 종가' — 직전 봉 대비가 아니라 일봉과 같은 당일 등락률.
+       전일 종가 = 직전 거래일의 정규장 마감(KR 15:30 · US 16:00) 이전 마지막 봉 종가
+       (시간외포함 모드에서 전일 애프터 체결을 기준 삼으면 일봉 % 와 어긋나므로 정규장 마감 기준). */
+    const _pdc=fi=>{ if(!_isMin()) return null;
+      const T=D.t||[], d=String(T[fi]||'').slice(0,8); if(d.length<8) return null;
+      const cut = mkt==='kr' ? '1531' : '1601';
+      let j=fi-1;
+      while(j>=0 && String(T[j]||'').slice(0,8)===d) j--;
+      if(j<0) return null;
+      const pd=String(T[j]).slice(0,8), any=full[j];
+      for(let k=j;k>=0;k--){ const z=String(T[k]||''); if(z.slice(0,8)!==pd) break;
+        if(z.slice(8,12)<cut) return full[k]; }        // 정규장 마지막 봉
+      return any; };                                   // 정규장 봉이 없으면 그 날 마지막 봉
     /* (2026-07-21) x축 라벨을 공통 함수로 — 메인 차트와 보조 패널(OBV 등)이 똑같은 라벨·위치를 쓴다.
        예전엔 OBV 패널이 분봉에서도 '년.월'(26.07)만 찍어 다 같아 보였다(정렬은 맞는데 라벨만 무의미).
        모든 패널이 P.l=6·P.r=52·N 동일이라 X(i) 픽셀이 일치 → 같은 함수를 쓰면 라벨도 세로로 딱 맞는다. */
@@ -3917,7 +3930,10 @@ await _canvasFlow(c);
     const sigF=_ema(macdF,9);
     const macd=sl(macdF), sig=sl(sigF), hist=macd.map((x,i)=>(x!=null&&sig[i]!=null)?x-sig[i]:null);
     const UP='#d33', DN='#1f6feb';
-    const last=c[c.length-1], prev=c[c.length-2]??last, chg=prev?(last/prev-1)*100:0;
+    const last=c[c.length-1];
+    let prev=c[c.length-2]??last;
+    if(_isMin()){ const r=_pdc(off+c.length-1); if(r!=null) prev=r; }   // 분봉: 전일 종가 대비
+    const chg=prev?(last/prev-1)*100:0;
     $('sd_last').innerHTML=`${mkt==='kr'?Math.round(last).toLocaleString()+'원':'$'+(+last).toFixed(2)} <span class="${chg>=0?'up':'dn'}">${chg>=0?'+':''}${chg.toFixed(2)}%</span>`;
     // ① 메인(캔들+MA+BB+52주고점) — 일반·로그 두 판 (useLog=가격을 log 공간에 매핑, 상승률 기준 균등)
     const drawMain=(id,useLog)=>{
@@ -4038,7 +4054,9 @@ await _canvasFlow(c);
        x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke();
        x.beginPath(); x.moveTo(P.l,Y(c[HI])); x.lineTo(W-P.r,Y(c[HI])); x.stroke(); x.restore(); }
      // 상단 범례 2줄 — 호버 중이면 그 봉, 아니면 최신 봉 기준
-     {const dd=String(t[HI]||'').replace(/-/g,''), pv=(HI>0?c[HI-1]:c[HI]);
+     {const dd=String(t[HI]||'').replace(/-/g,'');
+      let pv=(HI>0?c[HI-1]:c[HI]);
+      if(_isMin()){ const r=_pdc(off+HI); if(r!=null) pv=r; }   // 분봉: 전일 종가 대비 (일봉과 동일한 등락률)
       const df=c[HI]-pv, dp=pv?(df/pv*100):0, upc=df>=0;
       x.font='10px sans-serif'; x.textAlign='left';
       let cx=P.l+4; const put=(txt,col,bold)=>{ x.font=(bold?'bold ':'')+'10px sans-serif';
