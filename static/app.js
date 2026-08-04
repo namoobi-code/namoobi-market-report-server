@@ -1143,22 +1143,28 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          let met='avg';
          const q=$('re_cmp_q'), list=$('re_cmp_list');
          const mbar=()=>{$('re_cmp_metric').innerHTML=METRICS.map(([k,l])=>`<button data-m="${k}" style="margin-right:4px;padding:3px 10px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===met?'#1f2937':'#fff'};color:${k===met?'#fff':'#333'}">${l}</button>`).join('');
-           $('re_cmp_metric').querySelectorAll('button').forEach(b=>b.onclick=()=>{met=b.dataset.m; mbar(); drawBig();});};
+           $('re_cmp_metric').querySelectorAll('button').forEach(b=>b.onclick=()=>{met=b.dataset.m; mbar(); drawBig(true);});};
          const chips=()=>{$('re_cmp_chips').innerHTML=mset.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${PAL[i%PAL.length]}18;border:1px solid ${PAL[i%PAL.length]};color:#333"><b style="color:${PAL[i%PAL.length]}">●</b>${E(N[c]||c)}<b data-rm="${c}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
-           $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{mset=mset.filter(c=>c!==x.dataset.rm); chips(); drawBig();});};
+           $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{mset=mset.filter(c=>c!==x.dataset.rm); chips(); drawBig(true);});};
          const showList=()=>{const kw=(q.value||'').trim().toLowerCase();
            const cand=Object.keys(N).filter(c=>!mset.includes(c)&&(!kw||String(N[c]).toLowerCase().includes(kw)));
            const aggs=cand.filter(c=>c.startsWith('A')), regs=cand.filter(c=>!c.startsWith('A'));
            list.innerHTML=[...aggs,...regs].slice(0,40).map(c=>`<div data-add="${c}" style="padding:5px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">${c.startsWith('A')?'★ ':''}${E(N[c]||c)}</div>`).join('')||'<div style="padding:6px 10px" class="note">없음</div>';
            list.style.display='';
            list.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{if(mset.length>=12){alert('최대 12개까지');return;}
-             mset.push(x.dataset.add); q.value=''; list.style.display='none'; chips(); drawBig();});};
+             mset.push(x.dataset.add); q.value=''; list.style.display='none'; chips(); drawBig(true);});};
          q.oninput=showList; q.onfocus=showList;
          document.addEventListener('click',e=>{ if(!e.target.closest('#re_cmp_q')&&!e.target.closest('#re_cmp_list')) list.style.display='none'; });
-         function drawBig(){
+         let vN=null, vOff=0, curL=0;                       // 휠 확대/축소 상태 (null=전체)
+         function drawBig(reset){
+           if(reset){ vN=null; vOff=0; }
            const src=met==='dep'?(R.rent||{}):(R.sale||{});
            const tset=new Set(); mset.forEach(c=>Object.keys((src[c]||{}).m||{}).forEach(t=>tset.add(t)));
-           const ts=[...tset].sort(); if(!ts.length){$('re_rt_big_n').textContent='선택된 지역의 데이터가 없습니다'; return;}
+           const full=[...tset].sort(); if(!full.length){$('re_rt_big_n').textContent='선택된 지역의 데이터가 없습니다'; return;}
+           curL=full.length;
+           const n=vN?Math.max(6,Math.min(vN,curL)):curL, off=Math.max(0,Math.min(vOff,curL-n));
+           const end=curL-off, st=Math.max(0,end-n);
+           const ts=full.slice(st,end);
            const _d=new Date(); _d.setMonth(_d.getMonth()-2);
            const _cut=`${_d.getFullYear()}${String(_d.getMonth()+1).padStart(2,'0')}`;
            let provIdx=ts.findIndex(t=>t>_cut); if(provIdx<0) provIdx=null;
@@ -1166,9 +1172,27 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                                        label:(N[c]||c).replace(/\(.*\)/,''),color:PAL[i%PAL.length]})).filter(a=>a.v.some(v=>v!=null));
            line('re_rt_big',arr,{provIdx});
            const ml=METRICS.find(x=>x[0]===met)[1];
-           $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · <b>중위가는 시도 전체 합산에선 미제공</b>(개별 시군구만)':''} · 주황 음영=신고 진행 중(잠정) · 지역별 스케일 차이가 크면 평균가 대신 거래량으로 비교 권장`;
+           $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · <b>중위가는 시도 전체 합산에선 미제공</b>(개별 시군구만)':''} · 주황 음영=신고 진행 중(잠정) · 🖱 휠=X축 확대/축소·드래그=좌우 이동(표시 ${ts.length}/${curL}개월) · 지역별 스케일 차이가 크면 거래량으로 비교 권장`;
          }
-         mbar(); chips(); drawBig();}
+         {const cv2=$('re_rt_big');
+          cv2.addEventListener('wheel',e=>{ e.preventDefault();
+            const r2=cv2.getBoundingClientRect();
+            const fr=Math.min(1,Math.max(0,(e.clientX-r2.left)/Math.max(1,r2.width)));
+            const n0=vN?Math.min(vN,curL):curL, off0=Math.min(vOff,curL-n0);
+            const st0=Math.max(0,curL-off0-n0), anchor=st0+fr*(n0-1);
+            const n1=Math.max(6,Math.min(curL,Math.round(n0*(e.deltaY<0?0.8:1.25))));
+            let s1=Math.round(anchor-fr*(n1-1)); s1=Math.max(0,Math.min(curL-n1,s1));
+            vN=n1; vOff=curL-s1-n1; drawBig();
+          },{passive:false});
+          let dr2=null;
+          cv2.addEventListener('mousedown',e=>{ dr2={x:e.clientX,o:vOff}; });
+          cv2.addEventListener('mousemove',e=>{ if(!dr2) return;
+            const n0=vN?Math.min(vN,curL):curL;
+            const bw=(cv2.clientWidth||900)/Math.max(1,n0);
+            vOff=Math.max(0,Math.min(curL-n0,dr2.o+Math.round((e.clientX-dr2.x)/bw))); drawBig(); });
+          cv2.addEventListener('mouseup',()=>{ dr2=null; });
+          cv2.addEventListener('mouseleave',()=>{ dr2=null; });}
+         mbar(); chips(); drawBig(true);}
       }).catch(()=>{});
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
       try{
