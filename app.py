@@ -753,28 +753,14 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
                 base = {"t": [_dt.utcfromtimestamp(x + off).strftime("%Y%m%d%H%M") for x in ts],
                         "o": q.get("open"), "h": q.get("high"), "l": q.get("low"),
                         "c": q.get("close"), "v": q.get("volume")}
-                # (2026-08-04) 시간외 오류 프린트 정화 — 저유동성 프리·애프터의 단발 이상체결이
-                #   ±수십% 스파이크로 그려진다(MTS는 거래소 정제 피드라 안 보임).
-                #   ① 이웃 ±3봉 중앙값에서 5% 이상 벗어난 봉 제거 ② 꼬리는 몸통 ±3%로 클램프 ③ o/h/l 결측은 c로
-                import statistics as _st
-                cs = base["c"] or []; n_ = len(cs)
-                bad = set()
-                for i in range(n_):
-                    if cs[i] is None: continue
-                    nb = [cs[j] for j in range(max(0, i - 3), min(n_, i + 4)) if j != i and cs[j] is not None]
-                    if len(nb) >= 3 and abs(cs[i] / _st.median(nb) - 1) > 0.05:
-                        bad.add(i)
-                for k_ in ("o", "h", "l", "c", "v"):
-                    arr_ = base[k_] or [None] * n_
-                    base[k_] = [None if i in bad else arr_[i] for i in range(n_)]
-                for i in range(n_):
+                # (2026-08-04) 사용자 요청으로 이상틱 필터 없음(실제 체결 그대로 — 급등락 즉시 확인용).
+                #   결측 OHLC만 종가로 보정(렌더 깨짐 방지).
+                for i in range(len(base["c"] or [])):
                     c_ = base["c"][i]
                     if c_ is None: continue
-                    o_ = base["o"][i] if base["o"][i] is not None else c_
-                    bh, bl = max(o_, c_), min(o_, c_)
-                    base["o"][i] = o_
-                    base["h"][i] = min(base["h"][i], bh * 1.03) if base["h"][i] is not None else bh
-                    base["l"][i] = max(base["l"][i], bl * 0.97) if base["l"][i] is not None else bl
+                    if base["o"][i] is None: base["o"][i] = c_
+                    if base["h"][i] is None: base["h"][i] = max(base["o"][i], c_)
+                    if base["l"][i] is None: base["l"][i] = min(base["o"][i], c_)
             # 분 단위 버킷 — 같은 날짜 안에서 (시*60+분)//n
             def _kf(s):
                 return s[:8] + str((int(s[8:10]) * 60 + int(s[10:12])) // n)

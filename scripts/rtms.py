@@ -9,7 +9,7 @@
 산출: data/db/rtms.json {asof, names, sale:{code:{t,n,avg,med}}, rent:{...}, } + SEOUL(25구 합산) 의사지역
 사용: rtms.py [--backfill]  (백필 24개월 · 기본 최근 3개월 롤링)
 """
-import json, sys, time, urllib.request
+import json, sys, time, urllib.request, urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
@@ -135,6 +135,14 @@ def fetch(svc, op, lawd, ym):
         try:
             d = urllib.request.urlopen(u, timeout=25).read()
             root = ET.fromstring(d)
+        except urllib.error.HTTPError as he:
+            if he.code == 429:
+                raise _Stop("HTTP 429 요청 과다(국토부 레이트리밋)")
+            time.sleep(1)
+            try:
+                d = urllib.request.urlopen(u, timeout=25).read(); root = ET.fromstring(d)
+            except Exception:
+                return rows
         except Exception:
             time.sleep(1)
             try:
