@@ -54,6 +54,7 @@
   .cbox{position:relative}
   .cbox canvas{height:100%!important;max-height:none!important}
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
+  #re_rt_big{height:520px!important;max-height:none!important} /* 부동산 지역비교 대형차트 — 동일 캡 해제 */
   a{color:var(--dn);text-decoration:none}a:hover{text-decoration:underline}
   .links{display:flex;flex-wrap:wrap;gap:7px}
   .links a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--tx)}
@@ -657,7 +658,7 @@
           </span>
           <span id="re_cmp_chips" style="display:inline-flex;gap:5px;flex-wrap:wrap"></span>
         </div>
-        <canvas id="re_rt_big" style="width:100%;height:380px"></canvas>
+        <canvas id="re_rt_big" style="width:100%;height:520px"></canvas>
         <div class="note" id="re_rt_big_n" style="margin-top:4px;line-height:1.6"></div>
       </div>
     </div>

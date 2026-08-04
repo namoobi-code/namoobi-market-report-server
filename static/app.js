@@ -1137,6 +1137,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         sel.onchange=draw; draw();
         /* ── 지역 비교 대형 차트 — 다중 선택(검색+칩) · 지표 토글 (2026-08-02) ── */
         {const N=R.names||{}, PAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e9aa7','#c2185b','#5d4037','#455a64','#9e9d24','#00838f','#6d4c41'];
+         const E=z=>String(z??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));  // 부동산 IIFE엔 전역 E 없음(ReferenceError 수정)
          const METRICS=[['avg','평균가(억)'],['med','중위가(억)'],['n','매매 거래량'],['dep','전세 보증금(억)']];
          let mset=['A11','A26','A41'].filter(c=>N[c]); if(!mset.length) mset=Object.keys(N).slice(0,3);
          let met='avg';
