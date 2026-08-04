@@ -18,6 +18,9 @@ BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "rtms.json"
 KEY = (BASE / "keys" / "data.go.kr.txt").read_text().strip()
 MONTHS = 24 if "--backfill" in sys.argv else 3
+ONLY = None
+if "--only" in sys.argv:
+    ONLY = set(sys.argv[sys.argv.index("--only") + 1].split(","))
 
 REGIONS = {
     "11110": "서울 종로구", "11140": "서울 중구", "11170": "서울 용산구", "11200": "서울 성동구",
@@ -27,8 +30,10 @@ REGIONS = {
     "11530": "서울 구로구", "11545": "서울 금천구", "11560": "서울 영등포구", "11590": "서울 동작구",
     "11620": "서울 관악구", "11650": "서울 서초구", "11680": "서울 강남구", "11710": "서울 송파구",
     "11740": "서울 강동구",
-    "41135": "성남 분당구", "41117": "수원 영통구", "41465": "용인 수지구", "41590": "화성시", "41290": "과천시",
-    "26350": "부산 해운대구", "27260": "대구 수성구", "28185": "인천 연수구", "29155": "광주 남구", "30200": "대전 유성구",
+    "41135": "성남 분당구", "41117": "수원 영통구", "41465": "용인 수지구", "41597": "화성 동탄구", "41290": "과천시",
+    "26350": "부산 해운대구", "27260": "대구 수성구", "28185": "인천 연수구", "31140": "울산 남구", "30200": "대전 유성구",
+    # 참고: 화성시(41590)는 2026 일반구 분화(41593 봉담·41595 병점·41597 동탄) — 최대 거래권 동탄 채택.
+    #       광주광역시는 본 API에 전 구·전 월 0건(국토부 데이터 미제공 이슈)이라 울산 남구로 대체.
 }
 SEOUL = [c for c in REGIONS if c.startswith("11")]
 
@@ -93,6 +98,7 @@ def main():
     yms = months_back(MONTHS + 1)                               # 당월 포함(신고분 반영)
     yms.append(datetime.now().strftime("%Y%m"))
     for i, (code, name) in enumerate(REGIONS.items()):
+        if ONLY and code not in ONLY: continue
         s = {t: (sale.get(code) or {}).get("m", {}).get(t) for t in (sale.get(code) or {}).get("m", {})} \
             if isinstance((sale.get(code) or {}).get("m"), dict) else {}
         r_ = {t: (rent.get(code) or {}).get("m", {}).get(t) for t in (rent.get(code) or {}).get("m", {})} \
