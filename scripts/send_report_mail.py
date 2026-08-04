@@ -22,7 +22,13 @@
   발송 전 같은 첨부파일명이 최근 DEDUP_HOURS(20h) 내 기록돼 있으면 SMTP 를 건너뛰고
   기존 메시지ID 로 SENT(dedup) 를 반환한다. 클라이언트(send_mail_server.py)가 45초
   샌드박스 벽 등으로 "SENT" 확인을 유실하고 재시도해도 같은 회차가 두 번 발송되지 않는다.
-  (파일명에 _HHMM 이 포함되므로 새로 빌드한 다른 회차는 정상 발송된다. 강제 재발송은 --force.)
+
+[v3.71 일자 키 dedup — 2026-08-04 중복 발송 재발방지 2차]
+  종전엔 '첨부파일명 완전일치'로만 판정해, 예약 catch-up 세션과 수동 세션이 병렬로
+  같은 날짜 보고서를 _HHMM 만 다른 파일명(_1412/_1413)으로 각각 발송하는 중복 사고 발생
+  (2026-08-04 실측). 이제 global_market_report_YYYYMMDD 의 '일자 키'가 최근
+  DEDUP_HOURS 내 기발송이면 회차(_HHMM)가 달라도 차단한다. 같은 날 의도적 재발송
+  (재작업 회차 등)은 --force 로만 가능.
 """
 import json, os, re, smtplib, ssl, sys, time
 from datetime import datetime, timedelta
@@ -47,8 +53,17 @@ def app_password():
             pass
     return None
 
+def _date_key(name):
+    """global_market_report_YYYYMMDD_HHMM.docx → 'global_market_report_YYYYMMDD'.
+    회차(_HHMM)가 달라도 같은 날짜 보고서면 같은 키. 패턴 미일치 파일은 파일명 전체가 키(구 동작)."""
+    m = re.match(r"^(global_market_report_\d{8})_\d{4}\.docx$", name)
+    return m.group(1) if m else name
+
 def recent_sent(attach_name):
-    """최근 DEDUP_HOURS 내 같은 첨부파일명 발송 기록 → (시각, 메시지ID) 또는 None."""
+    """최근 DEDUP_HOURS 내 같은 '일자 키' 발송 기록 → (시각, 메시지ID, 기발송 파일명) 또는 None.
+    (v3.71) 파일명 완전일치 → 일자 키 비교로 확장: 병렬 세션이 _HHMM 만 다른 같은 날짜
+    보고서를 각각 발송하던 중복 수신(2026-08-04)을 차단한다."""
+    key = _date_key(attach_name)
     try:
         lines = SENT_LOG.read_text(encoding="utf-8").splitlines()
     except Exception:
@@ -56,14 +71,14 @@ def recent_sent(attach_name):
     cutoff = datetime.now() - timedelta(hours=DEDUP_HOURS)
     for ln in reversed(lines):
         parts = ln.split("\t")
-        if len(parts) < 3 or parts[1] != attach_name:
+        if len(parts) < 3 or _date_key(parts[1]) != key:
             continue
         try:
             ts = datetime.fromisoformat(parts[0])
         except Exception:
             continue
         if ts >= cutoff:
-            return parts[0], parts[2]
+            return parts[0], parts[2], parts[1]
     return None
 
 def log_sent(attach_name, msgid):
@@ -101,8 +116,9 @@ def main():
     if "--force" not in sys.argv:
         dup = recent_sent(attach_name)
         if dup:
-            ts, msgid = dup
-            print(f"SENT {msgid} (dedup — {ts} 기발송 재확인, 재발송 차단) "
+            ts, msgid, prior = dup
+            note = "" if prior == attach_name else f" 기발송={prior} (같은 날짜 다른 회차 — 재발송은 --force)"
+            print(f"SENT {msgid} (dedup — {ts} 기발송 재확인, 재발송 차단{note}) "
                   f"to=1 bcc={len(bcc)} attach={attach_name} {size}B")
             sys.exit(0)
 
