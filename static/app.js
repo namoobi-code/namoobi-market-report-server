@@ -1028,6 +1028,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(opts&&opts.base!=null){ x.setLineDash([4,3]); x.strokeStyle='#b7860b';
       x.beginPath();x.moveTo(P.l,Y(opts.base));x.lineTo(W-P.r,Y(opts.base));x.stroke(); x.setLineDash([]);
       x.fillStyle='#b7860b'; x.fillText(String(opts.base),P.l+2,Y(opts.base)-3); }
+    if(opts&&opts.provIdx!=null&&opts.provIdx>0&&opts.provIdx<N){   // (2026-08-02) 잠정 구간 음영 — 실거래 신고 진행 중
+      const x0=X(opts.provIdx);
+      x.fillStyle='rgba(230,140,0,0.07)'; x.fillRect(x0,P.t,(W-P.r)-x0,H-P.t-P.b);
+      x.save(); x.setLineDash([3,3]); x.strokeStyle='#e08e3c'; x.beginPath(); x.moveTo(x0,P.t); x.lineTo(x0,H-P.b); x.stroke(); x.restore();
+      x.fillStyle='#c47b1e'; x.fillText('⚠ 잠정(신고 진행 중)',x0+3,P.t+10); }
     const t0=arr[0].t;                                  // X축 눈금 — 연간(YYYY)·월간(YYYYMM) 모두 지원
     x.fillStyle='#98a2ad';
     for(let i=0;i<t0.length;i++){ const s=String(t0[i]);
@@ -1116,14 +1121,17 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const draw=()=>{
           const c=sel.value, sm=(R.sale[c]||{}).m||{}, rm=((R.rent||{})[c]||{}).m||{};
           const ts=Object.keys(sm).sort(); if(!ts.length) return;
+          const _d=new Date(); _d.setMonth(_d.getMonth()-2);
+          const _cut=`${_d.getFullYear()}${String(_d.getMonth()+1).padStart(2,'0')}`;
+          let provIdx=ts.findIndex(t=>t>_cut); if(provIdx<0) provIdx=null;   // 최근 2개월 = 신고 진행 중(잠정)
           const n1={t:ts,v:ts.map(t=>sm[t].n)}, rn={t:ts,v:ts.map(t=>(rm[t]||{}).n??null)};
-          line('re_rt_n',[{...n1,label:'매매 건수',color:'#d9534f'},{...rn,label:'전세 건수',color:'#2f6fed'}]);
+          line('re_rt_n',[{...n1,label:'매매 건수',color:'#d9534f'},{...rn,label:'전세 건수',color:'#2f6fed'}],{provIdx});
           const av={t:ts,v:ts.map(t=>sm[t].avg)}, md={t:ts,v:ts.map(t=>sm[t].med??null)};
           const series=[{...av,label:'평균가(억)',color:'#d9534f'}];
           if(md.v.some(v=>v!=null)) series.push({...md,label:'중위가(억)',color:'#888'});
-          line('re_rt_p',series);
+          line('re_rt_p',series,{provIdx});
           const L=ts[ts.length-1];
-          $('re_rt_n_n').innerHTML=`최신 <b>${fm(L)}</b> — 매매 <b>${sm[L].n.toLocaleString()}건</b>${rm[L]?` · 전세 ${rm[L].n.toLocaleString()}건`:''} · <b>신고기한 30일</b>이라 최근 1~2개월은 미완성치(매일 롤링 재수집으로 수렴) · 해제거래 제외 — 거래량 급감=거래절벽, 저점 대비 회복은 가격 반등 선행 신호로 참고`;
+          $('re_rt_n_n').innerHTML=`최신 <b>${fm(L)}</b>${provIdx!=null&&L>_cut?' <b style="color:#c47b1e">(잠정)</b>':''} — 매매 <b>${sm[L].n.toLocaleString()}건</b>${rm[L]?` · 전세 ${rm[L].n.toLocaleString()}건`:''} · <b>신고기한 30일</b>이라 최근 1~2개월은 미완성치(매일 롤링 재수집으로 수렴) · 해제거래 제외 — 거래량 급감=거래절벽, 저점 대비 회복은 가격 반등 선행 신호로 참고`;
           $('re_rt_p_n').innerHTML=`최신 ${fm(L)} — 평균 <b>${sm[L].avg}억</b>${sm[L].med!=null?` · 중위 ${sm[L].med}억`:''}${rm[L]?` · 전세 평균보증금 ${rm[L].dep}억`:''} — <b>가격지수(부동산원, 위 차트)</b>는 평활·보정으로 부드럽지만 늦고, <b>실거래 평균</b>은 빠르지만 그 달 거래 구성(고가·저가 단지 비중)에 따라 튈 수 있음`;
         };
         sel.onchange=draw; draw();
