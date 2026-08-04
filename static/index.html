@@ -647,6 +647,19 @@
         <canvas id="re_rt_p" style="width:100%;height:230px"></canvas>
         <div class="note" id="re_rt_p_n" style="margin-top:4px;line-height:1.6"></div>
       </div>
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">아파트 실거래 — 지역 비교 <span class="note">(원하는 지역을 여러 개 골라 겹쳐보기 · 시도 전체·개별 시군구 모두 선택 가능 · 최대 12개)</span></b>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
+          <span id="re_cmp_metric"></span>
+          <span style="position:relative">
+            <input type="text" id="re_cmp_q" placeholder="🔎 지역 검색 후 클릭해 추가 (예: 강남, 부산 전체)" style="width:280px;padding:4px 8px;font-size:12px;border:1px solid #d7dce3;border-radius:6px">
+            <div id="re_cmp_list" style="display:none;position:absolute;top:28px;left:0;z-index:30;background:#fff;border:1px solid #d7dce3;border-radius:6px;max-height:260px;overflow:auto;min-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.12)"></div>
+          </span>
+          <span id="re_cmp_chips" style="display:inline-flex;gap:5px;flex-wrap:wrap"></span>
+        </div>
+        <canvas id="re_rt_big" style="width:100%;height:380px"></canvas>
+        <div class="note" id="re_rt_big_n" style="margin-top:4px;line-height:1.6"></div>
+      </div>
     </div>
     <div class="note" style="margin-top:10px;line-height:1.7">
       📖 <b>읽는 법</b> — <b>전망CSI</b>는 심리 선행지표: 100선 위로 반등하면 몇 달 뒤 실제 가격지수·거래량이 따라오는 경향.

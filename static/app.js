@@ -1135,6 +1135,39 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           $('re_rt_p_n').innerHTML=`최신 ${fm(L)} — 평균 <b>${sm[L].avg}억</b>${sm[L].med!=null?` · 중위 ${sm[L].med}억`:''}${rm[L]?` · 전세 평균보증금 ${rm[L].dep}억`:''} — <b>가격지수(부동산원, 위 차트)</b>는 평활·보정으로 부드럽지만 늦고, <b>실거래 평균</b>은 빠르지만 그 달 거래 구성(고가·저가 단지 비중)에 따라 튈 수 있음`;
         };
         sel.onchange=draw; draw();
+        /* ── 지역 비교 대형 차트 — 다중 선택(검색+칩) · 지표 토글 (2026-08-02) ── */
+        {const N=R.names||{}, PAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e9aa7','#c2185b','#5d4037','#455a64','#9e9d24','#00838f','#6d4c41'];
+         const METRICS=[['avg','평균가(억)'],['med','중위가(억)'],['n','매매 거래량'],['dep','전세 보증금(억)']];
+         let mset=['A11','A26','A41'].filter(c=>N[c]); if(!mset.length) mset=Object.keys(N).slice(0,3);
+         let met='avg';
+         const q=$('re_cmp_q'), list=$('re_cmp_list');
+         const mbar=()=>{$('re_cmp_metric').innerHTML=METRICS.map(([k,l])=>`<button data-m="${k}" style="margin-right:4px;padding:3px 10px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===met?'#1f2937':'#fff'};color:${k===met?'#fff':'#333'}">${l}</button>`).join('');
+           $('re_cmp_metric').querySelectorAll('button').forEach(b=>b.onclick=()=>{met=b.dataset.m; mbar(); drawBig();});};
+         const chips=()=>{$('re_cmp_chips').innerHTML=mset.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${PAL[i%PAL.length]}18;border:1px solid ${PAL[i%PAL.length]};color:#333"><b style="color:${PAL[i%PAL.length]}">●</b>${E(N[c]||c)}<b data-rm="${c}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
+           $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{mset=mset.filter(c=>c!==x.dataset.rm); chips(); drawBig();});};
+         const showList=()=>{const kw=(q.value||'').trim().toLowerCase();
+           const cand=Object.keys(N).filter(c=>!mset.includes(c)&&(!kw||String(N[c]).toLowerCase().includes(kw)));
+           const aggs=cand.filter(c=>c.startsWith('A')), regs=cand.filter(c=>!c.startsWith('A'));
+           list.innerHTML=[...aggs,...regs].slice(0,40).map(c=>`<div data-add="${c}" style="padding:5px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">${c.startsWith('A')?'★ ':''}${E(N[c]||c)}</div>`).join('')||'<div style="padding:6px 10px" class="note">없음</div>';
+           list.style.display='';
+           list.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{if(mset.length>=12){alert('최대 12개까지');return;}
+             mset.push(x.dataset.add); q.value=''; list.style.display='none'; chips(); drawBig();});};
+         q.oninput=showList; q.onfocus=showList;
+         document.addEventListener('click',e=>{ if(!e.target.closest('#re_cmp_q')&&!e.target.closest('#re_cmp_list')) list.style.display='none'; });
+         function drawBig(){
+           const src=met==='dep'?(R.rent||{}):(R.sale||{});
+           const tset=new Set(); mset.forEach(c=>Object.keys((src[c]||{}).m||{}).forEach(t=>tset.add(t)));
+           const ts=[...tset].sort(); if(!ts.length){$('re_rt_big_n').textContent='선택된 지역의 데이터가 없습니다'; return;}
+           const _d=new Date(); _d.setMonth(_d.getMonth()-2);
+           const _cut=`${_d.getFullYear()}${String(_d.getMonth()+1).padStart(2,'0')}`;
+           let provIdx=ts.findIndex(t=>t>_cut); if(provIdx<0) provIdx=null;
+           const arr=mset.map((c,i)=>({t:ts,v:ts.map(t=>{const e=((src[c]||{}).m||{})[t]; return e?(e[met]??null):null;}),
+                                       label:(N[c]||c).replace(/\(.*\)/,''),color:PAL[i%PAL.length]})).filter(a=>a.v.some(v=>v!=null));
+           line('re_rt_big',arr,{provIdx});
+           const ml=METRICS.find(x=>x[0]===met)[1];
+           $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · <b>중위가는 시도 전체 합산에선 미제공</b>(개별 시군구만)':''} · 주황 음영=신고 진행 중(잠정) · 지역별 스케일 차이가 크면 평균가 대신 거래량으로 비교 권장`;
+         }
+         mbar(); chips(); drawBig();}
       }).catch(()=>{});
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
       try{
