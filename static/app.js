@@ -1992,7 +1992,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       scov:{label:'커버일수',fixed:'— (US 전용)'},
       inst:{label:'기관보유비중',fixed:'— (US 전용 — KR은 외인보유비중 사용)'},
       drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+parseFloat(v.toFixed(2))+'점',reqData:1,presets:[['전체',null,null],['강세(+1점 ↑)',1,null],['+0.5점 ↑',0.5,null],['약세(−1점 ↓)',null,-1],['−0.5점 ↓',null,-0.5]],def:[null,null]},
-      ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
+      ern:{label:'어닝일(D±)',fmt:v=>(v<0?'D+'+(-v).toFixed(0):'D-'+v.toFixed(0)),reqData:1,
+        presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30],
+                 ['발표 후 D+1~D+7',-7,-1],['발표 전후 ±7일',-7,7]],def:[null,null]},   // (2026-08-04) 음수=발표 지남(사후 추적)
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     },
@@ -2033,7 +2035,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       ost:{label:'기관연속매수',fixed:'— (US 미제공)'},
       sr:{label:'공매도비중',fixed:'— (US 미제공)'},
       lbr:{label:'대차잔고비율',fixed:'— (US 미제공)'},
-      ern:{label:'어닝임박',fmt:v=>'D-'+v.toFixed(0)+' 이내',reqData:1,presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30]],def:[null,null]},
+      ern:{label:'어닝일(D±)',fmt:v=>(v<0?'D+'+(-v).toFixed(0):'D-'+v.toFixed(0)),reqData:1,
+        presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30],
+                 ['발표 후 D+1~D+7',-7,-1],['발표 전후 ±7일',-7,7]],def:[null,null]},   // (2026-08-04) 음수=발표 지남(사후 추적)
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',presets:[['전체',null,null],['-10% 이내',-10,null],['-20% 이내',-20,null],['-30% ↓(낙폭 큼)',null,-30],['-50% ↓',null,-50]],def:[null,null]},
       v200:{label:'200일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,presets:[['전체',null],['−30% ↑',-30],['−20% ↑',-20],['−10% ↑',-10],['위(0%) ↑',0],['+10% ↑',10],['+20% ↑',20]],def:[-30,null]},
       v20:{label:'20일선',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['위(0%) ↑',0],['−5% ↑',-5],['+5% ↑',5]],def:[null,null]},
@@ -2506,11 +2510,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'srf': return r.sr_f!=null?r.sr_f*100:null;               // US 공매도잔량/유통주식(%)
       case 'scov': return r.scov;                                    // US 커버일수(일)
       case 'inst': return r.inst!=null?r.inst*100:null;              // US 기관보유(%)
-      case 'ern': {                                                 // 어닝까지 D-day (지난 발표는 제외)
+      case 'ern': {                                                 // 어닝 D-day — 음수=발표 지남(D+, 사후 추적용)
         if(!r.ed) return null;
         const t=new Date(); t.setHours(0,0,0,0);
-        const d=Math.round((new Date(r.ed+'T00:00:00')-t)/86400000);
-        return d>=0?d:null; }
+        return Math.round((new Date(r.ed+'T00:00:00')-t)/86400000); }   // (2026-08-04) 과거도 반환 — US 풀은 지난 ed 유지(실측 2,159종)
     }
     return null;
   }
@@ -2555,7 +2558,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       return `<span class="${cls}" title="${tt}">${ar} ${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
     if(key==='age'){const a=ageOf(r); return a==null?dash(r,key):a+'년';}
     if(key==='ern'){const v=colVal(r,'ern'); if(v==null) return dash(r,key);
-      return `<span class="${v<=7?'up':''}">${v===0?'오늘':'D-'+v}</span> <span class="note">${E((r.ed||'').slice(5))}</span>`;}
+      const lab=v===0?'오늘':(v<0?'D+'+(-v):'D-'+v);                     // D+ = 발표 지남(사후 추적)
+      return `<span class="${v<0?'dn':(v<=7?'up':'')}">${lab}</span> <span class="note">${E((r.ed||'').slice(5))}</span>`;}
     const v=colVal(r,key); if(v==null) return dash(r,key);
     const sgn=d=>`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
     switch(key){
@@ -2730,7 +2734,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['PEG','forward PE ÷ EPS 성장률 — 1 이하면 성장 대비 저평가'],
         ['PSR','P/S(TTM) — 적자 성장주 밸류에이션. 높으면 기본은 고평가 신호이나, 고성장이 뒷받침되면 "성장 프리미엄"으로 정당화됨 → 매출성장·성장가속과 반드시 교차 확인'],
         ['흑자전환·수급·공매도·대차잔고','미국 미제공 — 연간 영업이익 배열·투자자별 수급·공매도·대차잔고 데이터 없음'],
-        ['어닝임박','다음 실적발표일까지 D-day (Yahoo earnings date)'],
+        ['어닝일(D±)','실적발표 D-day (Yahoo earnings date) — D-면 발표 전, D+면 발표 후(사후 추적: D+1~D+7 프리셋)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['장기 이평선','<b>한국 120일·미국 200일</b> 이동평균 대비 현재가 — 장기 추세(차트선). 기본 −30%↑ = 심각한 하락추세 제외'],
         ['단기·중기 이평선','해당 이동평균 대비 현재가 위치 — 한국 20·60일 / 미국 20·50일(차트선)'],
@@ -2778,7 +2782,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['공매도비중','최근 거래일 공매도 거래량 ÷ 전체 거래량(%) — 5%↑ 과열 경계 (KIS)'],
         ['파생·수급판정','<b>파생 z</b>(베이시스·풋콜·IV스큐): |z|≥1 ±0.5점 · |z|≥2 ±1점 + <b>수급 프록시</b>: 외인·기관 20일 순매수(시총 0.3%↑ ±0.5 · 미만 ±0.25), 공매도 5%↑ −0.5/2%↓ +0.25, 대차 10%↑ −0.5. <b>+1점↑ 강세 · −1점↓ 약세</b>. 파생 미수록 종목은 프록시만(≈)'],
         ['대차잔고비율','대차잔여주식수 ÷ 상장주식수(%) — 공매도 대기물량 프록시, 높을수록 하락배팅 부담 (금융위 주식대차정보 · 기준일 +1영업일 13시 갱신)'],
-        ['어닝임박','다음 실적발표일까지 D-day (네이버 IR 일정 — 대형주 위주 제공)'],
+        ['어닝일(D±)','실적발표 D-day (네이버 IR 일정 — 대형주 위주) — D-면 발표 전, D+면 발표 후(사후 추적)'],
         ['고점比','52주 최고가 대비 현재가 위치 (−10% = 고점 근접)'],
         ['외인보유비중','외국인 보유 비중'],
         ['목표주가','애널리스트 컨센서스 목표주가. 필터는 \'있는 종목만\' 토글'],
@@ -2819,7 +2823,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     Object.assign(m,{ '시장':'시세','섹터':'시세','가격':'시세','등락':'시세','시가총액':'시세','거래대금':'시세','회전율':'시세',
       '수익률 12-1M':'기간수익률','수익률 12M':'기간수익률','수익률 1M·3M·6M':'기간수익률','수익률 1M':'기간수익률','수익률 3M':'기간수익률','수익률 6M':'기간수익률','변동성(20일)':'기간수익률',
       'RSI(14)':'기술적 지표','거래량배수':'기술적 지표','MACD':'기술적 지표','볼린저밴드':'기술적 지표','이평배열':'기술적 지표','200일선':'기술적 지표','20일선':'기술적 지표','50일선':'기술적 지표','고점比':'기술적 지표',
-      '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝임박':'컨센서스',
+      '목표주가':'컨센서스','상승여력':'컨센서스','투자의견':'컨센서스','리비전':'컨센서스','애널수':'컨센서스','어닝일(D±)':'컨센서스',
       'PER':'밸류·수익성','PEG':'밸류·수익성','PBR':'밸류·수익성','PSR':'밸류·수익성','ROE':'밸류·수익성','배당성향':'밸류·수익성','배당':'밸류·수익성','영업이익률':'밸류·수익성',
       '성장':'성장','매출성장':'성장','이익성장':'성장','성장가속':'성장','흑자전환':'성장','분기흑자YoY':'성장','분기흑자QoQ':'성장','마진변화':'밸류·수익성',
       '외인·기관수급(20일)':'수급','외인·기관연속매수':'수급','공매도비중':'수급','대차잔고비율':'수급','대차잔고':'수급','흑자전환·수급·공매도·대차잔고':'수급','외인보유비중':'수급',
@@ -2939,7 +2943,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         $('sd_tfnote').textContent = (_isMin()
           ? `${D.t?D.t.length:0}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
           : `${D.t?D.t.length:0}봉`)
-          + (D.ppf?' · ⚠ 시간외 분봉 미제공 종목(ETF 등) — 정규장 표시':'');
+          + (D.ppf?' · ⚠ 시간외 분봉 미제공 종목 — 정규장 표시':'')
+          + (D.ppo?' · ⏰ 당일 시간외단일가(16:00~18:00) 포함 — ETF는 NXT 미상장이라 프리·애프터 없음':'');
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
         loadDisc(c);                              // 공시 마커도 별도 로드
         loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
@@ -3705,7 +3710,7 @@ await _canvasFlow(c);
       const nt=$('sd_tfnote');
       if(nt) nt.textContent = (_isMin()
           ? `${tot}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
-          : `${tot}봉`) + (D.ppf?' · ⚠ 시간외 미제공(정규장 표시)':'')
+          : `${tot}봉`) + (D.ppf?' · ⚠ 시간외 미제공(정규장 표시)':'') + (D.ppo?' · ⏰ 시간외단일가 포함':'')
           + ` · 🔴 LIVE ${new Date().toLocaleTimeString('ko-KR',{hour12:false})}`;
     }catch(e){}
   }

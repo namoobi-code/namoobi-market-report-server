@@ -768,10 +768,12 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
                             "o": [_f(x, "stck_oprc") for x in acc], "h": [_f(x, "stck_hgpr") for x in acc],
                             "l": [_f(x, "stck_lwpr") for x in acc], "c": [_f(x, "stck_prpr") for x in acc],
                             "v": [_f(x, "cntg_vol") for x in acc]}
-                # (2026-08-04 실측) ETF 는 KIS 분봉이 시간외를 제공하지 않는다:
+                # (2026-08-04 실측) ETF 는 NXT 미상장(NX 현재가 0)이고 KIS 통합 분봉도 0건이다:
                 #   일별분봉(FHKST03010230) UN = 과거일 포함 전부 0건 · 당일분봉(FHKST03010200) UN·NX = 전 봉 0값
-                #   · J 는 15:30 이후가 종가 채움봉(vol 0). NXT ETF 체결 분봉 제공처 없음 → 정규장 폴백 + ppf 플래그로 안내.
-            _ppf = bool(pp and mkt == "kr" and base is None)   # 시간외 요청했지만 미제공 → 정규장 폴백 표시용
+                #   · J 는 15:30 이후가 종가 채움봉(vol 0).
+                #   다만 KRX 시간외단일가(16:00~18:00, 10분 단위)는 ETF 도 실체결이 있고
+                #   시간외시간별체결(FHPST02310000)로 당일치를 받을 수 있다(실측 069500 12건) → 아래에서 병합.
+            _ppf = _ppo = bool(pp and mkt == "kr" and base is None)   # 시간외 미제공 폴백 여부(단일가 병합 성공 시 ppo 로 전환)
             if mkt == "kr" and base is None:
                 E = _d.today().strftime("%Y%m%d") + "1600"
                 S = (_d.today() - _td(days=20)).strftime("%Y%m%d") + "0900"
@@ -785,6 +787,30 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
                         "o": [r.get("openPrice") for r in rows], "h": [r.get("highPrice") for r in rows],
                         "l": [r.get("lowPrice") for r in rows], "c": [r.get("currentPrice") for r in rows],
                         "v": [r.get("accumulatedTradingVolume") for r in rows]}
+                if pp:
+                    try:      # 당일 시간외단일가 체결(16:00~18:00) 병합 — 단일가라 봉은 플랫(o=h=l=c)
+                        j = _K._get(c_, tok_, "/uapi/domestic-stock/v1/quotations/inquire-time-overtimeconclusion",
+                                    "FHPST02310000",
+                                    {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": code,
+                                     "FID_HOUR_CLS_CODE": "1"})
+                        # 자정 이후에도 TR 은 직전 거래일 시간외를 준다 → 날짜는 마지막 정규장 봉 기준으로 라벨
+                        today8 = base["t"][-1][:8] if base["t"] else _d.today().strftime("%Y%m%d")
+                        for xx in reversed(j.get("output2") or []):       # DESC → ASC
+                            try:
+                                p_ = float(xx.get("stck_prpr") or 0); v_ = float(xx.get("cntg_vol") or 0)
+                            except Exception:
+                                continue
+                            hh = str(xx.get("stck_cntg_hour") or "")[:4]
+                            if p_ <= 0 or len(hh) < 4:
+                                continue
+                            tt = today8 + hh
+                            if base["t"] and tt <= base["t"][-1]:
+                                continue
+                            base["t"].append(tt); base["o"].append(p_); base["h"].append(p_)
+                            base["l"].append(p_); base["c"].append(p_); base["v"].append(v_)
+                            _ppf = False                                  # 시간외단일가라도 붙었으면 '미제공' 아님
+                    except Exception:
+                        pass
             if mkt == "us":
                 iv, rg = ("1m", "5d") if n <= 3 else ("5m", "1mo")
                 # (2026-08-04) pp=1 이면 프리장(04:00~)·애프터장(~20:00 ET) 체결 포함(야후 Extended Hours).
@@ -815,6 +841,8 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
             out["tf"] = tf
             if _ppf:
                 out["ppf"] = 1     # 프론트: '시간외 미제공 종목(정규장 표시)' 안내
+            elif _ppo:
+                out["ppo"] = 1     # 프론트: 'NXT 미상장 — 시간외단일가(16:00~18:00)만 포함' 안내
         else:
             # 필요한 이력 = 표시 250봉 + 최장 이동평균(240) + 줌아웃 여유.
             #   일 10년(≈2,500봉) · 주 15년(≈780주) · 월 30년(≈360개월)
