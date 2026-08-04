@@ -80,3 +80,4 @@
 15 16 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/program_trading.py >> /home/ubuntu/namoobi/program.log 2>&1
 40 18 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/program_trading.py >> /home/ubuntu/namoobi/program.log 2>&1
 30 7 * * 0 cd /home/ubuntu/namoobi && python3 scripts/sector_map.py >> /home/ubuntu/namoobi/sector.log 2>&1
+20 7 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms.py >> /home/ubuntu/namoobi/rtms.log 2>&1

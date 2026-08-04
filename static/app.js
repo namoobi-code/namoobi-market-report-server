@@ -1096,6 +1096,27 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          const lv=V[L-1], pv=V[L-2], y1=yoy(T,a0.v);
          $('re_tdep_n').innerHTML=`최신 <b>${fm(T[L-1])} 월말 = ${lv!=null?Math.round(lv).toLocaleString()+'조원':'—'}</b>${pv!=null?` (전월 ${lv-pv>0?'+':''}${(lv-pv).toFixed(1)}조)`:''} · YoY <b class="${y1>0?'up':'dn'}">${y1!=null?(y1>0?'+':'')+y1.toFixed(1)+'%':'—'}</b> — 예금금리 매력이 높거나 위험회피 국면에서 증가. 증시 투자자예탁금·부동산 매수세와 반대로 움직이는 경향(12월 법인자금 유입 등 계절성 있음) · ECOS 공표 ~1개월+ 지연 · 🖱 휠=확대/축소(전체 2010~), 드래그=좌우 이동`;
        }}
+      /* ⑧⑨ 아파트 실거래(국토부 rtms.py 매일 07:20) — 지역 드롭다운 + 거래량·가격 (2026-08-02) */
+      fetch('/api/db/rtms').then(x=>x.ok?x.json():null).then(R=>{
+        if(!R||!R.sale) return;
+        const sel=$('re_rt_sel'); if(!sel) return;
+        const codes=['SEOUL',...Object.keys(R.names||{}).filter(c=>c!=='SEOUL')];
+        sel.innerHTML=codes.map(c=>`<option value="${c}">${(R.names||{})[c]||c}</option>`).join('');
+        const draw=()=>{
+          const c=sel.value, sm=(R.sale[c]||{}).m||{}, rm=((R.rent||{})[c]||{}).m||{};
+          const ts=Object.keys(sm).sort(); if(!ts.length) return;
+          const n1={t:ts,v:ts.map(t=>sm[t].n)}, rn={t:ts,v:ts.map(t=>(rm[t]||{}).n??null)};
+          line('re_rt_n',[{...n1,label:'매매 건수',color:'#d9534f'},{...rn,label:'전세 건수',color:'#2f6fed'}]);
+          const av={t:ts,v:ts.map(t=>sm[t].avg)}, md={t:ts,v:ts.map(t=>sm[t].med??null)};
+          const series=[{...av,label:'평균가(억)',color:'#d9534f'}];
+          if(md.v.some(v=>v!=null)) series.push({...md,label:'중위가(억)',color:'#888'});
+          line('re_rt_p',series);
+          const L=ts[ts.length-1];
+          $('re_rt_n_n').innerHTML=`최신 <b>${fm(L)}</b> — 매매 <b>${sm[L].n.toLocaleString()}건</b>${rm[L]?` · 전세 ${rm[L].n.toLocaleString()}건`:''} · <b>신고기한 30일</b>이라 최근 1~2개월은 미완성치(매일 롤링 재수집으로 수렴) · 해제거래 제외 — 거래량 급감=거래절벽, 저점 대비 회복은 가격 반등 선행 신호로 참고`;
+          $('re_rt_p_n').innerHTML=`최신 ${fm(L)} — 평균 <b>${sm[L].avg}억</b>${sm[L].med!=null?` · 중위 ${sm[L].med}억`:''}${rm[L]?` · 전세 평균보증금 ${rm[L].dep}억`:''} — <b>가격지수(부동산원, 위 차트)</b>는 평활·보정으로 부드럽지만 늦고, <b>실거래 평균</b>은 빠르지만 그 달 거래 구성(고가·저가 단지 비중)에 따라 튈 수 있음`;
+        };
+        sel.onchange=draw; draw();
+      }).catch(()=>{});
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
       try{
         const M=d.mcap||{};
