@@ -4673,6 +4673,25 @@ await _canvasFlow(c);
     else apply();
   });
   {const rb=$('scr_rst'); if(rb) rb.onclick=()=>{ if(stage===1){sort={k:'cap',d:-1};resetF();apply();} else if(stage===2){resetW();renderS2();} else {resetW();renderS3();} };}
+  /* (2026-08-04) 🔥 개장서지 프리셋 — "장 시작하며 거래량 터지며 급등" 실시간 포착.
+     핵심: 등락 +5%↑ + 거래량배수 3배↑ (풀이 장중 KR 1분·US 3분 갱신이라 실시간 추적)
+     잡음 배제: 거래대금(KR 100억/US $20M)↑ · 시총(KR 1,000억/US $300M)↑ · 상장 1년↑(신규상장 왜곡 제외)
+     결과는 등락률 내림차순. 추가로 볼 만한 조합(수동): 고점比 -10% 이내=신고가 돌파형 ·
+     공매도비중 ↑=숏스퀴즈 후보 · 어닝일 D+1~D+7=실적 서프라이즈 추격 */
+  {const sg=$('scr_surge'); if(sg) sg.onclick=()=>{
+    if(stage!==1) return;
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }   // 전부 '전체'로
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('chg',{min:5,max:null});                       // 등락 +5% ↑
+    set('volx',{min:3,max:null});                      // 거래량배수 3배 ↑
+    set('tv',{min:mkt==='kr'?1e10:2e7,max:null});      // 거래대금 100억 / $20M ↑
+    set('cap',{min:mkt==='kr'?1e11:3e8,max:null});     // 시총 1,000억 / $300M ↑
+    set('age',{min:1,max:null});                       // 상장 1년 ↑
+    sort={k:'chg',d:-1};                               // 등락률 높은 순
+    apply();
+  };}
   /* (2026-08-01) 🔄 턴어라운드 프리셋 v2 — 사용자 검증 세팅(KR 21종 통과)으로 교체.
      "이미 하락(고점 -40%·3M 하락) + 실적 재가속(성장가속 +30%p) + 추정 상향(리비전 10%)
       + 밸류 여지(상승여력 50%) + 부실 배제(부채 200%↓·영업적자 1년이상 제외)".
