@@ -18,6 +18,9 @@ BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "rtms.json"
 KEY = (BASE / "keys" / "data.go.kr.txt").read_text().strip()
 MONTHS = 24 if "--backfill" in sys.argv else 3
+if "--months" in sys.argv:
+    MONTHS = int(sys.argv[sys.argv.index("--months") + 1])
+EXTEND = "--extend" in sys.argv        # 이미 수집된 달은 건너뛰고 과거만 채움(최근 3개월은 항상 재수집)
 ONLY = None
 if "--only" in sys.argv:
     ONLY = set(sys.argv[sys.argv.index("--only") + 1].split(","))
@@ -174,7 +177,10 @@ def main():
             if isinstance((sale.get(code) or {}).get("m"), dict) else {}
         r_ = {t: (rent.get(code) or {}).get("m", {}).get(t) for t in (rent.get(code) or {}).get("m", {})} \
             if isinstance((rent.get(code) or {}).get("m"), dict) else {}
+        recent = set(months_back(3)) | {datetime.now().strftime("%Y%m")}
         for ym in yms:
+            if EXTEND and ym not in recent and (ym in s or ym in r_):
+                continue
             a = agg_sale(fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym))
             if a: s[ym] = a
             time.sleep(0.12)
