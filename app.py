@@ -719,7 +719,7 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
         raise HTTPException(400, "bad tf")
     if tf in TF_MIN and not _logged_in(request):
         raise HTTPException(401, "분봉은 로그인 후 이용 가능합니다(KIS·외부 API 부하 보호)")
-    pp = 1 if (pp and mkt == "us" and tf in TF_MIN) else 0   # 시간외는 US 분봉에서만 의미
+    pp = 1 if (pp and tf in TF_MIN) else 0   # 시간외포함은 분봉에서만 의미 (KR=KIS UN 통합 · US=Yahoo prepost)
     key = f"{mkt}:{code}:{tf}:{pp}"; now = time.time()
     hit = _chart_cache.get(key)
     if hit and now - hit[0] < (30 if tf in TF_MIN else 60):
@@ -728,7 +728,46 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
         from datetime import date as _d, timedelta as _td, datetime as _dt
         if tf in TF_MIN:
             n = TF_MIN[tf]
-            if mkt == "kr":
+            base = None
+            if mkt == "kr" and pp:
+                # (2026-08-04) 시간외포함 — KIS 일별분봉(FHKST03010230) UN(KRX+NXT 통합).
+                #   프리마켓 08:00~08:50 · 정규 09:00~15:30 · 애프터 ~20:00 (NXT 체결 포함, 실측).
+                #   네이버 분봉은 정규장(09:00~15:30)만 줘서 못 쓴다(넓은 시간창 요청해도 동일 — 실측).
+                #   120봉/호출·과거 페이징 → 최근 3거래일만(호출 ~20회, 30초 캐시로 방어).
+                sys.path.insert(0, str(BASE / "scripts"))
+                import kis_api as _K
+                c_ = _K._creds(); tok_ = _K._token(c_)
+                acc, dt8, hr6, seen = [], _d.today().strftime("%Y%m%d"), "200000", set()
+                for _pg in range(24):
+                    j = _K._get(c_, tok_, "/uapi/domestic-stock/v1/quotations/inquire-time-dailychartprice",
+                                "FHKST03010230",
+                                {"FID_COND_MRKT_DIV_CODE": "UN", "FID_INPUT_ISCD": code,
+                                 "FID_INPUT_DATE_1": dt8, "FID_INPUT_HOUR_1": hr6,
+                                 "FID_PW_DATA_INCU_YN": "Y", "FID_FAKE_TICK_INCU_YN": "N"})
+                    o2 = j.get("output2") or []
+                    o2 = [x for x in o2 if (x.get("stck_bsop_date"), x.get("stck_cntg_hour")) not in seen]
+                    if not o2:
+                        break
+                    for x in o2:
+                        seen.add((x.get("stck_bsop_date"), x.get("stck_cntg_hour")))
+                    acc.extend(o2)
+                    if len({x["stck_bsop_date"] for x in acc}) > 3:      # 3거래일 초과분 등장 → 중단
+                        break
+                    last = o2[-1]; dt8, hr6 = last["stck_bsop_date"], last["stck_cntg_hour"]
+                    time.sleep(0.05)
+                days3 = sorted({x["stck_bsop_date"] for x in acc})[-3:]
+                acc = [x for x in acc if x["stck_bsop_date"] in days3]
+                acc.reverse()                                            # DESC → ASC
+
+                def _f(x, k):
+                    try: return float(x.get(k))
+                    except Exception: return None
+                if acc:      # 통합분봉 미제공 종목(일부 ETF — 실측 069500은 UN·NX 모두 0건)은 아래 네이버 정규장 폴백
+                    base = {"t": [x["stck_bsop_date"] + str(x.get("stck_cntg_hour") or "")[:4] for x in acc],
+                            "o": [_f(x, "stck_oprc") for x in acc], "h": [_f(x, "stck_hgpr") for x in acc],
+                            "l": [_f(x, "stck_lwpr") for x in acc], "c": [_f(x, "stck_prpr") for x in acc],
+                            "v": [_f(x, "cntg_vol") for x in acc]}
+            if mkt == "kr" and base is None:
                 E = _d.today().strftime("%Y%m%d") + "1600"
                 S = (_d.today() - _td(days=20)).strftime("%Y%m%d") + "0900"
                 url = (f"https://api.stock.naver.com/chart/domestic/item/{code}"
@@ -741,7 +780,7 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
                         "o": [r.get("openPrice") for r in rows], "h": [r.get("highPrice") for r in rows],
                         "l": [r.get("lowPrice") for r in rows], "c": [r.get("currentPrice") for r in rows],
                         "v": [r.get("accumulatedTradingVolume") for r in rows]}
-            else:
+            if mkt == "us":
                 iv, rg = ("1m", "5d") if n <= 3 else ("5m", "1mo")
                 # (2026-08-04) pp=1 이면 프리장(04:00~)·애프터장(~20:00 ET) 체결 포함(야후 Extended Hours).
                 #   기본(pp=0)은 정규장만 — 프론트 토글 default 정규장.

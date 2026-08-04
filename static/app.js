@@ -2934,7 +2934,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         $('sd_tfbar').style.display='flex';
         /* (2026-08-04) 정규장/시간외 토글 노출 갱신 — KR↔US 전환·주기 변경 시에도 정확히 */
         {const pw=$('sd_ppwrap');
-         if(pw){ pw.style.display=(mkt==='us'&&_isMin())?'inline-flex':'none';
+         if(pw){ pw.style.display=_isMin()?'inline-flex':'none';
            pw.querySelectorAll('.ppb').forEach(b=>b.classList.toggle('on', (b.dataset.pp==='1')===_PP)); }}
         $('sd_tfnote').textContent = _isMin()
           ? `${D.t?D.t.length:0}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
@@ -3000,7 +3000,7 @@ await _canvasFlow(c);
         if(oc) fetch(`/api/overview?mkt=${mkt}&code=${encodeURIComponent(oc)}`).then(x=>x.ok?x.json():null).then(o=>{
           if(!o||!(o.lines||[]).length||ov.dataset.c!==oc) return;   // 응답 도착 전 다른 종목 선택 시 무시
           ov.style.display='';
-          ov.innerHTML=`<div class="sgt">기업개요 <span class="note" style="font-weight:400">(네이버)</span></div>
+          ov.innerHTML=`<div class="sgt">기업개요</div>
             <div style="font-size:12px;line-height:1.65;padding:2px 2px 0">${o.lines.slice(0,6).map(t=>'· '+E(t)).join('<br>')}</div>`;
         }).catch(()=>{}); } }
     const G=[['시세',['px','chg','cap','tv','turn']],
@@ -3402,9 +3402,10 @@ await _canvasFlow(c);
              'd':'일','w':'주','M':'월'};
   let _TF='d';
   const _isMin=()=>_TF.endsWith('m');
-  /* (2026-08-04) US 분봉 시간외(프리·애프터) 포함 여부 — 야후 Extended Hours 식 토글. 기본 정규장(false). */
+  /* (2026-08-04) 분봉 시간외(프리·애프터) 포함 토글 — 기본 정규장(false).
+     US=Yahoo prepost(04:00~20:00 ET) · KR=KIS UN 통합(NXT 프리 08:00~·애프터 ~20:00, 최근 3거래일) */
   let _PP=false;
-  const _ppq=()=>(mkt==='us'&&_isMin()&&_PP)?'&pp=1':'';
+  const _ppq=()=>(_isMin()&&_PP)?'&pp=1':'';
   const CZ0=250;                          // 기본 표시 봉수
   let _CZ=CZ0, _COFF=0, _DRAG=null, _DMOVE=0;
   const _mk=n=>{ const a=Math.abs(n);
@@ -3735,9 +3736,9 @@ await _canvasFlow(c);
     const sync=()=>{ document.querySelectorAll('#sd_tfbar .tfb')
         .forEach(b=>b.classList.toggle('on', b.dataset.tf===_TF));
       if(sel) sel.classList.toggle('on', _isMin());
-      /* (2026-08-04) 정규장/시간외 토글 — US 분봉일 때만 노출 (야후 Extended Hours 식, 기본 정규장) */
+      /* (2026-08-04) 정규장/시간외 토글 — 분봉일 때만 노출 (KR·US 공통, 기본 정규장) */
       const pw=$('sd_ppwrap');
-      if(pw){ pw.style.display=(mkt==='us'&&_isMin())?'inline-flex':'none';
+      if(pw){ pw.style.display=_isMin()?'inline-flex':'none';
         pw.querySelectorAll('.ppb').forEach(b=>b.classList.toggle('on', (b.dataset.pp==='1')===_PP)); } };
     document.querySelectorAll('#sd_ppwrap .ppb').forEach(b=>{
       b.onclick=()=>{ const v=b.dataset.pp==='1'; if(v===_PP) return;

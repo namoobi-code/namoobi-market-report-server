@@ -49,6 +49,34 @@
 
   /* ── 필터 정의 (min/max 는 표시 단위) ── */
   const pct0=v=>(v>=0?'+':'')+v.toFixed(0)+'%';
+  /* (2026-08-04) 레버리지 배수 — 이름 기반 판별.
+     실측(서버 etf_pool 전수): US lev 플래그 805종 중 배수판별 705 · 미판별 100은 플래그 오탐
+     (BulletShares 의 'Bull', Ultra-Short 채권 의 'Ultra' 등) → 1X(일반) 취급이 오히려 정확.
+     Short 는 Short-Term(단기채) 오탐이 많아 Bear·Inverse·명시적 -NX 외에는
+     ProShares·Direxion(인버스 발행사) 이름일 때만 인버스로 본다. */
+  function levF(r){
+    const s=String(r.n||''); let m;
+    if(mkt==='kr'){
+      if(/인버스\s*2X|2X\s*인버스/i.test(s)) return -2;
+      if(/인버스/.test(s)) return -1;
+      if(/레버리지/.test(s)) return 2;
+      if((m=s.match(/(\d(?:\.\d+)?)X/i))) return +m[1];
+      return 1;
+    }
+    if((m=s.match(/[-−]\s?(\d(?:\.\d+)?)[xX]\b/))) return -+m[1];
+    const bear=/\b(Bear|Inverse)\b/i.test(s)
+      || (/ProShares|Direxion/i.test(s) && /\bShort\b/i.test(s) && !/Short[- ]?(Term|Duration|Maturity)/i.test(s));
+    if((m=s.match(/(\d(?:\.\d+)?)[xX]\b/))) return bear?-+m[1]:+m[1];
+    if(/ProShares/i.test(s)){
+      if(/UltraPro\s?Short/i.test(s)) return -3;
+      if(/UltraPro/i.test(s)) return 3;
+      if(/UltraShort/i.test(s)) return -2;
+      if(/\bUltra\b/i.test(s)) return 2;
+    }
+    if(bear) return -1;
+    return 1;
+  }
+  const levLbl=f=>f===1?'1X(일반)':(f+'X');
   const DEF={
     kr:{
       asset:{label:'자산군',cat:1,opts:['국내지수','업종·테마','파생','해외주식','원자재','채권','기타']},
@@ -67,7 +95,7 @@
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['-5% 이내',-5],['-10% 이내',-10],['-20% 이내',-20]],def:[null,null]},
       divy:{label:'분배율',fmt:v=>v.toFixed(1)+'%',min:1,reqData:1,presets:[['전체',null],['1% ↑',1],['3% ↑',3],['5% ↑',5],['8% ↑',8]],def:[null,null]},
       dev:{label:'괴리율',fmt:v=>(v>=0?'+':'')+v.toFixed(2)+'%',reqData:1,presets:[['전체',null,null],['±0.5% 이내',-0.5,0.5],['±1% 이내',-1,1],['저평가(0% ↓)',null,0]],def:[null,null]},
-      lev:{label:'레버리지·인버스',tgl:1,def:false,tglLabel:'레버리지·인버스 제외'},
+      lev:{label:'레버리지·인버스',cat:1},   // (2026-08-04) 토글(제외)→배수 선택 필터 (2X·-1X·-2X…)
       md:{label:'월배당',tgl:1,def:false,tglLabel:'월배당(월분배)만'}
     },
     us:{
@@ -87,7 +115,7 @@
       hi:{label:'고점比',fmt:v=>'고점 '+v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['-5% 이내',-5],['-10% 이내',-10],['-20% 이내',-20]],def:[null,null]},
       divy:{label:'분배율',fmt:v=>v.toFixed(1)+'%',min:1,reqData:1,presets:[['전체',null],['1% ↑',1],['3% ↑',3],['5% ↑',5],['8% ↑',8]],def:[null,null]},
       dev:{label:'괴리율',fixed:'— (US 미제공)'},
-      lev:{label:'레버리지·인버스',tgl:1,def:false,tglLabel:'레버리지·인버스 제외'},
+      lev:{label:'레버리지·인버스',cat:1},   // (2026-08-04) 토글(제외)→배수 선택 필터 (3X·2X·-1X·-2X…)
       md:{label:'월배당',fixed:'— (US 미제공)'}
     }
   };
@@ -119,6 +147,7 @@
         return ws.length?Math.max(...ws):null;
       }
       case 'asset': return mkt==='kr'?r.asset:r.exch;
+      case 'lev': return levF(r);          // (2026-08-04) 숫자 배수 — 정렬용 (필터는 pass 에서 라벨 비교)
     }
     return r[k];
   }
@@ -133,10 +162,15 @@
       } }
     for(const k in F){ const f=d[k], st=F[k]; if(!f) continue;
       if(f.tgl){ if(!st.on) continue;
-        if(k==='lev' && r.lev) return false;
         if(k==='md' && !r.md) return false;
         continue; }
-      if(f.cat){ if(st.v!=null && String(val(r,k)||'')!==st.v) return false; continue; }
+      if(f.cat){ if(st.v!=null){
+          if(k==='lev'){ const lf=levF(r);   // (2026-08-04) 배수 필터 — 집계 옵션 + 개별 배수
+            if(st.v==='레버리지(2X↑)'){ if(!(lf>=2)) return false; }
+            else if(st.v==='인버스(전체)'){ if(!(lf<0)) return false; }
+            else if(levLbl(lf)!==st.v) return false; }
+          else if(String(val(r,k)||'')!==st.v) return false; }
+        continue; }
       const v=val(r,k);
       if(v==null){ if(f.reqData&&(st.min!=null||st.max!=null)) return false; continue; }
       if(st.min!=null&&v<st.min) return false;
@@ -159,7 +193,7 @@
     divy:{l:'분배율',n:1,m:'both'}, r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
     r6m:{l:'수익률 6M',n:1,m:'both'}, r1y:{l:'수익률 1Y',n:1,m:'both'}, vol20:{l:'변동성(20일)',n:1,m:'both'},
     v200:{l:'200일선',n:1,m:'both'}, hi:{l:'고점比',n:1,m:'both'}, yr:{l:'상장기간',n:1,m:'both'},
-    lev:{l:'레버리지',n:0,m:'both'}, md:{l:'월배당',n:0,m:'kr'}
+    lev:{l:'레버리지',n:0,sn:1,m:'both'}, md:{l:'월배당',n:0,m:'kr'}   // lev: 표시는 뱃지·정렬은 배수 숫자
   };
   const CORDER=['n','hold','asset','exch','px','chg','cap','tv','fee','dev','divy','r1m','r3m','r6m','r1y','vol20','v200','hi','yr','lev','md'];
   const cAvail=k=>{const m=(CDEF[k]||{}).m; return m==='both'||m===mkt;};
@@ -219,10 +253,10 @@
     ];
     if(KR) g.push(
       ['괴리율','시장가 vs 실시간 NAV(iNAV) — +면 비싸게(고평가) 사는 것. ±0.5% 이내가 정상'],
-      ['레버리지·인버스','2X·인버스 등 파생 ETF (토글로 제외 가능)'],
+      ['레버리지·인버스','배수 필터 — 2X(레버리지)·−1X(인버스)·−2X(곱버스) 등 이름 기반 판별. 1X(일반)만 골라 파생 제외도 가능'],
       ['월배당','월분배(월배당) ETF 만 필터']);
     else g.push(['괴리율·월배당','미국 미제공 (Yahoo 데이터에 iNAV·분배주기 없음)'],
-      ['레버리지·인버스','이름 기반 판별 (3X·Inverse 등, 토글로 제외)']);
+      ['레버리지·인버스','배수 필터 — 3X·2X·−1X·−2X·−3X 등 이름 기반 판별(Direxion Bull/Bear·ProShares Ultra 계열 포함). 1X(일반)만 골라 파생 제외도 가능']);
     // (2026-07-26) 항목 라벨 옆 카테고리 배지 (종목 스크리너와 동일 방식)
     return `<div class="note" style="margin-bottom:8px">ETF 전종목(${KR?'네이버':'Yahoo'})을 필터로 실시간 압축한다. 1단계 하드컷 방식(2·3단계 없음).</div>`
       +`<div class="lgcols">`+g.map(x=>{const c=etfCat(x[0]); return `<div class="lgit"><b>${x[0]}</b>${c?` <span class="lgcat">[${c}]</span>`:''} = ${E(x[1])}</div>`;}).join('')+`</div>`;
@@ -247,7 +281,11 @@
     const a=st.min!=null?f.fmt(st.min):null,b=st.max!=null?f.fmt(st.max):null;
     let t='전체'; if(a&&b)t=`${a}~${b}`; else if(a)t=`${a} ↑`; else if(b)t=`${b} ↓`;
     return `${f.label}: <span class="cv">${t}</span>`;};
-  const catOpts=k=>{const f=DEF[mkt][k]; if(f.opts) return ['',...f.opts];
+  const catOpts=k=>{const f=DEF[mkt][k];
+    if(k==='lev'){ // (2026-08-04) 배수 옵션 — 데이터에서 자동 수집, 배수 내림차순 (+ 집계 옵션 2종)
+      const s=new Set(); for(const r of POOL[mkt]) s.add(levLbl(levF(r)));
+      return ['','레버리지(2X↑)','인버스(전체)',...[...s].sort((a,b)=>parseFloat(b)-parseFloat(a))]; }
+    if(f.opts) return ['',...f.opts];
     const s=new Set(); for(const r of POOL[mkt]) {const v=val(r,k); if(v)s.add(String(v));}
     return ['',...[...s].sort()];};
   function findChipHTML(){
@@ -331,8 +369,10 @@
   function cell(r,k){
     const v=val(r,k);
     switch(k){
-      case 'n': return `<b>${E(mkt==='kr'?r.n:r.c)}</b> <span class="note">${E(mkt==='kr'?r.c:(r.n||'').slice(0,26))}</span>`
-        +(r.lev?' <span class="etflev">L</span>':'')+(r.md?' <span class="etfmd">월</span>':'');
+      case 'n': {const lf=levF(r);
+        return `<b>${E(mkt==='kr'?r.n:r.c)}</b> <span class="note">${E(mkt==='kr'?r.c:(r.n||'').slice(0,26))}</span>`
+        +(lf!==1?` <span class="etflev"${lf<0?' style="background:#e8f0fd;color:#1f6feb"':''}>${lf}X</span>`:'')
+        +(r.md?' <span class="etfmd">월</span>':'');}
       /* (2026-07-20) 보유종목 — 종목 검색 중이면 매칭 종목·비중, 아니면 Top3 요약 */
       case 'hold': {
         const tbl=(HOLD&&HOLD[mkt])||{}, hs=tbl[r.c];
@@ -341,7 +381,9 @@
         const src=hit||hs.slice(0,3);
         return src.map(h=>`<span class="${hit?'holdhit':'note'}">${E(h[0])}${h[2]!=null?` ${(+h[2]).toFixed(1)}%`:''}</span>`).join(hit?' · ':'<span class="note"> · </span>');
       }
-      case 'lev': return r.lev?'<span class="etflev">레버·인버스</span>':'<span class="note">—</span>';
+      case 'lev': {const lf=levF(r);        // (2026-08-04) 배수 표시 — 레버리지 빨강 · 인버스 파랑
+        return lf===1?'<span class="note">—</span>'
+          :`<span class="etflev"${lf<0?' style="background:#e8f0fd;color:#1f6feb"':''}>${lf}X</span>`;}
       case 'md': return r.md?'<span class="etfmd">월배당</span>':'<span class="note">—</span>';
       case 'asset': case 'exch': return `<span class="note">${E(v||'—')}</span>`;
       case 'px': return v==null?'—':(mkt==='kr'?Math.round(v).toLocaleString()+'원':'$'+(+v).toFixed(2));
@@ -467,7 +509,9 @@
       ['기술',[['변동성(20일)',r.vol20!=null?r.vol20.toFixed(1)+'%':'—'],['200일선',pctS(r.v200)],['고점比',r.hi!=null?(r.hi*100).toFixed(0)+'%':'—']]],
       ['ETF 정보',[[(mkt==='kr'?'자산군':'거래소'),cell(r,'asset')],['총보수',cell(r,'fee')],['분배율',cell(r,'divy')]
         ].concat(mkt==='kr'?[['괴리율',cell(r,'dev')],['운용사',r.issuer?`<b>${E(r.issuer)}</b>`:'—'],['월배당',r.md?'<b class="up">월배당</b>':'—']]:[])
-        .concat([['레버리지·인버스',r.lev?'<b class="dn">예</b>':'아니오'],['상장기간',cell(r,'yr')]]) ]];
+        .concat([['레버리지·인버스',(()=>{const lf=levF(r);
+          return lf===1?'아니오':`<b class="${lf<0?'dn':'up'}">${lf}X${lf<0?' (인버스)':''}</b>`;})()],
+          ['상장기간',cell(r,'yr')]]) ]];
     return G.map(([t,its])=>`<div class="sgt">${t}</div>`+its.map(it=>`<div class="si"><span class="note">${it[0]}</span>${it[1]}</div>`).join('')).join('');
   }
   // (2026-07-20) 보유비중 Top — 상세 우측 하단. KR 네이버·US Yahoo 온디맨드.
@@ -506,6 +550,14 @@
     $('ed_code').textContent = mkt==='kr'?r.c:(r.n||'');
     $('ed_last').innerHTML = cell(r,'px')+' '+cell(r,'chg');
     $('ed_sum').innerHTML = infoRows(r);
+    /* (2026-08-04) ETF 설명 — 시세 위에 표시. KR=finance.naver ETF개요 · US=api.stock overview(.K) — /api/overview 공용(24h 캐시) */
+    { const oc=r.c, ow=document.createElement('div');
+      $('ed_sum').insertBefore(ow, $('ed_sum').firstChild);
+      fetch(`/api/overview?mkt=${mkt}&code=${encodeURIComponent(oc)}`).then(x=>x.ok?x.json():null).then(o=>{
+        if(!o||!(o.lines||[]).length||dcode!==oc) return;
+        ow.innerHTML=`<div class="sgt">ETF 설명</div><div style="font-size:12px;line-height:1.65;padding:2px 2px 4px">`
+          +o.lines.slice(0,6).map(t=>'· '+E(String(t).replace(/^[-–—]\s*/,''))).join('<br>')+`</div>`;
+      }).catch(()=>{}); }
     // 보유비중 Top (온디맨드) — 우측 정보 하단에 덧붙임
     {const hc=r.c, hm=mkt, hw=document.createElement('div'); hw.className='hold-wrap';
      hw.innerHTML='<div class="sgt hold-t">보유비중 Top</div><div class="hold-empty">불러오는 중…</div>';

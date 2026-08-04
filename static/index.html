@@ -393,6 +393,7 @@
   .tfsel{padding:4px 8px;border:1px solid var(--line);border-radius:7px;background:#fff;font-size:12px;cursor:pointer;color:var(--tx)}
   .tfsel.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}
   .tfb.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}
+  .ppb.on{background:#1f6feb;color:#fff;border-color:#1f6feb;font-weight:600}  /* 정규장/시간외 토글 선택 표시 */
   /* 차트 하단 패널 — 호가창 / 시간별체결 / 외국인·기관 순매매 */
   .bkwrap{display:flex;gap:10px;flex-wrap:wrap}
   .bkbox{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff}
@@ -972,8 +973,8 @@
                 <button class="cp-x tfb" data-tf="M">월</button>
                 <!-- (2026-08-04) US 분봉 전용 — 야후 Extended Hours 식 정규장/시간외 토글 (기본 정규장) -->
                 <span id="sd_ppwrap" style="display:none;gap:2px;margin-left:8px">
-                  <button class="cp-x ppb" data-pp="0" title="정규장 체결만 (09:30~16:00 ET)">정규장</button>
-                  <button class="cp-x ppb" data-pp="1" title="프리마켓(04:00~)·애프터마켓(~20:00 ET) 포함">시간외포함</button>
+                  <button class="cp-x ppb" data-pp="0" title="정규장 체결만 (KR 09:00~15:30 · US 09:30~16:00 ET)">정규장</button>
+                  <button class="cp-x ppb" data-pp="1" title="시간외 체결 포함 — KR: KRX+NXT 통합(프리 08:00~ · 애프터 ~20:00, 최근 3거래일) · US: 프리 04:00~ · 애프터 ~20:00 ET">시간외포함</button>
                 </span>
                 <span class="note" id="sd_tfnote" style="margin-left:6px;font-size:11px"></span>
               </div>
