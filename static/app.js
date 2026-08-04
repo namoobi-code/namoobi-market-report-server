@@ -2936,9 +2936,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         {const pw=$('sd_ppwrap');
          if(pw){ pw.style.display=_isMin()?'inline-flex':'none';
            pw.querySelectorAll('.ppb').forEach(b=>b.classList.toggle('on', (b.dataset.pp==='1')===_PP)); }}
-        $('sd_tfnote').textContent = _isMin()
+        $('sd_tfnote').textContent = (_isMin()
           ? `${D.t?D.t.length:0}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
-          : `${D.t?D.t.length:0}봉`;
+          : `${D.t?D.t.length:0}봉`)
+          + (D.ppf?' · ⚠ 시간외 분봉 미제공 종목(ETF 등) — 정규장 표시':'');
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
         loadDisc(c);                              // 공시 마커도 별도 로드
         loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
@@ -3704,7 +3705,8 @@ await _canvasFlow(c);
       const nt=$('sd_tfnote');
       if(nt) nt.textContent = (_isMin()
           ? `${tot}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
-          : `${tot}봉`) + ` · 🔴 LIVE ${new Date().toLocaleTimeString('ko-KR',{hour12:false})}`;
+          : `${tot}봉`) + (D.ppf?' · ⚠ 시간외 미제공(정규장 표시)':'')
+          + ` · 🔴 LIVE ${new Date().toLocaleTimeString('ko-KR',{hour12:false})}`;
     }catch(e){}
   }
   function _bindAuto(){ if(_AUTOBOUND) return; _AUTOBOUND=true;
@@ -3868,14 +3870,23 @@ await _canvasFlow(c);
     function _xlabels(cx2, Xf, Hc){
       cx2.fillStyle='#98a2ad'; cx2.font='10px sans-serif';
       if(_isMin()){
-        let lastD='', px=-99;
+        /* 날짜 경계 x좌표 선계산 — 경계 ±44px 안의 시각 라벨은 생략(날짜와 겹침 방지) */
+        const bx=[]; {let ld='';
+          for(let i=0;i<N;i++){ const z=String(t[i]||''); if(z.length<12) continue;
+            const d=z.slice(0,8); if(d!==ld){ if(ld) bx.push(Xf(i)); ld=d; } }}
+        let lastD='', px=-99, firstBar=true;
         for(let i=0;i<N;i++){ const z=String(t[i]||''); if(z.length<12) continue;
           const d=z.slice(0,8), hm=z.slice(8,10)+':'+z.slice(10,12), xx=Xf(i);
-          if(d!==lastD){ lastD=d;
-            if(xx-px>=46){ px=xx; cx2.save(); cx2.fillStyle='#5b6470'; cx2.font='bold 10px sans-serif';
-              cx2.fillText((+d.slice(4,6))+'/'+(+d.slice(6,8)), xx-10, Hc-4); cx2.restore(); }
+          if(d!==lastD){ const isFirst=firstBar; firstBar=false; lastD=d;
+            /* (2026-08-04) 날짜 경계 — 하루 시작 지점에 세로 점선(모든 패널 공통) + 아래 날짜.
+               화면 맨 왼쪽에서 시작하는 날은 점선 생략(경계가 아니라 잘린 것). */
+            if(!isFirst){ cx2.save(); cx2.strokeStyle='#c5beb2'; cx2.setLineDash([3,3]);
+              cx2.beginPath(); cx2.moveTo(xx-0.5,2); cx2.lineTo(xx-0.5,Hc-13); cx2.stroke(); cx2.restore(); }
+            /* 날짜 라벨은 항상 표시(시각 라벨보다 우선) — 시각 라벨의 간격 가드에 밀려 빠지지 않게 */
+            px=xx; cx2.save(); cx2.fillStyle='#5b6470'; cx2.font='bold 10px sans-serif';
+            cx2.fillText((+d.slice(4,6))+'/'+(+d.slice(6,8)), xx-9, Hc-4); cx2.restore();
             continue; }
-          if(hm.endsWith(':00') && xx-px>=52){ px=xx; cx2.fillText(hm, xx-12, Hc-4); } }
+          if(hm.endsWith(':00') && xx-px>=52 && bx.every(b=>Math.abs(xx-b)>=44)){ px=xx; cx2.fillText(hm, xx-12, Hc-4); } }
       } else {
         let lastM='',lastY='',px=-99;
         for(let i=0;i<N;i++){ const d=String(t[i]||'').replace(/-/g,''); if(d.length<6) continue;

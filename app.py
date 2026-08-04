@@ -755,6 +755,7 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
                         break
                     last = o2[-1]; dt8, hr6 = last["stck_bsop_date"], last["stck_cntg_hour"]
                     time.sleep(0.05)
+                acc = [x for x in acc if str(x.get("stck_prpr") or "0") != "0"]   # 무체결(0 채움) 분 제거
                 days3 = sorted({x["stck_bsop_date"] for x in acc})[-3:]
                 acc = [x for x in acc if x["stck_bsop_date"] in days3]
                 acc.reverse()                                            # DESC → ASC
@@ -762,11 +763,15 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
                 def _f(x, k):
                     try: return float(x.get(k))
                     except Exception: return None
-                if acc:      # 통합분봉 미제공 종목(일부 ETF — 실측 069500은 UN·NX 모두 0건)은 아래 네이버 정규장 폴백
+                if acc:
                     base = {"t": [x["stck_bsop_date"] + str(x.get("stck_cntg_hour") or "")[:4] for x in acc],
                             "o": [_f(x, "stck_oprc") for x in acc], "h": [_f(x, "stck_hgpr") for x in acc],
                             "l": [_f(x, "stck_lwpr") for x in acc], "c": [_f(x, "stck_prpr") for x in acc],
                             "v": [_f(x, "cntg_vol") for x in acc]}
+                # (2026-08-04 실측) ETF 는 KIS 분봉이 시간외를 제공하지 않는다:
+                #   일별분봉(FHKST03010230) UN = 과거일 포함 전부 0건 · 당일분봉(FHKST03010200) UN·NX = 전 봉 0값
+                #   · J 는 15:30 이후가 종가 채움봉(vol 0). NXT ETF 체결 분봉 제공처 없음 → 정규장 폴백 + ppf 플래그로 안내.
+            _ppf = bool(pp and mkt == "kr" and base is None)   # 시간외 요청했지만 미제공 → 정규장 폴백 표시용
             if mkt == "kr" and base is None:
                 E = _d.today().strftime("%Y%m%d") + "1600"
                 S = (_d.today() - _td(days=20)).strftime("%Y%m%d") + "0900"
@@ -808,6 +813,8 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0)
             out = _agg(base["t"], base["o"], base["h"], base["l"], base["c"], base["v"], _kf) \
                 if n > 1 else base
             out["tf"] = tf
+            if _ppf:
+                out["ppf"] = 1     # 프론트: '시간외 미제공 종목(정규장 표시)' 안내
         else:
             # 필요한 이력 = 표시 250봉 + 최장 이동평균(240) + 줌아웃 여유.
             #   일 10년(≈2,500봉) · 주 15년(≈780주) · 월 30년(≈360개월)
