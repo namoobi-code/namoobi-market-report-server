@@ -2242,6 +2242,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     show('scr_glsbtn', stage<=2);                     // 필터설명: 1·2단계
     show('scr_rst', S1);                              // 초기화: 1단계
     show('scr_turn', S1);                             // 턴어라운드 프리셋: 1단계
+    show('scr_surge', S1); show('scr_surge_hi', S1);  // 개장서지 + 변형 3종: 1단계
+    show('scr_surge_sq', S1); show('scr_surge_ern', S1);
     show('scr_lowpbr', S1);                           // 저PBR M&A 프리셋: 1단계
     show('scr_allf', S1);                             // 전부전체: 1단계
     show('scr_autoscroll', S1);
@@ -4678,8 +4680,7 @@ await _canvasFlow(c);
      잡음 배제: 거래대금(KR 100억/US $20M)↑ · 시총(KR 1,000억/US $300M)↑ · 상장 1년↑(신규상장 왜곡 제외)
      결과는 등락률 내림차순. 추가로 볼 만한 조합(수동): 고점比 -10% 이내=신고가 돌파형 ·
      공매도비중 ↑=숏스퀴즈 후보 · 어닝일 D+1~D+7=실적 서프라이즈 추격 */
-  {const sg=$('scr_surge'); if(sg) sg.onclick=()=>{
-    if(stage!==1) return;
+  function _surgeBase(){                               // 서지 공통 조건 적용 후 set 함수 반환
     const d=DEF[mkt];
     for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
       F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }   // 전부 '전체'로
@@ -4690,8 +4691,23 @@ await _canvasFlow(c);
     set('cap',{min:mkt==='kr'?1e11:3e8,max:null});     // 시총 1,000억 / $300M ↑
     set('age',{min:1,max:null});                       // 상장 1년 ↑
     sort={k:'chg',d:-1};                               // 등락률 높은 순
-    apply();
-  };}
+    return set;
+  }
+  {const sg=$('scr_surge'); if(sg) sg.onclick=()=>{ if(stage!==1) return; _surgeBase(); apply(); };}
+  /* (2026-08-04) 서지 변형 3종 — 개장서지 + 추가 조건 하나씩 */
+  {const b=$('scr_surge_hi'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const set=_surgeBase();
+    set('hi',{min:-10,max:null});                      // 고점比 -10% 이내 — 52주 신고가 돌파형
+    apply(); };}
+  {const b=$('scr_surge_sq'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const set=_surgeBase();
+    if(mkt==='kr') set('sr',{min:5,max:null});         // KR 공매도비중 5% ↑ (과열)
+    else set('srf',{min:10,max:null});                 // US 공매도잔량/유통주식 10% ↑ (과열)
+    apply(); };}
+  {const b=$('scr_surge_ern'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const set=_surgeBase();
+    set('ern',{min:-7,max:-1});                        // 어닝 D+1~D+7 — 실적 발표 직후
+    apply(); };}
   /* (2026-08-01) 🔄 턴어라운드 프리셋 v2 — 사용자 검증 세팅(KR 21종 통과)으로 교체.
      "이미 하락(고점 -40%·3M 하락) + 실적 재가속(성장가속 +30%p) + 추정 상향(리비전 10%)
       + 밸류 여지(상승여력 50%) + 부실 배제(부채 200%↓·영업적자 1년이상 제외)".
