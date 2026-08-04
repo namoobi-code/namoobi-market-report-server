@@ -1100,7 +1100,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       fetch('/api/db/rtms').then(x=>x.ok?x.json():null).then(R=>{
         if(!R||!R.sale) return;
         const sel=$('re_rt_sel'); if(!sel) return;
-        const codes=['SEOUL',...Object.keys(R.names||{}).filter(c=>c!=='SEOUL')];
+        const codes=[...['SEOUL','BUSAN'].filter(c=>(R.names||{})[c]),...Object.keys(R.names||{}).filter(c=>c!=='SEOUL'&&c!=='BUSAN')];
         sel.innerHTML=codes.map(c=>`<option value="${c}">${(R.names||{})[c]||c}</option>`).join('');
         const draw=()=>{
           const c=sel.value, sm=(R.sale[c]||{}).m||{}, rm=((R.rent||{})[c]||{}).m||{};

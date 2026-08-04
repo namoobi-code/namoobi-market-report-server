@@ -31,7 +31,11 @@ REGIONS = {
     "11620": "서울 관악구", "11650": "서울 서초구", "11680": "서울 강남구", "11710": "서울 송파구",
     "11740": "서울 강동구",
     "41135": "성남 분당구", "41117": "수원 영통구", "41465": "용인 수지구", "41597": "화성 동탄구", "41290": "과천시",
-    "26350": "부산 해운대구", "27260": "대구 수성구", "28185": "인천 연수구", "31140": "울산 남구", "30200": "대전 유성구",
+    "26110": "부산 중구", "26140": "부산 서구", "26170": "부산 동구", "26200": "부산 영도구",
+    "26230": "부산 부산진구", "26260": "부산 동래구", "26290": "부산 남구", "26320": "부산 북구",
+    "26350": "부산 해운대구", "26380": "부산 사하구", "26410": "부산 금정구", "26440": "부산 강서구",
+    "26470": "부산 연제구", "26500": "부산 수영구", "26530": "부산 사상구", "26710": "부산 기장군",
+    "27260": "대구 수성구", "28185": "인천 연수구", "31140": "울산 남구", "30200": "대전 유성구",
     # 참고: 화성시(41590)는 2026 일반구 분화(41593 봉담·41595 병점·41597 동탄) — 최대 거래권 동탄 채택.
     #       광주광역시는 본 API에 전 구·전 월 0건(국토부 데이터 미제공 이슈)이라 울산 남구로 대체.
 }
@@ -112,28 +116,29 @@ def main():
             time.sleep(0.12)
         sale[code] = {"m": s}; rent[code] = {"m": r_}
         print(f"  [{i+1}/{len(REGIONS)}] {name}: 매매 {len(s)}개월 · 전세 {len(r_)}개월")
-    # 서울 전체(25구 합산) 의사지역
-    allm = sorted({t for c in SEOUL for t in (sale.get(c) or {}).get("m", {})})
-    sm = {}
-    for t in allm:
-        rs = [(sale[c]["m"].get(t)) for c in SEOUL if (sale.get(c) or {}).get("m", {}).get(t)]
-        if rs:
+    # 합산 의사지역 — 서울(25구)·부산(16구군)
+    def agg_region(codes, key_avg):
+        allm = sorted({t for c in codes for t in ((sale if key_avg == "avg" else rent).get(c) or {}).get("m", {})})
+        out = {}
+        src = sale if key_avg == "avg" else rent
+        for t in allm:
+            rs = [src[c]["m"].get(t) for c in codes if (src.get(c) or {}).get("m", {}).get(t)]
+            if not rs: continue
             n = sum(x["n"] for x in rs)
-            sm[t] = {"n": n, "avg": round(sum(x["avg"] * x["n"] for x in rs) / n, 2), "med": None}
-    rm = {}
-    allr = sorted({t for c in SEOUL for t in (rent.get(c) or {}).get("m", {})})
-    for t in allr:
-        rs = [(rent[c]["m"].get(t)) for c in SEOUL if (rent.get(c) or {}).get("m", {}).get(t)]
-        if rs:
-            n = sum(x["n"] for x in rs)
-            rm[t] = {"n": n, "dep": round(sum(x["dep"] * x["n"] for x in rs) / n, 2)}
-    sale["SEOUL"] = {"m": sm}; rent["SEOUL"] = {"m": rm}
-    names = dict(REGIONS); names["SEOUL"] = "서울 전체(25개구)"
+            if key_avg == "avg":
+                out[t] = {"n": n, "avg": round(sum(x["avg"] * x["n"] for x in rs) / n, 2), "med": None}
+            else:
+                out[t] = {"n": n, "dep": round(sum(x["dep"] * x["n"] for x in rs) / n, 2)}
+        return out
+    BUSAN = [c for c in REGIONS if c.startswith("26")]
+    sale["SEOUL"] = {"m": agg_region(SEOUL, "avg")}; rent["SEOUL"] = {"m": agg_region(SEOUL, "dep")}
+    sale["BUSAN"] = {"m": agg_region(BUSAN, "avg")}; rent["BUSAN"] = {"m": agg_region(BUSAN, "dep")}
+    names = dict(REGIONS); names["SEOUL"] = "서울 전체(25개구)"; names["BUSAN"] = "부산 전체(16개구·군)"
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
                                "names": names, "sale": sale, "rent": rent}, ensure_ascii=False),
                    encoding="utf-8")
-    print(f"[rtms] ✅ {len(REGIONS)}지역 · 서울합산 {len(sm)}개월 → {OUT}")
+    print(f"[rtms] ✅ {len(REGIONS)}지역 · 서울합산 {len(sale['SEOUL']['m'])}개월 · 부산합산 {len(sale['BUSAN']['m'])}개월 → {OUT}")
 
 if __name__ == "__main__":
     main()
