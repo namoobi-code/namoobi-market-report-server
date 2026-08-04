@@ -1170,9 +1170,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            let provIdx=ts.findIndex(t=>t>_cut); if(provIdx<0) provIdx=null;
            const arr=mset.map((c,i)=>({t:ts,v:ts.map(t=>{const e=((src[c]||{}).m||{})[t]; return e?(e[met]??null):null;}),
                                        label:(N[c]||c).replace(/\(.*\)/,''),color:PAL[i%PAL.length]})).filter(a=>a.v.some(v=>v!=null));
+           if(!arr.length){ const cvb=$('re_rt_big'); cvb.getContext('2d').clearRect(0,0,cvb.width,cvb.height);
+             $('re_rt_big_n').innerHTML='선택 지역엔 이 지표 데이터가 없습니다 — 다음 수집(매일 07:20) 후 시도 전체 중위가(근사)가 채워집니다'; return; }
            line('re_rt_big',arr,{provIdx});
            const ml=METRICS.find(x=>x[0]===met)[1];
-           $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · <b>중위가는 시도 전체 합산에선 미제공</b>(개별 시군구만)':''} · 주황 음영=신고 진행 중(잠정) · 🖱 휠=X축 확대/축소·드래그=좌우 이동(표시 ${ts.length}/${curL}개월) · 지역별 스케일 차이가 크면 거래량으로 비교 권장`;
+           $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · 시도 전체 중위가는 <b>거래량 가중 근사치</b>':''} · 주황 음영=신고 진행 중(잠정) · 🖱 휠=X축 확대/축소·드래그=좌우 이동(표시 ${ts.length}/${curL}개월) · 지역별 스케일 차이가 크면 거래량으로 비교 권장`;
          }
          {const cv2=$('re_rt_big');
           cv2.addEventListener('wheel',e=>{ e.preventDefault();

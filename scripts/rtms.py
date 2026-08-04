@@ -215,7 +215,16 @@ def main():
             if not rs: continue
             n = sum(x["n"] for x in rs)
             if key_avg == "avg":
-                out[t] = {"n": n, "avg": round(sum(x["avg"] * x["n"] for x in rs) / n, 2), "med": None}
+                # 중위가: 시군구 중위가의 거래건수 가중 중위(근사 — 전체 거래 풀링과 유사)
+                pairs = sorted((x["med"], x["n"]) for x in rs if x.get("med") is not None)
+                med = None
+                if pairs:
+                    half = sum(w for _, w in pairs) / 2; acc = 0
+                    for v, w in pairs:
+                        acc += w
+                        if acc >= half: med = v; break
+                out[t] = {"n": n, "avg": round(sum(x["avg"] * x["n"] for x in rs) / n, 2),
+                          "med": round(med, 2) if med is not None else None}
             else:
                 out[t] = {"n": n, "dep": round(sum(x["dep"] * x["n"] for x in rs) / n, 2)}
         return out

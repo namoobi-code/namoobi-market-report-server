@@ -742,8 +742,9 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
                         "v": [r.get("accumulatedTradingVolume") for r in rows]}
             else:
                 iv, rg = ("1m", "5d") if n <= 3 else ("5m", "1mo")
+                # (2026-08-04) includePrePost=true — 프리장(04:00~)·애프터장(~20:00 ET) 체결도 포함(미래에셋 MTS식)
                 url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}"
-                       f"?range={rg}&interval={iv}")
+                       f"?range={rg}&interval={iv}&includePrePost=true")
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
                 j = json.loads(urllib.request.urlopen(req, timeout=15).read())
                 res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]
