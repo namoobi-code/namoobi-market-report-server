@@ -1,35 +1,58 @@
 {
- "marker": "2026-07",
- "as_of": "2026-07-23",
+ "marker": "2026-08",
+ "as_of": "2026-08-04",
  "data": {
-  "latest_sep": "2026-06-17 FOMC (2026년 6월 SEP, 최신)",
-  "compare_sep": "2026-03-18 FOMC (2026년 3월 SEP, 직전 비교)",
   "rows": [
    {
-    "item": "2026년말",
-    "jun": "3.8%",
-    "mar": "3.4%",
-    "change": ""
+    "year": "2026",
+    "jun": 3.8,
+    "mar": 3.4,
+    "change": "+0.4"
    },
    {
-    "item": "2027년말",
-    "jun": "3.6%",
-    "mar": "3.1%",
-    "change": ""
+    "year": "2027",
+    "jun": 3.6,
+    "mar": 3.1,
+    "change": "+0.5"
    },
    {
-    "item": "2028년말",
-    "jun": "3.4%",
-    "mar": "3.1%",
-    "change": ""
+    "year": "2028",
+    "jun": 3.4,
+    "mar": 3.1,
+    "change": "+0.3"
    },
    {
-    "item": "장기중립(Longer run)",
-    "jun": "3.1%",
-    "mar": "3.1%",
-    "change": ""
+    "year": "장기중립",
+    "jun": 3.1,
+    "mar": 3.1,
+    "change": "+0.0"
    }
   ],
-  "note": "2026년 6월 FOMC(6/16~17) SEP은 3월 대비 2026년말 정책금리 중간값이 3.4%→3.8%로 대폭 상향된 매파적 급선회(참가자 18명 중 9명이 연내 1회 이상 인상 전망). 2027·2028년말 중간값도 각각 3.1%→3.6%, 3.1%→3.4%로 동반 상향. 장기중립은 3.1%로 3월과 동일. Kevin Warsh 신임 의장은 6월 회의에서 점도표를 제출하지 않음(18명 중 17명 참여로 집계). (출처: federalreserve.gov, Summary of Economic Projections, fomcprojtabl20260617.htm / fomcprojtabl20260318.htm, 2026-07-23 WebSearch·직접조회 확인)"
+  "unit": "%",
+  "summary": "2026-06-17 SEP(점도표)에서 2026년말 정책금리 중간값이 3월 3.4%→6월 3.8%로 매파적 급선회(18명 중 9명이 연내 1회 이상 인상 전망) — 관세발 인플레·노동시장 견조함 반영. 2027년말 3.6%, 2028년말 3.4%로 상향, 장기중립금리는 3.1%로 유지. 다음 SEP는 2026-09-16 예정(변경 시까지 6월 전망 유지).",
+  "policy_rate": "3.50~3.75% (2026-07-29 FOMC, 5회 연속 동결)",
+  "next_meeting": "2026-09-15~16 (SEP 점도표 발표 예정)",
+  "background": [
+   "2026-06-17 SEP는 Kevin Warsh 신임 의장 취임 후 첫 점도표로, 3월 전망 대비 전 구간 상향(매파적) — 관세로 인한 물가 상방 압력과 견조한 고용을 반영.",
+   "2026-07-29 FOMC는 SEP 미실시 정례회의였으나 Hammack·Kashkari·Logan 3인이 25bp 인상을 주장하며 반대해(2016년 9월 이후 최초 3인 동일방향 소수의견) 매파적 색채가 이어짐.",
+   "다음 SEP(2026-09-16)에서 점도표가 추가로 상향될지가 4분기 금리 경로의 핵심 변수."
+  ],
+  "market_impact": "6월 SEP의 매파적 상향 이후 국채금리 전반이 레벨업(10년물 4.7%대)되었고, 9월 SEP 전까지는 위원별 발언(특히 반대표 3인)의 매파 강도가 단기 변동성 요인.",
+  "source": "federalreserve.gov FOMC Summary of Economic Projections (fomcprojtabl20260617.htm, fomcprojtabl20260318.htm) — Federal funds rate median row",
+  "source_url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm",
+  "sources": [
+   {
+    "source": "federalreserve.gov FOMC SEP 2026-06-17",
+    "url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm"
+   },
+   {
+    "source": "federalreserve.gov FOMC SEP 2026-03-18",
+    "url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260318.htm"
+   },
+   {
+    "source": "federalreserve.gov FOMC statement 2026-07-29",
+    "url": "https://www.federalreserve.gov/newsevents/pressreleases/monetary20260729a.htm"
+   }
+  ]
  }
 }

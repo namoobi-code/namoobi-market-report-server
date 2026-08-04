@@ -703,7 +703,7 @@ TF_MIN = {"1m": 1, "3m": 3, "5m": 5, "10m": 10, "30m": 30, "60m": 60}
 
 
 @app.get("/api/chart/{mkt}/{code}")
-def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
+def chart_api(request: Request, mkt: str, code: str, tf: str = "d", pp: int = 0):
     """종목 차트 프록시 — KR: 네이버 / US: Yahoo v8.
 
     tf: 1m·3m·5m·10m·30m·60m(분봉) · d(일) · w(주) · M(월)
@@ -719,7 +719,8 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
         raise HTTPException(400, "bad tf")
     if tf in TF_MIN and not _logged_in(request):
         raise HTTPException(401, "분봉은 로그인 후 이용 가능합니다(KIS·외부 API 부하 보호)")
-    key = f"{mkt}:{code}:{tf}"; now = time.time()
+    pp = 1 if (pp and mkt == "us" and tf in TF_MIN) else 0   # 시간외는 US 분봉에서만 의미
+    key = f"{mkt}:{code}:{tf}:{pp}"; now = time.time()
     hit = _chart_cache.get(key)
     if hit and now - hit[0] < (30 if tf in TF_MIN else 60):
         return hit[1]
@@ -742,9 +743,10 @@ def chart_api(request: Request, mkt: str, code: str, tf: str = "d"):
                         "v": [r.get("accumulatedTradingVolume") for r in rows]}
             else:
                 iv, rg = ("1m", "5d") if n <= 3 else ("5m", "1mo")
-                # (2026-08-04) includePrePost=true — 프리장(04:00~)·애프터장(~20:00 ET) 체결도 포함(미래에셋 MTS식)
+                # (2026-08-04) pp=1 이면 프리장(04:00~)·애프터장(~20:00 ET) 체결 포함(야후 Extended Hours).
+                #   기본(pp=0)은 정규장만 — 프론트 토글 default 정규장.
                 url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(code)}"
-                       f"?range={rg}&interval={iv}&includePrePost=true")
+                       f"?range={rg}&interval={iv}&includePrePost={'true' if pp else 'false'}")
                 req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
                 j = json.loads(urllib.request.urlopen(req, timeout=15).read())
                 res = j["chart"]["result"][0]; q = res["indicators"]["quote"][0]

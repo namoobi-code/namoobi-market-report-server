@@ -2898,7 +2898,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cvs.forEach(id=>{const e=$(id); if(e)e.style.display='block';});
       $('sd_src').textContent='차트 불러오는 중…';
       try{
-        const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${_TF}`)).json();
+        const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${_TF}${_ppq()}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
         _LASTFETCH=Date.now();
         drawAll(D);
@@ -2932,6 +2932,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
              return ` · ⚠ 맨 오른쪽 봉은 아직 진행 중 — 장 ${Math.round(g.f*100)}% 경과 시점의 ${u(g.now)}주(빗금)이며 평균선과 비교하면 ${x1}배로 보입니다.`
                   + ` 점선은 이 페이스로 마감까지 갔을 때의 예상치 ${u(g.proj)}주(${x2}배)로, 표의 거래량배수가 이 값입니다.`; })());
         $('sd_tfbar').style.display='flex';
+        /* (2026-08-04) 정규장/시간외 토글 노출 갱신 — KR↔US 전환·주기 변경 시에도 정확히 */
+        {const pw=$('sd_ppwrap');
+         if(pw){ pw.style.display=(mkt==='us'&&_isMin())?'inline-flex':'none';
+           pw.querySelectorAll('.ppb').forEach(b=>b.classList.toggle('on', (b.dataset.pp==='1')===_PP)); }}
         $('sd_tfnote').textContent = _isMin()
           ? `${D.t?D.t.length:0}봉 · 최근 ${new Set((D.t||[]).map(z=>z.slice(0,8))).size}거래일`
           : `${D.t?D.t.length:0}봉`;
@@ -3398,6 +3402,9 @@ await _canvasFlow(c);
              'd':'일','w':'주','M':'월'};
   let _TF='d';
   const _isMin=()=>_TF.endsWith('m');
+  /* (2026-08-04) US 분봉 시간외(프리·애프터) 포함 여부 — 야후 Extended Hours 식 토글. 기본 정규장(false). */
+  let _PP=false;
+  const _ppq=()=>(mkt==='us'&&_isMin()&&_PP)?'&pp=1':'';
   const CZ0=250;                          // 기본 표시 봉수
   let _CZ=CZ0, _COFF=0, _DRAG=null, _DMOVE=0;
   const _mk=n=>{ const a=Math.abs(n);
@@ -3686,7 +3693,7 @@ await _canvasFlow(c);
     if(Date.now()-_LASTFETCH < need) return;
     const c=dcode, tf=_TF;
     try{
-      const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${tf}`)).json();
+      const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${tf}${_ppq()}`)).json();
       if(dcode!==c || _TF!==tf) return;                 // 그 사이 종목·주기가 바뀌었으면 버린다
       _LASTFETCH=Date.now();
       const prevTot=(_CD&&_CD.c)?_CD.c.length:0, tot=(D.c||[]).length;
@@ -3727,7 +3734,14 @@ await _canvasFlow(c);
     const sel=$('sd_tfmin');
     const sync=()=>{ document.querySelectorAll('#sd_tfbar .tfb')
         .forEach(b=>b.classList.toggle('on', b.dataset.tf===_TF));
-      if(sel) sel.classList.toggle('on', _isMin()); };
+      if(sel) sel.classList.toggle('on', _isMin());
+      /* (2026-08-04) 정규장/시간외 토글 — US 분봉일 때만 노출 (야후 Extended Hours 식, 기본 정규장) */
+      const pw=$('sd_ppwrap');
+      if(pw){ pw.style.display=(mkt==='us'&&_isMin())?'inline-flex':'none';
+        pw.querySelectorAll('.ppb').forEach(b=>b.classList.toggle('on', (b.dataset.pp==='1')===_PP)); } };
+    document.querySelectorAll('#sd_ppwrap .ppb').forEach(b=>{
+      b.onclick=()=>{ const v=b.dataset.pp==='1'; if(v===_PP) return;
+        _PP=v; sync(); if(dcode) showDetail(dcode); }; });
     /* (2026-07-21) 일/주/월 상태에서 드롭다운의 '현재 선택값'(예: 5분)을 다시 고르면
        select 의 value 가 안 바뀌어 change 이벤트가 안 난다 → 아무 반응이 없었다.
        (다른 값을 고르면 정상 동작해서 더 헷갈렸다)

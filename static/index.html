@@ -970,6 +970,11 @@
                 <button class="cp-x tfb" data-tf="d">일</button>
                 <button class="cp-x tfb" data-tf="w">주</button>
                 <button class="cp-x tfb" data-tf="M">월</button>
+                <!-- (2026-08-04) US 분봉 전용 — 야후 Extended Hours 식 정규장/시간외 토글 (기본 정규장) -->
+                <span id="sd_ppwrap" style="display:none;gap:2px;margin-left:8px">
+                  <button class="cp-x ppb" data-pp="0" title="정규장 체결만 (09:30~16:00 ET)">정규장</button>
+                  <button class="cp-x ppb" data-pp="1" title="프리마켓(04:00~)·애프터마켓(~20:00 ET) 포함">시간외포함</button>
+                </span>
                 <span class="note" id="sd_tfnote" style="margin-left:6px;font-size:11px"></span>
               </div>
               <canvas id="sd_main"></canvas><canvas id="sd_vol"></canvas>

@@ -1,6 +1,6 @@
 {
- "marker": "2026-07-23",
- "as_of": "2026-07-23",
+ "marker": "2026-08-04",
+ "as_of": "2026-08-04",
  "data": [
   [
    "2026-07-04",
@@ -112,6 +112,102 @@
     "inventory": 0,
     "price_qoq": 1,
     "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-24",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-25",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-26",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-27",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-28",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-29",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-30",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 1
+   }
+  ],
+  [
+   "2026-07-31",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 2
+   }
+  ],
+  [
+   "2026-08-01",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 2
+   }
+  ],
+  [
+   "2026-08-02",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 2
+   }
+  ],
+  [
+   "2026-08-03",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 2
+   }
+  ],
+  [
+   "2026-08-04",
+   {
+    "inventory": 0,
+    "price_qoq": 1,
+    "capex_yoy": 2
    }
   ]
  ]
