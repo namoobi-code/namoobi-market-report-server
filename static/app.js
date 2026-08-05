@@ -938,8 +938,44 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     box.style.display='';
     return {byCode, days};
   }
+  /* (2026-08-05) SEC 8-K 워치리스트 관리 박스 — US 뷰 전용. 조회는 공개, 추가/삭제는 로그인 필요(서버 401). */
+  let _w8kOpen = localStorage.getItem('w8k_open')==='1';
+  function _w8kBox(mk){
+    const box=document.getElementById('mc_8k'); if(!box) return;
+    if(mk!=='us'){ box.style.display='none'; return; }
+    fetch('/api/8k_watchlist').then(r=>r.ok?r.json():null).then(d=>{
+      const syms=(d&&d.syms)||[];
+      const E2=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+      const capF=v=>v==null?'':(v>=1e12?' $'+(v/1e12).toFixed(1)+'T':' $'+(v/1e9).toFixed(0)+'B');
+      box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;cursor:pointer" id="w8k_hd">
+          <b style="font-size:12.5px">📄 SEC 8-K 실시간 감시 — ${syms.length}종</b>
+          <span class="note">1분 주기 · 8-K 접수 즉시 태그 → 이후 야후 EPS 수치로 교차검증 · 클릭해서 ${_w8kOpen?'접기 ▲':'펼치기 ▼'}</span></div>
+        <div id="w8k_body" style="display:${_w8kOpen?'':'none'}">
+          <div class="w8k-list">${syms.map(s=>
+            `<span class="w8k-it" title="${E2(s.n)}${capF(s.cap)}"><b>${E2(s.c)}</b> <span class="note">${E2(s.n).slice(0,14)}</span><button class="w8k-x" data-del="${E2(s.c)}" title="감시에서 제거">✕</button></span>`).join('')}</div>
+          <div style="display:flex;gap:6px;margin-top:6px;align-items:center">
+            <input id="w8k_in" placeholder="티커 추가 (예: SNOW)" style="border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px;width:160px" autocomplete="off">
+            <button class="cp-x" id="w8k_add">＋ 추가</button>
+            <span class="note">ADR(TSM 등)은 6-K 피드로 함께 감지 · 추가/삭제는 로그인 필요</span></div>
+        </div>`;
+      box.style.display='';
+      document.getElementById('w8k_hd').onclick=()=>{ _w8kOpen=!_w8kOpen;
+        localStorage.setItem('w8k_open',_w8kOpen?'1':'0'); _w8kBox(mk); };
+      const post=q=>fetch('/api/8k_watchlist?'+q,{method:'POST'}).then(r=>{
+        if(r.status===401){ alert('추가/삭제는 관리자 로그인이 필요합니다'); return null; }
+        return r.ok?r.json():null; }).then(x=>{ if(x) _w8kBox(mk); });
+      box.querySelectorAll('.w8k-x').forEach(b=>b.onclick=e=>{ e.stopPropagation();
+        if(confirm(b.dataset.del+' 을 8-K 감시에서 제거할까요?')) post('remove='+encodeURIComponent(b.dataset.del)); });
+      const inp=document.getElementById('w8k_in');
+      const doAdd=()=>{ const v=(inp.value||'').trim().toUpperCase(); if(!v) return;
+        post('add='+encodeURIComponent(v)); inp.value=''; };
+      document.getElementById('w8k_add').onclick=doAdd;
+      inp.onkeydown=e=>{ if(e.key==='Enter') doAdd(); };
+    }).catch(()=>{ box.style.display='none'; });
+  }
   function renderMonthCal(mk){
     const grid=document.getElementById('mc_grid'); if(!grid) return;
+    _w8kBox(mk);
     const done=pool=>{ const build=LV=>{
       const LIVEBY=(LV&&LV.byCode)||{};
       const evs={};

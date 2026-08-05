@@ -245,6 +245,12 @@
   .mc-tag.up{background:#fde8e8;color:#c0392b}
   .mc-tag.dn{background:#e8f0fd;color:#1f6feb}
   .mc-tag.nt{background:#efefef;color:#555}   /* 8-K 접수 등 중립 태그 */
+  /* SEC 8-K 워치리스트 박스 */
+  #mc_8k{border:1px solid var(--line);border-radius:8px;background:#fff;padding:8px 10px}
+  .w8k-list{display:flex;flex-wrap:wrap;gap:5px;max-height:150px;overflow-y:auto;margin-top:6px;padding:2px}
+  .w8k-it{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:6px;padding:1px 4px 1px 8px;font-size:11.5px;background:#fafbfc;white-space:nowrap}
+  .w8k-x{border:0;background:none;cursor:pointer;color:#c0392b;font-size:11px;padding:0 3px}
+  .w8k-x:hover{font-weight:700}
   .mc-chip{display:block;font-size:11px;line-height:1.5;background:#eef4ff;border-radius:4px;padding:0 5px;margin-bottom:2px;
            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#1e3a8a;cursor:default}
   .mc-more{font-size:10.5px;color:#1f6feb;font-weight:700}
@@ -693,8 +699,10 @@
         <button class="cp-x" id="mc_prev">◀ 이전달</button><b id="mc_title" style="font-size:15px"></b><button class="cp-x" id="mc_next">다음달 ▶</button>
         <span class="note" id="mc_note"></span>
       </div>
-      <!-- (2026-08-05) 실적 속보 스트립 — DART 잠정실적 실시간 감지(earnings_watch, 5분 주기). KR 뷰에서만 표시 -->
+      <!-- (2026-08-05) 실적 속보 스트립 — KR=DART 5분 · US=야후 5분+SEC 8-K 1분 -->
       <div id="mc_live" style="display:none;margin-bottom:8px"></div>
+      <!-- (2026-08-05) SEC 8-K 워치리스트 관리 — US 뷰에서만 -->
+      <div id="mc_8k" style="display:none;margin-bottom:8px"></div>
       <div class="mcal-grid" id="mc_grid"></div>
     </div>
     <div id="cal_v_ev">
@@ -1336,8 +1344,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260805h"></script>
-<script src="/etf.js?v=20260805h"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260805i"></script>
+<script src="/etf.js?v=20260805i"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

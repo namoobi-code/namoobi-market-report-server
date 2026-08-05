@@ -180,6 +180,53 @@ def stock_overview(mkt: str, code: str):
         _ov_cache.clear()
     return out
 
+# ── (2026-08-05) SEC 8-K 워치리스트 — 캘린더 US 뷰에서 조회/추가/삭제 ──
+_W8K = BASE / "data" / "watch" / "us_8k_watchlist.txt"
+
+@app.get("/api/8k_watchlist")
+def w8k_get():
+    syms = []
+    try:
+        for ln in _W8K.read_text().splitlines():
+            s = ln.strip().upper()
+            if s and not s.startswith("#") and s not in syms:
+                syms.append(s)
+    except Exception:
+        pass
+    info = {}
+    try:
+        p = json.loads((BASE / "data" / "db" / "screener_pool.json").read_text(encoding="utf-8"))
+        info = {r["c"]: r for r in p.get("us") or []}
+    except Exception:
+        pass
+    out = [{"c": s, "n": (info.get(s) or {}).get("kn") or (info.get(s) or {}).get("n") or "",
+            "cap": (info.get(s) or {}).get("cap")} for s in syms]
+    out.sort(key=lambda x: -(x["cap"] or 0))
+    return {"syms": out}
+
+@app.post("/api/8k_watchlist")
+def w8k_post(request: Request, add: str = "", remove: str = ""):
+    from auth_visitors import current_user
+    if not current_user(request):
+        raise HTTPException(401, "로그인이 필요합니다")
+    add = add.strip().upper(); remove = remove.strip().upper()
+    if add and not re.fullmatch(r"[A-Z0-9.\-]{1,10}", add):
+        raise HTTPException(400, "티커 형식이 아닙니다")
+    lines = []
+    try:
+        lines = _W8K.read_text().splitlines()
+    except Exception:
+        pass
+    head = [l for l in lines if l.strip().startswith("#")]
+    syms = [l.strip().upper() for l in lines if l.strip() and not l.strip().startswith("#")]
+    if remove:
+        syms = [s for s in syms if s != remove]
+    if add and add not in syms:
+        syms.append(add)
+    _W8K.parent.mkdir(parents=True, exist_ok=True)
+    _W8K.write_text("\n".join(head + syms) + "\n")
+    return {"ok": True, "count": len(syms)}
+
 @app.get("/api/policyrates")
 def policyrates():
     """주요 6개국 정책금리 월별 시계열"""

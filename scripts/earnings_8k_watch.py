@@ -57,8 +57,11 @@ def main():
             if s.strip() and not s.strip().startswith("#")]
     mp = cik_map()
     watch = {mp[s]: s for s in syms if s in mp}
-    d = get("https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type=8-K"
-            "&company=&dateb=&owner=include&count=100&output=atom").decode("utf-8", "ignore")
+    # (2026-08-05) ADR(외국계: TSM·ASML 등)은 8-K 대신 6-K 로 실적을 낸다 → 두 피드 모두 감시
+    d = ""
+    for ftype in ("8-K", "6-K"):
+        d += get(f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type={ftype}"
+                 "&company=&dateb=&owner=include&count=100&output=atom").decode("utf-8", "ignore")
     live = {}
     try:
         live = json.loads(OUT.read_text(encoding="utf-8"))
@@ -86,9 +89,10 @@ def main():
         ts = datetime.fromisoformat(up.group(1))
         et = ts.astimezone(ET)
         d8 = et.strftime("%Y%m%d")
-        its = items_of(cik, ac.group(1))
+        ft = "6-K" if "6-K" in (re.search(r"<title>([^<]*)", e) or [None, ""])[1] else "8-K"
+        its = items_of(cik, ac.group(1)) if ft == "8-K" else ""
         is_ern = "2.02" in its
-        tag = f"📄 8-K{'(실적)' if is_ern else ''} 접수 {et.strftime('%H:%M')}ET"
+        tag = f"📄 {ft}{'(실적)' if is_ern else ''} 접수 {et.strftime('%H:%M')}ET"
         lst = days.setdefault(d8, [])
         cur = next((z for z in lst if z["c"] == sym), None)
         if cur:
