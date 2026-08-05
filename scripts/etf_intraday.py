@@ -116,13 +116,13 @@ def update_us(pool):
         v3 = x.get("averageDailyVolume3Month")
         if v3:
             r["tv"] = round(v3*P)
-        if x.get("fiftyTwoWeekChangePercent") is not None:
-            r["r1y"] = x["fiftyTwoWeekChangePercent"]/100
-        if x.get("fiftyTwoWeekHighChangePercent") is not None:
-            r["hi"] = x["fiftyTwoWeekHighChangePercent"]/100
-        if x.get("twoHundredDayAverageChangePercent") is not None:
-            r["v200"] = x["twoHundredDayAverageChangePercent"]/100
-        for a, albl in (("r1m", "a1m"), ("r3m", "a3m"), ("r6m", "a6m")):
+        # (2026-08-06) 야후 v7 fiftyTwoWeek*/twoHundredDay* 필드는 값이 깨져(1/100 수준) 폐기 —
+        #   KR 과 동일하게 etf_pool 이 spark(1y)로 만든 앵커(ma200a·hi52a)로 실시간 재계산
+        if r.get("ma200a"):
+            r["v200"] = _rr(P, r["ma200a"])
+        if r.get("hi52a"):
+            r["hi"] = _rr(P, max(r["hi52a"], P))
+        for a, albl in (("r1m", "a1m"), ("r3m", "a3m"), ("r6m", "a6m"), ("r1y", "a1y")):
             if r.get(albl):
                 vv = _rr(P, r[albl])
                 if vv is not None:

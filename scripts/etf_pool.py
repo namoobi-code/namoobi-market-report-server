@@ -50,7 +50,12 @@ def kr_collect():
     raw = urllib.request.urlopen(urllib.request.Request(
         "https://finance.naver.com/api/sise/etfItemList.nhn", headers=UA), timeout=15).read()
     items = json.loads(raw.decode("euc-kr", "ignore"))["result"]["etfItemList"]
-    # 상장일: krxbase(주식용 캐시 재사용 — ETF 도 base info 에 포함)
+    # (2026-08-06) 상장연도·월배당: etf_meta.json(주 1회 수집 — krxbase 엔 ETF 가 없어 전부 null 이던 버그)
+    meta = {}
+    try:
+        meta = json.load(open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "db", "etf_meta.json")))["d"]
+    except Exception:
+        pass
     base = {}
     try:
         d0s, _ = T.krx_day_back(date.today(), "stk")
@@ -74,12 +79,14 @@ def kr_collect():
                 yr = int(str(b.get("LIST_DD", ""))[:4])
             except Exception:
                 pass
+        mt = meta.get(c) or {}
+        if yr is None and mt.get("yr"): yr = mt["yr"]
         rows.append({"c": c, "n": nm, "px": it.get("nowVal"), "chg": it.get("changeRate"),
                      "cap": (it.get("marketSum") or 0)*1e8,       # 억원 → 원
                      "tv": (it.get("amonut") or 0)*1e6,           # 백만원 → 원
                      "nav": it.get("nav"), "asset": TAB.get(it.get("etfTabCode"), "기타"),
                      "lev": bool(it.get("etfTabCode") == 3 or LEV_RE.search(nm)),
-                     "md": ("월배당" in nm) or ("월분배" in nm), "yr": yr})
+                     "md": bool(mt.get("md")) or ("월배당" in nm) or ("월분배" in nm), "yr": yr})
 
     def enrich(r):
         try:  # 핵심 지표 (총보수·괴리율·분배율·수익률)
@@ -152,17 +159,17 @@ def us_collect():
                          "cap": q.get("netAssets"), "tv": round(v3*px) if v3 else None,
                          "fee": q.get("netExpenseRatio"), "divy": q.get("dividendYield"),
                          "r1y": (q.get("fiftyTwoWeekChangePercent")/100 if q.get("fiftyTwoWeekChangePercent") is not None else None),
-                         "hi": (q.get("fiftyTwoWeekHighChangePercent")),
-                         "v200": q.get("twoHundredDayAverageChangePercent"),
+                         # (2026-08-06) 야후 v7 의 hi/v200(*ChangePercent)은 값이 실제의 1/100 수준으로
+                         #   깨져 온다(실측 VTI v200=0.0009 — 실제 +7%대) → 버리고 spark(1y) 계산치 사용
                          "exch": q.get("fullExchangeName"), "yr": yr,
                          "lev": bool(LEV_RE.search(nm))})
-    # spark 6mo → r1m/r3m/r6m·vol20
+    # spark 1y → r1m/r3m/r6m·vol20·v200·hi (2026-08-06 6mo→1y: r6m·200일선·고점比 정상화)
     codes = [r["c"] for r in rows]
     by = {r["c"]: r for r in rows}
 
     def sbatch(chunk):
         try:
-            u = ("https://query1.finance.yahoo.com/v7/finance/spark?symbols=%s&range=6mo&interval=1d"
+            u = ("https://query1.finance.yahoo.com/v7/finance/spark?symbols=%s&range=1y&interval=1d"
                  % urllib.parse.quote(",".join(chunk)))
             j = T.jget(u, opener=op, timeout=15)
             out = {}
@@ -183,7 +190,7 @@ def us_collect():
                 continue
             st = _series_stats(cl)
             for k, v in st.items():
-                if k in ("r1m", "r3m", "r6m", "vol20", "a1m", "a3m", "a6m", "ma200a", "hi52a"):
+                if k in ("r1m", "r3m", "r6m", "r1y", "vol20", "a1m", "a3m", "a6m", "a1y", "ma200a", "hi52a", "v200", "hi"):
                     r.setdefault(k, v)
             ok2 += 1
     print(f"[etf] US {len(rows)}종 · spark {ok2}종")
