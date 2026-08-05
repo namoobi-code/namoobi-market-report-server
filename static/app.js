@@ -2097,6 +2097,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         presets:[['전체',null,null],['D-7 이내',0,7],['D-14 이내',0,14],['D-30 이내',0,30],
                  ['발표 후 D+1~D+7',-7,-1],['발표 전후 ±7일',-7,7]],def:[null,null]},   // (2026-08-04) 음수=발표 지남(사후 추적)
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
+      frgn4w:{label:'지분율 4주변화',fmt:v=>(v>=0?'+':'')+v.toFixed(2)+'%p',reqData:1,presets:[['전체',null,null],['상승(0%p ↑)',0,null],['+0.3%p ↑',0.3,null],['+1%p ↑',1,null],['하락(0%p ↓)',null,0]],def:[null,null]},   // (2026-08-05) 네이버 일별 보유율 실측 Δ
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]}
     },
     us:{
@@ -2156,6 +2157,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       qtobq:{label:'분기흑자QoQ',tgl:1,def:false,tglLabel:'직전분기 적자→당분기 흑자 전환만 (가장 빠름·계절성 주의)'},
       opmch:{label:'마진변화',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',reqData:1,presets:[['전체',null,null],['개선(0%p ↑)',0,null],['+3%p ↑',3,null],['+10%p ↑',10,null],['악화(0%p ↓)',null,0]],def:[null,null]},
       frgn:{label:'외인보유비중',fixed:'— (US 미제공)'},
+      frgn4w:{label:'지분율 4주변화',fixed:'— (US 미제공)'},
       srf:{label:'공매도잔량비율',fmt:v=>v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['2% ↓(약함)',null,2],['5% ↓',null,5],['10% ↑(과열)',10,null],['20% ↑',20,null]],def:[null,null]},
       scov:{label:'커버일수',fmt:v=>v.toFixed(1)+'일',reqData:1,presets:[['전체',null,null],['2일 ↓',null,2],['5일 ↑(부담)',5,null],['10일 ↑',10,null]],def:[null,null]},
       inst:{label:'기관보유비중',fmt:v=>v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['70% ↑',70,null],['50% ↑',50,null],['30% ↓',null,30]],def:[null,null]},
@@ -2170,7 +2172,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
                  r1y 와 사실상 동일값이었다(실측 ALKS +98/+97.7 · AEHR +393/+392.7 · NAVN +30/+29.8).
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
-              'r1m','r3m','r6m','mom','vol20','hi','frgn','fnb20','onb20','fst','ost','sr','lbr','srf','scov','inst','drvj',
+              'r1m','r3m','r6m','mom','vol20','hi','frgn','frgn4w','fnb20','onb20','fst','ost','sr','lbr','srf','scov','inst','drvj',
               'ern','cov','upside','rec','rev','nan',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
@@ -2246,11 +2248,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
   /* (2026-08-02) 업종 분류 맵 — sector_map.py(주1회): KR=KRX·WICS대·WICS세부 / US=세부업종(한글) */
-  let SECMAP=null;
-  function mergeSec(){ if(!SECMAP) return;
-    for(const r of POOL.kr){ const e=(SECMAP.kr||{})[r.code]; if(e){ if(e.krx)r.krx=e.krx; if(e.wics)r.wics=e.wics; if(e.wics2)r.wics2=e.wics2; } }
-    for(const r of POOL.us){ const e=(SECMAP.us||{})[r.sym]; if(e&&e.ind) r.usind=e.ind; } }
-  function loadSecMap(){ if(SECMAP){ mergeSec(); return; }
+  let SECMAP=null, F4W=null;   // F4W: 외인 지분율 4주 변화(%p) — frgn_hist.py 산출 (2026-08-05)
+  function mergeSec(){
+    if(SECMAP){
+      for(const r of POOL.kr){ const e=(SECMAP.kr||{})[r.code]; if(e){ if(e.krx)r.krx=e.krx; if(e.wics)r.wics=e.wics; if(e.wics2)r.wics2=e.wics2; } }
+      for(const r of POOL.us){ const e=(SECMAP.us||{})[r.sym]; if(e&&e.ind) r.usind=e.ind; } }
+    if(F4W&&F4W.d) for(const r of POOL.kr){ const v=F4W.d[r.code]; if(v!=null) r.frgn4w=v; } }
+  function loadSecMap(){
+    if(!F4W) fetch('/api/db/frgn4w').then(x=>x.ok?x.json():null).then(d=>{ if(!d||!d.d) return;
+      F4W=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{});
+    if(SECMAP){ mergeSec(); return; }
     fetch('/api/db/sector_map').then(x=>x.ok?x.json():null).then(d=>{ if(!d) return; SECMAP=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{}); }
 
   const F_ST={};   // 마켓별 1단계 필터 상태 유지
@@ -2505,7 +2512,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     r1m:{l:'수익률 1M',n:1,m:'both'}, r3m:{l:'수익률 3M',n:1,m:'both'},
     r6m:{l:'수익률 6M',n:1,m:'both'},
     vol20:{l:'변동성(20일)',n:1,m:'both'},
-    hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'},
+    hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'}, frgn4w:{l:'지분율Δ4주',n:1,m:'kr'},
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
     sr:{l:'공매도비중',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
@@ -2592,6 +2599,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'de': return r.de; case 'cr': return r.cr;
       case 'oploss': return r.oploss!=null?r.oploss:(r.op3neg?3:null);
       case 'frgn': return r.frgn;
+      case 'frgn4w': return r.frgn4w;                              // 외인 지분율 4주 변화(%p)
       case 'payout': return r.payout!=null?r.payout*100:null;
       // (2026-07-26) 1차 필터 추가분 — 서버는 소수(fraction)로 저장, 표시·필터는 %
       case 'r1m': return r.r1m!=null?r.r1m*100:null;
@@ -2672,6 +2680,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'de': return v.toFixed(0)+'%';
       case 'cr': return v.toFixed(1);
       case 'roe': case 'frgn': return v.toFixed(1)+'%';
+      case 'frgn4w': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'payout': return v.toFixed(0)+'%';
       case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
@@ -2919,7 +2928,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
-    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','drvj']],
+    ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
   const _catByLabel=(()=>{ const m={};
     for(const [cat,ks] of GCAT) for(const k of ks){ const c=CDEF[k]; if(c) m[c.l]=cat; }
@@ -3119,7 +3128,7 @@ await _canvasFlow(c);
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
-             ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','drvj']],
+             ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
              ['건전성',['de','cr','oploss']],
              ['기타',['age']]];
     $('sd_sum').innerHTML=G.map(([t,ks])=>{
@@ -4837,6 +4846,7 @@ await _canvasFlow(c);
     for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
       F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
     const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('frgn4w',{min:0,max:null});    // 지분율 4주 변화 0%p ↑ — 실측(네이버 일별 보유율) 정식 지표
     set('fnb20',{min:0,max:null});     // 외인 20일 순매수 + (지분율 상승 중)
     set('fst',{min:3,max:null});       // 외인 연속매수 3일 ↑ (꾸준함)
     set('rev',{min:5,max:null});       // 리비전 +5% ↑ (추정 상향)
