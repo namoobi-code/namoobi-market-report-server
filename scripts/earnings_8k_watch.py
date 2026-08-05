@@ -53,10 +53,20 @@ def items_of(cik, accno):
     return ""
 
 def main():
-    syms = [s.strip().upper() for s in WATCH.read_text().splitlines()
-            if s.strip() and not s.strip().startswith("#")]
+    # (2026-08-05) 전 종목 감시로 확장 — 피드 1콜/분이라 종목 수와 무관(사용자 확인).
+    #   소음 방지: 비핵심 종목은 Item 2.02(실적) 8-K 만 기록 · 6-K 는 핵심만.
+    #   핵심(us_8k_watchlist.txt) = 모든 8-K·6-K 기록 + 스트립 항상 표시(core 플래그).
+    core_syms = [s.strip().upper() for s in WATCH.read_text().splitlines()
+                 if s.strip() and not s.strip().startswith("#")]
     mp = cik_map()
-    watch = {mp[s]: s for s in syms if s in mp}
+    pool_syms = []
+    try:
+        p0 = json.loads((BASE / "data" / "db" / "screener_pool.json").read_text(encoding="utf-8"))
+        pool_syms = [r["c"] for r in p0.get("us") or [] if r.get("c")]
+    except Exception:
+        pass
+    core = {mp[s] for s in core_syms if s in mp}
+    watch = {mp[s]: s for s in set(pool_syms) | set(core_syms) if s in mp}
     # (2026-08-05) ADR(외국계: TSM·ASML 등)은 8-K 대신 6-K 로 실적을 낸다 → 두 피드 모두 감시
     d = ""
     for ftype in ("8-K", "6-K"):
@@ -90,21 +100,29 @@ def main():
         et = ts.astimezone(ET)
         d8 = et.strftime("%Y%m%d")
         ft = "6-K" if "6-K" in (re.search(r"<title>([^<]*)", e) or [None, ""])[1] else "8-K"
+        is_core = cik in core
+        if ft == "6-K" and not is_core:
+            continue                                   # 전 종목 6-K 는 수시보고 소음 — 핵심만
         its = items_of(cik, ac.group(1)) if ft == "8-K" else ""
         is_ern = "2.02" in its
+        if ft == "8-K" and not is_core and not is_ern:
+            continue                                   # 비핵심은 실적(2.02) 8-K 만 기록
         tag = f"📄 {ft}{'(실적)' if is_ern else ''} 접수 {et.strftime('%H:%M')}ET"
         lst = days.setdefault(d8, [])
         cur = next((z for z in lst if z["c"] == sym), None)
         if cur:
-            if not any("8-K" in t for t in cur.get("tags") or []):
+            if not any("K" in t and "접수" in t for t in cur.get("tags") or []):
                 cur.setdefault("tags", []).insert(0, tag)
                 cur["acc"] = ac.group(1)
+                if is_core: cur["core"] = 1
                 new += 1
         else:
             r = pool_us.get(sym) or {}
-            lst.append({"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
-                        "eps": None, "est": None, "spr": None, "tags": [tag],
-                        "acc": ac.group(1), "t": datetime.now().strftime("%H:%M")})
+            it2 = {"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
+                   "eps": None, "est": None, "spr": None, "tags": [tag],
+                   "acc": ac.group(1), "t": datetime.now().strftime("%H:%M")}
+            if is_core: it2["core"] = 1
+            lst.append(it2)
             new += 1
         print(f"  📄 {sym} 8-K {its or 'items미상'} {et.strftime('%m/%d %H:%M')}ET acc={ac.group(1)}")
     if new:

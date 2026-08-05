@@ -97,10 +97,12 @@ def main():
         prev = next((z for z in days[d8] if z["c"] == sym), None)
         if prev:
             for t_ in prev.get("tags") or []:
-                if "8-K" in t_ and t_ not in it["tags"]:
+                if "접수" in t_ and t_ not in it["tags"]:   # 8-K/6-K 접수 태그 보존
                     it["tags"].insert(0, t_)
             if prev.get("acc"):
                 it["acc"] = prev["acc"]
+            if prev.get("core"):
+                it["core"] = 1
         days[d8] = [z for z in days[d8] if z["c"] != sym] + [it]
         new += 1
         if new <= 25 or tg:

@@ -923,7 +923,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       if(mk==='us') items=items.filter(it=>
         (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9)   // 서프라이즈 ±10% & 시총 $2B↑(초소형 잡음 컷)
         ||((it.cap||0)>=1e11)                                     // 주요종목($100B↑)은 항상
-        ||(it.tags||[]).some(t=>t.includes('8-K')));              // 8-K 워치리스트 감지 종목도 항상
+        ||it.core);                                               // 핵심 리스트(워치리스트) 종목은 항상
       items.sort((a,b)=>mk==='us'?Math.abs(b.spr??0)-Math.abs(a.spr??0)
                                  :Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
       if(mk==='us'&&items.length>40) items=items.slice(0,40);     // 일별 표시 상한
@@ -951,8 +951,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const E2=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
       const capF=v=>v==null?'':(v>=1e12?' $'+(v/1e12).toFixed(1)+'T':' $'+(v/1e9).toFixed(0)+'B');
       box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;cursor:pointer" id="w8k_hd">
-          <b style="font-size:12.5px">📄 SEC 8-K 실시간 감시 — ${syms.length}종</b>
-          <span class="note">1분 주기 · 8-K 접수 즉시 태그 → 이후 야후 EPS 수치로 교차검증 · 클릭해서 ${_w8kOpen?'접기 ▲':'펼치기 ▼'}</span></div>
+          <b style="font-size:12.5px">📄 SEC 8-K 실시간 감시 — 전 종목(실적 8-K) · 핵심 ${syms.length}종</b>
+          <span class="note">1분 주기 · 전 종목은 Item 2.02(실적) 8-K 감지 · 핵심 리스트는 모든 8-K/6-K + 속보 스트립 항상 표시 · 클릭해서 ${_w8kOpen?'접기 ▲':'펼치기 ▼'}</span></div>
         <div id="w8k_body" style="display:${_w8kOpen?'':'none'}">
           <div class="w8k-list">${syms.map(s=>
             `<span class="w8k-it" title="${E2(s.n)}${capF(s.cap)}"><b>${E2(s.c)}</b> <span class="note">${E2(s.n).slice(0,14)}</span><button class="w8k-x" data-del="${E2(s.c)}" title="감시에서 제거">✕</button></span>`).join('')}</div>
