@@ -944,6 +944,7 @@
             <button class="scrrst" id="scr_surge_hi" title="돌파서지 — 개장서지 조건 + 고점比 -10% 이내. 52주 신고가 부근에서 거래량 실린 돌파(저항 없는 상승 지속형)">🚀 돌파서지</button>
             <button class="scrrst" id="scr_surge_sq" title="숏스퀴즈서지 — 개장서지 조건 + 공매도 과열(KR 공매도비중 5%↑ / US 공매도잔량비율 10%↑). 급등이 숏커버링을 강제해 추가 상승 연쇄 가능">🩳 숏스퀴즈</button>
             <button class="scrrst" id="scr_surge_ern" title="어닝서지 — 개장서지 조건 + 어닝일 D+1~D+7. 실적 발표 직후 거래량 실린 급등(서프라이즈 추격, PEAD 드리프트)">📈 어닝서지</button>
+            <button class="scrrst" id="scr_fmom" title="외인모멘텀 (한국 전용) — '외국인 지분율 개선 + 이익모멘텀 개선' 전략(증권사 리서치 아이디어). 외인 20일 순매수 0억↑ · 외인 연속매수 3일↑ (지분율 상승 프록시) + 리비전 +5%↑ · 성장가속 0%p↑ (이익모멘텀) + 시총 3,000억↑ · 거래대금 30억↑. 결과는 외인 순매수 많은 순">🌏 외인모멘텀</button>
             <button class="scrrst" id="scr_turn" title="턴어라운드 프리셋 — 이익성장 부진↓ · 고점 -30%↓ · 수익률3M 하락↓ · 리비전 상향 · 분기흑자QoQ ON · 상승여력 +30%↑ 을 한 번에 설정 (나쁜 실적으로 이미 하락했지만 앞으로 좋아질 근거가 있는 종목)">🔄 턴어라운드</button>
             <button class="scrrst" id="scr_lowpbr" title="저PBR M&A 표적 프리셋 — PBR 0.4배↓ · 시총 1,000억↑ · 영업이익 흑자(1년이상 적자 제외). 자본시장 개편으로 저PBR 방치 기업이 M&A(베어허그) 압박을 받는다는 아이디어(DS증권) — 결과는 PBR 낮은 순 정렬">🎯 저PBR M&A</button>
             <button class="scrrst" id="scr_allf" title="모든 필터를 '전체'로 — 하드컷 없이 전종목 표시">⊘ 전부전체</button>
@@ -1162,6 +1163,8 @@
     <div class="card"><div class="k">선박</div><canvas id="c_cus_ship"></canvas></div>
     <div class="card"><div class="k">자동차부품</div><canvas id="c_cus_autoparts"></canvas></div>
     <div class="card"><div class="k">컴퓨터주변기기</div><canvas id="c_cus_computer"></canvas></div>
+    <div class="card"><div class="k">정밀기기</div><canvas id="c_cus_precision"></canvas></div>
+    <div class="card"><div class="k">가전제품</div><canvas id="c_cus_appliance"></canvas></div>
   </div>
   <h3>최신월 품목별</h3>
   <div class="box"><table id="cus_tbl"></table></div>
@@ -1352,8 +1355,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260805k"></script>
-<script src="/etf.js?v=20260805k"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260805l"></script>
+<script src="/etf.js?v=20260805l"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

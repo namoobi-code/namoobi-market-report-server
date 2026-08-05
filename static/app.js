@@ -476,7 +476,8 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   if(cs){
     const m=cs.months.slice(-24);
     const it=[['total','전체'],['semiconductor','반도체'],['steel','철강'],['car','승용차'],['petroleum','석유'],
-      ['wireless','무선통신'],['ship','선박'],['autoparts','자동차부품'],['computer','컴퓨터주변기기']];
+      ['wireless','무선통신'],['ship','선박'],['autoparts','자동차부품'],['computer','컴퓨터주변기기'],
+      ['precision','정밀기기'],['appliance','가전제품']];   // (2026-08-05) API 제공 전 품목(00~10) — 이 11개가 전부(실측)
     /* (2026-08-05) 전체+8품목 3×3 그리드 — rows(월×차수 전 품목)를 피벗해 품목별 차트 */
     {const rmap={}; (cs.rows||[]).forEach(r=>{ rmap[r.yyyymm+'_'+r.seq]=r; });
      it.forEach(([k])=>{ const cv=$('c_cus_'+k); if(!cv) return;
@@ -2344,6 +2345,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     show('scr_turn', S1);                             // 턴어라운드 프리셋: 1단계
     show('scr_surge', S1); show('scr_surge_hi', S1);  // 개장서지 + 변형 3종: 1단계
     show('scr_surge_sq', S1); show('scr_surge_ern', S1);
+    show('scr_fmom', S1);                             // 외인모멘텀(KR 전용): 1단계
     show('scr_lowpbr', S1);                           // 저PBR M&A 프리셋: 1단계
     show('scr_allf', S1);                             // 전부전체: 1단계
     show('scr_autoscroll', S1);
@@ -4825,6 +4827,23 @@ await _canvasFlow(c);
   {const b=$('scr_surge_ern'); if(b) b.onclick=()=>{ if(stage!==1) return;
     const set=_surgeBase();
     set('ern',{min:-7,max:-1});                        // 어닝 D+1~D+7 — 실적 발표 직후
+    apply(); };}
+  /* (2026-08-05) 🌏 외인모멘텀 — '외국인 지분율 개선 + 이익모멘텀 개선' (증권사 리서치 아이디어).
+     지분율 일별 시계열이 없어 '꾸준한 개선'은 외인 20일 순매수(+)·연속매수일로 프록시(지분율 상승과 동치).
+     이익모멘텀 = 리비전(추정 상향) + 성장가속(직전 분기 대비 성장률 개선). */
+  {const b=$('scr_fmom'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    if(mkt!=='kr'){ alert('외인모멘텀 프리셋은 한국 전용입니다 (미국은 외인 수급 데이터 미제공)'); return; }
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('fnb20',{min:0,max:null});     // 외인 20일 순매수 + (지분율 상승 중)
+    set('fst',{min:3,max:null});       // 외인 연속매수 3일 ↑ (꾸준함)
+    set('rev',{min:5,max:null});       // 리비전 +5% ↑ (추정 상향)
+    set('gacc',{min:0,max:null});      // 성장가속 0%p ↑ (이익모멘텀 개선)
+    set('cap',{min:3e11,max:null});    // 시총 3,000억 ↑
+    set('tv',{min:3e9,max:null});      // 거래대금 30억 ↑
+    sort={k:'fnb20',d:-1};             // 외인 순매수 많은 순
     apply(); };}
   /* (2026-08-01) 🔄 턴어라운드 프리셋 v2 — 사용자 검증 세팅(KR 21종 통과)으로 교체.
      "이미 하락(고점 -40%·3M 하락) + 실적 재가속(성장가속 +30%p) + 추정 상향(리비전 10%)
