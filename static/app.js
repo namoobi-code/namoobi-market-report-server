@@ -926,7 +926,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         it.core || (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9));
       items.sort((a,b)=>mk==='us'?Math.abs(b.spr??0)-Math.abs(a.spr??0)
                                  :Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
-      if(mk==='us'&&items.length>40) items=items.slice(0,40);     // 일별 표시 상한
+      /* 일별 표시 상한 40 — 핵심(core) 종목은 상한에 밀리지 않게 보호 (2026-08-05 LLY 누락 수정) */
+      if(mk==='us'&&items.length>40){
+        const keep=new Set(items.filter(i=>i.core).map(i=>i.c));
+        for(const i of items){ if(keep.size>=40) break; keep.add(i.c); }
+        items=items.filter(i=>keep.has(i.c));
+      }
       const chips=items.map(it=>{
         /* US 소스 표기 — (S)=SEC 8-K/6-K 감지 · (Y)=야후 EPS 확정 · 둘 다면 (S)(Y) */
         const t8=(it.tags||[]).find(t=>t.includes('접수'));

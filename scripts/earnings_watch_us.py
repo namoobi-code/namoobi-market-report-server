@@ -40,6 +40,13 @@ def main():
     # 8-K 감시기가 먼저 만든 항목(eps 미채움)은 '기수집'으로 치지 않는다 — 야후 수치를 채워야 함
     seen = {it["c"] for v in days.values() for it in v if it.get("eps") is not None}
     pool = json.loads((BASE / "data" / "db" / "screener_pool.json").read_text(encoding="utf-8"))
+    # (2026-08-05) 핵심 리스트 — 야후 경로로 만들어지는 항목에도 core 플래그(스트립 항상 표시)
+    core = set()
+    try:
+        core = {s.strip().upper() for s in (BASE / "data" / "watch" / "us_8k_watchlist.txt").read_text().splitlines()
+                if s.strip() and not s.strip().startswith("#")}
+    except Exception:
+        pass
     today = datetime.now().date()
     lo = (today - timedelta(days=LOOK)).isoformat()
     cand = [r for r in (pool.get("us") or [])
@@ -92,6 +99,8 @@ def main():
         it = {"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
               "eps": ea, "est": ee, "spr": sp, "tags": tg,
               "t": datetime.now().strftime("%H:%M")}
+        if sym in core:
+            it["core"] = 1                             # 핵심 리스트 — 스트립 항상 표시
         days.setdefault(d8, [])
         # (2026-08-05) 8-K 감시기(earnings_8k_watch)가 먼저 만든 항목의 태그·접수번호는 보존
         prev = next((z for z in days[d8] if z["c"] == sym), None)
