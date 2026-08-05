@@ -10,7 +10,7 @@
 판정: 서프라이즈 ≥+10% '어닝비트' · ≤-10% '어닝미스' · 예상밖 흑자/적자
 산출: data/db/earnings_live_us.json {asof, days:{YYYYMMDD:[{c,n,cap,eps,est,spr,tags,t}]}} 45일 유지
 사용: earnings_watch_us.py [--days N]   (기본 lookback 2일 · 백필 시 --days 45)
-cron: */15 05-08 * * 2-6 (애프터장 발표=KST 새벽) + */15 19-22 * * 1-5 (프리장 발표=KST 저녁)
+cron: */5 05-08 * * 2-6 (애프터장 발표=KST 새벽) + */5 19-22 * * 1-5 (프리장 발표=KST 저녁) · flock 중복방지
 """
 import http.cookiejar, json, sys, time, urllib.request, urllib.parse
 from datetime import datetime, timedelta
@@ -43,6 +43,7 @@ def main():
     lo = (today - timedelta(days=LOOK)).isoformat()
     cand = [r for r in (pool.get("us") or [])
             if r.get("ed") and lo <= r["ed"] <= today.isoformat() and r.get("c") not in seen]
+    cand.sort(key=lambda r: -(r.get("cap") or 0))   # (2026-08-05) 시총 큰 주요종목부터 — 먼저·빨리 잡히게
     print(f"[us] 어닝창({lo}~{today}) 후보 {len(cand)}종 (기수집 제외)")
     if not cand:
         return save(days, 0)
