@@ -903,9 +903,31 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
   // (2026-07-26) 종목별 어닝 월간 달력 (구글캘린더식) — 풀 DB의 ed(실적발표일) 사용
   let calView='ev', mcY=new Date().getFullYear(), mcM=new Date().getMonth(); // 0-based month
+  /* (2026-08-05) 실적 속보 스트립 — DART 잠정실적(earnings_watch, 5분 감지)을 KR 달력 위에 표시.
+     반환: {종목코드→속보항목} — 달력 칩 ✅ 마킹용 */
+  function _ernStrip(live){
+    const box=document.getElementById('mc_live'); const byCode={};
+    const days=(live&&live.days)||{};
+    const keys=Object.keys(days).sort().slice(-2);          // 최근 2영업일
+    keys.forEach(d=>days[d].forEach(it=>{ byCode[it.c]=it; }));
+    if(!box) return byCode;
+    if(!keys.length){ box.style.display='none'; return byCode; }
+    const E2=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+    const pct=v=>v==null?'<span class="note">—</span>':`<b class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${(+v).toFixed(1)}%</b>`;
+    const rows=keys.slice().reverse().map(d=>{
+      const items=days[d].slice().sort((a,b)=>Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
+      const chips=items.map(it=>{
+        const tg=(it.tags||[]).map(t=>`<span class="mc-tag ${/급증|흑자/.test(t)?'up':'dn'}">${E2(t)}</span>`).join('');
+        const tip=`${it.n} (${it.cons}) · 매출 ${it.sales??'—'}억 (YoY ${it.sales_yoy??'—'}%) · 영업익 ${it.op??'—'}억 (YoY ${it.op_yoy??'—'}%) · 순이익YoY ${it.ni_yoy??'—'}% · ${it.t} 수집`;
+        return `<span class="mc-live-it" title="${E2(tip)}"><b>${E2(it.n)}</b> 영업익 ${pct(it.op_yoy)}${tg}</span>`; }).join('');
+      return `<div class="mc-live-day"><b class="note">${d.slice(4,6)}/${d.slice(6,8)} (${days[d].length}건)</b> ${chips}</div>`; }).join('');
+    box.innerHTML=`<div class="mc-live-h">🔔 실적 속보 <span class="note" style="font-weight:400">— DART 영업(잠정)실적 5분 주기 자동 감지 · 영업익 변화 큰 순 · 마우스오버=상세 · 달력의 ✅=발표 완료</span></div>${rows}`;
+    box.style.display='';
+    return byCode;
+  }
   function renderMonthCal(mk){
     const grid=document.getElementById('mc_grid'); if(!grid) return;
-    const done=pool=>{
+    const done=pool=>{ const build=LIVEBY=>{
       const evs={};
       for(const r of (pool[mk]||[])) if(r.ed) (evs[r.ed]=evs[r.ed]||[]).push(r);
       for(const d in evs) evs[d].sort((a,b)=>(b.cap||0)-(a.cap||0));
@@ -923,7 +945,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         cnt+=list.length;
         const isT=inM&&dt.getTime()===tds.getTime();
         const wd=i%7;
-        const chips=list.slice(0,4).map(r=>`<span class="mc-chip" title="${esc(mk==='kr'?r.n:((r.kn?r.kn+' · ':'')+r.n))} (${esc(r.c)}) 실적발표">${esc(mk==='kr'?r.n:(r.kn||r.c))}</span>`).join('')
+        const chips=list.slice(0,4).map(r=>{
+          const lv=LIVEBY[r.c];                        // (2026-08-05) 발표 완료 종목 ✅ + 결과 툴팁
+          const tip=lv?` — 발표됨: 영업익YoY ${lv.op_yoy??'—'}% · 매출YoY ${lv.sales_yoy??'—'}%${(lv.tags||[]).length?' · '+lv.tags.join('·'):''}`:'';
+          return `<span class="mc-chip" title="${esc(mk==='kr'?r.n:((r.kn?r.kn+' · ':'')+r.n))} (${esc(r.c)}) 실적발표${esc(tip)}">${lv?'✅':''}${esc(mk==='kr'?r.n:(r.kn||r.c))}</span>`;}).join('')
           +(list.length>4?`<span class="mc-more">+${list.length-4}종 더 보기</span>`:'');
         h+=`<div class="mc-cell ${inM?'':'out'} ${isT?'tdy':''} ${list.length?'has':''}" ${list.length?`data-k="${key}"`:''}
              title="${list.length?'클릭하면 이날 전체 '+list.length+'종 표시':''}"><div class="mc-d ${wd===0?'sun':wd===6?'sat':''}">${inM?dnum:''}</div>${inM?chips:''}</div>`;
@@ -950,6 +975,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       document.getElementById('mc_title').textContent=`${mcY}년 ${mcM+1}월`;
       document.getElementById('mc_note').textContent=
         (mk==='kr'?'네이버 IR 일정(대형주 위주)':'Yahoo earnings date')+` · 이 달 실적발표 ${cnt}건 · 셀당 최대 4종(시총순)`;
+      };
+      /* (2026-08-05) KR 뷰: DART 실적 속보 로드 후 렌더(스트립 + 달력 ✅) · US 뷰: 스트립 숨김 */
+      if(mk==='kr') fetch('/api/db/earnings_live').then(r=>r.ok?r.json():null)
+        .then(lv=>build(_ernStrip(lv||{}))).catch(()=>build({}));
+      else { const bx=document.getElementById('mc_live'); if(bx) bx.style.display='none'; build({}); }
     };
     if(window.nmrPool) window.nmrPool(done);
     else grid.innerHTML='<div class="note" style="grid-column:1/-1;padding:12px">풀 데이터 로드 중…</div>';
