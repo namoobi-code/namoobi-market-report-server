@@ -903,26 +903,37 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
   // (2026-07-26) 종목별 어닝 월간 달력 (구글캘린더식) — 풀 DB의 ed(실적발표일) 사용
   let calView='ev', mcY=new Date().getFullYear(), mcM=new Date().getMonth(); // 0-based month
-  /* (2026-08-05) 실적 속보 스트립 — DART 잠정실적(earnings_watch, 5분 감지)을 KR 달력 위에 표시.
-     반환: {종목코드→속보항목} — 달력 칩 ✅ 마킹용 */
-  function _ernStrip(live){
+  /* (2026-08-05) 실적 속보 스트립 — KR=DART 잠정실적(5분 감지) · US=Yahoo EPS 서프라이즈(15분 감지).
+     반환: {byCode, days} — 달력 칩 ✅ 마킹·팝업 결과용.
+     US 는 종목이 너무 많아 스트립엔 '서프라이즈(|스프|≥10%) 또는 시총 $100B↑ 주요종목'만 표시(사용자 요청). */
+  function _ernStrip(live, mk){
     const box=document.getElementById('mc_live'); const byCode={};
     const days=(live&&live.days)||{};
-    /* ✅ 마킹은 백필 전 기간(45일) — 스트립은 최근 2영업일만. d8=실제 발표(접수)일 */
     Object.keys(days).forEach(d=>days[d].forEach(it=>{ byCode[it.c]=Object.assign({d8:d},it); }));
-    const keys=Object.keys(days).sort().slice(-2);          // 최근 2영업일
-    if(!box) return byCode;
-    if(!keys.length){ box.style.display='none'; return byCode; }
+    const keys=Object.keys(days).sort().slice(-3);          // 스트립은 최근 3영업일 (보관은 45일)
+    if(!box) return {byCode, days};
+    if(!keys.length){ box.style.display='none'; return {byCode, days}; }
     const E2=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
     const pct=v=>v==null?'<span class="note">—</span>':`<b class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${(+v).toFixed(1)}%</b>`;
     const rows=keys.slice().reverse().map(d=>{
-      const items=days[d].slice().sort((a,b)=>Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
+      let items=days[d].slice();
+      if(mk==='us') items=items.filter(it=>
+        (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9)   // 서프라이즈 ±10% & 시총 $2B↑(초소형 잡음 컷)
+        ||((it.cap||0)>=1e11));                                   // 주요종목($100B↑)은 항상
+      items.sort((a,b)=>mk==='us'?Math.abs(b.spr??0)-Math.abs(a.spr??0)
+                                 :Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
+      if(mk==='us'&&items.length>40) items=items.slice(0,40);     // 일별 표시 상한
       const chips=items.map(it=>{
-        const tg=(it.tags||[]).map(t=>`<span class="mc-tag ${/급증|흑자/.test(t)?'up':'dn'}">${E2(t)}</span>`).join('');
-        const tip=`${it.n} (${it.cons}) · 매출 ${it.sales??'—'}억 (YoY ${it.sales_yoy??'—'}%) · 영업익 ${it.op??'—'}억 (YoY ${it.op_yoy??'—'}%) · 순이익YoY ${it.ni_yoy??'—'}% · ${it.t} 수집`;
-        return `<span class="mc-live-it" title="${E2(tip)}"><b>${E2(it.n)}</b> 영업익 ${pct(it.op_yoy)}${tg}</span>`; }).join('');
-      return `<div class="mc-live-day"><b class="note">${d.slice(4,6)}/${d.slice(6,8)} (${days[d].length}건)</b> ${chips}</div>`; }).join('');
-    box.innerHTML=`<div class="mc-live-h">🔔 실적 속보 <span class="note" style="font-weight:400">— DART 영업(잠정)실적 5분 주기 자동 감지 · 영업익 변화 큰 순 · 마우스오버=상세 · 달력의 ✅=발표 완료</span></div>${rows}`;
+        const tg=(it.tags||[]).map(t=>`<span class="mc-tag ${/급증|흑자|비트/.test(t)?'up':'dn'}">${E2(t)}</span>`).join('');
+        const tip=mk==='us'
+          ? `${it.n} (${it.c}) · EPS 실제 ${it.eps??'—'} vs 예상 ${it.est??'—'} · 서프라이즈 ${it.spr??'—'}% · ${it.t} 수집`
+          : `${it.n} (${it.cons}) · 매출 ${it.sales??'—'}억 (YoY ${it.sales_yoy??'—'}%) · 영업익 ${it.op??'—'}억 (YoY ${it.op_yoy??'—'}%) · 순이익YoY ${it.ni_yoy??'—'}% · ${it.t} 수집`;
+        const val=mk==='us'?`EPS서프 ${pct(it.spr)}`:`영업익 ${pct(it.op_yoy)}`;
+        return `<span class="mc-live-it" title="${E2(tip)}"><b>${E2(it.n)}</b> ${val}${tg}</span>`; }).join('');
+      return `<div class="mc-live-day"><b class="note">${d.slice(4,6)}/${d.slice(6,8)} (${days[d].length}건${mk==='us'&&items.length<days[d].length?` · 표시 ${items.length}`:''})</b> ${chips}</div>`; }).join('');
+    box.innerHTML=`<div class="mc-live-h">🔔 실적 속보 <span class="note" style="font-weight:400">${mk==='us'
+      ?'— Yahoo EPS 실제치 15분 주기 감지 · 표시=서프라이즈 ±10% 또는 시총 $100B↑ 주요종목 · ✅=발표 완료(전 종목)'
+      :'— DART 영업(잠정)실적 5분 주기 자동 감지 · 영업익 변화 큰 순 · 마우스오버=상세 · 달력의 ✅=발표 완료'}</span></div>${rows}`;
     box.style.display='';
     return {byCode, days};
   }
@@ -934,13 +945,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       for(const r of (pool[mk]||[])) if(r.ed) (evs[r.ed]=evs[r.ed]||[]).push(r);
       /* (2026-08-05) 발표일 기준 칩 병합 — 예정일(ed)은 발표 후 다음 분기로 롤포워드돼
          과거 달에서 칩이 사라진다 → DART 실적속보의 접수일 기준으로 칩을 보완(✅ 포함) */
-      if(mk==='kr'&&LV&&LV.days){ for(const d8 in LV.days){
+      if(LV&&LV.days){ for(const d8 in LV.days){
         const key=`${d8.slice(0,4)}-${d8.slice(4,6)}-${d8.slice(6,8)}`;
         for(const it of LV.days[d8]){ const lst=(evs[key]=evs[key]||[]);
           if(!lst.some(r=>r.c===it.c)) lst.push({c:it.c,n:it.n,cap:0}); } } }
       /* (2026-08-05) 발표 완료 종목은 '실제 발표일' 칸에만 — 예정일(ed)이 달라 다른 날에도
          적혀 있으면(예: 8/4 발표인데 예정일 8/5 칸에 그대로) 혼동되므로 그 칸에서 제거 */
-      if(mk==='kr'&&LV){ for(const key in evs){ const k8=key.replace(/-/g,'');
+      if(LV){ for(const key in evs){ const k8=key.replace(/-/g,'');
         evs[key]=evs[key].filter(r=>{ const lv=LIVEBY[r.c]; return !lv || lv.d8===k8; });
         if(!evs[key].length) delete evs[key]; } }
       for(const d in evs) evs[d].sort((a,b)=>(b.cap||0)-(a.cap||0));
@@ -978,8 +989,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             <span class="note" style="margin-left:auto">시가총액순</span>
             <button class="cp-x" id="mcp_x">닫기 ✕</button></div>
           <div class="mc-pop-list">${list.map((r,i)=>{
-            const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 영업익YoY·태그 요약
-            const res=lv?` <span class="note">— 영업익YoY <b class="${(lv.op_yoy??0)>0?'up':'dn'}">${lv.op_yoy??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.join(' · ')):''}</span>`:'';
+            const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 결과 요약 (KR=영업익YoY · US=EPS서프)
+            const rv=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
+            const res=lv?` <span class="note">— ${mk==='us'?'EPS서프':'영업익YoY'} <b class="${(rv??0)>0?'up':'dn'}">${rv??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.join(' · ')):''}</span>`:'';
             return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;}).join('')}
           </div></div>`;
         pop.onclick=e=>{ if(e.target===pop) pop.remove(); };
@@ -991,10 +1003,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       document.getElementById('mc_note').textContent=
         (mk==='kr'?'네이버 IR 일정(대형주 위주)':'Yahoo earnings date')+` · 이 달 실적발표 ${cnt}건 · 셀당 최대 4종(시총순)`;
       };
-      /* (2026-08-05) KR 뷰: DART 실적 속보 로드 후 렌더(스트립 + 달력 ✅) · US 뷰: 스트립 숨김 */
-      if(mk==='kr') fetch('/api/db/earnings_live').then(r=>r.ok?r.json():null)
-        .then(lv=>build(_ernStrip(lv||{}))).catch(()=>build(null));
-      else { const bx=document.getElementById('mc_live'); if(bx) bx.style.display='none'; build(null); }
+      /* (2026-08-05) 실적 속보 로드 후 렌더(스트립 + 달력 ✅) — KR=DART · US=Yahoo 서프라이즈 */
+      fetch(mk==='kr'?'/api/db/earnings_live':'/api/db/earnings_live_us').then(r=>r.ok?r.json():null)
+        .then(lv=>build(_ernStrip(lv||{}, mk))).catch(()=>build(null));
     };
     if(window.nmrPool) window.nmrPool(done);
     else grid.innerHTML='<div class="note" style="grid-column:1/-1;padding:12px">풀 데이터 로드 중…</div>';
