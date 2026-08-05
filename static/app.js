@@ -908,8 +908,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   function _ernStrip(live){
     const box=document.getElementById('mc_live'); const byCode={};
     const days=(live&&live.days)||{};
+    /* ✅ 마킹은 백필 전 기간(45일) — 스트립은 최근 2영업일만 */
+    Object.keys(days).forEach(d=>days[d].forEach(it=>{ byCode[it.c]=it; }));
     const keys=Object.keys(days).sort().slice(-2);          // 최근 2영업일
-    keys.forEach(d=>days[d].forEach(it=>{ byCode[it.c]=it; }));
     if(!box) return byCode;
     if(!keys.length){ box.style.display='none'; return byCode; }
     const E2=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -923,13 +924,20 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       return `<div class="mc-live-day"><b class="note">${d.slice(4,6)}/${d.slice(6,8)} (${days[d].length}건)</b> ${chips}</div>`; }).join('');
     box.innerHTML=`<div class="mc-live-h">🔔 실적 속보 <span class="note" style="font-weight:400">— DART 영업(잠정)실적 5분 주기 자동 감지 · 영업익 변화 큰 순 · 마우스오버=상세 · 달력의 ✅=발표 완료</span></div>${rows}`;
     box.style.display='';
-    return byCode;
+    return {byCode, days};
   }
   function renderMonthCal(mk){
     const grid=document.getElementById('mc_grid'); if(!grid) return;
-    const done=pool=>{ const build=LIVEBY=>{
+    const done=pool=>{ const build=LV=>{
+      const LIVEBY=(LV&&LV.byCode)||{};
       const evs={};
       for(const r of (pool[mk]||[])) if(r.ed) (evs[r.ed]=evs[r.ed]||[]).push(r);
+      /* (2026-08-05) 발표일 기준 칩 병합 — 예정일(ed)은 발표 후 다음 분기로 롤포워드돼
+         과거 달에서 칩이 사라진다 → DART 실적속보의 접수일 기준으로 칩을 보완(✅ 포함) */
+      if(mk==='kr'&&LV&&LV.days){ for(const d8 in LV.days){
+        const key=`${d8.slice(0,4)}-${d8.slice(4,6)}-${d8.slice(6,8)}`;
+        for(const it of LV.days[d8]){ const lst=(evs[key]=evs[key]||[]);
+          if(!lst.some(r=>r.c===it.c)) lst.push({c:it.c,n:it.n,cap:0}); } } }
       for(const d in evs) evs[d].sort((a,b)=>(b.cap||0)-(a.cap||0));
       const first=new Date(mcY,mcM,1), off=first.getDay(), dim=new Date(mcY,mcM+1,0).getDate();
       const tds=new Date(); tds.setHours(0,0,0,0);
@@ -978,8 +986,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       };
       /* (2026-08-05) KR 뷰: DART 실적 속보 로드 후 렌더(스트립 + 달력 ✅) · US 뷰: 스트립 숨김 */
       if(mk==='kr') fetch('/api/db/earnings_live').then(r=>r.ok?r.json():null)
-        .then(lv=>build(_ernStrip(lv||{}))).catch(()=>build({}));
-      else { const bx=document.getElementById('mc_live'); if(bx) bx.style.display='none'; build({}); }
+        .then(lv=>build(_ernStrip(lv||{}))).catch(()=>build(null));
+      else { const bx=document.getElementById('mc_live'); if(bx) bx.style.display='none'; build(null); }
     };
     if(window.nmrPool) window.nmrPool(done);
     else grid.innerHTML='<div class="note" style="grid-column:1/-1;padding:12px">풀 데이터 로드 중…</div>';
