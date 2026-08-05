@@ -258,12 +258,13 @@
   .mc-cell.has:hover{border-color:#1f6feb;box-shadow:0 1px 6px rgba(31,111,235,.18)}
   /* 날짜 클릭 → 그날 전체 종목 팝업 */
   .mc-pop{position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:999;display:flex;align-items:center;justify-content:center}
-  .mc-pop-in{background:var(--card);border-radius:12px;width:min(560px,94vw);max-height:72vh;display:flex;flex-direction:column;
+  /* (2026-08-05) 팝업 확대 — 좁아서 종목명·결과가 잘리던 문제(사용자 요청) */
+  .mc-pop-in{background:var(--card);border-radius:12px;width:min(1500px,96vw);max-height:86vh;display:flex;flex-direction:column;
              box-shadow:0 12px 40px rgba(0,0,0,.25);padding:14px 16px}
   .mc-pop-h{flex:0 0 auto;display:flex;align-items:center;gap:8px;margin-bottom:9px}
   .mc-pop-h b{font-size:14.5px}
   /* 행이 6px로 균등 압축되던 문제 — 행 높이를 콘텐츠 크기로 고정(max-content) + 위 정렬 */
-  .mc-pop-list{overflow:auto;flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;
+  .mc-pop-list{overflow:auto;flex:1 1 auto;min-height:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));
                grid-auto-rows:max-content;align-content:start;gap:2px 14px}
   .mc-pi{font-size:12.5px;line-height:1.5;padding:3px 6px;border-radius:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .mc-pi:nth-child(odd){background:#f6f8fb}
@@ -1355,8 +1356,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260805t"></script>
-<script src="/etf.js?v=20260805t"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260805u"></script>
+<script src="/etf.js?v=20260805u"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
