@@ -2391,6 +2391,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     show('scr_surge', S1); show('scr_surge_hi', S1);  // 개장서지 + 변형 3종: 1단계
     show('scr_surge_sq', S1); show('scr_surge_ern', S1);
     show('scr_fmom', S1);                             // 외인모멘텀(KR 전용): 1단계
+    show('scr_divp', S1);                             // 배당선취(KR 전용): 1단계
     show('scr_lowpbr', S1);                           // 저PBR M&A 프리셋: 1단계
     show('scr_allf', S1);                             // 전부전체: 1단계
     show('scr_autoscroll', S1);
@@ -4880,6 +4881,29 @@ await _canvasFlow(c);
   {const b=$('scr_surge_ern'); if(b) b.onclick=()=>{ if(stage!==1) return;
     const set=_surgeBase();
     set('ern',{min:-7,max:-1});                        // 어닝 D+1~D+7 — 실적 발표 직후
+    apply(); };}
+  /* (2026-08-05) 🎁 배당선취 (KR 전용) — 8~9월 연말 배당 선취 전략.
+     고배당(4~12% — 12% 초과는 주가 폭락 역산/특별배당 '배당 함정' 배제)
+     + 지속성(배당성향 20~60% — 상한이 핵심: 이익 일부만 배당해야 매년 지킬 체력)
+     + 이익 방어력(영업이익성장 0%↑ · 영업적자 1년이상 제외 · ROE 5%↑ — 배당락 후 회복력)
+     + 안정성(부채 150%↓ · 변동성 2.5%↓ · 시총 3,000억↑ · 거래대금 10억↑). 배당률 높은 순.
+     ※ 'DPS 3년 연속 증가'는 v2(주당배당금 이력 수집) 예정 — 현재는 성향 상한+연속흑자로 근사 */
+  {const b=$('scr_divp'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    if(mkt!=='kr'){ alert('배당선취 프리셋은 한국 전용입니다 (연말 일괄 배당 구조 전제)'); return; }
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('divy',{min:4,max:12});        // 배당 4~12% (함정 상한)
+    set('payout',{min:20,max:60});     // 배당성향 20~60% (지속 가능 체력)
+    set('opg',{min:0,max:null});       // 영업이익성장 + (배당락 후 회복력)
+    set('opLoss',{min:null,max:1});    // 영업적자 1년이상 제외
+    set('roe',{min:5,max:null});       // ROE 5% ↑
+    set('de',{min:null,max:150});      // 부채비율 150% ↓
+    set('vol20',{min:null,max:2.5});   // 변동성 낮음 (배당주 안정성)
+    set('cap',{min:3e11,max:null});    // 시총 3,000억 ↑
+    set('tv',{min:1e9,max:null});      // 거래대금 10억 ↑
+    sort={k:'divy',d:-1};              // 배당률 높은 순
     apply(); };}
   /* (2026-08-05) 🌏 외인모멘텀 — '외국인 지분율 개선 + 이익모멘텀 개선' (증권사 리서치 아이디어).
      지분율 일별 시계열이 없어 '꾸준한 개선'은 외인 20일 순매수(+)·연속매수일로 프록시(지분율 상승과 동치).
