@@ -920,23 +920,30 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const pct=v=>v==null?'<span class="note">—</span>':`<b class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${(+v).toFixed(1)}%</b>`;
     const rows=keys.slice().reverse().map(d=>{
       let items=days[d].slice();
+      /* (2026-08-05 사용자 확정) US 표시 규칙: 핵심 리스트(100종)만 항상 표시,
+         그 외 전 종목은 서프라이즈(±10% & $2B↑ 잡음 컷)일 때만 */
       if(mk==='us') items=items.filter(it=>
-        (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9)   // 서프라이즈 ±10% & 시총 $2B↑(초소형 잡음 컷)
-        ||((it.cap||0)>=1e11)                                     // 주요종목($100B↑)은 항상
-        ||it.core);                                               // 핵심 리스트(워치리스트) 종목은 항상
+        it.core || (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9));
       items.sort((a,b)=>mk==='us'?Math.abs(b.spr??0)-Math.abs(a.spr??0)
                                  :Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
       if(mk==='us'&&items.length>40) items=items.slice(0,40);     // 일별 표시 상한
       const chips=items.map(it=>{
-        const tg=(it.tags||[]).map(t=>`<span class="mc-tag ${t.includes('8-K')?'nt':(/급증|흑자|비트/.test(t)?'up':'dn')}">${E2(t)}</span>`).join('');
+        /* US 소스 표기 — (S)=SEC 8-K/6-K 감지 · (Y)=야후 EPS 확정 · 둘 다면 (S)(Y) */
+        const t8=(it.tags||[]).find(t=>t.includes('접수'));
+        const hasY=it.spr!=null||it.eps!=null;
+        const src=mk==='us'?`<b class="note" style="color:#8a6d3b">${t8?'(S)':''}${hasY?'(Y)':''}</b>`:'';
+        const tg=(it.tags||[]).filter(t=>!(mk==='us'&&t.includes('접수')))   // 접수 태그는 (S)로 대체
+          .map(t=>`<span class="mc-tag ${/급증|흑자|비트/.test(t)?'up':'dn'}">${E2(t)}</span>`).join('');
         const tip=mk==='us'
-          ? `${it.n} (${it.c}) · EPS 실제 ${it.eps??'—'} vs 예상 ${it.est??'—'} · 서프라이즈 ${it.spr??'—'}% · ${it.t} 수집`
+          ? `${it.n} (${it.c}) · EPS 실제 ${it.eps??'—'} vs 예상 ${it.est??'—'} · 서프라이즈 ${it.spr??'—'}%${t8?' · '+t8:''} · ${it.t} 수집`
           : `${it.n} (${it.cons}) · 매출 ${it.sales??'—'}억 (YoY ${it.sales_yoy??'—'}%) · 영업익 ${it.op??'—'}억 (YoY ${it.op_yoy??'—'}%) · 순이익YoY ${it.ni_yoy??'—'}% · ${it.t} 수집`;
-        const val=mk==='us'?`EPS서프 ${pct(it.spr)}`:`영업익 ${pct(it.op_yoy)}`;
-        return `<span class="mc-live-it" title="${E2(tip)}"><b>${E2(it.n)}</b> ${val}${tg}</span>`; }).join('');
+        const val=mk==='us'
+          ? (hasY?`EPS서프 ${pct(it.spr)}`:(t8?E2(t8.replace('📄 ','')):''))   // 야후 전이면 8-K 접수 내용 표시
+          : `영업익 ${pct(it.op_yoy)}`;
+        return `<span class="mc-live-it" title="${E2(tip)}"><b>${E2(it.n)}</b> ${val}${tg}${src}</span>`; }).join('');
       return `<div class="mc-live-day"><b class="note">${d.slice(4,6)}/${d.slice(6,8)} (${days[d].length}건${mk==='us'&&items.length<days[d].length?` · 표시 ${items.length}`:''})</b> ${chips}</div>`; }).join('');
     box.innerHTML=`<div class="mc-live-h">🔔 실적 속보 <span class="note" style="font-weight:400">${mk==='us'
-      ?'— Yahoo EPS 실제치 15분 주기 감지 · 표시=서프라이즈 ±10% 또는 시총 $100B↑ 주요종목 · ✅=발표 완료(전 종목)'
+      ?'— (S)=SEC 8-K 감지(1분) · (Y)=야후 EPS 확정(5분) · 핵심 100종 항상 표시, 그 외는 서프라이즈 ±10%만 · ✅=발표 완료(전 종목)'
       :'— DART 영업(잠정)실적 5분 주기 자동 감지 · 영업익 변화 큰 순 · 마우스오버=상세 · 달력의 ✅=발표 완료'}</span></div>${rows}`;
     box.style.display='';
     return {byCode, days};
@@ -951,8 +958,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const E2=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
       const capF=v=>v==null?'':(v>=1e12?' $'+(v/1e12).toFixed(1)+'T':' $'+(v/1e9).toFixed(0)+'B');
       box.innerHTML=`<div style="display:flex;align-items:center;gap:8px;cursor:pointer" id="w8k_hd">
-          <b style="font-size:12.5px">📄 SEC 8-K 실시간 감시 — 전 종목(실적 8-K) · 핵심 ${syms.length}종</b>
-          <span class="note">1분 주기 · 전 종목은 Item 2.02(실적) 8-K 감지 · 핵심 리스트는 모든 8-K/6-K + 속보 스트립 항상 표시 · 클릭해서 ${_w8kOpen?'접기 ▲':'펼치기 ▼'}</span></div>
+          <b style="font-size:12.5px">📄 SEC 8-K 감시 — 전 종목 · 핵심 리스트 ${syms.length}종</b>
+          <span class="note">핵심 종목 관리 ${_w8kOpen?'▲':'▼'}</span></div>
         <div id="w8k_body" style="display:${_w8kOpen?'':'none'}">
           <div class="w8k-list">${syms.map(s=>
             `<span class="w8k-it" title="${E2(s.n)}${capF(s.cap)}"><b>${E2(s.c)}</b> <span class="note">${E2(s.n).slice(0,14)}</span><button class="w8k-x" data-del="${E2(s.c)}" title="감시에서 제거">✕</button></span>`).join('')}</div>
