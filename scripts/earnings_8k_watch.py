@@ -113,14 +113,14 @@ def main():
         if cur:
             if not any("K" in t and "접수" in t for t in cur.get("tags") or []):
                 cur.setdefault("tags", []).insert(0, tag)
-                cur["acc"] = ac.group(1)
+                cur["acc"] = ac.group(1); cur["cik"] = cik
                 if is_core: cur["core"] = 1
                 new += 1
         else:
             r = pool_us.get(sym) or {}
             it2 = {"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
                    "eps": None, "est": None, "spr": None, "tags": [tag],
-                   "acc": ac.group(1), "t": datetime.now().strftime("%H:%M")}
+                   "acc": ac.group(1), "cik": cik, "t": datetime.now().strftime("%H:%M")}
             if is_core: it2["core"] = 1
             lst.append(it2)
             new += 1

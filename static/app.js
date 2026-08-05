@@ -936,7 +936,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         /* US 소스 표기 — (S)=SEC 8-K/6-K 감지 · (Y)=야후 EPS 확정 · 둘 다면 (S)(Y) */
         const t8=(it.tags||[]).find(t=>t.includes('접수'));
         const hasY=it.spr!=null||it.eps!=null;
-        const src=mk==='us'?`<b class="note" style="color:#8a6d3b">${t8?'(S)':''}${hasY?'(Y)':''}</b>`:'';
+        /* (S) 클릭 → SEC 원문(보도자료) — 야후 수치 대기 중에도 직접 확인 가능 */
+        const secU=(it.cik&&it.acc)?`https://www.sec.gov/Archives/edgar/data/${it.cik}/${String(it.acc).replace(/-/g,'')}/`:null;
+        const src=mk==='us'?`<b class="note" style="color:#8a6d3b">${t8?(secU?`<a href="${secU}" target="_blank" rel="noopener" title="SEC 원문(8-K 보도자료) 새 창" style="color:#8a6d3b;text-decoration:underline">(S)</a>`:'(S)'):''}${hasY?'(Y)':''}</b>`:'';
         const tg=(it.tags||[]).filter(t=>!(mk==='us'&&t.includes('접수')))   // 접수 태그는 (S)로 대체
           /* US 어닝비트/미스 태그의 수치는 본문 EPS서프와 중복 → 라벨만 표시 (2026-08-05) */
           .map(t=>mk==='us'?t.replace(/^(어닝비트|어닝미스)\s*[+\-−]?\d+(\.\d+)?%$/,'$1'):t)
@@ -1042,15 +1044,17 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 결과 요약 (KR=영업익YoY · US=EPS서프)
           const rv=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
           const t8p=lv&&(lv.tags||[]).find(t=>t.includes('접수'));
+          const secU=(lv&&lv.cik&&lv.acc)?`https://www.sec.gov/Archives/edgar/data/${lv.cik}/${String(lv.acc).replace(/-/g,'')}/`:null;
           const res=lv?(rv==null&&t8p
-            ? ` <span class="note">— ${esc(t8p.replace('📄 ',''))} · <b>수치 대기</b>(야후 미반영)</span>`
+            ? ` <span class="note">— ${esc(t8p.replace('📄 ',''))} · <b>수치 대기</b>${secU?` · <a href="${secU}" target="_blank" rel="noopener">SEC 원문</a>`:''}</span>`
             : ` <span class="note">— ${mk==='us'?'EPS서프':'영업익YoY'} <b class="${(rv??0)>0?'up':'dn'}">${rv??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.filter(t=>!t.includes('접수')).join(' · ')):''}</span>`):'';
           return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;};
         /* (2026-08-05) 정렬 토글 — 시가총액순 / 서프라이즈순(발표분 우선, |값| 큰 순) */
         const sprLbl=mk==='us'?'EPS서프순':'영업익YoY순';
         const sorted=m=>{ const a=list.slice();
+          /* 서프순 = 부호 그대로 내림차순: +큰 것 → 0 → −큰 것(마지막). 미발표(null)는 맨 뒤 */
           if(m==='spr') a.sort((x,y)=>{ const g=r=>{const lv=LIVEBY[r.c]; const v=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
-              return v==null?-1e18:Math.abs(v); }; return g(y)-g(x); });
+              return v==null?-1e18:v; }; return g(y)-g(x); });
           else a.sort((x,y)=>((y.cap||(LIVEBY[y.c]||{}).cap||0)-(x.cap||(LIVEBY[x.c]||{}).cap||0)));
           return a; };
         let mode='cap';

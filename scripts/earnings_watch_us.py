@@ -110,6 +110,8 @@ def main():
                     it["tags"].insert(0, t_)
             if prev.get("acc"):
                 it["acc"] = prev["acc"]
+            if prev.get("cik"):
+                it["cik"] = prev["cik"]
             if prev.get("core"):
                 it["core"] = 1
         days[d8] = [z for z in days[d8] if z["c"] != sym] + [it]
