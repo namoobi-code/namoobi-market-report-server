@@ -924,8 +924,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          그 외 전 종목은 서프라이즈(±10% & $2B↑ 잡음 컷)일 때만 */
       if(mk==='us') items=items.filter(it=>
         it.core || (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9));
-      items.sort((a,b)=>mk==='us'?Math.abs(b.spr??0)-Math.abs(a.spr??0)
-                                 :Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
+      /* (2026-08-05 사용자 확정) 부호 그대로 내림차순: +큰 것 → 0 → −큰 것 · 수치 대기(null)=맨 뒤 */
+      const _sv=it=>{ const v=mk==='us'?it.spr:it.op_yoy; return v==null?-1e18:v; };
+      items.sort((a,b)=>_sv(b)-_sv(a));
       /* 일별 표시 상한 40 — 핵심(core) 종목은 상한에 밀리지 않게 보호 (2026-08-05 LLY 누락 수정) */
       if(mk==='us'&&items.length>40){
         const keep=new Set(items.filter(i=>i.core).map(i=>i.c));
