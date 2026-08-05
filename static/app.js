@@ -933,6 +933,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const hasY=it.spr!=null||it.eps!=null;
         const src=mk==='us'?`<b class="note" style="color:#8a6d3b">${t8?'(S)':''}${hasY?'(Y)':''}</b>`:'';
         const tg=(it.tags||[]).filter(t=>!(mk==='us'&&t.includes('접수')))   // 접수 태그는 (S)로 대체
+          /* US 어닝비트/미스 태그의 수치는 본문 EPS서프와 중복 → 라벨만 표시 (2026-08-05) */
+          .map(t=>mk==='us'?t.replace(/^(어닝비트|어닝미스)\s*[+\-−]?\d+(\.\d+)?%$/,'$1'):t)
           .map(t=>`<span class="mc-tag ${/급증|흑자|비트/.test(t)?'up':'dn'}">${E2(t)}</span>`).join('');
         const tip=mk==='us'
           ? `${it.n} (${it.c}) · EPS 실제 ${it.eps??'—'} vs 예상 ${it.est??'—'} · 서프라이즈 ${it.spr??'—'}%${t8?' · '+t8:''} · ${it.t} 수집`
