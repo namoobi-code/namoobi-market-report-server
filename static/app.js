@@ -3024,6 +3024,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       try{
         const D=await (await fetch(`/api/chart/${mkt}/${encodeURIComponent(c)}?tf=${_TF}${_ppq()}`)).json();
         if(dcode!==c) return;                     // 로드 중 다른 종목 클릭됨
+        /* (2026-08-05) 분봉 401(세션 만료) — 조용히 실패하지 않고 안내 + 일봉 폴백 */
+        if(D&&D.detail&&!(D.t||[]).length){
+          _AUTH=false; _applyAuthTF(); _TF='d';
+          $('sd_src').innerHTML='🔒 세션이 만료되어 분봉을 열 수 없습니다 — <b>다시 로그인하면 분봉 이용 가능</b> (일봉으로 전환합니다)';
+          return _canvasFlow(c);
+        }
         _LASTFETCH=Date.now();
         drawAll(D);
         const _src = mkt==='kr'?'네이버':'Yahoo';

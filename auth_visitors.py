@@ -189,6 +189,11 @@ def current_user(req: Request):
     if not s or s.get("exp", 0) <= time.time():
         SESS.pop(tok, None)
         return None
+    # (2026-08-05) 슬라이딩 연장 — 활동 중이면 만료를 계속 밀고 즉시 저장(서버 재시작에도 유지).
+    #   종전엔 로그인 시에만 저장돼, 배포 재시작이 잦은 날 세션이 조용히 풀리는 문제가 있었다(실측).
+    if s.get("exp", 0) - time.time() < SESS_TTL - 3600:   # 1시간에 한 번꼴로만 저장
+        s["exp"] = time.time() + SESS_TTL
+        _save_sess(SESS)
     return s.get("u")
 
 def require_login(req: Request) -> str:
