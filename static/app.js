@@ -908,8 +908,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   function _ernStrip(live){
     const box=document.getElementById('mc_live'); const byCode={};
     const days=(live&&live.days)||{};
-    /* ✅ 마킹은 백필 전 기간(45일) — 스트립은 최근 2영업일만 */
-    Object.keys(days).forEach(d=>days[d].forEach(it=>{ byCode[it.c]=it; }));
+    /* ✅ 마킹은 백필 전 기간(45일) — 스트립은 최근 2영업일만. d8=실제 발표(접수)일 */
+    Object.keys(days).forEach(d=>days[d].forEach(it=>{ byCode[it.c]=Object.assign({d8:d},it); }));
     const keys=Object.keys(days).sort().slice(-2);          // 최근 2영업일
     if(!box) return byCode;
     if(!keys.length){ box.style.display='none'; return byCode; }
@@ -938,6 +938,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const key=`${d8.slice(0,4)}-${d8.slice(4,6)}-${d8.slice(6,8)}`;
         for(const it of LV.days[d8]){ const lst=(evs[key]=evs[key]||[]);
           if(!lst.some(r=>r.c===it.c)) lst.push({c:it.c,n:it.n,cap:0}); } } }
+      /* (2026-08-05) 발표 완료 종목은 '실제 발표일' 칸에만 — 예정일(ed)이 달라 다른 날에도
+         적혀 있으면(예: 8/4 발표인데 예정일 8/5 칸에 그대로) 혼동되므로 그 칸에서 제거 */
+      if(mk==='kr'&&LV){ for(const key in evs){ const k8=key.replace(/-/g,'');
+        evs[key]=evs[key].filter(r=>{ const lv=LIVEBY[r.c]; return !lv || lv.d8===k8; });
+        if(!evs[key].length) delete evs[key]; } }
       for(const d in evs) evs[d].sort((a,b)=>(b.cap||0)-(a.cap||0));
       const first=new Date(mcY,mcM,1), off=first.getDay(), dim=new Date(mcY,mcM+1,0).getDate();
       const tds=new Date(); tds.setHours(0,0,0,0);
@@ -972,8 +977,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             <b>📅 ${key} (${wdn}) 실적발표 — ${list.length}종</b>
             <span class="note" style="margin-left:auto">시가총액순</span>
             <button class="cp-x" id="mcp_x">닫기 ✕</button></div>
-          <div class="mc-pop-list">${list.map((r,i)=>
-            `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> <b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span></div>`).join('')}
+          <div class="mc-pop-list">${list.map((r,i)=>{
+            const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 영업익YoY·태그 요약
+            const res=lv?` <span class="note">— 영업익YoY <b class="${(lv.op_yoy??0)>0?'up':'dn'}">${lv.op_yoy??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.join(' · ')):''}</span>`:'';
+            return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;}).join('')}
           </div></div>`;
         pop.onclick=e=>{ if(e.target===pop) pop.remove(); };
         pop.querySelector('#mcp_x').onclick=()=>pop.remove();
