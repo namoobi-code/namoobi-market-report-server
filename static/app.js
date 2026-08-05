@@ -474,14 +474,16 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   /* ── 3.1.10 관세청 수출 ── */
   const cs=b.customs?.data;
   if(cs){
-    const m=cs.months.slice(-24), n=cs.months.length;
-    const cut=a=>(a||[]).slice(n-24).map(v=>v!=null?v/1000:null);
-    mk($('c_cus_t'),m,[{n:'1~10일',d:cut(cs.series.total.p10),c:C.b},{n:'1~20일',d:cut(cs.series.total.p20),c:C.o},
-      {n:'월전체',d:cut(cs.series.total.pm),c:C.r}],{legend:true,bar:true});
-    mk($('c_cus_s'),m,[{n:'1~10일',d:cut(cs.series.semiconductor.p10),c:C.b},{n:'1~20일',d:cut(cs.series.semiconductor.p20),c:C.o},
-      {n:'월전체',d:cut(cs.series.semiconductor.pm),c:C.r}],{legend:true,bar:true});
+    const m=cs.months.slice(-24);
     const it=[['total','전체'],['semiconductor','반도체'],['steel','철강'],['car','승용차'],['petroleum','석유'],
       ['wireless','무선통신'],['ship','선박'],['autoparts','자동차부품'],['computer','컴퓨터주변기기']];
+    /* (2026-08-05) 전체+8품목 3×3 그리드 — rows(월×차수 전 품목)를 피벗해 품목별 차트 */
+    {const rmap={}; (cs.rows||[]).forEach(r=>{ rmap[r.yyyymm+'_'+r.seq]=r; });
+     it.forEach(([k])=>{ const cv=$('c_cus_'+k); if(!cv) return;
+       const seq=[1,2,3].map(sq=>m.map(mo=>{ const r=rmap[mo.replace('-','')+'_'+sq];
+         const v=r?r[k]:null; return v!=null?v/1000:null; }));
+       mk(cv,m,[{n:'1~10일',d:seq[0],c:C.b},{n:'1~20일',d:seq[1],c:C.o},{n:'월전체',d:seq[2],c:C.r}],
+          {legend:true,bar:true}); });}
     const P=['p10','p20','pm'],PN=['1~10일','1~20일','월전체'];
     $('cus_tbl').innerHTML=`<tr><th>품목</th>${PN.map(x=>`<th style="text-align:right">${x}</th>`).join('')}</tr>`+
       it.map(([k,lab])=>`<tr><td><b>${lab}</b></td>${P.map(p=>{const v=cs.latest[p]?.[k];
@@ -1087,6 +1089,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(b.dataset.pane==='p_estate'&&window.renderEstate) window.renderEstate();
     if(b.dataset.pane==='p_global'&&window.renderGlobal) window.renderGlobal();
     if(b.dataset.pane==='p_db'&&window.renderVeps) window.renderVeps();
+    /* (2026-08-05) 숨김 상태에서 생성된 Chart.js 는 0×0 으로 남는다(실측: 3.1.10 3×3 그리드)
+       → 탭을 열 때 크기 없는 차트만 골라 resize */
+    if(window.Chart&&Chart.getChart) setTimeout(()=>{
+      document.querySelectorAll('#'+b.dataset.pane+' canvas').forEach(c=>{
+        const ch=Chart.getChart(c); if(ch&&(!c.width||!c.height)) ch.resize(); });},80);
   }));
   // 사이드바 SCREENER 버튼 → p_screener 페인 (상단 탭과 독립)
   const sbtn=document.getElementById('btn_screener');
