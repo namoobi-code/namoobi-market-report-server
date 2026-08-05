@@ -1038,16 +1038,35 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const wdn=['일','월','화','수','목','금','토'][new Date(key+'T00:00:00').getDay()];
         const old=document.querySelector('.mc-pop'); if(old) old.remove();
         const pop=document.createElement('div'); pop.className='mc-pop';
+        const row=(r,i)=>{
+          const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 결과 요약 (KR=영업익YoY · US=EPS서프)
+          const rv=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
+          const t8p=lv&&(lv.tags||[]).find(t=>t.includes('접수'));
+          const res=lv?(rv==null&&t8p
+            ? ` <span class="note">— ${esc(t8p.replace('📄 ',''))} · <b>수치 대기</b>(야후 미반영)</span>`
+            : ` <span class="note">— ${mk==='us'?'EPS서프':'영업익YoY'} <b class="${(rv??0)>0?'up':'dn'}">${rv??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.filter(t=>!t.includes('접수')).join(' · ')):''}</span>`):'';
+          return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;};
+        /* (2026-08-05) 정렬 토글 — 시가총액순 / 서프라이즈순(발표분 우선, |값| 큰 순) */
+        const sprLbl=mk==='us'?'EPS서프순':'영업익YoY순';
+        const sorted=m=>{ const a=list.slice();
+          if(m==='spr') a.sort((x,y)=>{ const g=r=>{const lv=LIVEBY[r.c]; const v=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
+              return v==null?-1e18:Math.abs(v); }; return g(y)-g(x); });
+          else a.sort((x,y)=>((y.cap||(LIVEBY[y.c]||{}).cap||0)-(x.cap||(LIVEBY[x.c]||{}).cap||0)));
+          return a; };
+        let mode='cap';
         pop.innerHTML=`<div class="mc-pop-in"><div class="mc-pop-h">
             <b>📅 ${key} (${wdn}) 실적발표 — ${list.length}종</b>
-            <span class="note" style="margin-left:auto">시가총액순</span>
+            <span style="margin-left:auto;display:inline-flex;gap:4px">
+              <button class="cp-x" id="mcp_scap">시가총액순</button>
+              <button class="cp-x" id="mcp_sspr">${sprLbl}</button></span>
             <button class="cp-x" id="mcp_x">닫기 ✕</button></div>
-          <div class="mc-pop-list">${list.map((r,i)=>{
-            const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 결과 요약 (KR=영업익YoY · US=EPS서프)
-            const rv=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
-            const res=lv?` <span class="note">— ${mk==='us'?'EPS서프':'영업익YoY'} <b class="${(rv??0)>0?'up':'dn'}">${rv??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.join(' · ')):''}</span>`:'';
-            return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;}).join('')}
-          </div></div>`;
+          <div class="mc-pop-list"></div></div>`;
+        const paint=()=>{ pop.querySelector('.mc-pop-list').innerHTML=sorted(mode).map(row).join('');
+          pop.querySelector('#mcp_scap').style.cssText=mode==='cap'?'background:#1f6feb;color:#fff;border-color:#1f6feb':'';
+          pop.querySelector('#mcp_sspr').style.cssText=mode==='spr'?'background:#1f6feb;color:#fff;border-color:#1f6feb':''; };
+        pop.querySelector('#mcp_scap').onclick=()=>{ mode='cap'; paint(); };
+        pop.querySelector('#mcp_sspr').onclick=()=>{ mode='spr'; paint(); };
+        paint();
         pop.onclick=e=>{ if(e.target===pop) pop.remove(); };
         pop.querySelector('#mcp_x').onclick=()=>pop.remove();
         document.addEventListener('keydown',function esc0(e){ if(e.key==='Escape'){ pop.remove(); document.removeEventListener('keydown',esc0); } });
