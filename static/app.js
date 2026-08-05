@@ -919,12 +919,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       let items=days[d].slice();
       if(mk==='us') items=items.filter(it=>
         (it.spr!=null&&Math.abs(it.spr)>=10&&(it.cap||0)>=2e9)   // 서프라이즈 ±10% & 시총 $2B↑(초소형 잡음 컷)
-        ||((it.cap||0)>=1e11));                                   // 주요종목($100B↑)은 항상
+        ||((it.cap||0)>=1e11)                                     // 주요종목($100B↑)은 항상
+        ||(it.tags||[]).some(t=>t.includes('8-K')));              // 8-K 워치리스트 감지 종목도 항상
       items.sort((a,b)=>mk==='us'?Math.abs(b.spr??0)-Math.abs(a.spr??0)
                                  :Math.abs(b.op_yoy??0)-Math.abs(a.op_yoy??0));
       if(mk==='us'&&items.length>40) items=items.slice(0,40);     // 일별 표시 상한
       const chips=items.map(it=>{
-        const tg=(it.tags||[]).map(t=>`<span class="mc-tag ${/급증|흑자|비트/.test(t)?'up':'dn'}">${E2(t)}</span>`).join('');
+        const tg=(it.tags||[]).map(t=>`<span class="mc-tag ${t.includes('8-K')?'nt':(/급증|흑자|비트/.test(t)?'up':'dn')}">${E2(t)}</span>`).join('');
         const tip=mk==='us'
           ? `${it.n} (${it.c}) · EPS 실제 ${it.eps??'—'} vs 예상 ${it.est??'—'} · 서프라이즈 ${it.spr??'—'}% · ${it.t} 수집`
           : `${it.n} (${it.cons}) · 매출 ${it.sales??'—'}억 (YoY ${it.sales_yoy??'—'}%) · 영업익 ${it.op??'—'}억 (YoY ${it.op_yoy??'—'}%) · 순이익YoY ${it.ni_yoy??'—'}% · ${it.t} 수집`;

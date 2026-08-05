@@ -37,7 +37,8 @@ def main():
     try: old = json.loads(OUT.read_text(encoding="utf-8"))
     except Exception: pass
     days = old.get("days") or {}
-    seen = {it["c"] for v in days.values() for it in v}
+    # 8-K 감시기가 먼저 만든 항목(eps 미채움)은 '기수집'으로 치지 않는다 — 야후 수치를 채워야 함
+    seen = {it["c"] for v in days.values() for it in v if it.get("eps") is not None}
     pool = json.loads((BASE / "data" / "db" / "screener_pool.json").read_text(encoding="utf-8"))
     today = datetime.now().date()
     lo = (today - timedelta(days=LOOK)).isoformat()
@@ -92,6 +93,14 @@ def main():
               "eps": ea, "est": ee, "spr": sp, "tags": tg,
               "t": datetime.now().strftime("%H:%M")}
         days.setdefault(d8, [])
+        # (2026-08-05) 8-K 감시기(earnings_8k_watch)가 먼저 만든 항목의 태그·접수번호는 보존
+        prev = next((z for z in days[d8] if z["c"] == sym), None)
+        if prev:
+            for t_ in prev.get("tags") or []:
+                if "8-K" in t_ and t_ not in it["tags"]:
+                    it["tags"].insert(0, t_)
+            if prev.get("acc"):
+                it["acc"] = prev["acc"]
         days[d8] = [z for z in days[d8] if z["c"] != sym] + [it]
         new += 1
         if new <= 25 or tg:

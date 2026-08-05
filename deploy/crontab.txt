@@ -84,3 +84,5 @@
 30 1 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms.py --backfill --months 250 --extend --budget 12000 >> /home/ubuntu/namoobi/rtms_deep.log 2>&1
 2-52/10 * * * * cd /home/ubuntu/namoobi && /usr/bin/python3 scripts/global_market.py >> /home/ubuntu/namoobi/logs/global_market.log 2>&1
 */5 7-18 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/earnings_watch.py >> logs/earnings_watch.log 2>&1  # DART 잠정실적 실시간 감지
+* 5-8 * * 2-6 cd /home/ubuntu/namoobi && flock -n /tmp/ern_8k.lock python3 scripts/earnings_8k_watch.py >> logs/earnings_8k.log 2>&1  # SEC 8-K 워치리스트 1분 감시
+*/5 5-8 * * 2-6 + */5 19-22 * * 1-5 earnings_watch_us.py (flock)  # US 어닝 야후 5분
