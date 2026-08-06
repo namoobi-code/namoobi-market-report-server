@@ -520,6 +520,7 @@
       <button id="btn_calendar" class="tab" data-pane="p_cal" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 Calendar<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_global" style="background:#4338ca;border-color:#4338ca;color:#fff">🌐 Market<small style="color:#e0e7ff">지수·상품·환율·크립토</small></button>
       <button class="tab"    data-pane="p_estate">🏠 부동산<small>가격지수·전망·금리</small></button>
+      <button class="tab"    data-pane="p_trends">📈 Trends<small>구글·유튜브·네이버</small></button>
       <button class="tab"    data-pane="p_daily">AI Daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB Server<small>누적·버전관리</small></button>
       <button class="tab"    data-pane="p_ai">AI 추론<small>종합분석·포트폴리오</small></button>
@@ -613,6 +614,29 @@
       </div>
     </div>
     <div class="note" style="margin:8px 0 14px;line-height:1.7">📖 기간수익률은 각 소스의 1년 일봉 기준(현재가 대비 과거 최근접 종가) · KRX 세부지수는 이력 누적 개시(2026-08-02)부터 기간수익률·추세가 차오른다 · 미래에셋 리스트 중 러시아 RTS(거래정지)·항셍종합·항셍 레드칩(R)·K-뉴딜 TOP10 시리즈는 무료 소스 미제공. 선물 시세는 최근월 연속(롤오버 자동)이며, 만기 교체 시 월물 간 가격차가 시계열에 섞여 매월물 상품(원유·천연가스 등)의 장기 수익률은 실제 현물 등락과 다소 다를 수 있음. 리서치용·투자권유 아님.</div>
+  </div>
+
+  <div class="pane" id="p_trends" style="overflow:auto">
+    <h2>📈 Trends <em id="tr_asof">구글·유튜브·네이버 — 서버 매일 05:50 무토큰 자동 수집</em></h2>
+    <div class="note" style="margin:-4px 0 10px">
+      급상승(일간)은 구글 공식 RSS · 네이버 쇼핑은 데이터랩 인기검색어(실검은 2021 폐지) · 유튜브는 공식 API(키 등록 시) ·
+      주간은 최근 7일 일간 랭킹 등장일수 자체 집계 · 인스타그램은 공개 API 부재로 제외(주간 LLM 리포트 별도)</div>
+    <h3>🔍 구글 급상승 검색어 (일간)</h3>
+    <div class="grid g2">
+      <div class="box"><b style="font-size:13px">🇰🇷 한국</b><table id="tr_gkr"></table></div>
+      <div class="box"><b style="font-size:13px">🇺🇸 글로벌(미국)</b><table id="tr_gus"></table></div>
+    </div>
+    <h3>▶️ 유튜브 인기 급상승 (일간)</h3>
+    <div id="tr_yt_off" class="note" style="display:none">유튜브는 공식 Data API 키가 필요합니다 (무료 · 일 10,000쿼터).
+      Google Cloud Console에서 YouTube Data API v3 키 발급 → 서버 keys/youtube.txt 에 저장하면 다음 수집부터 자동 활성화됩니다.</div>
+    <div class="grid g2" id="tr_yt_grid">
+      <div class="box"><b style="font-size:13px">🇰🇷 한국</b><table id="tr_ykr"></table></div>
+      <div class="box"><b style="font-size:13px">🇺🇸 글로벌(미국)</b><table id="tr_yus"></table></div>
+    </div>
+    <h3>🛒 네이버 쇼핑 인기검색어 (최근 7일 · 분야별 TOP10)</h3>
+    <div class="grid g3" id="tr_naver"></div>
+    <h3>📅 주간 트렌드 — 최근 7일 랭킹 등장일수 자체 집계 <span class="note" id="tr_wk_note"></span></h3>
+    <div class="grid g2" id="tr_weekly"></div>
   </div>
 
   <div class="pane" id="p_estate" style="overflow:auto">
@@ -1365,8 +1389,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260806i"></script>
-<script src="/etf.js?v=20260806i"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260806j"></script>
+<script src="/etf.js?v=20260806j"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

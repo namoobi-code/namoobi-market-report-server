@@ -1178,7 +1178,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends'];
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -1199,6 +1199,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(b.dataset.pane==='p_estate'&&window.renderEstate) window.renderEstate();
     if(b.dataset.pane==='p_global'&&window.renderGlobal) window.renderGlobal();
     if(b.dataset.pane==='p_db'&&window.renderVeps) window.renderVeps();
+    if(b.dataset.pane==='p_trends'&&window.renderTrends) window.renderTrends();
     /* (2026-08-05) 숨김 상태에서 생성된 Chart.js 는 0×0 으로 남는다(실측: 3.1.10 3×3 그리드)
        → 탭을 열 때 크기 없는 차트만 골라 resize */
     if(window.Chart&&Chart.getChart) setTimeout(()=>{
@@ -1259,6 +1260,46 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   const yoy=(t,v)=>{ const i=t.length-1, j=t.indexOf(String(+String(t[i]).slice(0,4)-1)+String(t[i]).slice(4));
     return (i>=0&&j>=0&&v[j])?((v[i]/v[j]-1)*100):null; };
   const fm=t=>t?`${String(t).slice(0,4)}.${String(t).slice(4)}`:'—';
+  /* (2026-08-06) 📈 Trends 탭 — trends_collect.py(무토큰 일일 수집) 렌더.
+     구글 RSS·네이버 쇼핑 XHR·유튜브 API(키 있을 때) + 주간 등장일수 자체 집계 */
+  let _trLoaded=false;
+  window.renderTrends=function(){
+    if(_trLoaded) return; _trLoaded=true;
+    const E2=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    fetch('/api/db/trends').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d){ const e=document.getElementById('tr_asof'); if(e) e.textContent='데이터 없음 — 첫 수집(05:50) 대기'; return; }
+      {const e=document.getElementById('tr_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 매일 05:50 무토큰 자동`;}
+      const gtbl=(id,rows)=>{ const t=document.getElementById(id); if(!t) return;
+        t.innerHTML=`<tr><th style="width:26px">#</th><th>검색어</th><th style="width:64px">검색량</th><th>관련 뉴스</th></tr>`+
+          (rows||[]).slice(0,15).map((r,i)=>`<tr><td class="note">${i+1}</td>
+            <td><b>${E2(r.kw)}</b></td><td class="note">${E2(r.tf)}</td>
+            <td class="note" style="font-size:12px">${r.url?`<a href="${E2(r.url)}" target="_blank">${E2(r.news)}</a>`:E2(r.news)}</td></tr>`).join('')
+          ||'<tr><td class="note">—</td></tr>'; };
+      gtbl('tr_gkr',d.g_kr); gtbl('tr_gus',d.g_us);
+      // 유튜브 — 키 미등록이면 안내만
+      const off=document.getElementById('tr_yt_off'), grid=document.getElementById('tr_yt_grid');
+      if(!d.yt_enabled){ if(off)off.style.display='block'; if(grid)grid.style.display='none'; }
+      else{
+        const ytbl=(id,rows)=>{ const t=document.getElementById(id); if(!t) return;
+          t.innerHTML=`<tr><th style="width:26px">#</th><th>영상</th><th>채널</th><th style="width:70px;text-align:right">조회수</th></tr>`+
+            (rows||[]).slice(0,15).map((r,i)=>`<tr><td class="note">${i+1}</td>
+              <td style="font-size:12px"><a href="https://www.youtube.com/watch?v=${E2(r.id)}" target="_blank">${E2(r.t)}</a></td>
+              <td class="note">${E2(r.ch)}</td><td class="num">${(r.v/1e4).toFixed(0)}만</td></tr>`).join(''); };
+        ytbl('tr_ykr',d.y_kr); ytbl('tr_yus',d.y_us); }
+      // 네이버 쇼핑 — 분야별 카드
+      const nv=document.getElementById('tr_naver');
+      if(nv) nv.innerHTML=Object.entries(d.naver_shop||{}).map(([cat,kws])=>`<div class="box">
+        <b style="font-size:13px">${E2(cat)}</b><table>${(kws||[]).slice(0,10).map((k,i)=>
+          `<tr><td class="note" style="width:24px">${i+1}</td><td>${E2(k)}</td></tr>`).join('')}</table></div>`).join('');
+      // 주간 자체 집계
+      const wkEl=document.getElementById('tr_weekly');
+      const WKL={g_kr:'🔍 구글 주간 (한국)',g_us:'🔍 구글 주간 (글로벌)',y_kr:'▶️ 유튜브 주간 (한국)',y_us:'▶️ 유튜브 주간 (글로벌)'};
+      if(wkEl) wkEl.innerHTML=Object.entries(d.weekly||{}).filter(([k,v])=>v&&v.length&&(d.yt_enabled||k.startsWith('g_'))).map(([k,v])=>`<div class="box">
+        <b style="font-size:13px">${WKL[k]||k}</b><table><tr><th style="width:26px">#</th><th>키워드/채널</th><th style="width:70px;text-align:right">등장일수</th></tr>
+        ${v.slice(0,10).map(([kw,n],i)=>`<tr><td class="note">${i+1}</td><td>${E2(kw)}</td><td class="num">${n}일</td></tr>`).join('')}</table></div>`).join('');
+      {const e=document.getElementById('tr_wk_note'); if(e) e.textContent=`— 누적 ${d.hist_days||1}일차 (7일 차면 완전한 주간 랭킹)`;}
+    }).catch(()=>{});
+  };
   window.renderEstate=function(){
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
