@@ -2137,7 +2137,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       frgn:{label:'외인보유비중',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
       frgn4w:{label:'외인지분율 4주변화',fmt:v=>(v>=0?'+':'')+v.toFixed(2)+'%p',reqData:1,presets:[['전체',null,null],['상승(0%p ↑)',0,null],['+0.3%p ↑',0.3,null],['+1%p ↑',1,null],['하락(0%p ↓)',null,0]],def:[null,null]},   // (2026-08-05) 네이버 일별 보유율 실측 Δ
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
-      dinc:{label:'DPS 연속증가',fmt:v=>v.toFixed(0)+'년 연속↑',min:1,reqData:1,presets:[['전체',null],['1년 ↑',1],['2년 ↑',2],['3년 ↑',3]],def:[null,null]}   // (2026-08-06) DART 배당공시 5개년
+      dinc:{label:'DPS 연속증가',fmt:v=>v.toFixed(0)+'년 연속↑',min:1,reqData:1,presets:[['전체',null],['1년 ↑',1],['2년 ↑',2],['3년 ↑',3]],def:[null,null]},   // (2026-08-06) DART 배당공시 5개년
+      dgy:{label:'배당성장연수',fixed:'— (KR은 DPS 연속증가 사용)'},
+      dcyc:{label:'배당주기',fixed:'— (US 전용 — KR은 연말 일괄 배당)'},
+      mdd5:{label:'최대낙폭 5Y',fixed:'— (US 전용)'}
     },
     us:{
       sector:{label:'섹터',cat:1},
@@ -2202,7 +2205,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       inst:{label:'기관보유비중',fmt:v=>v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['70% ↑',70,null],['50% ↑',50,null],['30% ↓',null,30]],def:[null,null]},
       drvj:{label:'파생·수급판정',fmt:v=>(v>0?'+':'')+parseFloat(v.toFixed(2))+'점',reqData:1,presets:[['전체',null,null],['강세(+1점 ↑)',1,null],['+0.5점 ↑',0.5,null],['약세(−1점 ↓)',null,-1],['−0.5점 ↓',null,-0.5]],def:[null,null]},
       payout:{label:'배당성향',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['10% ↑',10],['30% ↑',30],['50% ↑',50]],def:[null,null]},
-      dinc:{label:'DPS 연속증가',fixed:'— (US 미제공)'}
+      dinc:{label:'DPS 연속증가',fixed:'— (US 미제공)'},
+      /* (2026-08-06) US 배당 이력(div_hist_us.py — 야후 30y 배당 이벤트 실측):
+         dgy = '건당 평균 배당' 기준 연속 증가 연수 (연간 합계는 지급 밀림에 취약 — O 리얼티인컴 실측으로 확인).
+               10년↑=Achievers · 20년↑=귀족급 · 30년+=Kings 급. 야후 이력 한계로 실제(KO 63년)보다 짧게 나올 수 있음(보수적).
+         dcyc = 지급월 그룹 — 그룹별 1종목씩 3종목이면 매월 배당 수령(월배당 달력 조합).
+         mdd5 = 최근 5년 월봉 최대낙폭 — '폭락 이력' 실측. */
+      dgy:{label:'배당성장연수',fmt:v=>(v>=30?'30년+':v.toFixed(0)+'년')+' 연속↑',min:1,reqData:1,presets:[['전체',null],['10년 ↑',10],['20년 ↑',20],['30년+',30]],def:[null,null]},
+      dcyc:{label:'배당주기',cat:1,opts:['월배당(연12회)','분기 1·4·7·10월','분기 2·5·8·11월','분기 3·6·9·12월'],
+        hint:{'월배당(연12회)':['up','매월 지급'],'분기 1·4·7·10월':['neu','그룹1'],'분기 2·5·8·11월':['neu','그룹2'],'분기 3·6·9·12월':['neu','그룹3 — 세 그룹 1종목씩=매월 수령']}},
+      mdd5:{label:'최대낙폭 5Y',fmt:v=>v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['−20% 이내',-20,null],['−30% 이내',-30,null],['−40% 이내',-40,null]],def:[null,null]}
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
@@ -2214,7 +2226,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
               'r1m','r3m','r6m','mom','vol20','hi','frgn','frgn4w','fnb20','onb20','fst','ost','sr','lbr','srf','scov','inst','drvj',
               'ern','cov','upside','rec','rev','nan',
-              'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','sec'];
+              'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
      파생 z 3종(베이시스·풋콜(OI)·IV스큐 — 방향지표만, GEX·OI 제외):
        |z|≥1 → ±0.5점 · |z|≥2 → ±1점  (절벽 제거 — 1.49/1.51 이 갈리지 않게)
@@ -2288,19 +2300,24 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const FK2CK={rec:'recn', mgrw:'revg', ogrw:'opg', cov:'tp', opLoss:'oploss'};   // 필터키 → 컬럼키(값 접근자 공통화)
   let POOL={kr:[],us:[]}, mkt='kr', F={}, sort={k:'cap',d:-1}, loaded=false;
   /* (2026-08-02) 업종 분류 맵 — sector_map.py(주1회): KR=KRX·WICS대·WICS세부 / US=세부업종(한글) */
-  let SECMAP=null, F4W=null, DPSH=null;   // F4W=외인지분율 4주Δ · DPSH=DPS 연속증가(dps_hist.py, 2026-08-06)
+  let SECMAP=null, F4W=null, DPSH=null, DIVUS=null;   // F4W=외인지분율 4주Δ · DPSH=DPS 연속증가 · DIVUS=US 배당이력(div_hist_us.py, 2026-08-06)
   function mergeSec(){
     if(SECMAP){
       for(const r of POOL.kr){ const e=(SECMAP.kr||{})[r.code]; if(e){ if(e.krx)r.krx=e.krx; if(e.wics)r.wics=e.wics; if(e.wics2)r.wics2=e.wics2; } }
       for(const r of POOL.us){ const e=(SECMAP.us||{})[r.sym]; if(e&&e.ind) r.usind=e.ind; } }
     if(F4W&&F4W.d) for(const r of POOL.kr){ const v=F4W.d[r.code]; if(v!=null) r.frgn4w=v; }
     if(DPSH&&DPSH.d) for(const r of POOL.kr){ const v=DPSH.d[r.code];
-      if(v){ r.dinc=v.inc; r.dps_y=v.y; } } }
+      if(v){ r.dinc=v.inc; r.dps_y=v.y; } }
+    if(DIVUS&&DIVUS.d) for(const r of POOL.us){ const v=DIVUS.d[r.sym];
+      if(v){ r.dgy=v.dgy; r.dfreq=v.freq; r.dmd=v.md; r.pmg=v.pmg; r.mdd5=v.mdd5; r.div_y=v.y;
+        r.dcyc=v.md?'월배당(연12회)':(v.pmg?['','분기 1·4·7·10월','분기 2·5·8·11월','분기 3·6·9·12월'][v.pmg]:(v.freq?'기타(연'+v.freq+'회)':null)); } } }
   function loadSecMap(){
     if(!F4W) fetch('/api/db/frgn4w').then(x=>x.ok?x.json():null).then(d=>{ if(!d||!d.d) return;
       F4W=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{});
     if(!DPSH) fetch('/api/db/dps_hist').then(x=>x.ok?x.json():null).then(d=>{ if(!d||!d.d) return;
       DPSH=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{});
+    if(!DIVUS) fetch('/api/db/div_hist_us').then(x=>x.ok?x.json():null).then(d=>{ if(!d||!d.d) return;
+      DIVUS=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{});
     if(SECMAP){ mergeSec(); return; }
     fetch('/api/db/sector_map').then(x=>x.ok?x.json():null).then(d=>{ if(!d) return; SECMAP=d; mergeSec(); if(loaded&&typeof refresh==='function') refresh(); }).catch(()=>{}); }
 
@@ -2398,6 +2415,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     show('scr_surge_sq', S1); show('scr_surge_ern', S1);
     show('scr_fmom', S1);                             // 외인모멘텀(KR 전용): 1단계
     show('scr_divp', S1);                             // 배당선취(KR 전용): 1단계
+    show('scr_darist', S1); show('scr_dgrow', S1);    // US 배당 3종(US 전용): 1단계
+    show('scr_dcal', S1);
     show('scr_lowpbr', S1);                           // 저PBR M&A 프리셋: 1단계
     show('scr_allf', S1);                             // 전부전체: 1단계
     show('scr_autoscroll', S1);
@@ -2558,6 +2577,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     r6m:{l:'수익률 6M',n:1,m:'both'},
     vol20:{l:'변동성(20일)',n:1,m:'both'},
     hi:{l:'고점比',n:1,m:'both'}, frgn:{l:'외인보유비중',n:1,m:'kr'}, frgn4w:{l:'외인지분율Δ4주',n:1,m:'kr'}, dinc:{l:'DPS연속증가',n:1,m:'kr'},
+    dgy:{l:'배당성장연수',n:1,m:'us'}, dcyc:{l:'배당주기',n:0,m:'us'}, mdd5:{l:'최대낙폭5Y',n:1,m:'us'},
     fnb20:{l:'외인수급(20일)',n:1,m:'kr'}, onb20:{l:'기관수급(20일)',n:1,m:'kr'},
     fst:{l:'외인연속매수',n:1,m:'kr'}, ost:{l:'기관연속매수',n:1,m:'kr'},
     sr:{l:'공매도비중',n:1,m:'kr'}, lbr:{l:'대차잔고비율',n:1,m:'kr'},
@@ -2646,6 +2666,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'frgn': return r.frgn;
       case 'frgn4w': return r.frgn4w;                              // 외인 지분율 4주 변화(%p)
       case 'dinc': return r.dinc;                                  // DPS 연속 증가 연수
+      case 'dgy': return r.dgy;                                    // US 배당성장연수(건당 평균 기준)
+      case 'dcyc': return r.dcyc;
+      case 'mdd5': return r.mdd5;                                  // 5년 월봉 최대낙폭(%)
       case 'payout': return r.payout!=null?r.payout*100:null;
       // (2026-07-26) 1차 필터 추가분 — 서버는 소수(fraction)로 저장, 표시·필터는 %
       case 'r1m': return r.r1m!=null?r.r1m*100:null;
@@ -2729,6 +2752,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'frgn4w': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'dinc': { const ys=r.dps_y||{}; const tip=Object.keys(ys).sort().map(y=>y+' '+Math.round(ys[y]).toLocaleString()+'원').join(' · ');
         return `<span class="${v>=3?'up':(v>=1?'':'note')}" title="${tip}">${v}년 연속↑</span>`; }
+      case 'dgy': { const ys=r.div_y||{}; const tip='건당 평균 배당: '+Object.keys(ys).sort().map(y=>y+' $'+ys[y]).join(' · ');
+        return `<span class="${v>=20?'up':(v>=10?'':'note')}" title="${tip}">${v>=30?'30년+':v+'년'} 연속↑</span>`; }
+      case 'dcyc': return `<span class="${/월배당/.test(v)?'up':'note'}" title="지급월 그룹별 1종목씩 3종목 = 매월 배당 수령">${v}</span>`;
+      case 'mdd5': return `<span class="${v<=-40?'dn':(v>=-20?'up':'note')}" title="최근 5년 월봉 최대낙폭">${v.toFixed(0)}%</span>`;
       case 'payout': return v.toFixed(0)+'%';
       case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
@@ -2975,7 +3002,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','mom']],
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-    ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','roe','opm']],
+    ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
     ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
   const _catByLabel=(()=>{ const m={};
@@ -4914,6 +4941,49 @@ await _canvasFlow(c);
     set('cap',{min:3e11,max:null});    // 시총 3,000억 ↑
     set('tv',{min:1e9,max:null});      // 거래대금 10억 ↑
     sort={k:'divy',d:-1};              // 배당률 높은 순
+    apply(); };}
+  /* (2026-08-06) US 배당 3종 프리셋 — div_hist_us(야후 30y 배당 이벤트) 기반.
+     공통 사상: '사놓고 잊는' 배당 — 성장연수(감액 이력 없음)·성향 상한(증가 여력)·폭락 이력(MDD)·대형주. */
+  const _usDivBase=(d)=>{ for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+    F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; } };
+  // 🏛️ 배당귀족 — 20년↑ 연속 증가(귀족급) + 초대형 + 저변동. 가장 보수적.
+  {const b=$('scr_darist'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    if(mkt!=='us'){ alert('배당귀족 프리셋은 미국 전용입니다 (KR은 배당선취 사용)'); return; }
+    const d=DEF[mkt]; _usDivBase(d);
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('dgy',{min:20,max:null});      // 20년 연속 증가 (야후 이력 한계 감안 — 귀족(25년)급)
+    set('divy',{min:1.5,max:8});       // 배당 1.5~8% (극단 함정 배제)
+    set('payout',{min:null,max:70});   // 성향 70% ↓ — 증가 여력
+    set('cap',{min:1e10,max:null});    // 시총 $10B ↑
+    set('mdd5',{min:-40,max:null});    // 5년 낙폭 -40% 이내
+    set('vol20',{min:null,max:3});     // 저변동
+    sort={k:'dgy',d:-1};               // 성장연수 긴 순
+    apply(); };}
+  // 📈 배당성장 — 10년↑(Achievers) + 이익성장 병행. 배당·성장 균형.
+  {const b=$('scr_dgrow'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    if(mkt!=='us'){ alert('배당성장 프리셋은 미국 전용입니다'); return; }
+    const d=DEF[mkt]; _usDivBase(d);
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('dgy',{min:10,max:null});      // 10년 연속 증가 (Achievers)
+    set('divy',{min:1.5,max:8});
+    set('payout',{min:null,max:70});
+    set('grw',{min:0,max:null});       // 이익성장 +
+    set('cap',{min:2e9,max:null});     // $2B ↑
+    set('mdd5',{min:-50,max:null});
+    sort={k:'divy',d:-1};
+    apply(); };}
+  // 📅 월현금흐름 — 매월 배당 수령 설계: 월배당 종목 또는 지급월 그룹(1·4·7·10 / 2·5·8·11 / 3·6·9·12)별
+  //    1종목씩 3종목 조합. 프리셋은 후보군(고배당·지속·저낙폭)을 깔고 '배당주기' 칩에서 그룹 선택.
+  {const b=$('scr_dcal'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    if(mkt!=='us'){ alert('월현금흐름 프리셋은 미국 전용입니다'); return; }
+    const d=DEF[mkt]; _usDivBase(d);
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('divy',{min:3,max:12});        // 고배당 3~12%
+    set('dgy',{min:1,max:null});       // 최소 작년보다 증가 (감액 함정 배제)
+    set('payout',{min:null,max:80});
+    set('cap',{min:2e9,max:null});
+    set('mdd5',{min:-45,max:null});
+    sort={k:'divy',d:-1};
     apply(); };}
   /* (2026-08-05) 🌏 외인모멘텀 — '외국인 지분율 개선 + 이익모멘텀 개선' (증권사 리서치 아이디어).
      지분율 일별 시계열이 없어 '꾸준한 개선'은 외인 20일 순매수(+)·연속매수일로 프록시(지분율 상승과 동치).
