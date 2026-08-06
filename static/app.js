@@ -1313,8 +1313,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       fetch('/api/db/trends_annual').then(x=>x.ok?x.json():null).then(an=>{
         const el=document.getElementById('tr_annual'); if(!el||!an) return;
         el.innerHTML=(an.cards||[]).map(c=>`<div class="box">
-          <b style="font-size:13px">${E2(c.icon)} ${E2(c.title)}</b>
-          <div class="note" style="margin:2px 0 6px">${E2(c.src)}</div>
+          <b style="font-size:13px">${E2(c.icon)} ${c.url?`<a href="${E2(c.url)}" target="_blank">${E2(c.title)} ↗</a>`:E2(c.title)}</b>
+          <div class="note" style="margin:2px 0 6px">${c.url?`<a href="${E2(c.url)}" target="_blank" class="note">${E2(c.src)}</a>`:E2(c.src)}</div>
           <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.75">${(c.items||[]).map(x=>`<li>${E2(x)}</li>`).join('')}</ul></div>`).join('');
       }).catch(()=>{});
     }).catch(()=>{});
