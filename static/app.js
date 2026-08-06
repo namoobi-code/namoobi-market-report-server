@@ -1479,37 +1479,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       /* ⑧⑨ 아파트 실거래(국토부 rtms.py 매일 07:20) — 지역 드롭다운 + 거래량·가격 (2026-08-02) */
       fetch('/api/db/rtms').then(x=>x.ok?x.json():null).then(R=>{
         if(!R||!R.sale) return;
-        const sel=$('re_rt_sel'); if(!sel) return;
-        // (2026-08-02) 전국 시군구 — 시도 합산(A11 서울 전체 등) 그룹 + 시도별 optgroup
-        {const N=R.names||{};
-         const aggs=Object.keys(N).filter(c=>c.startsWith('A')).sort();
-         const regs=Object.keys(N).filter(c=>!c.startsWith('A')).sort();
-         let html=`<optgroup label="시도 전체(합산)">${aggs.map(c=>`<option value="${c}">${N[c]}</option>`).join('')}</optgroup>`;
-         const SIDONM={'11':'서울','26':'부산','27':'대구','28':'인천','30':'대전','31':'울산','36':'세종','41':'경기','51':'강원','43':'충북','44':'충남','52':'전북','46':'전남','47':'경북','48':'경남','50':'제주'};
-         for(const pfx of Object.keys(SIDONM)){
-           const grp=regs.filter(c=>c.startsWith(pfx));
-           if(grp.length) html+=`<optgroup label="${SIDONM[pfx]}">${grp.map(c=>`<option value="${c}">${N[c]}</option>`).join('')}</optgroup>`;
-         }
-         if(!aggs.length) html=Object.keys(N).map(c=>`<option value="${c}">${N[c]}</option>`).join('');   // 구버전 데이터 호환
-         sel.innerHTML=html;
-         if(N['A11']) sel.value='A11'; else if(N['SEOUL']) sel.value='SEOUL';}
-        const draw=()=>{
-          const c=sel.value, sm=(R.sale[c]||{}).m||{}, rm=((R.rent||{})[c]||{}).m||{};
-          const ts=Object.keys(sm).sort(); if(!ts.length) return;
-          const _d=new Date(); _d.setMonth(_d.getMonth()-2);
-          const _cut=`${_d.getFullYear()}${String(_d.getMonth()+1).padStart(2,'0')}`;
-          let provIdx=ts.findIndex(t=>t>_cut); if(provIdx<0) provIdx=null;   // 최근 2개월 = 신고 진행 중(잠정)
-          const n1={t:ts,v:ts.map(t=>sm[t].n)}, rn={t:ts,v:ts.map(t=>(rm[t]||{}).n??null)};
-          line('re_rt_n',[{...n1,label:'매매 건수',color:'#d9534f'},{...rn,label:'전세 건수',color:'#2f6fed'}],{provIdx});
-          const av={t:ts,v:ts.map(t=>sm[t].avg)}, md={t:ts,v:ts.map(t=>sm[t].med??null)};
-          const series=[{...av,label:'평균가(억)',color:'#d9534f'}];
-          if(md.v.some(v=>v!=null)) series.push({...md,label:'중위가(억)',color:'#888'});
-          line('re_rt_p',series,{provIdx});
-          const L=ts[ts.length-1];
-          $('re_rt_n_n').innerHTML=`최신 <b>${fm(L)}</b>${provIdx!=null&&L>_cut?' <b style="color:#c47b1e">(잠정)</b>':''} — 매매 <b>${sm[L].n.toLocaleString()}건</b>${rm[L]?` · 전세 ${rm[L].n.toLocaleString()}건`:''} · <b>신고기한 30일</b>이라 최근 1~2개월은 미완성치(매일 롤링 재수집으로 수렴) · 해제거래 제외 — 거래량 급감=거래절벽, 저점 대비 회복은 가격 반등 선행 신호로 참고`;
-          $('re_rt_p_n').innerHTML=`최신 ${fm(L)} — 평균 <b>${sm[L].avg}억</b>${sm[L].med!=null?` · 중위 ${sm[L].med}억`:''}${rm[L]?` · 전세 평균보증금 ${rm[L].dep}억`:''} — <b>가격지수(부동산원, 위 차트)</b>는 평활·보정으로 부드럽지만 늦고, <b>실거래 평균</b>은 빠르지만 그 달 거래 구성(고가·저가 단지 비중)에 따라 튈 수 있음`;
-        };
-        sel.onchange=draw; draw();
+        /* (2026-08-06) 단일지역 드롭다운·거래량·가격 카드 삭제(지역 비교와 중복 — 사용자 요청).
+           기존 `if(!re_rt_sel) return` 가드가 아래 지역 비교 초기화까지 스킵시키던 버그 함께 제거 */
         /* ── 지역 비교 대형 차트 — 다중 선택(검색+칩) · 지표 토글 (2026-08-02) ── */
         {const N=R.names||{}, PAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e9aa7','#c2185b','#5d4037','#455a64','#9e9d24','#00838f','#6d4c41'];
          const E=z=>String(z??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));  // 부동산 IIFE엔 전역 E 없음(ReferenceError 수정)
