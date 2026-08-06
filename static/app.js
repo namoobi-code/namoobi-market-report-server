@@ -1315,8 +1315,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         {const e=document.getElementById('tr_ig_asof'); if(e) e.textContent=`— ${w.week||''} · 작성 ${w.asof||''} · 주 1회 갱신 (인스타는 공개 API 부재 — LLM 리서치)`;}
         el.innerHTML=[w.kr,w.global].filter(Boolean).map(s=>`<div class="box">
           <b style="font-size:13px">${E2(s.title)}</b>
-          <table style="margin-top:4px">${(s.items||[]).map(([t,d],i)=>
-            `<tr><td class="note" style="width:24px">${i+1}</td><td><b>${E2(t)}</b><div class="note" style="font-size:12px">${E2(d)}</div></td></tr>`).join('')}</table></div>`).join('')
+          <table style="margin-top:4px">${(s.items||[]).map(([t,d,u],i)=>
+            `<tr><td class="note" style="width:24px">${i+1}</td><td><b>${u?`<a href="${E2(u)}" target="_blank">${E2(t)} ↗</a>`:E2(t)}</b><div class="note" style="font-size:12px">${E2(d)}</div></td></tr>`).join('')}</table></div>`).join('')
           +`<div class="note" style="grid-column:1/-1">출처: ${(w.sources||[]).map(([n,u])=>`<a href="${E2(u)}" target="_blank">${E2(n)}</a>`).join(' · ')}</div>`;
       }).catch(()=>{});
       // 연간·시즌 리포트 카드 (trends_annual.json — 연 1회 갱신)
