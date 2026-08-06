@@ -491,6 +491,29 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         return `<td class="num">${v!=null?(v/1000).toLocaleString(undefined,{maximumFractionDigits:0}):'—'}</td>`;}).join('')}</tr>`).join('')+
       `<tr><td colspan="4" class="note">${esc(cs.latest.yyyymm)} 기준 · 백만 달러</td></tr>`;
   }
+  /* (2026-08-06) 3.1.10 하단 — 투자 관점 품목별 월간 수출 (HS코드 · 2년 · fetch_hs_invest.py)
+     표: 테마|품목|HS|비고|최신월|YoY|차트(24개월 막대). 10일 잠정치 미제공 품목(화장품·배터리 등)을 월간으로 보완 */
+  if($('hsi_tbl')) fetch('/api/db/hs_invest').then(x=>x.ok?x.json():null).then(hv=>{
+    if(!hv||!hv.items) return;
+    const ms=(hv.months||[]).slice(-24);
+    const off=hv.months.length-ms.length;
+    $('hsi_asof').textContent='· 수집 '+(hv.asof||'');
+    $('hsi_tbl').innerHTML=`<tr><th>테마</th><th>품목</th><th>HS코드</th><th>비고</th>
+      <th style="text-align:right">최신월</th><th style="text-align:right">YoY</th><th style="min-width:320px">월간 수출 (2년)</th></tr>`+
+      hv.items.map((r,i)=>{
+        const e=(r.exp||[]).slice(off);
+        let li=e.length-1; while(li>=0&&e[li]==null) li--;          // 최신 유효월
+        const last=li>=0?e[li]:null, yoy=(li>=12&&e[li-12])?(last/e[li-12]-1)*100:null;
+        return `<tr><td><b>${esc(r.th)}</b></td><td>${esc(r.nm)}</td>
+          <td class="note">${esc(r.hs)}</td><td class="note">${esc(r.note||'')}</td>
+          <td class="num">${last!=null?('$'+(last/1000).toLocaleString(undefined,{maximumFractionDigits:0})+'M'):'—'}</td>
+          <td class="num ${yoy>0?'up':(yoy<0?'dn':'')}">${yoy!=null?((yoy>0?'+':'')+yoy.toFixed(1)+'%'):'—'}</td>
+          <td><canvas id="c_hsi_${i}" style="max-height:56px"></canvas></td></tr>`;
+      }).join('');
+    hv.items.forEach((r,i)=>{ const cv=$('c_hsi_'+i); if(!cv) return;
+      const e=(r.exp||[]).slice(off).map(v=>v!=null?v/1000:null);
+      mk(cv,ms,[{n:'수출',d:e,c:C.r}],{bar:true}); });
+  }).catch(()=>{});
 
   /* ── 3.1.11 반도체 사이클 ── */
   const sc=b.semi_cycle?.data;
