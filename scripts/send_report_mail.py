@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""send_report_mail.py — 서버에서 Gmail SMTP 로 시황 보고서 docx 발송 (v3.70).
+"""send_report_mail.py — 서버에서 Gmail SMTP 로 시황 보고서 docx 발송 (v3.72 — flock 직렬화).
 
 인증: Gmail '앱 비밀번호' (2단계 인증 계정에서 발급) — keys/gmail_app_password.txt
   · 이 파일은 git 미포함(keys/ 는 .gitignore). PC SECURITY 폴더에서 scp 로 배포.
@@ -30,7 +30,7 @@
   DEDUP_HOURS 내 기발송이면 회차(_HHMM)가 달라도 차단한다. 같은 날 의도적 재발송
   (재작업 회차 등)은 --force 로만 가능.
 """
-import json, os, re, smtplib, ssl, sys, time
+import fcntl, json, os, re, signal, smtplib, ssl, sys, time
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 from email.utils import formatdate, make_msgid
@@ -40,6 +40,32 @@ BASE = Path(__file__).resolve().parent.parent
 ACCOUNT = "namoobi@gmail.com"
 SENT_LOG = BASE / "data" / "mail_sent.log"
 DEDUP_HOURS = 20
+LOCK_FILE = BASE / "data" / "mail_send.lock"
+
+def _acquire_send_lock():
+    """[v3.72 · 2026-08-06 재발방지] 발송 전 구간(dedup 확인→SMTP→로그 기록)을 배타 락으로 직렬화.
+    종전엔 dedup 확인(시작 시점)과 로그 기록(SMTP 완료 후) 사이 수십 초의 TOCTOU 창이 있어,
+    첫 발송의 SMTP 진행 중에 재시도/병렬 호출이 들어오면 로그가 아직 없어 dedup 을 통과해
+    같은 회차가 2통 발송됐다(2026-08-06 06:27:20/06:27:47 실측 — 27초 간격 중복).
+    락을 잡은 뒤 dedup 을 확인하므로, 두 번째 호출은 첫 발송의 로그 기록 이후에야 진행돼 차단된다."""
+    LOCK_FILE.parent.mkdir(parents=True, exist_ok=True)
+    f = open(LOCK_FILE, "w")
+    try:
+        fcntl.flock(f, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return f
+    except (BlockingIOError, OSError):
+        print("WAIT 다른 발송 진행 중 — 완료 대기 후 dedup 재확인(최대 180초)", flush=True)
+        def _to(signum, frame):
+            raise TimeoutError
+        signal.signal(signal.SIGALRM, _to)
+        signal.alarm(180)
+        try:
+            fcntl.flock(f, fcntl.LOCK_EX)
+            signal.alarm(0)
+            return f
+        except TimeoutError:
+            print("ERR 발송 락 180초 대기 초과 — 중복 방지 우선으로 발송 포기(mail_sent.log 확인 요)")
+            sys.exit(5)
 
 def app_password():
     for p in (BASE / "keys" / "gmail_app_password.txt",
@@ -113,6 +139,7 @@ def main():
         print("ERR 첨부 24MB 초과:", size); sys.exit(2)
 
     attach_name = os.path.basename(attach)
+    _send_lock = _acquire_send_lock()  # v3.72 — 프로세스 종료까지 유지(락 안에서 dedup 확인·발송·로그)
     if "--force" not in sys.argv:
         dup = recent_sent(attach_name)
         if dup:
