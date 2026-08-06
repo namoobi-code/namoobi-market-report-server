@@ -1307,10 +1307,15 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       document.getElementById('hb_prev').onclick=()=>{ _hbM--; if(_hbM<0){_hbM=11;_hbY--;} draw(); };
       document.getElementById('hb_next').onclick=()=>{ _hbM++; if(_hbM>11){_hbM=0;_hbY++;} draw(); };
       draw();
-      // 리스트 — 카테고리별 그룹
-      const cats=[...new Set(_hbEv.map(e=>e.cat))];
-      document.getElementById('hb_list').innerHTML=cats.map(c=>{
-        const rows=_hbEv.filter(e=>e.cat===c);
+      // 리스트 — 카테고리별 그룹 (좌: 한국 대회 · 우: 외국 대회 — 2026-08-07)
+      //   표시 순서: 마라톤→트레일→철인3종→울트라→하이록스→스파르탄→기타 (쉬엄쉬엄3종은 기타에 포함)
+      const mapC=c=>c==='쉬엄쉬엄3종'?'기타':c;
+      const ord=c=>{ const K=['마라톤','트레일','철인','울트라','하이록스','스파르탄'];
+        for(let i=0;i<K.length;i++) if(c.includes(K[i])) return i; return 9; };
+      const cats=[...new Set(_hbEv.map(e=>mapC(e.cat)))].sort((a,b)=>ord(a)-ord(b));
+      const isFg=c=>/해외|메이저/.test(c);
+      const catBox=c=>{
+        const rows=_hbEv.filter(e=>mapC(e.cat)===c);
         return `<div class="box" style="margin-bottom:10px"><b style="font-size:13px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${CATC[c]||'#64748b'};margin-right:6px"></span>${E3(c)} <span class="note">(${rows.length})</span></b>
           <table style="margin-top:4px"><tr><th style="width:110px">대회일</th><th>대회명</th><th>장소</th><th>신청 접수</th></tr>
           ${rows.map(ev=>{
@@ -1320,7 +1325,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
               <td><a href="${E3(ev.url)}" target="_blank"><b>${E3(ev.name)}</b></a>${hot}</td>
               <td class="note">${E3(ev.place)}</td><td class="note" style="font-size:12px">${E3(ev.reg)}</td></tr>`;
           }).join('')}</table></div>`;
-      }).join('');
+      };
+      document.getElementById('hb_list').innerHTML=
+        `<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start">
+          <div><div class="note" style="margin:2px 0 6px"><b>🇰🇷 한국 대회</b></div>${cats.filter(c=>!isFg(c)).map(catBox).join('')}</div>
+          <div><div class="note" style="margin:2px 0 6px"><b>🌍 외국 대회</b></div>${cats.filter(isFg).map(catBox).join('')}</div>
+        </div>`;
     }).catch(()=>{});
   };
   /* (2026-08-06) 📈 Trends 탭 — trends_collect.py(무토큰 일일 수집) 렌더.
