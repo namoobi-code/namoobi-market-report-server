@@ -1309,6 +1309,16 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         if(window.Chart) new Chart(document.getElementById('tr_nv_cv'),{type:'line',
           data:{labels:NT.labels,datasets:Object.entries(NT.series).map(([n,v],i)=>({label:n,data:v,borderColor:cols[i%10],borderWidth:1.6,pointRadius:0,tension:.2}))},
           options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}}},scales:{x:{ticks:{maxTicksLimit:12}}}}}); }
+      // (2026-08-06) 인스타 주간 LLM 큐레이션 (trends_weekly_llm.json — /namoobi-search-trends 주 1회)
+      fetch('/api/db/trends_weekly_llm').then(x=>x.ok?x.json():null).then(w=>{
+        const el=document.getElementById('tr_insta'); if(!el||!w) return;
+        {const e=document.getElementById('tr_ig_asof'); if(e) e.textContent=`— ${w.week||''} · 작성 ${w.asof||''} · 주 1회 갱신 (인스타는 공개 API 부재 — LLM 리서치)`;}
+        el.innerHTML=[w.kr,w.global].filter(Boolean).map(s=>`<div class="box">
+          <b style="font-size:13px">${E2(s.title)}</b>
+          <table style="margin-top:4px">${(s.items||[]).map(([t,d],i)=>
+            `<tr><td class="note" style="width:24px">${i+1}</td><td><b>${E2(t)}</b><div class="note" style="font-size:12px">${E2(d)}</div></td></tr>`).join('')}</table></div>`).join('')
+          +`<div class="note" style="grid-column:1/-1">출처: ${(w.sources||[]).map(([n,u])=>`<a href="${E2(u)}" target="_blank">${E2(n)}</a>`).join(' · ')}</div>`;
+      }).catch(()=>{});
       // 연간·시즌 리포트 카드 (trends_annual.json — 연 1회 갱신)
       fetch('/api/db/trends_annual').then(x=>x.ok?x.json():null).then(an=>{
         const el=document.getElementById('tr_annual'); if(!el||!an) return;
