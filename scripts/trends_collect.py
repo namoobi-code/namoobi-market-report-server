@@ -69,32 +69,28 @@ def tr_ko(text):
     except Exception:
         return ""
 
-# (2026-08-06) 네이버 데이터랩 장기 시계열 — 키워드 바스켓 (보고서 '네이버 시즌/장기' 구현)
-#   공식 오픈API(무료 일 1,000콜) — keys/naver_datalab.txt 에 "클라이언트ID:시크릿" 저장 시 활성화.
-#   웹 XHR(qcHash)은 봇 차단으로 기각(실측). 랭킹이 아니라 지정 키워드 상대비교라 바스켓 사전 정의(보고서 권고).
-BASKET = [("AI", ["AI", "인공지능", "챗GPT"]), ("주식투자", ["주식", "미국주식"]),
-          ("금테크", ["금값", "금투자"]), ("부동산", ["아파트 매매", "부동산"]),
-          ("전기차", ["전기차", "테슬라"]), ("다이어트", ["다이어트", "위고비"]),
-          ("해외여행", ["해외여행", "항공권"]), ("캠핑", ["캠핑", "캠핑용품"]),
-          ("K뷰티", ["선크림", "쿠션"]), ("위스키", ["위스키", "하이볼"])]
-
-def naver_datalab(cid, csec):
-    """5년 월간 — {name:[..ratio]}, 라벨은 첫 그룹 기준"""
+# (2026-08-06) 네이버 시즌/장기 — 쇼핑인사이트 카테고리 클릭 추이 5년 (무인증 XHR 실측 ✓)
+#   ※ 검색어트렌드 공식 API 는 네이버가 신규 발급 중단('신규로 등록할 수 없는 API' 실측 확인),
+#     웹 qcHash 는 봇 차단 → 쇼핑 카테고리 클릭 시계열이 유일하게 열린 장기 소스.
+def naver_shop_trend():
+    """{cat:[value..]} 5년 월간 + 라벨 — getCategoryClickTrend (무인증)"""
     ed = datetime.now().date().replace(day=1) - timedelta(days=1)
     sd = ed.replace(year=ed.year-5, day=1)
     out, labels = {}, []
-    for i in range(0, len(BASKET), 5):                  # 콜당 최대 5그룹
-        body = json.dumps({"startDate": str(sd), "endDate": str(ed), "timeUnit": "month",
-                           "keywordGroups": [{"groupName": n, "keywords": k} for n, k in BASKET[i:i+5]]}).encode()
-        j = json.loads(get("https://openapi.naver.com/v1/datalab/search", data=body,
-                           hdr={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": csec,
-                                "Content-Type": "application/json"}))
-        for g in j.get("results") or []:
-            pts = {p["period"][:7]: p["ratio"] for p in g.get("data") or []}
+    for cid, nm in NAVER_CATS:
+        body = urllib.parse.urlencode({"cid": cid, "timeUnit": "month", "startDate": str(sd),
+                                       "endDate": str(ed), "age": "", "gender": "", "device": ""}).encode()
+        j = json.loads(get("https://datalab.naver.com/shoppingInsight/getCategoryClickTrend.naver", data=body,
+                           hdr={"Referer": "https://datalab.naver.com/shoppingInsight/sCategory.naver",
+                                "Content-Type": "application/x-www-form-urlencoded"}))
+        for g in j.get("result") or []:
+            d = g.get("data") or []
+            lb = [p["period"][:6] for p in d]
             if not labels:
-                labels = sorted(pts)
-            out[g["title"]] = [pts.get(l) for l in labels]
-        time.sleep(0.3)
+                labels = lb
+            out[nm] = [p["value"] for p in d]
+        time.sleep(0.4)
+    labels = [f"{l[:4]}.{l[4:6]}" for l in labels]
     return labels, out
 
 def youtube_popular(region, key):
@@ -156,18 +152,16 @@ def main():
     for x in data.get("y_us") or []:
         x["ko"] = tr_ko(x["t"])
         time.sleep(0.15)
-    # ③-2 네이버 데이터랩 장기 시계열 (키 있을 때만)
+    # ③-2 네이버 쇼핑 카테고리 클릭 추이 5년 (무인증)
     data["nv_enabled"] = False
-    nf = BASE / "keys" / "naver_datalab.txt"
-    if nf.exists() and ":" in nf.read_text():
-        cid, csec = nf.read_text().strip().split(":", 1)
-        try:
-            labels, series = naver_datalab(cid.strip(), csec.strip())
+    try:
+        labels, series = naver_shop_trend()
+        if series:
             data["nv_trend"] = {"labels": labels, "series": series}
             data["nv_enabled"] = True
-            print(f"[trends] 데이터랩 바스켓 {len(series)}그룹 · {len(labels)}개월")
-        except Exception as e:
-            print(f"[trends] 데이터랩 실패: {repr(e)[:70]}")
+            print(f"[trends] 쇼핑 클릭추이 {len(series)}분야 · {len(labels)}개월")
+    except Exception as e:
+        print(f"[trends] 쇼핑 클릭추이 실패: {repr(e)[:70]}")
     # ④ 누적 + 주간 자체 집계 (등장일수 — 여러 날 랭킹에 오른 키워드가 '진짜' 주간 트렌드)
     hist = {}
     try:

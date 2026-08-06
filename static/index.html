@@ -637,12 +637,11 @@
     <div class="grid g3" id="tr_naver"></div>
     <h3>📅 주간 트렌드 — 최근 7일 랭킹 등장일수 자체 집계 <span class="note" id="tr_wk_note"></span></h3>
     <div class="grid g2" id="tr_weekly"></div>
-    <h3>📊 네이버 데이터랩 장기 시계열 — 키워드 바스켓 (5년 · 월간)</h3>
-    <div id="tr_nv_off" class="note" style="display:none">네이버 데이터랩 공식 오픈API 키가 필요합니다 (무료 · 일 1,000콜).
-      developers.naver.com → 애플리케이션 등록(사용 API: 데이터랩) → Client ID·Secret 발급 →
-      서버 keys/naver_datalab.txt 에 "클라이언트ID:시크릿" 한 줄로 저장하면 다음 수집부터 자동 활성화됩니다.</div>
+    <h3>📊 네이버 쇼핑 소비 트렌드 — 분야별 클릭 추이 (5년 · 월간)</h3>
+    <div id="tr_nv_off" class="note" style="display:none">수집 대기 중 — 다음 수집(매일 05:50)부터 표시됩니다.</div>
     <div class="box" id="tr_nv_box" style="display:none">
-      <div class="note" style="margin-bottom:6px">바스켓 10종(AI·주식투자·금테크·부동산·전기차·다이어트·해외여행·캠핑·K뷰티·위스키) — 상대 검색량(최대=100) · 시즌·장기 사이클 감지용</div>
+      <div class="note" style="margin-bottom:6px">6개 분야(패션의류·화장품/미용·디지털/가전·식품·스포츠/레저·생활/건강) 상대 클릭량(최대=100) — 시즌 소비 사이클·장기 소비 이동 감지용
+        · 검색어트렌드 공식 API는 네이버 신규발급 중단으로 쇼핑 클릭 추이로 대체(실측)</div>
       <canvas id="tr_nv_cv" style="width:100%;height:340px"></canvas>
     </div>
     <h3>📚 연간·시즌 리포트 (장기 트렌드) <span class="note">— 공식 리포트 요약 · 연 1회 갱신</span></h3>
@@ -1399,8 +1398,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260806l"></script>
-<script src="/etf.js?v=20260806l"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260806m"></script>
+<script src="/etf.js?v=20260806m"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
