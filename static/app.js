@@ -1280,10 +1280,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         document.getElementById('hb_ym').textContent=`${y}년 ${m+1}월`;
         const first=new Date(y,m,1), start=first.getDay(), dim=new Date(y,m+1,0).getDate();
         const pre=`${y}-${String(m+1).padStart(2,'0')}-`;
-        const evs={};
-        let mc=0;
-        for(const ev of _hbEv){ if(ev.date.startsWith(pre)){ const dd=+ev.date.slice(8); (evs[dd]=evs[dd]||[]).push(ev); mc++; } }
-        document.getElementById('hb_mcnt').textContent=mc?`— 이 달 대회 ${mc}건`:'— 이 달 대회 없음';
+        const evs={}, regs={};
+        let mc=0, rc=0;
+        for(const ev of _hbEv){
+          if(ev.date.startsWith(pre)){ const dd=+ev.date.slice(8); (evs[dd]=evs[dd]||[]).push(ev); mc++; }
+          if(ev.regStart&&ev.regStart.startsWith(pre)){ const dd=+ev.regStart.slice(8); (regs[dd]=regs[dd]||[]).push(ev); rc++; }
+        }
+        document.getElementById('hb_mcnt').textContent=`— 이 달 대회 ${mc}건 · 접수 시작 ${rc}건`;
         let html='<tr>'+['일','월','화','수','목','금','토'].map((w,i)=>`<th style="text-align:center;color:${i===0?'#e0442c':i===6?'#2f6fed':'inherit'}">${w}</th>`).join('')+'</tr><tr>';
         for(let i=0;i<start;i++) html+='<td></td>';
         for(let dd=1;dd<=dim;dd++){
@@ -1291,8 +1294,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           const today=(y===now.getFullYear()&&m===now.getMonth()&&dd===now.getDate());
           html+=`<td style="vertical-align:top;height:74px;border:1px solid #eef1f5;padding:3px 4px${today?';background:#fffbe6':''}">
             <div class="note" style="color:${dow===0?'#e0442c':dow===6?'#2f6fed':'#8a94a3'}">${dd}</div>
-            ${(evs[dd]||[]).map(ev=>`<a href="${E3(ev.url)}" target="_blank" title="${E3(ev.name)} · ${E3(ev.place)} · 신청: ${E3(ev.reg)}"
+            ${(evs[dd]||[]).map(ev=>`<a href="${E3(ev.url)}" target="_blank" title="🏁 대회일 — ${E3(ev.name)} · ${E3(ev.place)} · 신청: ${E3(ev.reg)}"
               style="display:block;font-size:10.5px;line-height:1.3;margin-top:2px;padding:1px 4px;border-radius:4px;background:${CATC[ev.cat]||'#64748b'};color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${E3(ev.name.replace(/ 20\d\d.*$/,''))}${ev.est?' (추정)':''}</a>`).join('')}
+            ${(regs[dd]||[]).map(ev=>`<a href="${E3(ev.url)}" target="_blank" title="📝 접수 시작 — ${E3(ev.name)} · ${E3(ev.reg)} · 대회일 ${E3(ev.date)}"
+              style="display:block;font-size:10.5px;line-height:1.3;margin-top:2px;padding:0 3px;border-radius:4px;border:1.5px dashed ${CATC[ev.cat]||'#64748b'};color:${CATC[ev.cat]||'#64748b'};background:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">📝 ${E3(ev.name.replace(/ 20\d\d.*$/,''))}${ev.est?' (추정)':''}</a>`).join('')}
           </td>`;
           if(dow===6&&dd<dim) html+='</tr><tr>';
         }
