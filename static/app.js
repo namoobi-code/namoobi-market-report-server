@@ -4896,7 +4896,7 @@ await _canvasFlow(c);
      + 지속성(배당성향 20~60% — 상한이 핵심: 이익 일부만 배당해야 매년 지킬 체력)
      + 이익 방어력(영업이익성장 0%↑ · 영업적자 1년이상 제외 · ROE 5%↑ — 배당락 후 회복력)
      + 안정성(부채 150%↓ · 변동성 2.5%↓ · 시총 3,000억↑ · 거래대금 10억↑). 배당률 높은 순.
-     ※ 'DPS 3년 연속 증가'는 v2(주당배당금 이력 수집) 예정 — 현재는 성향 상한+연속흑자로 근사 */
+     ※ (2026-08-06) DPS 이력(DART 5개년) 확보 — 'DPS 1년 연속↑' 기본 포함, 더 엄격히는 칩에서 2·3년↑ 선택 */
   {const b=$('scr_divp'); if(b) b.onclick=()=>{ if(stage!==1) return;
     if(mkt!=='kr'){ alert('배당선취 프리셋은 한국 전용입니다 (연말 일괄 배당 구조 전제)'); return; }
     const d=DEF[mkt];
@@ -4904,6 +4904,7 @@ await _canvasFlow(c);
       F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
     const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
     set('divy',{min:4,max:12});        // 배당 4~12% (함정 상한)
+    set('dinc',{min:1,max:null});      // (2026-08-06) DPS 1년 연속↑ 기본 포함 — '작년보다 배당 늘린 회사'만 (3년↑은 2종뿐이라 과속)
     set('payout',{min:20,max:60});     // 배당성향 20~60% (지속 가능 체력)
     set('opg',{min:0,max:null});       // 영업이익성장 + (배당락 후 회복력)
     set('opLoss',{min:null,max:1});    // 영업적자 1년이상 제외

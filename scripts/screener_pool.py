@@ -398,6 +398,14 @@ def _enrich_us(us):
         chunks=[codes[i:i+20] for i in range(0,len(codes),20)]
         closes={}
         for res in T.pmap(_spark_batch, chunks, workers=6): closes.update(res)
+        # (2026-08-06) 야후 일시 차단 방어 — 커버리지 절반 미만이면 90초 쉬고 미확보 심볼 1회 재시도.
+        #   실측: 08-06 06:52 빌드에서 spark 0/5195 → US 수익률·변동성 전부 소실됐다.
+        if len(closes)<len(codes)*0.5:
+            print(f"[pool] US spark 커버리지 {len(closes)}/{len(codes)} — 90초 후 재시도")
+            time.sleep(90)
+            miss=[c0 for c0 in codes if c0 not in closes]
+            for res in T.pmap(_spark_batch, [miss[i:i+20] for i in range(0,len(miss),20)], workers=4):
+                closes.update(res)
         ok_ta=0; sts_us={}   # 장중(intraday_us) 증분용 상태
         for r in us:
             q=qmap.get(r["c"]) or {}
@@ -452,7 +460,8 @@ def _enrich_us(us):
         for r in us:
             if r.get("rsi") is None and r["c"] in prev:
                 p=prev[r["c"]]
-                for k in ("v20","align","rsi","macd","bb","volx"):
+                # (2026-08-06) 이월 목록에 기간수익률·변동성 추가 — spark 실패 시 소실 방지 (08-06 실측 사고)
+                for k in ("v20","align","rsi","macd","bb","volx","r1m","r3m","r6m","vol20"):
                     if r.get(k) is None and p.get(k) is not None: r[k]=p[k]
                 if r.get("rsi") is not None: cfta+=1
         try: T.save_db("ta_state_us", {"st": sts_us})
@@ -543,12 +552,18 @@ def _kis_flow(kr):
             oa=[T.num(x.get("orgn_ntby_tr_pbmn")) for x in rows]
             fq=[T.num(x.get("frgn_ntby_qty")) for x in rows]
             oq=[T.num(x.get("orgn_ntby_qty")) for x in rows]
+            # (2026-08-06) 장중 빌드 방어 — 첫 행이 '오늘'인데 미집계(빈값)면 스킵.
+            #   실측: 09시 KIS 첫 행 frgn_ntby_qty='' → streak 가 즉시 끊겨 전종목 연속일 0 이 됐다.
+            def _skip(a):
+                i=0
+                while i<len(a) and a[i] is None: i+=1
+                return a[i:]
             def s(a,nn):
-                v=[x for x in a[:nn] if x is not None]
+                v=[x for x in _skip(a)[:nn] if x is not None]
                 return round(sum(v)/100,1) if v else None   # 백만원 → 억원
             def streak(a):
                 k=0
-                for x in a:
+                for x in _skip(a):
                     if x is not None and x>0: k+=1
                     else: break
                 return k

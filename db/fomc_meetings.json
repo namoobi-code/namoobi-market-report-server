@@ -1,6 +1,6 @@
 {
  "marker": "2026-10-27|19",
- "as_of": "2026-08-05",
+ "as_of": "2026-08-06",
  "data": [
   {
    "date": "2025-09-16~17",
@@ -40,7 +40,7 @@
   {
    "date": "2026-01-28",
    "stance": "동결",
-   "note": "3.50~3.75% 동결. 10-2 가결(Miran·Waller 25bp 인하 주장 소수의견). 3연속 인하 이후 숨고르기. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-01-28)"
+   "note": "3.50~3.75% 동결. 10-2 가결(Miran·Waller 25bp 인하 주장 소수의견). 3연속 인하 이후 숨고르기, Powell '정책이 크게 제약적이라 보기 어렵다' 발언. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-01-28)"
   },
   {
    "date": "2026-03-17~18",
@@ -90,7 +90,7 @@
   {
    "date": "2026-09-16",
    "stance": "예정",
-   "note": "SEP(점도표) 발표 예정 회의(3·6·9·12월 분기 공개 주기). (출처: federalreserve.gov FOMC calendar)"
+   "note": "SEP(점도표) 발표 예정 회의(3·6·9·12월 분기 공개 주기). (출처: federalreserve.gov FOMC calendar 2026)"
   },
   {
    "date": "2026-10-27~28",
