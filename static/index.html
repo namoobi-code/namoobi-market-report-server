@@ -527,6 +527,7 @@
       <button class="tab"    data-pane="p_ta">AI TradingAgents<small>Multi-Agent LLM Trading</small></button>
       <button class="tab"    data-pane="p_auto">자동매매<small>KIS · 선정종목 집행</small></button>
       <button class="tab off" data-pane="p_fire" disabled title="준비 중">경제적 자유<small>퇴사 시뮬레이터</small></button>
+      <button class="tab"    data-pane="p_hobby" style="background:#047857;border-color:#047857;color:#fff">🏃 취미(운동)<small style="color:#a7f3d0">대회 일정·신청</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -614,6 +615,24 @@
       </div>
     </div>
     <div class="note" style="margin:8px 0 14px;line-height:1.7">📖 기간수익률은 각 소스의 1년 일봉 기준(현재가 대비 과거 최근접 종가) · KRX 세부지수는 이력 누적 개시(2026-08-02)부터 기간수익률·추세가 차오른다 · 미래에셋 리스트 중 러시아 RTS(거래정지)·항셍종합·항셍 레드칩(R)·K-뉴딜 TOP10 시리즈는 무료 소스 미제공. 선물 시세는 최근월 연속(롤오버 자동)이며, 만기 교체 시 월물 간 가격차가 시계열에 섞여 매월물 상품(원유·천연가스 등)의 장기 수익률은 실제 현물 등락과 다소 다를 수 있음. 리서치용·투자권유 아님.</div>
+  </div>
+
+  <div class="pane" id="p_hobby" style="overflow:auto">
+    <h2>🏃 취미(운동) — 대회 일정 <em id="hb_asof"></em></h2>
+    <div class="note" style="margin:-4px 0 10px">마라톤(한국 풀코스+세계 7대 메이저) · 트레일(UTMB/ITRA) · 철인3종 · 하이록스 · 스파르탄 · 쉬엄쉬엄3종 등 —
+      <b>(추정)</b> 표시는 예년 패턴 기반, 공식 발표 시 갱신 · ⚠️는 접수 진행·임박</div>
+    <h3>📅 월간 달력 <span class="note">(◀ ▶ 로 월 이동 · 날짜의 뱃지 = 대회일)</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <button id="hb_prev" class="scrrst">◀</button>
+        <b id="hb_ym" style="font-size:15px"></b>
+        <button id="hb_next" class="scrrst">▶</button>
+        <span class="note" id="hb_mcnt"></span>
+      </div>
+      <table id="hb_cal" style="table-layout:fixed;width:100%"></table>
+    </div>
+    <h3>📋 전체 리스트 <span class="note">(대회일 순 · 카테고리별)</span></h3>
+    <div id="hb_list"></div>
   </div>
 
   <div class="pane" id="p_trends" style="overflow:auto">
@@ -1392,8 +1411,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260806s"></script>
-<script src="/etf.js?v=20260806s"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260806t"></script>
+<script src="/etf.js?v=20260806t"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

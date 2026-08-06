@@ -1178,7 +1178,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends'];
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby'];
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -1200,6 +1200,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(b.dataset.pane==='p_global'&&window.renderGlobal) window.renderGlobal();
     if(b.dataset.pane==='p_db'&&window.renderVeps) window.renderVeps();
     if(b.dataset.pane==='p_trends'&&window.renderTrends) window.renderTrends();
+    if(b.dataset.pane==='p_hobby'&&window.renderHobby) window.renderHobby();
     /* (2026-08-05) 숨김 상태에서 생성된 Chart.js 는 0×0 으로 남는다(실측: 3.1.10 3×3 그리드)
        → 탭을 열 때 크기 없는 차트만 골라 resize */
     if(window.Chart&&Chart.getChart) setTimeout(()=>{
@@ -1260,6 +1261,63 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   const yoy=(t,v)=>{ const i=t.length-1, j=t.indexOf(String(+String(t[i]).slice(0,4)-1)+String(t[i]).slice(4));
     return (i>=0&&j>=0&&v[j])?((v[i]/v[j]-1)*100):null; };
   const fm=t=>t?`${String(t).slice(0,4)}.${String(t).slice(4)}`:'—';
+  /* (2026-08-06) 🏃 취미(운동) 탭 — sports_events.json (LLM 조사 · 분기 갱신) 렌더.
+     리스트(대회일 순·카테고리 뱃지) + 월 변경 가능한 달력(대회일 뱃지 표시) */
+  let _hbLoaded=false, _hbEv=[], _hbY=0, _hbM=0;
+  window.renderHobby=function(){
+    if(_hbLoaded){ return; } _hbLoaded=true;
+    const E3=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    const CATC={'마라톤(해외 메이저)':'#4338ca','마라톤(한국)':'#2f6fed','울트라(한국)':'#0e7490',
+                '트레일(한국)':'#047857','트레일(해외)':'#65a30d','철인3종(한국)':'#b45309',
+                '하이록스':'#be185d','스파르탄':'#7c2d12','쉬엄쉬엄3종':'#8b5cf6','기타':'#64748b'};
+    fetch('/api/db/sports_events').then(x=>x.ok?x.json():null).then(d=>{
+      if(!d||!d.events) return;
+      _hbEv=d.events.slice().sort((a,b)=>a.date<b.date?-1:1);
+      {const e=document.getElementById('hb_asof'); if(e) e.textContent=`조사 ${d.asof||''} · (추정)은 예년 패턴 — 공식 발표 시 갱신`;}
+      const now=new Date(); _hbY=now.getFullYear(); _hbM=now.getMonth();
+      const draw=()=>{
+        const y=_hbY,m=_hbM;
+        document.getElementById('hb_ym').textContent=`${y}년 ${m+1}월`;
+        const first=new Date(y,m,1), start=first.getDay(), dim=new Date(y,m+1,0).getDate();
+        const pre=`${y}-${String(m+1).padStart(2,'0')}-`;
+        const evs={};
+        let mc=0;
+        for(const ev of _hbEv){ if(ev.date.startsWith(pre)){ const dd=+ev.date.slice(8); (evs[dd]=evs[dd]||[]).push(ev); mc++; } }
+        document.getElementById('hb_mcnt').textContent=mc?`— 이 달 대회 ${mc}건`:'— 이 달 대회 없음';
+        let html='<tr>'+['일','월','화','수','목','금','토'].map((w,i)=>`<th style="text-align:center;color:${i===0?'#e0442c':i===6?'#2f6fed':'inherit'}">${w}</th>`).join('')+'</tr><tr>';
+        for(let i=0;i<start;i++) html+='<td></td>';
+        for(let dd=1;dd<=dim;dd++){
+          const dow=(start+dd-1)%7;
+          const today=(y===now.getFullYear()&&m===now.getMonth()&&dd===now.getDate());
+          html+=`<td style="vertical-align:top;height:74px;border:1px solid #eef1f5;padding:3px 4px${today?';background:#fffbe6':''}">
+            <div class="note" style="color:${dow===0?'#e0442c':dow===6?'#2f6fed':'#8a94a3'}">${dd}</div>
+            ${(evs[dd]||[]).map(ev=>`<a href="${E3(ev.url)}" target="_blank" title="${E3(ev.name)} · ${E3(ev.place)} · 신청: ${E3(ev.reg)}"
+              style="display:block;font-size:10.5px;line-height:1.3;margin-top:2px;padding:1px 4px;border-radius:4px;background:${CATC[ev.cat]||'#64748b'};color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${E3(ev.name.replace(/ 20\d\d.*$/,''))}${ev.est?' (추정)':''}</a>`).join('')}
+          </td>`;
+          if(dow===6&&dd<dim) html+='</tr><tr>';
+        }
+        html+='</tr>';
+        document.getElementById('hb_cal').innerHTML=html;
+      };
+      document.getElementById('hb_prev').onclick=()=>{ _hbM--; if(_hbM<0){_hbM=11;_hbY--;} draw(); };
+      document.getElementById('hb_next').onclick=()=>{ _hbM++; if(_hbM>11){_hbM=0;_hbY++;} draw(); };
+      draw();
+      // 리스트 — 카테고리별 그룹
+      const cats=[...new Set(_hbEv.map(e=>e.cat))];
+      document.getElementById('hb_list').innerHTML=cats.map(c=>{
+        const rows=_hbEv.filter(e=>e.cat===c);
+        return `<div class="box" style="margin-bottom:10px"><b style="font-size:13px"><span style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${CATC[c]||'#64748b'};margin-right:6px"></span>${E3(c)} <span class="note">(${rows.length})</span></b>
+          <table style="margin-top:4px"><tr><th style="width:110px">대회일</th><th>대회명</th><th>장소</th><th>신청 접수</th></tr>
+          ${rows.map(ev=>{
+            const past=ev.date<'2026-08-06'?' style="opacity:.55"':'';
+            const hot=/⚠️/.test(ev.reg)?' <span style="color:#e0442c;font-weight:700">⚠️</span>':'';
+            return `<tr${past}><td class="num" style="text-align:left"><b>${ev.date}</b>${ev.est?' <span class="note">(추정)</span>':''}</td>
+              <td><a href="${E3(ev.url)}" target="_blank"><b>${E3(ev.name)}</b></a>${hot}</td>
+              <td class="note">${E3(ev.place)}</td><td class="note" style="font-size:12px">${E3(ev.reg)}</td></tr>`;
+          }).join('')}</table></div>`;
+      }).join('');
+    }).catch(()=>{});
+  };
   /* (2026-08-06) 📈 Trends 탭 — trends_collect.py(무토큰 일일 수집) 렌더.
      구글 RSS·네이버 쇼핑 XHR·유튜브 API(키 있을 때) + 주간 등장일수 자체 집계 */
   let _trLoaded=false;
