@@ -495,19 +495,32 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
      표: 테마|품목|HS|비고|최신월|YoY|차트(24개월 막대). 10일 잠정치 미제공 품목(화장품·배터리 등)을 월간으로 보완 */
   if($('hsi_tbl')) fetch('/api/db/hs_invest').then(x=>x.ok?x.json():null).then(hv=>{
     if(!hv||!hv.items) return;
-    const ms=(hv.months||[]).slice(-24);
+    const ms=(hv.months||[]).slice(-36);               // (2026-08-06) X축 3년치
     const off=hv.months.length-ms.length;
     $('hsi_asof').textContent='· 수집 '+(hv.asof||'');
+    // (2026-08-06) 최신월 + 최신 3·6개월 누적, 각각 전년 동일월(구간) 대비 YoY
+    const _fmtM=v=>v!=null?('$'+(v/1000).toLocaleString(undefined,{maximumFractionDigits:0})+'M'):'—';
+    const _fmtY=y=>`<td class="num ${y>0?'up':(y<0?'dn':'')}">${y!=null?((y>0?'+':'')+y.toFixed(1)+'%'):'—'}</td>`;
+    const _sum=(e,a,b)=>{ if(a<0) return null; const s=e.slice(a,b+1); return s.some(v=>v==null)?null:s.reduce((x,y)=>x+y,0); };
     $('hsi_tbl').innerHTML=`<tr><th>테마</th><th>품목</th><th>HS코드</th><th>비고</th>
-      <th style="text-align:right">최신월</th><th style="text-align:right">YoY</th><th style="min-width:320px">월간 수출 (2년)</th></tr>`+
+      <th style="text-align:right">최신월</th><th style="text-align:right">YoY</th>
+      <th style="text-align:right">최근 3개월</th><th style="text-align:right">3M YoY</th>
+      <th style="text-align:right">최근 6개월</th><th style="text-align:right">6M YoY</th>
+      <th style="text-align:right">최근 1년</th><th style="text-align:right">1Y YoY</th>
+      <th style="min-width:320px">월간 수출 (3년)</th></tr>`+
       hv.items.map((r,i)=>{
         const e=(r.exp||[]).slice(off);
         let li=e.length-1; while(li>=0&&e[li]==null) li--;          // 최신 유효월
         const last=li>=0?e[li]:null, yoy=(li>=12&&e[li-12])?(last/e[li-12]-1)*100:null;
+        const s3=_sum(e,li-2,li),  p3=_sum(e,li-14,li-12), y3=(s3!=null&&p3)?(s3/p3-1)*100:null;
+        const s6=_sum(e,li-5,li),  p6=_sum(e,li-17,li-12), y6=(s6!=null&&p6)?(s6/p6-1)*100:null;
+        const s12=_sum(e,li-11,li), p12=_sum(e,li-23,li-12), y12=(s12!=null&&p12)?(s12/p12-1)*100:null;
         return `<tr><td><b>${esc(r.th)}</b></td><td>${esc(r.nm)}</td>
           <td class="note">${esc(r.hs)}</td><td class="note">${esc(r.note||'')}</td>
-          <td class="num">${last!=null?('$'+(last/1000).toLocaleString(undefined,{maximumFractionDigits:0})+'M'):'—'}</td>
-          <td class="num ${yoy>0?'up':(yoy<0?'dn':'')}">${yoy!=null?((yoy>0?'+':'')+yoy.toFixed(1)+'%'):'—'}</td>
+          <td class="num">${_fmtM(last)}</td>${_fmtY(yoy)}
+          <td class="num">${_fmtM(s3)}</td>${_fmtY(y3)}
+          <td class="num">${_fmtM(s6)}</td>${_fmtY(y6)}
+          <td class="num">${_fmtM(s12)}</td>${_fmtY(y12)}
           <td><canvas id="c_hsi_${i}" style="max-height:56px"></canvas></td></tr>`;
       }).join('');
     hv.items.forEach((r,i)=>{ const cv=$('c_hsi_'+i); if(!cv) return;

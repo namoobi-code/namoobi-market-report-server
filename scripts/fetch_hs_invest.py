@@ -77,7 +77,7 @@ def fetch(hs, fr, to):
 def main():
     now = datetime.now()
     y, m = now.year, now.month
-    fr = f"{y-2 if m<12 else y-1}{(m%12)+1:02d}"        # 25개월 전
+    fr = f"{y-3 if m<12 else y-2}{(m%12)+1:02d}"        # 37개월 전 (X축 3년치)
     to = f"{y}{m:02d}"
     items = []
     months = set()
