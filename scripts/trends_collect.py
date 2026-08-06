@@ -57,6 +57,46 @@ def naver_shop(cid):
                             "Content-Type": "application/x-www-form-urlencoded"}))
     return [r.get("keyword") for r in (j.get("ranks") or [])][:20]
 
+def tr_ko(text):
+    """(2026-08-06) 무토큰 한글 번역 — 구글 gtx 무인증 엔드포인트 (실측 ✓). 글로벌 항목 한글 열용."""
+    if not text:
+        return ""
+    try:
+        u = ("https://translate.googleapis.com/translate_a/single?"
+             + urllib.parse.urlencode({"client": "gtx", "sl": "auto", "tl": "ko", "dt": "t", "q": text[:300]}))
+        j = json.loads(get(u, 12))
+        return "".join(x[0] for x in j[0] if x and x[0])[:120]
+    except Exception:
+        return ""
+
+# (2026-08-06) 네이버 데이터랩 장기 시계열 — 키워드 바스켓 (보고서 '네이버 시즌/장기' 구현)
+#   공식 오픈API(무료 일 1,000콜) — keys/naver_datalab.txt 에 "클라이언트ID:시크릿" 저장 시 활성화.
+#   웹 XHR(qcHash)은 봇 차단으로 기각(실측). 랭킹이 아니라 지정 키워드 상대비교라 바스켓 사전 정의(보고서 권고).
+BASKET = [("AI", ["AI", "인공지능", "챗GPT"]), ("주식투자", ["주식", "미국주식"]),
+          ("금테크", ["금값", "금투자"]), ("부동산", ["아파트 매매", "부동산"]),
+          ("전기차", ["전기차", "테슬라"]), ("다이어트", ["다이어트", "위고비"]),
+          ("해외여행", ["해외여행", "항공권"]), ("캠핑", ["캠핑", "캠핑용품"]),
+          ("K뷰티", ["선크림", "쿠션"]), ("위스키", ["위스키", "하이볼"])]
+
+def naver_datalab(cid, csec):
+    """5년 월간 — {name:[..ratio]}, 라벨은 첫 그룹 기준"""
+    ed = datetime.now().date().replace(day=1) - timedelta(days=1)
+    sd = ed.replace(year=ed.year-5, day=1)
+    out, labels = {}, []
+    for i in range(0, len(BASKET), 5):                  # 콜당 최대 5그룹
+        body = json.dumps({"startDate": str(sd), "endDate": str(ed), "timeUnit": "month",
+                           "keywordGroups": [{"groupName": n, "keywords": k} for n, k in BASKET[i:i+5]]}).encode()
+        j = json.loads(get("https://openapi.naver.com/v1/datalab/search", data=body,
+                           hdr={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": csec,
+                                "Content-Type": "application/json"}))
+        for g in j.get("results") or []:
+            pts = {p["period"][:7]: p["ratio"] for p in g.get("data") or []}
+            if not labels:
+                labels = sorted(pts)
+            out[g["title"]] = [pts.get(l) for l in labels]
+        time.sleep(0.3)
+    return labels, out
+
 def youtube_popular(region, key):
     """공식 Data API mostPopular — [{id,t,ch,v}]"""
     u = ("https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular"
@@ -82,6 +122,12 @@ def main():
         except Exception as e:
             data[k] = []; print(f"[trends] 구글 {geo} 실패: {repr(e)[:60]}")
         time.sleep(0.5)
+    # ①-2 글로벌 항목 한글 열 — gtx 무토큰 번역 (US 키워드·뉴스)
+    for x in data.get("g_us") or []:
+        x["ko"] = tr_ko(x["kw"])
+        x["news_ko"] = tr_ko(x["news"]) if x.get("news") else ""
+        time.sleep(0.15)
+    print(f"[trends] 구글 US 한글화 {sum(1 for x in data['g_us'] if x.get('ko'))}건")
     # ② 네이버 쇼핑
     ns = {}
     for cid, nm in NAVER_CATS:
@@ -106,6 +152,22 @@ def main():
                 print(f"[trends] 유튜브 {rg}: {len(data[k])}건")
             except Exception as e:
                 print(f"[trends] 유튜브 {rg} 실패: {repr(e)[:60]}")
+    # 유튜브 US 제목 한글 열
+    for x in data.get("y_us") or []:
+        x["ko"] = tr_ko(x["t"])
+        time.sleep(0.15)
+    # ③-2 네이버 데이터랩 장기 시계열 (키 있을 때만)
+    data["nv_enabled"] = False
+    nf = BASE / "keys" / "naver_datalab.txt"
+    if nf.exists() and ":" in nf.read_text():
+        cid, csec = nf.read_text().strip().split(":", 1)
+        try:
+            labels, series = naver_datalab(cid.strip(), csec.strip())
+            data["nv_trend"] = {"labels": labels, "series": series}
+            data["nv_enabled"] = True
+            print(f"[trends] 데이터랩 바스켓 {len(series)}그룹 · {len(labels)}개월")
+        except Exception as e:
+            print(f"[trends] 데이터랩 실패: {repr(e)[:70]}")
     # ④ 누적 + 주간 자체 집계 (등장일수 — 여러 날 랭킹에 오른 키워드가 '진짜' 주간 트렌드)
     hist = {}
     try:

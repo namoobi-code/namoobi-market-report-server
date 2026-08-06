@@ -1269,23 +1269,25 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     fetch('/api/db/trends').then(r=>r.ok?r.json():null).then(d=>{
       if(!d){ const e=document.getElementById('tr_asof'); if(e) e.textContent='데이터 없음 — 첫 수집(05:50) 대기'; return; }
       {const e=document.getElementById('tr_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 매일 05:50 무토큰 자동`;}
-      const gtbl=(id,rows)=>{ const t=document.getElementById(id); if(!t) return;
-        t.innerHTML=`<tr><th style="width:26px">#</th><th>검색어</th><th style="width:64px">검색량</th><th>관련 뉴스</th></tr>`+
+      // (2026-08-06) 글로벌 표엔 '한글' 열 — 서버 gtx 무토큰 번역(수집 시 생성)
+      const gtbl=(id,rows,ko)=>{ const t=document.getElementById(id); if(!t) return;
+        t.innerHTML=`<tr><th style="width:26px">#</th><th>검색어</th>${ko?'<th>한글</th>':''}<th style="width:64px">검색량</th><th>관련 뉴스${ko?' (한글 번역)':''}</th></tr>`+
           (rows||[]).slice(0,15).map((r,i)=>`<tr><td class="note">${i+1}</td>
-            <td><b>${E2(r.kw)}</b></td><td class="note">${E2(r.tf)}</td>
-            <td class="note" style="font-size:12px">${r.url?`<a href="${E2(r.url)}" target="_blank">${E2(r.news)}</a>`:E2(r.news)}</td></tr>`).join('')
+            <td><b>${E2(r.kw)}</b></td>${ko?`<td>${E2(r.ko||'')}</td>`:''}<td class="note">${E2(r.tf)}</td>
+            <td class="note" style="font-size:12px">${r.url?`<a href="${E2(r.url)}" target="_blank">${E2(ko&&r.news_ko?r.news_ko:r.news)}</a>`:E2(ko&&r.news_ko?r.news_ko:r.news)}</td></tr>`).join('')
           ||'<tr><td class="note">—</td></tr>'; };
-      gtbl('tr_gkr',d.g_kr); gtbl('tr_gus',d.g_us);
+      gtbl('tr_gkr',d.g_kr,false); gtbl('tr_gus',d.g_us,true);
       // 유튜브 — 키 미등록이면 안내만
       const off=document.getElementById('tr_yt_off'), grid=document.getElementById('tr_yt_grid');
       if(!d.yt_enabled){ if(off)off.style.display='block'; if(grid)grid.style.display='none'; }
       else{
-        const ytbl=(id,rows)=>{ const t=document.getElementById(id); if(!t) return;
-          t.innerHTML=`<tr><th style="width:26px">#</th><th>영상</th><th>채널</th><th style="width:70px;text-align:right">조회수</th></tr>`+
+        const ytbl=(id,rows,ko)=>{ const t=document.getElementById(id); if(!t) return;
+          t.innerHTML=`<tr><th style="width:26px">#</th><th>영상</th>${ko?'<th>한글</th>':''}<th>채널</th><th style="width:70px;text-align:right">조회수</th></tr>`+
             (rows||[]).slice(0,15).map((r,i)=>`<tr><td class="note">${i+1}</td>
               <td style="font-size:12px"><a href="https://www.youtube.com/watch?v=${E2(r.id)}" target="_blank">${E2(r.t)}</a></td>
+              ${ko?`<td class="note" style="font-size:12px">${E2(r.ko||'')}</td>`:''}
               <td class="note">${E2(r.ch)}</td><td class="num">${(r.v/1e4).toFixed(0)}만</td></tr>`).join(''); };
-        ytbl('tr_ykr',d.y_kr); ytbl('tr_yus',d.y_us); }
+        ytbl('tr_ykr',d.y_kr,false); ytbl('tr_yus',d.y_us,true); }
       // 네이버 쇼핑 — 분야별 카드
       const nv=document.getElementById('tr_naver');
       if(nv) nv.innerHTML=Object.entries(d.naver_shop||{}).map(([cat,kws])=>`<div class="box">
@@ -1298,6 +1300,23 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         <b style="font-size:13px">${WKL[k]||k}</b><table><tr><th style="width:26px">#</th><th>키워드/채널</th><th style="width:70px;text-align:right">등장일수</th></tr>
         ${v.slice(0,10).map(([kw,n],i)=>`<tr><td class="note">${i+1}</td><td>${E2(kw)}</td><td class="num">${n}일</td></tr>`).join('')}</table></div>`).join('');
       {const e=document.getElementById('tr_wk_note'); if(e) e.textContent=`— 누적 ${d.hist_days||1}일차 (7일 차면 완전한 주간 랭킹)`;}
+      // (2026-08-06) 데이터랩 장기 시계열 — 키 등록 시 자동 활성화
+      const nvOff=document.getElementById('tr_nv_off'), nvBox=document.getElementById('tr_nv_box');
+      if(!d.nv_enabled){ if(nvOff)nvOff.style.display='block'; }
+      else if(nvBox&&d.nv_trend){
+        nvBox.style.display='block';
+        const NT=d.nv_trend, cols=['#e0442c','#2f6fed','#1a9850','#f2a72e','#8b5cf6','#0e7490','#be185d','#65a30d','#7c2d12','#64748b'];
+        if(window.Chart) new Chart(document.getElementById('tr_nv_cv'),{type:'line',
+          data:{labels:NT.labels,datasets:Object.entries(NT.series).map(([n,v],i)=>({label:n,data:v,borderColor:cols[i%10],borderWidth:1.6,pointRadius:0,tension:.2}))},
+          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}}},scales:{x:{ticks:{maxTicksLimit:12}}}}}); }
+      // 연간·시즌 리포트 카드 (trends_annual.json — 연 1회 갱신)
+      fetch('/api/db/trends_annual').then(x=>x.ok?x.json():null).then(an=>{
+        const el=document.getElementById('tr_annual'); if(!el||!an) return;
+        el.innerHTML=(an.cards||[]).map(c=>`<div class="box">
+          <b style="font-size:13px">${E2(c.icon)} ${E2(c.title)}</b>
+          <div class="note" style="margin:2px 0 6px">${E2(c.src)}</div>
+          <ul style="margin:0;padding-left:18px;font-size:12.5px;line-height:1.75">${(c.items||[]).map(x=>`<li>${E2(x)}</li>`).join('')}</ul></div>`).join('');
+      }).catch(()=>{});
     }).catch(()=>{});
   };
   window.renderEstate=function(){
