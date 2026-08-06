@@ -1307,6 +1307,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       document.getElementById('hb_prev').onclick=()=>{ _hbM--; if(_hbM<0){_hbM=11;_hbY--;} draw(); };
       document.getElementById('hb_next').onclick=()=>{ _hbM++; if(_hbM>11){_hbM=0;_hbY++;} draw(); };
       draw();
+      // 🆕 서버 신규 감지 (sports_watch.py — 주 1회)
+      fetch('/api/db/sports_detect').then(x=>x.ok?x.json():null).then(dt=>{
+        const t=document.getElementById('hb_detect'); if(!t) return;
+        if(!dt||!(dt.found||[]).length){ t.innerHTML='<tr><td class="note">신규 감지 없음</td></tr>'; return; }
+        {const e=document.getElementById('hb_det_asof'); if(e) e.textContent=`— 감시 ${dt.asof||''} · ${dt.found.length}건 감지 (월 1회 LLM 정밀조사로 정본 편입)`;}
+        t.innerHTML='<tr><th style="width:100px">대회일</th><th>대회명</th><th>장소</th><th>출처</th></tr>'+
+          dt.found.map(f=>`<tr><td><b>${E3(f.date)}</b></td><td>${E3(f.name)}</td><td class="note">${E3(f.place||'—')}</td><td class="note">${E3(f.src)}</td></tr>`).join('');
+      }).catch(()=>{});
       // 리스트 — 카테고리별 그룹
       const cats=[...new Set(_hbEv.map(e=>e.cat))];
       document.getElementById('hb_list').innerHTML=cats.map(c=>{
