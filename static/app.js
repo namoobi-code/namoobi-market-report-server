@@ -1309,15 +1309,37 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         if(window.Chart) new Chart(document.getElementById('tr_nv_cv'),{type:'line',
           data:{labels:NT.labels,datasets:Object.entries(NT.series).map(([n,v],i)=>({label:n,data:v,borderColor:cols[i%10],borderWidth:1.6,pointRadius:0,tension:.2}))},
           options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}}},scales:{x:{ticks:{maxTicksLimit:12}}}}}); }
-      // (2026-08-06) 인스타 주간 LLM 큐레이션 (trends_weekly_llm.json — /namoobi-search-trends 주 1회)
+      // (2026-08-06) 주간 LLM 리포트 (trends_weekly_llm.json — /namoobi-search-trends 주 1회)
+      //   구글·유튜브 주간 해설 + 네이버 장기 해석 + 인스타 큐레이션 + 시즌·연간 발표 체크
       fetch('/api/db/trends_weekly_llm').then(x=>x.ok?x.json():null).then(w=>{
-        const el=document.getElementById('tr_insta'); if(!el||!w) return;
-        {const e=document.getElementById('tr_ig_asof'); if(e) e.textContent=`— ${w.week||''} · 작성 ${w.asof||''} · 주 1회 갱신 (인스타는 공개 API 부재 — LLM 리서치)`;}
-        el.innerHTML=[w.kr,w.global].filter(Boolean).map(s=>`<div class="box">
-          <b style="font-size:13px">${E2(s.title)}</b>
-          <table style="margin-top:4px">${(s.items||[]).map(([t,d,u],i)=>
-            `<tr><td class="note" style="width:24px">${i+1}</td><td><b>${u?`<a href="${E2(u)}" target="_blank">${E2(t)} ↗</a>`:E2(t)}</b><div class="note" style="font-size:12px">${E2(d)}</div></td></tr>`).join('')}</table></div>`).join('')
+        if(!w) return;
+        {const e=document.getElementById('tr_ig_asof'); if(e) e.textContent=`— ${w.week||''} · 작성 ${w.asof||''} · 주 1회 갱신 · /namoobi-search-trends`;}
+        const itemTbl=(items)=>`<table style="margin-top:4px">${(items||[]).map(([t,d,u],i)=>
+          `<tr><td class="note" style="width:24px">${i+1}</td><td><b>${u?`<a href="${E2(u)}" target="_blank">${E2(t)} ↗</a>`:E2(t)}</b><div class="note" style="font-size:12px">${E2(d)}</div></td></tr>`).join('')}</table>`;
+        // ① 구글·유튜브 주간 해설(KR/US 4박스) + 네이버 장기 해석(1박스)
+        const wkEl=document.getElementById('tr_wkllm');
+        if(wkEl){
+          const boxes=[];
+          for(const [sec,flag] of [[w.google_wk,'구글'],[w.youtube_wk,'유튜브']]){
+            if(!sec) continue;
+            for(const [rk,lbl] of [['kr','🇰🇷 한국'],['us','🇺🇸 글로벌']]){
+              const s=sec[rk]; if(!s) continue;
+              boxes.push(`<div class="box"><b style="font-size:13px">${E2(sec.title)} — ${lbl}</b>
+                <div class="note" style="margin:2px 0 2px"><b>${E2(s.head||'')}</b></div>${itemTbl(s.items)}</div>`);
+            }
+          }
+          if(w.naver_long) boxes.push(`<div class="box" style="grid-column:1/-1"><b style="font-size:13px">${E2(w.naver_long.title)}</b>
+            <div class="note" style="margin:2px 0 2px"><b>${E2(w.naver_long.head||'')}</b></div>${itemTbl(w.naver_long.items)}</div>`);
+          wkEl.innerHTML=boxes.join('');
+        }
+        // ② 인스타 큐레이션
+        const el=document.getElementById('tr_insta');
+        if(el) el.innerHTML=[w.kr,w.global].filter(Boolean).map(s=>`<div class="box">
+          <b style="font-size:13px">${E2(s.title)}</b>${itemTbl(s.items)}</div>`).join('')
           +`<div class="note" style="grid-column:1/-1">출처: ${(w.sources||[]).map(([n,u])=>`<a href="${E2(u)}" target="_blank">${E2(n)}</a>`).join(' · ')}</div>`;
+        // ③ 시즌·연간 발표 체크 상태
+        {const e=document.getElementById('tr_season');
+         if(e&&w.season_check) e.textContent=`📚 시즌·연간 리포트 발표 체크 (${w.season_check.checked}): ${w.season_check.found}`;}
       }).catch(()=>{});
       // 연간·시즌 리포트 카드 (trends_annual.json — 연 1회 갱신)
       fetch('/api/db/trends_annual').then(x=>x.ok?x.json():null).then(an=>{
