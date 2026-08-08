@@ -1536,13 +1536,15 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     document.addEventListener('click',e=>{
       if(!e.target.closest('#'+o.q)&&!e.target.closest('#'+o.list)) list.style.display='none';});
     /* 원클릭 프리셋 — 자주 쓰는 조합을 버튼으로 */
-    if(o.preset&&o.presetEl&&$(o.presetEl)){
-      const el=$(o.presetEl);
-      el.innerHTML=o.preset.map(([lab,tip],i)=>
+    /* (2026-08-08) preset 이 없는 화면(주택 공급 등)에도 '비우기' 는 필요하다 →
+       presetEl 만 있으면 버튼 영역을 만든다. */
+    if(o.presetEl&&$(o.presetEl)){
+      const el=$(o.presetEl); const PS=o.preset||[];
+      el.innerHTML=PS.map(([lab,tip],i)=>
         `<button data-p="${i}" title="${E(tip)}" style="padding:3px 9px;font-size:11.5px;border:1px solid #b45309;color:#b45309;background:#fff;border-radius:6px;cursor:pointer">${E(lab)}</button>`).join('')
         +`<button data-clr="1" title="선택 비우기" style="padding:3px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff;color:#888">비우기</button>`;
       el.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
-        api.sel=o.preset[+b.dataset.p][2]().slice(0,MAX); api.sort(); drawChips(); o.onChange(api.sel);});
+        api.sel=PS[+b.dataset.p][2]().slice(0,MAX); api.sort(); drawChips(); o.onChange(api.sel);});
       el.querySelector('[data-clr]').onclick=()=>{api.sel=[]; drawChips(); o.onChange(api.sel);};
     }
     api.refresh=()=>drawChips();
@@ -1910,8 +1912,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const all=[...new Set(Object.values(S).flatMap(v=>Object.keys(v.r||{})))];
       {const e=$('ms_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 통계누리 · 지역 ${all.length}(미분양은 시군구까지)`;}
       _msSel=_msSel.filter(r=>all.includes(r)); if(!_msSel.length) _msSel=['전국'];
-      regionPicker({q:'ms_q',list:'ms_list',chips:'ms_chips',sel:_msSel,
-        all:()=>all, isSido:r=>RP_SIDO.has(r), onChange:s=>{_msSel=s; drawMolit();}});
+      const has=r=>all.includes(r);
+      regionPicker({q:'ms_q',list:'ms_list',chips:'ms_chips',sel:_msSel,presetEl:'ms_preset',
+        all:()=>all, isSido:r=>RP_SIDO.has(r), onChange:s=>{_msSel=s; drawMolit();},
+        preset:[['전국','전국 한 줄만 보기',()=>['전국'].filter(has)],
+                ['수도권','서울·경기·인천',()=>['서울','경기','인천'].filter(has)],
+                ['5대 광역시','부산·대구·광주·대전·울산',()=>['부산','대구','광주','대전','울산'].filter(has)],
+                ['전 시도','시도 전체 겹쳐보기',()=>all.filter(r=>RP_SIDO.has(r)&&r!=='전국')]]});
       const mbar=()=>{$('ms_mode').innerHTML=[['12m','12개월 누적'],['m','월별 원자료']].map(([k,l])=>`<button data-m="${k}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===_msMode?'#1f2937':'#fff'};color:${k===_msMode?'#fff':'#333'}">${l}</button>`).join('');
         $('ms_mode').querySelectorAll('button').forEach(b=>b.onclick=()=>{_msMode=b.dataset.m; mbar(); drawMolit();});};
       mbar(); drawMolit();
