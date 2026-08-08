@@ -1,6 +1,6 @@
 import json, time, urllib.request, os, re, sqlite3, zlib, sys
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
@@ -319,6 +319,70 @@ def disclosure_api(code: str):
         if len(_disc_cache) > 300:
             _disc_cache.clear()
         return out
+    except Exception as e:
+        return {"items": [], "err": repr(e)[:80]}
+
+
+_earn_cache = {}
+_cikmap_cache = {"at": 0, "m": {}}
+
+@app.get("/api/earn_dates/us/{sym}")
+def earn_dates_us(sym: str, days: int = 400):
+    """미국 종목의 **과거 실적발표일** 목록 — SEC EDGAR 8-K Item 2.02 접수일.
+
+    (2026-08-09) 차트에 1년치 발표일을 찍기 위해 신설.
+    Yahoo 는 '다음 발표 예정일' 하나와 분기 **말일**(quarter end)만 줄 뿐,
+    실제 발표일을 주지 않는다. 실적 8-K 의 접수일이 곧 발표일이므로 그걸 쓴다
+    (실측: PLTR 마감 6분 뒤 접수 — earnings_8k_watch.py 와 동일 근거).
+
+    ADR(TSM·ASML 등)은 8-K 대신 6-K 로 내므로 둘 다 본다. 6-K 는 Item 구분이 없어
+    실적 여부를 못 가리니, 6-K 는 분기당 1건씩만 남겨 소음을 줄인다.
+    캐시 12시간 — 과거 발표일은 바뀌지 않는다.
+    """
+    sym = (sym or "").upper()
+    if not re.fullmatch(r"[A-Z0-9.\-]{1,10}", sym):
+        raise HTTPException(400, "bad symbol")
+    now = time.time()
+    hit = _earn_cache.get(sym)
+    if hit and now - hit[0] < 43200:
+        return hit[1]
+    H = {"User-Agent": "namoobi research namoobi@gmail.com"}
+    def _get(u, t=20):
+        return urllib.request.urlopen(urllib.request.Request(u, headers=H), timeout=t).read()
+    try:
+        if now - _cikmap_cache["at"] > 604800 or not _cikmap_cache["m"]:
+            j = json.loads(_get("https://www.sec.gov/files/company_tickers.json", 30))
+            _cikmap_cache["m"] = {v["ticker"].upper(): str(v["cik_str"]) for v in j.values()}
+            _cikmap_cache["at"] = now
+        cik = _cikmap_cache["m"].get(sym)
+        if not cik:
+            return {"items": [], "note": "CIK 미매핑"}
+        j = json.loads(_get(f"https://data.sec.gov/submissions/CIK{int(cik):010d}.json", 30))
+        r = j.get("filings", {}).get("recent", {})
+        forms = r.get("form", []); items = r.get("items", [])
+        dates = r.get("filingDate", []); accs = r.get("accessionNumber", [])
+        cut = (datetime.now() - timedelta(days=max(30, min(days, 1200)))).strftime("%Y-%m-%d")
+        out, seen_q = [], set()
+        for i in range(len(accs)):
+            d = dates[i] if i < len(dates) else ""
+            if not d or d < cut:
+                continue
+            f = forms[i] if i < len(forms) else ""
+            it = (items[i] if i < len(items) else "") or ""
+            if f == "8-K" and "2.02" in it:
+                out.append({"d": d.replace("-", ""), "acc": accs[i], "f": "8-K"})
+            elif f == "6-K":
+                q = d[:4] + str((int(d[5:7]) - 1) // 3)      # 분기당 1건만
+                if q in seen_q:
+                    continue
+                seen_q.add(q)
+                out.append({"d": d.replace("-", ""), "acc": accs[i], "f": "6-K"})
+        out.sort(key=lambda x: x["d"])
+        res = {"items": out, "cik": cik}
+        _earn_cache[sym] = (now, res)
+        if len(_earn_cache) > 400:
+            _earn_cache.clear()
+        return res
     except Exception as e:
         return {"items": [], "err": repr(e)[:80]}
 

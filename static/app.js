@@ -4300,6 +4300,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
           + (D.ppo?' · ⏰ 당일 시간외단일가(16:00~18:00) 포함 — ETF는 NXT 미상장이라 프리·애프터 없음':'');
         loadInv(c);                               // 수급 패널은 별도 로드(차트를 막지 않음)
         loadDisc(c);                              // 공시 마커도 별도 로드
+        loadEarn(c);                              // 실적발표일 1년치(미국 · SEC 8-K)
         loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
   }
@@ -4753,6 +4754,9 @@ await _canvasFlow(c);
      같은 급등락이라도 실적 발표 직후냐 아니냐에 따라 해석이 완전히 달라지므로
      캔들 위에 '실' 배지를 찍고, 누르면 캘린더 팝업과 같은 한 줄 요약을 띄운다. */
   let _ESEL=null, _EHIT=[];
+  /* (2026-08-09) 미국은 과거 1년치 발표일을 SEC 8-K(Item 2.02) 접수일로 받는다.
+     Yahoo 는 '다음 예정일' 하나와 분기 말일만 줘서 과거 발표일을 알 수 없다. */
+  let _EDATES=null;
   /* (2026-07-21) 줌·팬 — 휠로 기간 확대/축소, 드래그로 좌우 이동.
      구조상 어렵지 않다: 지표는 이미 전체 시계열(full)로 계산한 뒤 표시 구간만 잘라 쓰므로,
      보이는 봉수(_CZ)와 뒤로 밀린 봉수(_COFF)만 바꾸면 MA·RSI·MACD·ADX 가 전부 그대로 맞는다.
@@ -5211,6 +5215,14 @@ await _canvasFlow(c);
   function drawAll(D){ _CD=D; _CHI=null; _DISC=null; _DSEL=null; _DHIT=[]; _ESEL=null; _EHIT=[];
     _CZ=CZ0; _COFF=0;                    // 종목이 바뀌면 기본 구간으로
     _bindChart(); _paint(); }
+  async function loadEarn(c){
+    _EDATES=null;
+    if(mkt!=='us') return;                  // 한국은 DART 잠정공시(최근 45일)를 이미 쓰고 있다
+    try{ const J=await (await fetch('/api/earn_dates/us/'+encodeURIComponent(c))).json();
+      if(dcode!==c) return;
+      _EDATES=(J.items||[]); _paint();
+    }catch(e){ _EDATES=null; }
+  }
   async function loadDisc(c){
     if(mkt!=='kr'){ _DISC=null; return; }
     try{ const J=await (await fetch('/api/disclosure/kr/'+encodeURIComponent(c))).json();
@@ -5375,8 +5387,20 @@ await _canvasFlow(c);
       const idx2={}; for(let i=0;i<N;i++) idx2[String(t[i]||'').replace(/-/g,'').slice(0,8)]=i;
       const ed8=String(rw.ed||'').replace(/-/g,'').slice(0,8);
       const marks=[];
-      if(rw.edl && idx2[rw.edl]!=null) marks.push({d:rw.edl, i:idx2[rw.edl], t:'실', col:'#1f9d55'});
-      if(ed8 && ed8!==rw.edl && idx2[ed8]!=null) marks.push({d:ed8, i:idx2[ed8], t:'예', col:'#7a869a'});
+      /* (2026-08-09) 미국은 SEC 8-K(Item 2.02) 접수일로 **과거 1년치**를 전부 찍는다.
+         한 종목의 급등락이 실적 때문인지 아닌지를 1년 흐름에서 한눈에 보기 위함이다.
+         한국은 DART 잠정공시 최근 45일치(edl)만 있어 1건이다. */
+      (_EDATES||[]).forEach(e=>{ if(idx2[e.d]!=null) marks.push({d:e.d, i:idx2[e.d], t:'실', col:'#1f9d55', acc:e.acc}); });
+      if(rw.edl && idx2[rw.edl]!=null && !marks.some(m=>m.d===rw.edl))
+        marks.push({d:rw.edl, i:idx2[rw.edl], t:'실', col:'#1f9d55'});
+      if(ed8 && idx2[ed8]!=null && !marks.some(m=>m.d===ed8))
+        marks.push({d:ed8, i:idx2[ed8], t:'예', col:'#7a869a'});
+      /* 각 발표일의 주가 반응은 **차트에 이미 있는 종가로 직접 계산**한다.
+         풀에는 최근 1건만 들어 있어서, 과거 발표분은 여기서 구해야 한다. */
+      const reactAt=(i)=>{ if(i<1) return {};
+        const base=c[i-1]; if(!base) return {};
+        const g=(k)=>(i+k<N&&c[i+k]!=null)?((c[i+k]/base-1)*100):null;
+        return {r1:g(0), r5:g(4), r20:g(19)}; };
       marks.forEach(m=>{ const mx=X(m.i), sel=(_ESEL===m.d);
         // 세로 가이드선 — 어느 봉이 발표일인지 한눈에
         x.save(); x.setLineDash(m.t==='예'?[3,3]:[]); x.strokeStyle=m.col; x.globalAlpha=sel?.55:.3;
@@ -5396,16 +5420,22 @@ await _canvasFlow(c);
         const rows=[];
         if(sm.t==='예'){ rows.push(['다음 실적발표 예정일','IR 공시 기준 — 확정 아님']); }
         else{
-          rows.push(['실적', (mkt==='us'?'EPS 서프 ':'영업이익 컨센比 ')+(pc(rw.spr)||'—')
-            + (rw.sprb!=null?`  (4분기 중 ${rw.sprb}회 상회)`:'')]);
-          const gp = rw.gap!=null?pc(rw.gap):null;
-          const cv = rw.cr30!=null?pc(rw.cr30*100):(rw.tprv!=null?pc(rw.tprv):null);
-          rows.push(['전망', (gp?`가이던스 ${gp} vs 컨센`:'가이던스 —')
-            + '   ' + (cv?`${mkt==='us'?'컨센 30일':'목표가 30일'} ${cv}`:'')]);
-          const rr=[]; if(rw.r1!=null) rr.push('D+1 '+pc(rw.r1));
-          if(rw.r5!=null) rr.push('D+5 '+pc(rw.r5));
-          if(rw.r20!=null) rr.push('D+20 '+pc(rw.r20));
+          // 서프·전망은 '최근 발표분'에만 값이 있다(풀에 1건). 과거 분기는 주가 반응만 보여준다.
+          const latest = (sm.d===rw.edl);
+          if(latest){
+            rows.push(['실적', (mkt==='us'?'EPS 서프 ':'영업이익 컨센比 ')+(pc(rw.spr)||'—')
+              + (rw.sprb!=null?`  (4분기 중 ${rw.sprb}회 상회)`:'')]);
+            const gp = rw.gap!=null?pc(rw.gap):null;
+            const cv = rw.cr30!=null?pc(rw.cr30*100):(rw.tprv!=null?pc(rw.tprv):null);
+            rows.push(['전망', (gp?`가이던스 ${gp} vs 컨센`:'가이던스 —')
+              + '   ' + (cv?`${mkt==='us'?'컨센 30일':'목표가 30일'} ${cv}`:'')]);
+          }
+          const rc = latest ? {r1:rw.r1, r5:rw.r5, r20:rw.r20} : reactAt(sm.i);
+          const rr=[]; if(rc.r1!=null) rr.push('D+1 '+pc(rc.r1));
+          if(rc.r5!=null) rr.push('D+5 '+pc(rc.r5));
+          if(rc.r20!=null) rr.push('D+20 '+pc(rc.r20));
           rows.push(['주가', rr.length?rr.join('   '):'집계 전']);
+          if(!latest) rows.push(['비고','과거 분기 — 서프라이즈·전망 수치는 최근 발표분만 보관']);
         }
         x.font='11px sans-serif';
         const head=`${sm.d.slice(0,4)}.${sm.d.slice(4,6)}.${sm.d.slice(6,8)} ${sm.t==='예'?'실적발표 예정':'실적발표'}`;
@@ -6238,10 +6268,13 @@ await _canvasFlow(c);
        증권사 목표주가 리비전으로 대신한다(같은 '전망이 올라갔나' 축). */
     if(mkt==='us'){ set('cr30',{min:2,max:null}); set('gap',{min:2,max:null}); }
     else            set('tprv',{min:3,max:null});
-    /* (2026-08-09) 어닝일 D+1~D+7 — **막 발표한 종목만**.
-       PEAD 는 발표 직후 수 주간의 현상이라 한 달 전 발표분까지 섞으면 신호가 희석된다.
-       ern 은 D-day 라 발표가 지난 종목이 음수다(D+7 = -7). */
-    set('ern',{min:-7,max:-1});
+    /* (2026-08-09) **막 발표한 종목만** — PEAD 는 발표 직후 수 주간의 현상이라
+       한 달 전 발표분까지 섞으면 신호가 희석된다.
+       미국은 Yahoo 어닝일(ern)이 촘촘해 그걸 쓰고(D-day 라 지난 발표가 음수),
+       한국은 IR 예정일 커버리지가 낮아 **실제 발표 감지일(edld)** 을 쓴다
+       — 서프라이즈·주가반응 값도 전부 이 감지일 기준이라 축이 맞는다. */
+    if(mkt==='us') set('ern',{min:-7,max:-1});
+    else           set('edld',{min:null,max:7});
     set('r1',{min:null,max:5});         // 그런데 주가는 아직 크게 안 올랐다 = 남은 여지
     set('cap',{min:mkt==='kr'?3000:2e9,max:null});
     sort={k:'spr',d:-1}; apply(); };}
@@ -6257,12 +6290,17 @@ await _canvasFlow(c);
          주가만 −3% 이상 빠진 경우 = 과잉 반응 의심 구간. */
     set('spr',{min:0,max:null});         // 실적: 컨센 상회
     set('sprb',{min:4,max:null});        // 실적: 최근 4분기 전부 상회(꾸준히 이기는 회사)
-    set('cr30',{min:0,max:null});        // 전망: 발표 후 추정치가 꺾이지 않음
-    set('gap',{min:0,max:null});         // 전망: 가이던스도 컨센 이상
-    /* (2026-08-09) 어닝일 D+1~D+7 — **막 발표한 종목만**.
-       PEAD 는 발표 직후 수 주간의 현상이라 한 달 전 발표분까지 섞으면 신호가 희석된다.
-       ern 은 D-day 라 발표가 지난 종목이 음수다(D+7 = -7). */
-    set('ern',{min:-7,max:-1});
+    /* 전망이 꺾이지 않았는지 — 미국은 이익추정 리비전+가이던스, 한국은 목표주가 리비전.
+       (한국은 cr30·gap 이 구조적으로 비어 있어 이 줄이 없으면 전망 축이 통째로 빠진다) */
+    if(mkt==='us'){ set('cr30',{min:0,max:null}); set('gap',{min:0,max:null}); }
+    else            set('tprv',{min:0,max:null});
+    /* (2026-08-09) **막 발표한 종목만** — PEAD 는 발표 직후 수 주간의 현상이라
+       한 달 전 발표분까지 섞으면 신호가 희석된다.
+       미국은 Yahoo 어닝일(ern)이 촘촘해 그걸 쓰고(D-day 라 지난 발표가 음수),
+       한국은 IR 예정일 커버리지가 낮아 **실제 발표 감지일(edld)** 을 쓴다
+       — 서프라이즈·주가반응 값도 전부 이 감지일 기준이라 축이 맞는다. */
+    if(mkt==='us') set('ern',{min:-7,max:-1});
+    else           set('edld',{min:null,max:7});
     set('r1',{min:null,max:-3});         // 그런데 주가는 하락 → 과잉 반응 의심
     set('cap',{min:mkt==='kr'?3000:2e9,max:null});
     sort={k:'r1',d:1}; apply(); };}
