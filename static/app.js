@@ -1253,6 +1253,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       x.fillStyle='rgba(230,140,0,0.07)'; x.fillRect(x0,P.t,(W-P.r)-x0,H-P.t-P.b);
       x.save(); x.setLineDash([3,3]); x.strokeStyle='#e08e3c'; x.beginPath(); x.moveTo(x0,P.t); x.lineTo(x0,H-P.b); x.stroke(); x.restore();
       x.fillStyle='#c47b1e'; x.fillText('⚠ 잠정(신고 진행 중)',x0+3,P.t+10); }
+    /* (2026-08-08) 순위 기준월 표식 — 어느 점으로 줄 세웠는지 안 보이면
+       잠정 구간의 값을 보고 "순위가 틀렸다"고 오해하게 된다. */
+    if(opts&&opts.refIdx!=null&&opts.refIdx>=0&&opts.refIdx<N){
+      const xr=X(opts.refIdx);
+      x.save(); x.setLineDash([2,3]); x.strokeStyle='#1f2937'; x.globalAlpha=.55;
+      x.beginPath(); x.moveTo(xr,P.t); x.lineTo(xr,H-P.b); x.stroke(); x.restore();
+      x.fillStyle='#1f2937'; x.fillText('▲순위 기준',xr-24,H-P.b+ -2); }
     const t0=arr[0].t;                                  // X축 눈금 — 연간(YYYY)·월간(YYYYMM) 모두 지원
     x.fillStyle='#98a2ad';
     for(let i=0;i<t0.length;i++){ const s=String(t0[i]);
@@ -1787,6 +1794,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const i=ts.findIndex(t=>t>=cut);
     return i>0?i:null;
   }
+  function refIdxOf(){                       // 순위 기준월의 인덱스(차트 표식용)
+    const T=(_etD||{}).types||{}; const S=T[_etKind]; if(!S) return -1;
+    const d2=new Date(); d2.setMonth(d2.getMonth()-2);
+    const cut=`${d2.getFullYear()}${String(d2.getMonth()+1).padStart(2,'0')}`;
+    const V=S[_etMet]||{};
+    for(let i=S.t.length-1;i>=0;i--)
+      if(S.t[i]<=cut && Object.values(V).some(v=>v&&v[i]!=null)){ _etRef=S.t[i]; return i; }
+    return -1;}
   function drawEtc(){
     if(!_etD) return; const T=_etD.types||{};
     /* (2026-08-08) '비우기' 후 이전 그림이 남던 버그 — 선택이 비면 세 캔버스를 모두 지운다 */
@@ -1805,7 +1820,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     /* ① 선택 유형을 지역별로 겹쳐보기 (유형 전환은 버튼으로) */
     {const s=T[_etKind];
      const L=s?_etSel.map((r,i)=>(s[_etMet]&&s[_etMet][r])?{t:s.t,v:s[_etMet][r],label:r,color:RP_PAL[i%RP_PAL.length]}:null).filter(Boolean):[];
-     if(L.length){ line('et_main',L,{provIdx:_provRT(L[0].t),hi:_etHi});
+     if(L.length){ line('et_main',L,{provIdx:_provRT(L[0].t),hi:_etHi,refIdx:refIdxOf()});
        const last=a=>{for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null;};
        $('et_main_n').innerHTML=
          `<b>${kindLab}</b> · ${_etMet==='n'?'월별 <b>거래 건수</b>':'월별 <b>평균 거래가</b>(억원)'} · 지역 겹쳐보기(최대 30)`
@@ -2260,7 +2275,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            if(!arr.length){ const cvb=$('re_rt_big'); cvb.getContext('2d').clearRect(0,0,cvb.width,cvb.height);
              $('re_rt_big_n').innerHTML='선택 지역엔 이 지표 데이터가 없습니다 — 다음 수집(매일 07:20) 후 시도 전체 중위가(근사)가 채워집니다'; return; }
            _bigArr=arr;                       // 차트 hover 로 근접 계열을 찾기 위해 보관
-           line('re_rt_big',arr,{provIdx,hi:hiLab});
+           const rIdx=(()=>{const t=refYm(); return t?ts.indexOf(t):-1;})();
+           line('re_rt_big',arr,{provIdx,hi:hiLab,refIdx:rIdx});
            /* 차트 hover ↔ 칩 강조를 양방향으로 — 선을 짚으면 그 지역 칩이 켜진다 */
            $('re_cmp_chips').querySelectorAll('[data-hi]').forEach(el=>{
              const on=hiLab&&el.dataset.hi.replace(/\(.*\)/,'')===hiLab;
