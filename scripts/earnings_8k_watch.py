@@ -12,7 +12,7 @@
       이후 야후 수집기가 EPS 수치를 채우면 태그는 유지된다.
 cron: * 5-8 * * 2-6 · * 19-22 * * 1-5 (flock)
 """
-import json, re, urllib.request
+import html as _html, json, re, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -51,6 +51,144 @@ def items_of(cik, accno):
     except Exception:
         pass
     return ""
+
+# ── (2026-08-09) 가이던스 파싱 ─────────────────────────────────────────────
+#  8-K Item 2.02 에 첨부되는 Exhibit 99.1(실적 보도자료) 본문에는 회사가 직접 제시한
+#  **다음 분기 전망(가이던스)** 이 들어 있다. 실적 자체보다 이 숫자가 주가를 더 흔든다
+#  (샌디스크: EPS 는 컨센 상회했는데 가이던스가 기대에 못 미쳐 시간외 -5%).
+#
+#  이것이 "주가가 움직이기 전"에 알 수 있는 **유일한** 경로다 — 애널리스트 컨센서스
+#  리비전은 아무리 빨라도 다음 날에나 나온다.
+#
+#  한계(정직하게): 문장 형식이 회사마다 제각각이라 정규식이 다 잡지는 못한다.
+#  못 잡으면 조용히 건너뛴다 — 틀린 숫자를 보여주는 것보다 안 보여주는 편이 낫다.
+_MULT = {"billion": 1e9, "bn": 1e9, "b": 1e9, "million": 1e6, "mm": 1e6, "m": 1e6}
+_NUM = r"\$?\s?([\d,]+(?:\.\d+)?)\s*(billion|million|bn|mm|b|m)?"
+
+def _to_num(v, unit, hint=None):
+    try:
+        x = float(v.replace(",", ""))
+    except Exception:
+        return None
+    u = (unit or "").lower()
+    if u in _MULT:
+        return x * _MULT[u]
+    return x * (_MULT[hint] if hint in _MULT else 1)
+
+def exhibit_text(cik, accno):
+    """8-K 첨부 중 **실적 보도자료** 본문 → 태그 제거한 평문.
+
+    파일명 규칙이 회사마다 다르다(실측):
+      MU   a2026q3ex991-pressrelease.htm   ← 'ex99' 포함
+      NVDA q1fy27pr.htm                    ← 'ex99' 없음. 'pr'(press release)
+    → ①ex99 ②pressrelease/pr/earnings ③그래도 없으면 '본문 htm 중 가장 큰 것'(주 8-K 문서·
+      R*.htm 같은 XBRL 렌더링 파일은 제외) 순으로 고른다.
+    """
+    an = accno.replace("-", "")
+    try:
+        idx = json.loads(get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/index.json"))
+        items = idx.get("directory", {}).get("item", [])
+    except Exception:
+        return ""
+    htm = [i for i in items if str(i.get("name", "")).lower().endswith((".htm", ".html", ".txt"))]
+    def pick():
+        for pat in (r"ex-?99", r"press.?release", r"(^|[^a-z])pr\.htm", r"earnings"):
+            c = [i for i in htm if re.search(pat, i.get("name", ""), re.I)]
+            if c:
+                return max(c, key=lambda i: int(i.get("size") or 0))["name"]
+        c = [i for i in htm
+             if not re.match(r"(R\d+|FilingSummary|MetaLinks)", i.get("name", ""), re.I)
+             and not re.search(r"index|\.txt$|-\d{8}\.htm$", i.get("name", ""), re.I)]
+        return max(c, key=lambda i: int(i.get("size") or 0))["name"] if c else None
+    name = pick()
+    if not name:
+        return ""
+    try:
+        raw = get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/{name}", timeout=30)
+    except Exception:
+        return ""
+    t = raw.decode("utf-8", "ignore")
+    t = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", t, flags=re.S | re.I)
+    t = re.sub(r"<[^>]+>", " ", t)
+    t = _html.unescape(t)                       # &#177;→± &#8217;→' 등 일괄 해제
+    t = t.replace("\u2013", "-").replace("\u2014", "-")
+    return re.sub(r"\s+", " ", t)
+
+
+def parse_guidance(txt):
+    """보도자료 평문 → {rev_lo, rev_hi, eps_lo, eps_hi}. 못 잡으면 빈 dict.
+
+    실측한 세 가지 표기를 모두 지원한다.
+      범위형  SNDK "revenue of $10.3 billion to $10.8 billion"
+      ±형     MU   "Revenue $50.0 billion ± $1.0 billion" (표 안, 문장 아님)
+      근사형        "revenue of approximately $10.5 billion"
+    '전망'을 말하는 구간만 본다(expect/guidance/outlook/anticipate) — 과거 실적 서술을
+    잡으면 완전히 틀린 숫자가 나온다.
+    """
+    out = {}
+    sents = re.split(r"(?<=[.;])\s+", txt)
+    lead = [x for x in sents
+            if re.search(r"\b(expect|expects|guidance|outlook|anticipat|forecast|project)", x, re.I)]
+
+    def grab(seg, label_re, is_eps):
+        m = re.search(label_re + r"[^$%]{0,80}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM, seg, re.I)
+        if m:
+            hint = (m.group(4) or m.group(2) or "").lower()
+            return _to_num(m.group(1), m.group(2), hint), _to_num(m.group(3), m.group(4), hint)
+        # ± 금액형 — MU "Revenue $50.0 billion ± $1.0 billion"
+        m = re.search(label_re + r"[^$%]{0,80}?" + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM, seg, re.I)
+        if m:
+            hint = (m.group(2) or m.group(4) or "").lower()
+            c, d = _to_num(m.group(1), m.group(2), hint), _to_num(m.group(3), m.group(4), hint)
+            if c is not None and d is not None:
+                return c - d, c + d
+        # ± 퍼센트형 — NVDA "revenue is expected to be $45.0 billion, plus or minus 2%"
+        m = re.search(label_re + r"[^$]{0,80}?" + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%", seg, re.I)
+        if m:
+            c = _to_num(m.group(1), m.group(2))
+            try:
+                pc = float(m.group(3)) / 100
+            except Exception:
+                pc = None
+            if c is not None and pc is not None:
+                return c * (1 - pc), c * (1 + pc)
+        m = re.search(label_re + r"[^$%]{0,80}?(?:approximately|about|around)\s*" + _NUM, seg, re.I)
+        if m:
+            a = _to_num(m.group(1), m.group(2))
+            return a, a
+        return None, None
+
+    for s_ in lead[:80]:
+        if "rev_lo" not in out:
+            a, b = grab(s_, r"(?:revenue|net sales)", False)
+            # 분기 가이던스 폭은 보통 ±5% 안쪽이다. 상·하단이 1.6배를 넘으면 연간 전망이나
+            # 무관한 숫자를 잘못 물린 것(실측 DELL: $27B~$60B) → 버린다.
+            if a and b and a <= b and a > 1e5 and b / a < 1.6:
+                out["rev_lo"], out["rev_hi"] = a, b
+        if "eps_lo" not in out:
+            a, b = grab(s_, r"(?:diluted )?earnings per share|\beps\b", True)
+            if a is not None and b is not None and -100 < a <= b < 1000:
+                out["eps_lo"], out["eps_hi"] = round(a, 2), round(b, 2)
+    return out
+
+
+def guidance_gap(sym, g, pool_us):
+    """가이던스 중간값 vs 애널리스트 컨센서스(다음 분기) → 갭%.
+
+    컨센서스는 screener_pool 의 rq1(매출)·eq1(EPS) — Yahoo earningsTrend '+1q' 값이다.
+    """
+    r = pool_us.get(sym) or {}
+    out = {}
+    if g.get("rev_lo") and r.get("rq1"):
+        mid = (g["rev_lo"] + g["rev_hi"]) / 2
+        out["g_rev"] = round(mid / 1e6, 1)                  # 백만 달러
+        out["g_rev_gap"] = round((mid / r["rq1"] - 1) * 100, 1)
+    if g.get("eps_lo") and r.get("eq1"):
+        mid = (g["eps_lo"] + g["eps_hi"]) / 2
+        out["g_eps"] = round(mid, 2)
+        out["g_eps_gap"] = round((mid / r["eq1"] - 1) * 100, 1)
+    return out
+
 
 def main():
     # (2026-08-05) 전 종목 감시로 확장 — 피드 1콜/분이라 종목 수와 무관(사용자 확인).
@@ -108,19 +246,30 @@ def main():
         if ft == "8-K" and not is_core and not is_ern:
             continue                                   # 비핵심은 실적(2.02) 8-K 만 기록
         tag = f"📄 {ft}{'(실적)' if is_ern else ''} 접수 {et.strftime('%H:%M')}ET"
+        gd = {}
+        if is_ern:                                   # 실적 8-K 만 보도자료를 열어 가이던스 확인
+            try:
+                gd = guidance_gap(sym, parse_guidance(exhibit_text(cik, ac.group(1))), pool_us)
+            except Exception:
+                gd = {}
+            if gd.get("g_rev_gap") is not None:
+                tag += f" · 가이던스 매출 컨센 대비 {gd['g_rev_gap']:+.1f}%"
+            elif gd.get("g_eps_gap") is not None:
+                tag += f" · 가이던스 EPS 컨센 대비 {gd['g_eps_gap']:+.1f}%"
         lst = days.setdefault(d8, [])
         cur = next((z for z in lst if z["c"] == sym), None)
         if cur:
             if not any("K" in t and "접수" in t for t in cur.get("tags") or []):
                 cur.setdefault("tags", []).insert(0, tag)
                 cur["acc"] = ac.group(1); cur["cik"] = cik
+                cur.update(gd)                      # 가이던스 갭 필드(g_rev·g_rev_gap·g_eps·g_eps_gap)
                 if is_core: cur["core"] = 1
                 new += 1
         else:
             r = pool_us.get(sym) or {}
             it2 = {"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
                    "eps": None, "est": None, "spr": None, "tags": [tag],
-                   "acc": ac.group(1), "cik": cik, "t": datetime.now().strftime("%H:%M")}
+                   "acc": ac.group(1), "cik": cik, "t": datetime.now().strftime("%H:%M"), **gd}
             if is_core: it2["core"] = 1
             lst.append(it2)
             new += 1
