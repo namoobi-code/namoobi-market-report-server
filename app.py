@@ -1464,21 +1464,64 @@ def _aptcx():
     cx.row_factory = sqlite3.Row
     return cx
 
+SGG2 = {"11": "서울", "26": "부산", "27": "대구", "28": "인천", "29": "광주", "30": "대전",
+        "31": "울산", "36": "세종", "41": "경기", "43": "충북", "44": "충남", "46": "전남",
+        "47": "경북", "48": "경남", "50": "제주", "51": "강원", "52": "전북"}
+
 @app.get("/api/apt/search")
-def apt_search(q: str, n: int = 30):
-    """단지명 자동완성 — 거래건수 많은 순. q 는 2자 이상."""
+def apt_search(q: str = "", region: str = "", n: int = 30):
+    """단지 검색 — 단지명(q)과 지역(region)을 함께 쓸 수 있다.
+
+    (2026-08-08) 지역만으로도 훑을 수 있게 확장. region 은 '서울'(시도) 또는
+    '서울 강남구'(시군구) 또는 법정동('역삼동') 어느 쪽이든 받는다.
+    """
     q = (q or "").strip()
-    if len(q) < 2:
+    region = (region or "").strip()
+    if len(q) < 2 and not region:
         return {"rows": []}
+    esc = lambda s: s.replace("%", chr(92) + "%").replace("_", chr(92) + "_")
+    where, args = [], []
+    if len(q) >= 2:
+        where.append("a.name LIKE ? ESCAPE '\\'"); args.append(f"%{esc(q)}%")
+    if region:
+        # 시도명이면 코드 prefix 로, 그 외엔 법정동/시군구명으로 매칭
+        pre = [k for k, v in SGG2.items() if v == region]
+        if pre:
+            where.append("substr(a.sgg,1,2)=?"); args.append(pre[0])
+        else:
+            t = region.split()
+            if len(t) > 1 and t[0] in SGG2.values():        # '경기 화성시' → 시도 + 나머지
+                p2 = [k for k, v in SGG2.items() if v == t[0]]
+                where.append("substr(a.sgg,1,2)=?"); args.append(p2[0])
+                region = " ".join(t[1:])
+            where.append("a.umd LIKE ? ESCAPE '\\'"); args.append(f"%{esc(region)}%")
+    args += [q, max(1, min(n, 200))]
     with _aptcx() as cx:
         rows = cx.execute(
-            """SELECT a.id, a.name, a.umd, a.sgg, a.build_year,
-                      (SELECT COUNT(*) FROM sale s WHERE s.apt_id=a.id) AS ns,
-                      (SELECT MAX(ym)   FROM sale s WHERE s.apt_id=a.id) AS last
-               FROM apt a WHERE a.name LIKE ? ESCAPE '\\'
-               ORDER BY (a.name = ?) DESC, ns DESC LIMIT ?""",
-            (f"%{q.replace('%', chr(92) + '%').replace('_', chr(92) + '_')}%", q, max(1, min(n, 100)))).fetchall()
+            f"""SELECT a.id, a.name, a.umd, a.sgg, a.build_year,
+                       (SELECT COUNT(*) FROM sale s WHERE s.apt_id=a.id) AS ns,
+                       (SELECT MAX(ym)   FROM sale s WHERE s.apt_id=a.id) AS last
+                FROM apt a WHERE {' AND '.join(where)}
+                ORDER BY (a.name = ?) DESC, ns DESC LIMIT ?""", args).fetchall()
     return {"rows": [dict(r) for r in rows]}
+
+@app.get("/api/apt/regions")
+def apt_regions():
+    """단지 DB 에 실제로 있는 지역 목록 — 지역 선택기용 (시도 / 시도+법정동)."""
+    with _aptcx() as cx:
+        rows = cx.execute(
+            "SELECT sgg, umd, COUNT(*) n FROM apt GROUP BY sgg, umd HAVING n>0").fetchall()
+    sido, dong = {}, {}
+    for r in rows:
+        sd = SGG2.get(str(r["sgg"])[:2])
+        if not sd:
+            continue
+        sido[sd] = sido.get(sd, 0) + r["n"]
+        if r["umd"]:
+            k = f"{sd} {r['umd']}"
+            dong[k] = dong.get(k, 0) + r["n"]
+    return {"sido": [{"r": k, "n": v} for k, v in sorted(sido.items(), key=lambda x: -x[1])],
+            "dong": [{"r": k, "n": v} for k, v in sorted(dong.items(), key=lambda x: -x[1])[:3000]]}
 
 @app.get("/api/apt/series")
 def apt_series(id: int, ar: int = 0):

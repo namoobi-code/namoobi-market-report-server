@@ -1628,6 +1628,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       mb(); kb(); drawEtc();
     }).catch(()=>{});
   }
+  /* 실거래는 신고기한 30일 → 최근 2개월은 아직 덜 들어온 '잠정' 구간이다.
+     line() 의 provIdx 로 주황 음영을 넣어 눈으로 구분되게 한다. */
+  function _provRT(ts){
+    const d=new Date(); d.setMonth(d.getMonth()-1);
+    const cut=`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}`;
+    const i=ts.findIndex(t=>t>=cut);
+    return i>0?i:null;
+  }
   function drawEtc(){
     if(!_etD) return; const T=_etD.types||{};
     const K=n=>n==null?'—':(_etMet==='n'?Math.round(n).toLocaleString():n.toFixed(2)+'억');
@@ -1636,7 +1644,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     /* ① 선택 유형을 지역별로 겹쳐보기 (유형 전환은 버튼으로) */
     {const s=T[_etKind];
      const L=s?_etSel.map((r,i)=>(s[_etMet]&&s[_etMet][r])?{t:s.t,v:s[_etMet][r],label:r,color:RP_PAL[i%RP_PAL.length]}:null).filter(Boolean):[];
-     if(L.length){ line('et_main',L);
+     if(L.length){ line('et_main',L,{provIdx:_provRT(L[0].t)});
        const last=a=>{for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null;};
        $('et_main_n').innerHTML=
          `<b>${kindLab}</b> · ${_etMet==='n'?'월별 <b>거래 건수</b>':'월별 <b>평균 거래가</b>(억원)'} · 지역 겹쳐보기(최대 12)`
@@ -1647,7 +1655,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     {const s=T.offi_r; const R=_etSel;
      if(s&&s.conv){
        const L=R.map((r,i)=>s.conv[r]?{t:s.t,v:s.conv[r],label:r,color:RP_PAL[i%RP_PAL.length]}:null).filter(Boolean);
-       if(L.length){ line('et_conv',L);
+       if(L.length){ line('et_conv',L,{provIdx:_provRT(L[0].t)});
          const l=(a)=>{for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return a.v[i]; return null;};
          $('et_conv_n').innerHTML=L.map(a=>`<b style="color:${a.color}">${a.label}</b> ${l(a)!=null?l(a).toFixed(2)+'%':'—'}`).join(' · ')
            +` — 전세를 월세로 바꿀 때 적용되는 이율. 높을수록 <b>월세가 비싸다</b>.`
@@ -1657,7 +1665,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
        const r0=R[0];
        if(s.n[r0]&&s.wol_n[r0]){
          line('et_jw',[{t:s.t,v:s.n[r0],label:'전세',color:'#2f6fed'},
-                       {t:s.t,v:s.wol_n[r0],label:'월세',color:'#e08e3c'}]);
+                       {t:s.t,v:s.wol_n[r0],label:'월세',color:'#e08e3c'}],{provIdx:_provRT(s.t)});
          const je=s.n[r0], wo=s.wol_n[r0];
          let i=je.length-1; while(i>=0&&(je[i]==null&&wo[i]==null)) i--;
          const rt=(i>=0&&(je[i]||0)+(wo[i]||0))?((wo[i]||0)/((je[i]||0)+(wo[i]||0))*100):null;
@@ -1696,6 +1704,16 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(s.r[sd]) return {t:s.t, v:s.r[sd], label:s.label, unit:s.unit, note:s.note, reg:sd, fb:r};
     return null;
   }
+  /* 통계누리는 최근 몇 달을 "2026-06 p)" 처럼 잠정치로 낸다. 수집기가 그 시작월을
+     series.prov 로 저장해 두었으니, 여러 계열 중 가장 이른 잠정 시작점을 음영 기준으로 쓴다. */
+  function _msProv(ts, keys){
+    const S=_msD.series||{};
+    let p=null;
+    keys.forEach(k=>{const v=S[k]&&S[k].prov; if(v&&(p===null||v<p)) p=v;});
+    if(!p) return null;
+    const i=ts.indexOf(p);
+    return i>0?i:null;
+  }
   function _ms12(t,v){                         // 12개월 이동합(직전 12개월 전부 있어야 값)
     return v.map((_,i)=>{ if(i<11) return null;
       let s=0; for(let j=i-11;j<=i;j++){ if(v[j]==null) return null; s+=v[j]; } return s; });
@@ -1718,7 +1736,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      if(L.length){ const A=_msAlign(b?[...L,b]:L);
        const arr=L.map(a=>({t:A.ts,v:A.map(a),label:a.label,color:a.color}));
        if(b) arr.push({t:A.ts,v:A.map(b),label:'준공후',color:'#7c2d12'});
-       line('ms_unsold',arr);
+       line('ms_unsold',arr,{provIdx:_msProv(A.ts,['unsold','unsold_done'])});
        const lv=x=>{ if(!x) return null; for(let i=x.v.length-1;i>=0;i--) if(x.v[i]!=null) return {ym:x.t[i],v:x.v[i]}; return null; };
        const lb=lv(b);
        const a0=L[0], la=lv(a0);
@@ -1736,7 +1754,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
        const CO={'주택 인허가':'#2f6fed','주택 착공':'#e08e3c','주택 준공':'#27ae60'};
        const arr=P.map(p=>{ const v=A.map(p); return {t:A.ts, v:_msMode==='12m'?_ms12(A.ts,v):v,
                                                      label:p.label.replace('주택 ',''), color:CO[p.label]||'#64748b'}; });
-       line('ms_pipe',arr);
+       line('ms_pipe',arr,{provIdx:_msProv(A.ts,['permit','start','done'])});
        const last=a=>{ for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null; };
        const yoy=a=>{ const l=last(a); if(!l) return null; const i=a.t.indexOf(l.ym), j=i-12;
          return (j>=0&&a.v[j])?((l.v/a.v[j]-1)*100):null; };
@@ -1757,7 +1775,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
        let cutI=-1; for(let i=A.length-1;i>=0;i--) if(A[i]!=null){cutI=i;break;}
        const act=j12.map((v,i)=>i<=cutI?v:null), prj=j12.map((v,i)=>i>=cutI?v:null);
        line('ms_move',[{t:m.t,v:act,label:'확정',color:'#27ae60'},
-                       {t:m.t,v:prj,label:'추정',color:'#e08e3c'}]);
+                       {t:m.t,v:prj,label:'추정',color:'#e08e3c'}],{provIdx:cutI>0?cutI:null});
        const lastOf=v=>{for(let i=v.length-1;i>=0;i--) if(v[i]!=null) return {i,v:v[i]}; return null;};
        const la=lastOf(act), lp=lastOf(prj);
        const K=n=>Math.round(n).toLocaleString();
@@ -1776,7 +1794,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   /* ── (2026-08-08) 🏢 아파트 단지별 실거래 — /api/apt/* (apt.sqlite)
      매매·전세·월세를 한 단지 기준으로 겹쳐 본다. 면적(전용 m²)별로 분리해야
      평균이 의미를 갖기 때문에 면적 선택을 필수로 두고, 거래 최다 면적을 기본값으로 잡는다. ── */
-  let _apInit=false, _apAr=0, _apId=0;
+  let _apInit=false, _apAr=0, _apId=0, _apReg="";
   function initApt(){
     if(_apInit) return; _apInit=true;
     const E4=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -1786,8 +1804,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     let tmr=null;
     const search=()=>{
       const kw=(q.value||'').trim();
-      if(kw.length<2){ list.style.display='none'; return; }
-      fetch('/api/apt/search?q='+encodeURIComponent(kw)).then(r=>r.ok?r.json():null).then(d=>{
+      // 단지명 2자 이상 또는 지역이 지정돼 있으면 조회(둘 다 주면 AND 로 좁힌다)
+      if(kw.length<2&&!_apReg){ list.style.display='none'; return; }
+      fetch(`/api/apt/search?q=${encodeURIComponent(kw)}&region=${encodeURIComponent(_apReg)}&n=60`)
+        .then(r=>r.ok?r.json():null).then(d=>{
         const rows=(d&&d.rows)||[];
         list.innerHTML=rows.length?rows.map(r=>
           `<div data-id="${r.id}" style="padding:6px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">
@@ -1801,6 +1821,30 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     q.oninput=()=>{ clearTimeout(tmr); tmr=setTimeout(search,220); };
     q.onfocus=search;
     document.addEventListener('click',e=>{ if(!e.target.closest('#ap_q')&&!e.target.closest('#ap_list')) list.style.display='none'; });
+
+    /* (2026-08-08) 지역으로도 찾기 — 단지명을 몰라도 동네를 골라 훑을 수 있게.
+       고른 지역은 칩으로 남고, 단지명 검색과 AND 로 함께 걸린다. */
+    const rq=$('ap_rq'), rlist=$('ap_rlist'), rcur=$('ap_rcur');
+    let REG={sido:[],dong:[]}, tmr2=null;
+    const showReg=()=>{
+      const kw=(rq.value||'').trim();
+      const cand=[...REG.sido.filter(x=>!kw||x.r.includes(kw)),
+                  ...REG.dong.filter(x=>!kw||x.r.includes(kw))].slice(0,60);
+      rlist.innerHTML=cand.length?cand.map(x=>
+        `<div data-r="${E4(x.r)}" style="padding:5px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">${x.r.includes(' ')?'':'★ '}${E4(x.r)} <span class="note">${x.n}곳</span></div>`).join('')
+        : '<div style="padding:6px 10px" class="note">없음 — 수집이 끝난 지역만 나옵니다</div>';
+      rlist.style.display='';
+      rlist.querySelectorAll('[data-r]').forEach(el=>el.onclick=()=>{
+        _apReg=el.dataset.r; rq.value=''; rlist.style.display='none'; drawRcur(); search();});};
+    const drawRcur=()=>{rcur.innerHTML=_apReg
+      ? `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 8px;font-size:12px;border-radius:10px;background:#1f293718;border:1px solid #1f2937"><b>📍</b>${E4(_apReg)}<b data-clr="1" style="cursor:pointer;color:#888">✕</b></span>`
+      : '';
+      const x=rcur.querySelector('[data-clr]'); if(x) x.onclick=()=>{_apReg=''; drawRcur(); search();};};
+    rq.oninput=()=>{ clearTimeout(tmr2); tmr2=setTimeout(showReg,200); };
+    rq.onfocus=showReg;
+    document.addEventListener('click',e=>{ if(!e.target.closest('#ap_rq')&&!e.target.closest('#ap_rlist')) rlist.style.display='none'; });
+    fetch('/api/apt/regions').then(r=>r.ok?r.json():null).then(d=>{ if(d) REG=d; }).catch(()=>{});
+    drawRcur();
 
     function loadApt(id){
       _apId=id;

@@ -845,9 +845,14 @@
         <b style="font-size:13px">🏢 아파트 단지별 실거래 <span class="note">(단지명을 입력해 매매·전세·월세를 한 화면에서 · 국토부 실거래 신고 원본)</span></b>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
           <span style="position:relative">
-            <input type="text" id="ap_q" placeholder="🔎 단지명 2자 이상 (예: 도곡렉슬, 은마, 헬리오시티)" style="width:320px;padding:5px 9px;font-size:12.5px;border:1px solid #d7dce3;border-radius:6px">
+            <input type="text" id="ap_q" placeholder="🔎 단지명 2자 이상 (예: 도곡렉슬, 은마, 헬리오시티)" style="width:300px;padding:5px 9px;font-size:12.5px;border:1px solid #d7dce3;border-radius:6px">
             <div id="ap_list" style="display:none;position:absolute;top:30px;left:0;z-index:30;background:#fff;border:1px solid #d7dce3;border-radius:6px;max-height:300px;overflow:auto;min-width:340px;box-shadow:0 4px 14px rgba(0,0,0,.12)"></div>
           </span>
+          <span style="position:relative">
+            <input type="text" id="ap_rq" placeholder="📍 지역으로 찾기 (예: 서울, 대치동, 분당)" style="width:250px;padding:5px 9px;font-size:12.5px;border:1px solid #d7dce3;border-radius:6px">
+            <div id="ap_rlist" style="display:none;position:absolute;top:30px;left:0;z-index:30;background:#fff;border:1px solid #d7dce3;border-radius:6px;max-height:300px;overflow:auto;min-width:280px;box-shadow:0 4px 14px rgba(0,0,0,.12)"></div>
+          </span>
+          <span id="ap_rcur"></span>
           <span id="ap_ars" style="display:inline-flex;gap:4px;flex-wrap:wrap"></span>
         </div>
         <div id="ap_head" class="note" style="margin:2px 0 6px;line-height:1.6"></div>
@@ -1550,8 +1555,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260808h"></script>
-<script src="/etf.js?v=20260808h"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260808j"></script>
+<script src="/etf.js?v=20260808j"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
