@@ -15,9 +15,15 @@ flock -n 9 || { echo "이미 실행 중 — 중복 기동 중단"; exit 0; }
 pkill -f "scripts/rtms.py --backfill" 2>/dev/null
 pkill -f "scripts/rtms_etc.py"       2>/dev/null
 sleep 3
-# 비아파트를 먼저 한 바퀴 — 36개월 × 5종이라 짧고, 단지 검색이 바로 살아난다.
-echo "=== [pre] $(date '+%F %T') 비아파트 선행 ===" >> logs/rtms_etc.log
-python3 -u scripts/rtms_etc.py --months 36 --sleep 0.5 --budget 20000 >> logs/rtms_etc.log 2>&1
+# (2026-08-08) 비아파트 선행 — **얕고 넓게 먼저**.
+#   36개월×6종 = 지역당 216콜이라 246개 시군구를 한 바퀴 도는 데만 수 시간이 걸리고,
+#   그동안 경기·인천은 화면에 아예 안 나온다("경기 왜 없냐"의 원인).
+#   → 1차는 12개월(지역당 72콜)로 전국을 빠르게 채워 검색부터 살리고,
+#     2차에서 36개월로 넓힌다. done 표식이 (kind,sgg,ym) 단위라 2차는 빠진 24개월만 받는다.
+echo "=== [pre1] $(date '+%F %T') 비아파트 12개월 전국 ===" >> logs/rtms_etc.log
+python3 -u scripts/rtms_etc.py --months 12 --sleep 0.35 --budget 40000 >> logs/rtms_etc.log 2>&1
+echo "=== [pre2] $(date '+%F %T') 비아파트 36개월 확장 ===" >> logs/rtms_etc.log
+python3 -u scripts/rtms_etc.py --months 36 --sleep 0.5  --budget 30000 >> logs/rtms_etc.log 2>&1
 LOG=logs/apt_backfill.log
 LOG2=logs/rtms_etc.log
 for i in $(seq 1 400); do

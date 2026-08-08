@@ -249,8 +249,13 @@ def main():
     yms = months_back(MONTHS)
     recent = set(months_back(3))
     stopped = None
+    # (2026-08-08) 수집 순서 = 법정동코드 오름차순이라 서울(11)·부산(26) 다음에야 경기(41)가
+    #   나온다. 지역당 6종×N개월이라 한 바퀴가 길어서 경기·인천이 하염없이 밀린다.
+    #   → 수도권(서울·경기·인천)을 앞으로 당긴다. done 표식 기반이라 순서를 바꿔도 안전하다.
+    PRIOR = {"11": 0, "41": 1, "28": 2, "26": 3}
+    order = sorted(REGIONS.items(), key=lambda kv: (PRIOR.get(kv[0][:2], 9), kv[0]))
     try:
-        for i, (code, name) in enumerate(REGIONS.items()):
+        for i, (code, name) in enumerate(order):
             got = 0
             for kind, (svc, op, _, _) in KINDS.items():
                 for ym in reversed(yms):                    # 최신 → 과거

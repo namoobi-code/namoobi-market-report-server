@@ -1497,15 +1497,28 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const api={sel:o.sel.slice(), hi:null};
     api.sort=()=>{ if(!o.sortVal) return;
       api.sel=api.sel.map(r=>[r,o.sortVal(r)]).sort((a,b)=>(b[1]??-1e18)-(a[1]??-1e18)).map(x=>x[0]);};
+    /* (2026-08-08) 강조는 **스타일만** 바꾼다.
+       예전엔 hover 마다 drawChips() 로 innerHTML 을 통째로 다시 그렸는데, 그러면
+       커서 아래에 있던 ✕ 노드가 교체돼 mousedown/mouseup 이 다른 노드에서 일어나
+       클릭 자체가 성립하지 않았다("X 눌렀을때 제거 안됨"의 원인). */
+    const paint=()=>chips.querySelectorAll('[data-hi]').forEach(el=>{
+      const on=api.hi===el.dataset.hi;
+      el.style.boxShadow=on?'0 0 0 2px #1f2937':''; el.style.fontWeight=on?'700':''; });
+    let bound=false;
     const drawChips=()=>{chips.innerHTML=api.sel.map((r,i)=>{const c=RP_PAL[i%RP_PAL.length];
-      const on=api.hi===r;
-      return `<span data-hi="${E(r)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${c}18;border:1px solid ${c};color:#333;cursor:pointer;${on?'box-shadow:0 0 0 2px #1f2937;font-weight:700':''}"><b style="color:${c}">●</b>${E(r)}<b data-rm="${E(r)}" style="cursor:pointer;color:#888">✕</b></span>`;}).join('');
-      chips.querySelectorAll('[data-rm]').forEach(x=>x.onclick=e=>{
-        e.stopPropagation(); api.sel=api.sel.filter(r=>r!==x.dataset.rm); drawChips(); o.onChange(api.sel);});
-      chips.querySelectorAll('[data-hi]').forEach(x=>{
-        x.onmouseenter=()=>{api.hi=x.dataset.hi; drawChips(); o.onHover&&o.onHover(api.hi);};
-        x.onmouseleave=()=>{api.hi=null; drawChips(); o.onHover&&o.onHover(null);};});};
-    api.setHi=(r)=>{ if(api.hi===r) return; api.hi=r; drawChips(); };
+      return `<span data-hi="${E(r)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${c}18;border:1px solid ${c};color:#333;cursor:pointer"><b style="color:${c}">●</b>${E(r)}<b data-rm="${E(r)}" style="cursor:pointer;color:#888;padding:0 2px">✕</b></span>`;}).join('');
+      if(!bound){ bound=true;                       // 위임 리스너 — 재생성돼도 살아남는다
+        chips.addEventListener('click',e=>{const b=e.target.closest('[data-rm]'); if(!b) return;
+          e.stopPropagation(); e.preventDefault();
+          api.sel=api.sel.filter(r=>r!==b.dataset.rm); api.hi=null;
+          drawChips(); o.onChange(api.sel);});
+        chips.addEventListener('mouseover',e=>{const s=e.target.closest('[data-hi]');
+          const v=s?s.dataset.hi:null; if(api.hi===v) return;
+          api.hi=v; paint(); o.onHover&&o.onHover(v);});
+        chips.addEventListener('mouseleave',()=>{ if(api.hi==null) return;
+          api.hi=null; paint(); o.onHover&&o.onHover(null);}); }
+      paint();};
+    api.setHi=(r)=>{ if(api.hi===r) return; api.hi=r; paint(); };
     api.redraw=()=>{api.sort(); drawChips();};
     const show=()=>{const kw=(q.value||'').trim().toLowerCase();
       const cand=o.all().filter(r=>!api.sel.includes(r)&&(!kw||String(r).toLowerCase().includes(kw)));
