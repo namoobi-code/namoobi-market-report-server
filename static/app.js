@@ -6238,6 +6238,10 @@ await _canvasFlow(c);
        증권사 목표주가 리비전으로 대신한다(같은 '전망이 올라갔나' 축). */
     if(mkt==='us'){ set('cr30',{min:2,max:null}); set('gap',{min:2,max:null}); }
     else            set('tprv',{min:3,max:null});
+    /* (2026-08-09) 어닝일 D+1~D+7 — **막 발표한 종목만**.
+       PEAD 는 발표 직후 수 주간의 현상이라 한 달 전 발표분까지 섞으면 신호가 희석된다.
+       ern 은 D-day 라 발표가 지난 종목이 음수다(D+7 = -7). */
+    set('ern',{min:-7,max:-1});
     set('r1',{min:null,max:5});         // 그런데 주가는 아직 크게 안 올랐다 = 남은 여지
     set('cap',{min:mkt==='kr'?3000:2e9,max:null});
     sort={k:'spr',d:-1}; apply(); };}
@@ -6255,6 +6259,10 @@ await _canvasFlow(c);
     set('sprb',{min:4,max:null});        // 실적: 최근 4분기 전부 상회(꾸준히 이기는 회사)
     set('cr30',{min:0,max:null});        // 전망: 발표 후 추정치가 꺾이지 않음
     set('gap',{min:0,max:null});         // 전망: 가이던스도 컨센 이상
+    /* (2026-08-09) 어닝일 D+1~D+7 — **막 발표한 종목만**.
+       PEAD 는 발표 직후 수 주간의 현상이라 한 달 전 발표분까지 섞으면 신호가 희석된다.
+       ern 은 D-day 라 발표가 지난 종목이 음수다(D+7 = -7). */
+    set('ern',{min:-7,max:-1});
     set('r1',{min:null,max:-3});         // 그런데 주가는 하락 → 과잉 반응 의심
     set('cap',{min:mkt==='kr'?3000:2e9,max:null});
     sort={k:'r1',d:1}; apply(); };}
