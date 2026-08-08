@@ -59,6 +59,7 @@
   #ap_main{height:520px!important;max-height:none!important}   /* 단지별 실거래 대형차트 — 동일 캡 해제 */
   #ms_unsold,#ms_pipe{height:300px!important;max-height:none!important} /* 주택 공급 차트 — 동일 캡 해제 */
   #et_main{height:340px!important;max-height:none!important}            /* 비아파트 실거래 — 동일 캡 해제 */
+  #ah_main{height:320px!important;max-height:none!important}            /* 청약경쟁률 — 동일 캡 해제 */
   a{color:var(--dn);text-decoration:none}a:hover{text-decoration:underline}
   .links{display:flex;flex-wrap:wrap;gap:7px}
   .links a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--tx)}
@@ -728,6 +729,18 @@
         </div>
         <canvas id="re_rt_big" style="width:100%;height:680px"></canvas>
         <div class="note" id="re_rt_big_n" style="margin-top:4px;line-height:1.6"></div>
+      </div>
+      <!-- (2026-08-08) 청약경쟁률 — 청약홈 (실거래는 후행, 청약은 선행 지표) -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🎯 청약경쟁률 <span class="note">(한국부동산원 청약홈 · 실거래는 후행이지만 청약은 <b>선행</b> 지표)</span></b>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
+          <span class="note">지역</span><span id="ah_reg"></span>
+          <span class="note" id="ah_asof" style="margin-left:auto"></span>
+        </div>
+        <canvas id="ah_main" style="width:100%;height:320px"></canvas>
+        <div class="note" id="ah_main_n" style="margin-top:4px;line-height:1.6"></div>
+        <div class="note" style="margin:10px 0 3px"><b>최근 분양공고</b> — 경쟁률 높은 순 아님, 공고일 순</div>
+        <div id="ah_tbl" style="max-height:300px;overflow:auto"></div>
       </div>
       <!-- (2026-08-08) 비아파트 실거래 5종 — 국토부 실거래가 (오피스텔·연립다세대·단독다가구·토지·상업업무용) -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
@@ -1483,8 +1496,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260808c"></script>
-<script src="/etf.js?v=20260808c"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260808d"></script>
+<script src="/etf.js?v=20260808d"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

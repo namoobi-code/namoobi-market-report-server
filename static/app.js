@@ -1424,6 +1424,58 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }).catch(()=>{});
     }).catch(()=>{});
   };
+  /* ── (2026-08-08) 🎯 청약경쟁률 — applyhome.json (청약홈)
+     실거래는 계약 끝난 뒤에 잡히는 후행 지표지만, 청약은 지금 수요가 얼마나
+     달려드는지를 보여주는 선행 지표. 지역 격차가 워낙 커서(서울 33:1 vs 지방 2:1)
+     선택 지역 + 전국 기준선을 함께 그린다. ── */
+  let _ahInit=false, _ahD=null, _ahReg='전국';
+  function initApply(){
+    if(_ahInit) return; _ahInit=true;
+    fetch('/api/db/applyhome').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.series){ const e=$('ah_main_n'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:55)부터 표시됩니다.'; return; }
+      _ahD=d;
+      {const e=$('ah_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 청약홈`;}
+      const rb=()=>{$('ah_reg').innerHTML=(d.regions||[]).map(r=>`<button data-r="${r}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${r===_ahReg?'#1f2937':'#fff'};color:${r===_ahReg?'#fff':'#333'}">${r}</button>`).join('');
+        $('ah_reg').querySelectorAll('button').forEach(b=>b.onclick=()=>{_ahReg=b.dataset.r; rb(); drawApply();});};
+      rb(); drawApply();
+    }).catch(()=>{});
+  }
+  function drawApply(){
+    if(!_ahD) return; const d=_ahD, t=d.t, S=d.series;
+    const E5=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    const F=x=>x?`${x.slice(0,4)}.${x.slice(4)}`:'—';
+    const arr=[];
+    if(_ahReg!=='전국'&&S['전국']) arr.push({t,v:S['전국'],label:'전국',color:'#b9c0c9'});
+    if(S[_ahReg]) arr.push({t,v:S[_ahReg],label:_ahReg,color:'#be185d'});
+    if(arr.length) line('ah_main',arr);
+    const v=S[_ahReg]||[];
+    let li=-1; for(let i=v.length-1;i>=0;i--) if(v[i]!=null){li=i;break;}
+    let pk=-1; for(let i=0;i<v.length;i++) if(v[i]!=null&&(pk<0||v[i]>v[pk])) pk=i;
+    const nat=S['전국']||[];
+    $('ah_main_n').innerHTML=
+      `<b>${_ahReg}</b> · 경쟁률 = <b>총 청약건수 ÷ 총 공급세대</b> · 월별 <b>가중평균</b>(단지 단순평균 아님)`
+      +`<br>최신 <b class="up">${li>=0?v[li].toFixed(2)+' : 1':'—'}</b> (${li>=0?F(t[li]):'—'}${d.cnt&&d.cnt[_ahReg]&&d.cnt[_ahReg][li]?` · 공고 ${d.cnt[_ahReg][li]}건`:''})`
+      +`${_ahReg!=='전국'&&li>=0&&nat[li]!=null?` · 같은 달 전국 <b>${nat[li].toFixed(2)}:1</b>`:''}`
+      +`${pk>=0?` · 최고 <b>${v[pk].toFixed(2)}:1</b>(${F(t[pk])})`:''}`
+      +`<br><span class="note">1:1 미만이면 <b>미달</b>(공급 &gt; 청약). 실거래·가격지수보다 먼저 움직여 <b>수요 심리의 선행 지표</b>로 쓰인다. 다만 분양가상한제·입지에 따라 단지 편차가 커서 월별 값이 크게 튈 수 있다.</span>`;
+    /* 최근 공고 표 */
+    const R=d.recent||[];
+    $('ah_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="position:sticky;top:0;background:#f7f8fa">
+        ${['공고일','지역','단지명','유형','공급','경쟁률','최고'].map((h,i)=>`<th style="padding:5px 7px;text-align:${i>=4?'right':'left'};border-bottom:1px solid #e3e7ec;white-space:nowrap">${h}</th>`).join('')}
+      </tr></thead><tbody>${R.map(a=>{
+        const hot=a.rate>=10, cold=a.rate<1;
+        return `<tr style="border-bottom:1px solid #f2f4f7">
+          <td style="padding:4px 7px;white-space:nowrap">${E5(a.de)}</td>
+          <td style="padding:4px 7px;white-space:nowrap">${E5(a.reg)}</td>
+          <td style="padding:4px 7px">${a.url?`<a href="${E5(a.url)}" target="_blank" rel="noopener">${E5(a.name)}</a>`:E5(a.name)}</td>
+          <td style="padding:4px 7px;white-space:nowrap" class="note">${E5(a.kind||'')}</td>
+          <td style="padding:4px 7px;text-align:right">${Math.round(a.sup).toLocaleString()}</td>
+          <td style="padding:4px 7px;text-align:right;font-weight:700;color:${hot?'#c0392b':cold?'#8a94a0':'#333'}">${a.rate.toFixed(2)}</td>
+          <td style="padding:4px 7px;text-align:right" class="note">${a.top!=null?a.top.toFixed(1):'—'}</td></tr>`;}).join('')}
+      </tbody></table>`;
+  }
+
   /* ── (2026-08-08) 🏬 비아파트 실거래 5종 — rtms_etc.json
      아파트만 보면 시장의 절반을 놓친다. 오피스텔은 매매+전월세가 다 있어
      전월세전환율까지 직접 산출된다(단, 표본이 달라 근사치 — 추세로 읽을 것). ── */
@@ -1652,7 +1704,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
 
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc();
+    initApt(); initMolit(); initEtc(); initApply();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
