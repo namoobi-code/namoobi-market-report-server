@@ -363,7 +363,9 @@ def _enrich_us(us):
         # 평균이 아니라 **중위값**. 추정치가 0 근처면 서프라이즈%가 폭주해 평균이 무의미해진다
         # (실측 INTC: 4분기 평균 +1361% ← 적자→흑자 전환 분기 하나가 전부를 지배).
         n=len(last4); med=last4[n//2] if n%2 else (last4[n//2-1]+last4[n//2])/2
-        return {"spr":vs[-1][1],"sprb":sum(1 for v in last4 if v>0),"sprn":n,"spra":med}
+        # 화면·필터는 %로 쓴다(us_consensus.py 와 동일 규약). Yahoo 는 비율(0.137)로 준다.
+        return {"spr":round(vs[-1][1]*100,1),"sprb":sum(1 for v in last4 if v>0),
+                "sprn":n,"spra":round(med*100,1)}
 
     def yqs(r):
         for att in range(3):

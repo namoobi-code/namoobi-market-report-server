@@ -52,14 +52,63 @@ def latest_events(path):
     return out
 
 
+def quarter_end(d8):
+    """공시일 → 그 잠정실적이 속한 분기말(YYYY/MM). earnings_watch.py 와 동일 규칙."""
+    y, m = int(d8[:4]), int(d8[4:6])
+    if m <= 3:  return f"{y-1}/12"
+    if m <= 6:  return f"{y}/03"
+    if m <= 9:  return f"{y}/06"
+    return f"{y}/09"
+
+
+def kr_surprise_backfill(ev):
+    """(2026-08-09) 과거 45일치 KR 발표에 서프라이즈%를 소급 계산.
+
+    서프라이즈 계산은 2026-08-09 에 붙였기 때문에 그 이전 공시분은 spr 이 비어 있다.
+    WISEreport 는 실적이 확정되기 전까지 해당 분기를 (E) 로 계속 들고 있어서(실측: 8월 현재도
+    2026/06(E) 유지), 오늘 뜬 스냅샷으로 지난 분기 발표분까지 되짚을 수 있다.
+    → 필터가 0건만 반환하던 원인(데이터 커버리지)이 이걸로 해소된다.
+    """
+    import sqlite3
+    db = BASE / "data" / "db" / "kr_consensus.sqlite"
+    if not db.exists():
+        return 0
+    cx = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=15)
+    n = 0
+    for c, (d8, it) in ev.items():
+        if it.get("spr") is not None or it.get("op") is None:
+            continue
+        r = cx.execute("SELECT op FROM snap WHERE code=? AND period=? ORDER BY d DESC LIMIT 1",
+                       (c, quarter_end(d8))).fetchone()
+        est = r[0] if r else None
+        if est and abs(est) > 10:                       # 컨센 10억원 미만은 비율이 무의미
+            it["spr"] = round((it["op"] / est - 1) * 100, 1)
+            it["cons_op"] = est
+            n += 1
+    cx.close()
+    return n
+
+
 def main():
     pool = load(POOL)
     if not pool:
         raise SystemExit("screener_pool.json 없음 — 풀 빌드 후 실행할 것")
     cons = (load(CONS) or {}).get("r", {})
     stat = {}
+    kr_ev = latest_events(ERN["kr"])
+    bf = kr_surprise_backfill(kr_ev)
+    if bf:
+        # 되짚은 값은 원본에도 남긴다 — 모달에서도 보여야 하고, 다음 실행 때 재계산하지 않도록
+        j = load(ERN["kr"])
+        for d8 in j.get("days") or {}:
+            for it in j["days"][d8]:
+                src = kr_ev.get(it.get("c"))
+                if src and src[0] == d8 and src[1].get("spr") is not None:
+                    it["spr"] = src[1]["spr"]; it["cons_op"] = src[1].get("cons_op")
+        ERN["kr"].write_text(json.dumps(j, ensure_ascii=False), encoding="utf-8")
+    print(f"[join] KR 서프라이즈 소급 계산 {bf}건")
     for mk in ("kr", "us"):
-        ev = latest_events(ERN[mk])
+        ev = kr_ev if mk == "kr" else latest_events(ERN[mk])
         n = 0
         for r in pool.get(mk) or []:
             c = r.get("c")
@@ -68,6 +117,11 @@ def main():
                 cc = cons.get(c) or {}
                 if cc.get("op30") is not None:
                     patch["cr30"] = cc["op30"]          # 비율(0.05 = +5%)
+                # 목표주가 리비전 — 한국의 이익추정 리비전(op30)은 스냅샷 30일이 필요해
+                # 당장은 비어 있다. 증권사 목표가 변동은 오늘 바로 쓸 수 있는 대체 신호다.
+                if cc.get("tp30") is not None:
+                    patch["tprv"] = cc["tp30"]          # % 단위
+                    patch["tpn"] = cc.get("tpn"); patch["tpu"] = cc.get("tpu"); patch["tpd"] = cc.get("tpd")
             d8, it = ev.get(c, (None, None))
             if it:
                 patch["edl"] = d8

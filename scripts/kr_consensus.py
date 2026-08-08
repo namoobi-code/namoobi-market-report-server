@@ -110,6 +110,41 @@ def quarters(code, enc):
     return out
 
 
+_TPRV_RE = re.compile(r'id="cTB24".*?</table>', re.S)
+
+def tp_revision(html):
+    """증권사별 목표주가 변동표(#cTB24) → 최근 30일 리포트의 평균 목표가 변동률.
+
+    한국은 이익 추정치 리비전 과거값을 주는 무료 소스가 없어(미국 Yahoo 와 달리)
+    스냅샷이 30일 쌓여야 op30 이 나온다. 그런데 이 표는 **각 증권사가 직전 목표가를 얼마나
+    바꿨는지**를 리포트 발간일과 함께 이미 갖고 있다 → 기다리지 않고 오늘 바로 쓸 수 있는
+    전망 변화 지표다(실측 SK하이닉스 2026-07-30: 신한 −35.7%·한화 −26.7%·한투 +23.7% …).
+
+    목표주가는 이익 추정과 목표 배수를 곱해 만든 값이라 이익 전망 변화를 반영한다.
+    다만 배수(멀티플) 조정만으로도 움직이므로 **이익 리비전과 동일하지는 않다**.
+    """
+    m = _TPRV_RE.search(html)
+    if not m:
+        return {}
+    cut = (datetime.now() - timedelta(days=30)).strftime("%y/%m/%d")
+    vals, ups, dns = [], 0, 0
+    for r in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(0), re.S):
+        c = [_CLEAN(x) for x in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, re.S)]
+        if len(c) < 5 or not re.match(r"\d\d/\d\d/\d\d", c[1] or ""):
+            continue
+        if c[1] < cut:
+            continue
+        v = num(c[4])
+        if v is None:
+            continue
+        vals.append(v)
+        if v > 0: ups += 1
+        elif v < 0: dns += 1
+    if not vals:
+        return {}
+    return {"tp30": round(sum(vals) / len(vals), 2), "tpn": len(vals), "tpu": ups, "tpd": dns}
+
+
 def naver_extra(code):
     """증권사 리포트 발간 흐름 + 목표주가 — 컨센 재조정의 조기 신호.
 
@@ -200,6 +235,20 @@ def main():
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
         for code, ex_ in zip(top, ex.map(naver_extra, top)):
             out[code].update(ex_)
+
+    # ── 목표주가 리비전 — 컨센 페이지를 한 번 더 열어 #cTB24 를 읽는다(종목당 1콜)
+    def tprv(code):
+        try:
+            return code, tp_revision(get(f"https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={code}"))
+        except Exception:
+            return code, {}
+    codes2 = list(out.keys())
+    got2 = 0
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        for code, d in ex.map(tprv, codes2):
+            if d:
+                out[code].update(d); got2 += 1
+    print(f"[cons] 목표주가 리비전 {got2}/{len(codes2)}종목", flush=True)
 
     OUT.write_text(json.dumps({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
                                "src": "WISEreport 분기 컨센서스(증권사 추정 평균) + 네이버 리포트·목표주가",
