@@ -1251,12 +1251,33 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       if(s.length===4){ if(+s%2===0) x.fillText(s,X(i)-12,H-4); }                                  // 연간: 짝수 해
       else if(s.slice(4)==='01'){ x.fillText(s.slice(0,4),X(i)-12,H-4); }                          // 월간: 매년 1월=연도
       else if(t0.length<=30&&+s.slice(4)%3===1){ x.fillText(s.slice(2,4)+'.'+s.slice(4),X(i)-10,H-4); } }  // 확대 시 분기 보조 눈금
-    arr.forEach(a=>{ x.strokeStyle=a.color; x.lineWidth=1.6; x.beginPath(); let st=false;
+    /* (2026-08-08) 계열이 많아지면(최대 30) ① 선이 구분 안 되고 ② 우측 라벨이 겹쳐 못 읽는다.
+       → hi(강조 대상)가 있으면 나머지를 흐리게, 라벨은 세로 충돌을 밀어내 배치한다. */
+    const HI=opts&&opts.hi;
+    const ordered=HI?[...arr.filter(a=>a.label!==HI),...arr.filter(a=>a.label===HI)]:arr;
+    ordered.forEach(a=>{ const on=!HI||a.label===HI;
+      x.save(); x.globalAlpha=on?1:0.15;
+      x.strokeStyle=a.color; x.lineWidth=on&&HI?2.6:1.6; x.beginPath(); let st=false;
       for(let i=0;i<a.v.length;i++){ if(a.v[i]==null) continue;
         st?x.lineTo(X(i),Y(a.v[i])):(x.moveTo(X(i),Y(a.v[i])),st=true); }
-      x.stroke(); x.lineWidth=1;
-      const lv=a.v[a.v.length-1];
-      if(lv!=null){ x.fillStyle=a.color; x.fillText(a.label+' '+lv.toFixed(1),X(a.v.length-1)-60,Y(lv)-5); } });
+      x.stroke(); x.restore(); });
+    x.lineWidth=1;
+    /* 라벨 — 마지막 값 위치를 기준으로 잡되, 위아래로 겹치면 최소 간격만큼 밀어낸다 */
+    const labs=[];
+    arr.forEach(a=>{ let li=-1; for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null){li=i;break;}
+      if(li<0) return;
+      labs.push({a, li, y:Y(a.v[li]), v:a.v[li]}); });
+    labs.sort((p,q)=>p.y-q.y);
+    const GAP=11;
+    for(let i=1;i<labs.length;i++) if(labs[i].y-labs[i-1].y<GAP) labs[i].y=labs[i-1].y+GAP;
+    for(let i=labs.length-1;i>0;i--) if(labs[i].y>H-P.b) labs[i].y=H-P.b, (labs[i-1].y=Math.min(labs[i-1].y,labs[i].y-GAP));
+    labs.forEach(L=>{ const on=!HI||L.a.label===HI;
+      x.save(); x.globalAlpha=on?1:0.25;
+      x.fillStyle=L.a.color; x.font=(on&&hi?'bold ':'')+'10px sans-serif';
+      const t=L.a.label+' '+L.v.toFixed(1);
+      x.fillText(t, Math.max(P.l+2, X(L.li)-x.measureText(t).width-4), L.y+3);
+      x.restore(); });
+    x.font='10px sans-serif';
   }
   const yoy=(t,v)=>{ const i=t.length-1, j=t.indexOf(String(+String(t[i]).slice(0,4)-1)+String(t[i]).slice(4));
     return (i>=0&&j>=0&&v[j])?((v[i]/v[j]-1)*100):null; };
@@ -1996,8 +2017,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          const q=$('re_cmp_q'), list=$('re_cmp_list');
          const mbar=()=>{$('re_cmp_metric').innerHTML=METRICS.map(([k,l])=>`<button data-m="${k}" style="margin-right:4px;padding:3px 10px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===met?'#1f2937':'#fff'};color:${k===met?'#fff':'#333'}">${l}</button>`).join('');
            $('re_cmp_metric').querySelectorAll('button').forEach(b=>b.onclick=()=>{met=b.dataset.m; mbar(); drawBig(true);});};
-         const chips=()=>{$('re_cmp_chips').innerHTML=mset.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${PAL[i%PAL.length]}18;border:1px solid ${PAL[i%PAL.length]};color:#333"><b style="color:${PAL[i%PAL.length]}">●</b>${E(N[c]||c)}<b data-rm="${c}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
-           $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{mset=mset.filter(c=>c!==x.dataset.rm); chips(); drawBig(true);});};
+         let hiLab=null;                     // 강조 중인 계열 라벨(칩 hover / 차트 hover)
+         const chips=()=>{$('re_cmp_chips').innerHTML=mset.map((c,i)=>`<span data-hi="${E(N[c]||c)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${PAL[i%PAL.length]}18;border:1px solid ${PAL[i%PAL.length]};color:#333;cursor:pointer"><b style="color:${PAL[i%PAL.length]}">●</b>${E(N[c]||c)}<b data-rm="${c}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
+           $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=e=>{
+             e.stopPropagation(); mset=mset.filter(c=>c!==x.dataset.rm); chips(); drawBig(true);});
+           /* 칩에 마우스를 올리면 그 지역만 진하게 — 30개가 겹쳐도 하나를 눈으로 따라갈 수 있다 */
+           $('re_cmp_chips').querySelectorAll('[data-hi]').forEach(x=>{
+             x.onmouseenter=()=>{hiLab=x.dataset.hi.replace(/\(.*\)/,''); drawBig();};
+             x.onmouseleave=()=>{hiLab=null; drawBig();};});};
          /* (2026-08-08) 시도로 검색이 안 되던 문제 —
             광역시 시군구는 이름에 시도가 붙어 있지만("부산 중구") 도 단위는 안 붙어 있어서
             ("수원 장안구","춘천시") '경기'·'강원' 으로 검색하면 하나도 안 걸렸다.
@@ -2022,8 +2049,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          /* (2026-08-08) 원클릭 프리셋 — 하나씩 고르기 번거로운 조합을 버튼으로.
             'TOP30' 은 현재 선택된 지표의 최신값 기준 상위 30(시군구만, 시도 합산 ★ 제외) */
          const isAgg=c=>String(c).startsWith('A');
+         /* 정렬·TOP 선정 기준값 — **잠정 구간 직전의 확정 최신월**을 쓴다.
+            최근 2개월은 실거래 신고가 덜 들어와 값이 과소·요동치므로 순위 기준으로 부적합하다. */
+         const confCut=()=>{const d=new Date(); d.setMonth(d.getMonth()-2);
+           return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}`;};
          const latestOf=c=>{const src=met==='dep'?(R.rent||{}):(R.sale||{});
-           const m=((src[c]||{}).m)||{}; const ts=Object.keys(m).sort();
+           const m=((src[c]||{}).m)||{}; const cut=confCut();
+           const ts=Object.keys(m).filter(t=>t<=cut).sort();
            for(let i=ts.length-1;i>=0;i--){const e=m[ts[i]]; const v=e?(e[met]??null):null; if(v!=null) return v;}
            return null;};
          const topN=(filter,n)=>Object.keys(N).filter(c=>!isAgg(c)&&filter(c))
@@ -2044,9 +2076,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          pbar();
          q.oninput=showList; q.onfocus=showList;
          document.addEventListener('click',e=>{ if(!e.target.closest('#re_cmp_q')&&!e.target.closest('#re_cmp_list')) list.style.display='none'; });
-         let vN=null, vOff=0, curL=0;                       // 휠 확대/축소 상태 (null=전체)
+         let vN=null, vOff=0, curL=0, _bigArr=null;                       // 휠 확대/축소 상태 (null=전체)
          function drawBig(reset){
            if(reset){ vN=null; vOff=0; }
+           /* (2026-08-08) 칩을 최신값 내림차순으로 정렬 — 칩 순서 = 차트에서 위→아래 순서가 되어
+              30개를 겹쳐 놔도 "위에서 몇 번째 선이 어느 구인지" 눈으로 바로 맞출 수 있다.
+              색도 이 순서를 따라가므로 지표를 바꾸면 순서·색이 함께 재배치된다. */
+           {const ord=mset.map(c=>[c, latestOf(c)]).sort((a,b)=>(b[1]??-1e18)-(a[1]??-1e18)).map(x=>x[0]);
+            if(ord.join('|')!==mset.join('|')){ mset=ord; chips(); }}
            const src=met==='dep'?(R.rent||{}):(R.sale||{});
            const tset=new Set(); mset.forEach(c=>Object.keys((src[c]||{}).m||{}).forEach(t=>tset.add(t)));
            const full=[...tset].sort(); if(!full.length){$('re_rt_big_n').textContent='선택된 지역의 데이터가 없습니다'; return;}
@@ -2061,7 +2098,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                                        label:(N[c]||c).replace(/\(.*\)/,''),color:PAL[i%PAL.length]})).filter(a=>a.v.some(v=>v!=null));
            if(!arr.length){ const cvb=$('re_rt_big'); cvb.getContext('2d').clearRect(0,0,cvb.width,cvb.height);
              $('re_rt_big_n').innerHTML='선택 지역엔 이 지표 데이터가 없습니다 — 다음 수집(매일 07:20) 후 시도 전체 중위가(근사)가 채워집니다'; return; }
-           line('re_rt_big',arr,{provIdx});
+           _bigArr=arr;                       // 차트 hover 로 근접 계열을 찾기 위해 보관
+           line('re_rt_big',arr,{provIdx,hi:hiLab});
+           /* 차트 hover ↔ 칩 강조를 양방향으로 — 선을 짚으면 그 지역 칩이 켜진다 */
+           $('re_cmp_chips').querySelectorAll('[data-hi]').forEach(el=>{
+             const on=hiLab&&el.dataset.hi.replace(/\(.*\)/,'')===hiLab;
+             el.style.boxShadow=on?'0 0 0 2px #1f2937':'';
+             el.style.fontWeight=on?'700':'400';});
            const ml=METRICS.find(x=>x[0]===met)[1];
            $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · 시도 전체 중위가는 <b>거래량 가중 근사치</b>':''} · 주황 음영=신고 진행 중(잠정) · 🖱 휠=X축 확대/축소·드래그=좌우 이동(표시 ${ts.length}/${curL}개월) · 지역별 스케일 차이가 크면 거래량으로 비교 권장`;
          }
@@ -2077,12 +2120,37 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           },{passive:false});
           let dr2=null;
           cv2.addEventListener('mousedown',e=>{ dr2={x:e.clientX,o:vOff}; });
-          cv2.addEventListener('mousemove',e=>{ if(!dr2) return;
+          cv2.addEventListener('mousemove',e=>{ if(!dr2){
+            /* 드래그 중이 아니면 커서에 가장 가까운 선을 찾아 강조 —
+               30개가 겹쳐도 마우스만 올리면 어느 구인지 바로 뜬다 */
+            if(!_bigArr||!_bigArr.length) return;
+            const r=cv2.getBoundingClientRect();
+            const W=cv2.clientWidth||900, Hh=cv2.clientHeight||600;
+            const P={l:8,r:52,t:10,b:18};
+            const N0=Math.max(..._bigArr.map(a=>a.v.length));
+            const fx=(e.clientX-r.left)/W*(cv2.width||W);   // 실제 캔버스 좌표계로
+            const fy=(e.clientY-r.top)/Hh*(cv2.height||Hh);
+            const iw=(cv2.width-P.l-P.r)/Math.max(1,N0-1);
+            let idx=Math.round((fx-P.l)/Math.max(1,iw));
+            idx=Math.max(0,Math.min(N0-1,idx));
+            const all=_bigArr.flatMap(a=>a.v).filter(v=>v!=null);
+            if(!all.length) return;
+            let lo=Math.min(...all), hi2=Math.max(...all);
+            const pad=(hi2-lo)*0.06||1; lo-=pad; hi2+=pad;
+            const Yv=v=>P.t+(cv2.height-P.t-P.b)*(1-(v-lo)/(hi2-lo));
+            let best=null, bd=1e9;
+            _bigArr.forEach(a=>{ let v=a.v[idx];
+              if(v==null){ for(let k=1;k<6&&v==null;k++) v=a.v[idx-k]??a.v[idx+k]; }
+              if(v==null) return;
+              const d=Math.abs(Yv(v)-fy); if(d<bd){bd=d; best=a.label;} });
+            const nl=(bd<26)?best:null;
+            if(nl!==hiLab){ hiLab=nl; drawBig(); }
+            return; }
             const n0=vN?Math.min(vN,curL):curL;
             const bw=(cv2.clientWidth||900)/Math.max(1,n0);
             vOff=Math.max(0,Math.min(curL-n0,dr2.o+Math.round((e.clientX-dr2.x)/bw))); drawBig(); });
           cv2.addEventListener('mouseup',()=>{ dr2=null; });
-          cv2.addEventListener('mouseleave',()=>{ dr2=null; });}
+          cv2.addEventListener("mouseleave",()=>{ dr2=null; if(hiLab){hiLab=null; drawBig();} });}
          mbar(); chips(); drawBig(true);}
       }).catch(()=>{});
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */

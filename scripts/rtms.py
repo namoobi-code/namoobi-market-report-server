@@ -234,6 +234,7 @@ def main():
                 b = agg_rent(raw)
                 if b: r_[ym] = b
                 apt_db.ingest_rent(cx, code, ym, raw, acache)
+                cx.commit()          # 월마다 커밋 — 잠금 구간을 짧게(동시 수집 대비)
                 time.sleep(0.3)
         except _Stop as e:
             stopped = str(e)

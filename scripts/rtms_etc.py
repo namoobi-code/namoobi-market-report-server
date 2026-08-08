@@ -242,7 +242,8 @@ def build_json(cx):
 
 def main():
     DB.parent.mkdir(parents=True, exist_ok=True)
-    cx = sqlite3.connect(DB, timeout=60)
+    cx = sqlite3.connect(DB, timeout=180)
+    cx.execute("PRAGMA busy_timeout=180000")
     cx.executescript(SCHEMA)
     acx = apt_db.connect(); acache = {}     # 단지별 DB(아파트와 공용)
     yms = months_back(MONTHS)
@@ -268,6 +269,7 @@ def main():
                                 apt_db.ingest_rent(acx, code, ym, raw, acache, k2, nf)
                             else:
                                 apt_db.ingest_sale(acx, code, ym, raw, acache, k2, nf)
+                            acx.commit()      # 잠금 구간 최소화
                         except Exception as e:
                             print(f"    ⚠ 단지DB 적재 실패({kind} {code} {ym}): {e}")
                     a = agg(kind, raw)

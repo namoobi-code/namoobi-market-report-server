@@ -65,7 +65,11 @@ CREATE TABLE IF NOT EXISTS done(
 
 def connect():
     DB.parent.mkdir(parents=True, exist_ok=True)
-    cx = sqlite3.connect(DB, timeout=60)
+    # (2026-08-08) 아파트 백필과 비아파트 수집이 이 DB 를 동시에 쓴다.
+    # SQLite 는 쓰기가 1개만 가능하므로 넉넉히 기다리게 하고, 각 수집기는 월 단위로 커밋해
+    # 잠금 구간을 짧게 유지한다(지역 단위로 커밋하면 7분씩 잡혀 상대가 타임아웃난다).
+    cx = sqlite3.connect(DB, timeout=180)
+    cx.execute("PRAGMA busy_timeout=180000")
     cx.executescript(SCHEMA)
     # (2026-08-08) 오피스텔·연립다세대까지 담기 위해 kind 컬럼 추가(기존 행은 'apt').
     # 같은 (sgg,umd,name,jibun) 이 두 유형으로 동시에 존재하는 경우는 없어 UNIQUE 는 그대로 둔다.
