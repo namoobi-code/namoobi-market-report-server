@@ -125,9 +125,20 @@ def months_back(n):
         out.append(f"{y}{m:02d}")
     return out[::-1]
 
+class _Quota(Exception):
+    """이 API 의 **일일** 한도 소진 — 오늘은 이 계열만 건너뛰고 나머지는 계속한다."""
+
+
+# (2026-08-08) data.go.kr 은 API(활용신청)마다 일일 한도가 따로 있다.
+# 예전엔 매매 한도가 차면 _Stop 으로 전체가 끝나 전세까지 같이 멈췄다.
+DEAD = set()
+
+
 def fetch(svc, op, lawd, ym):
     """전 페이지 수집 — item dict 리스트."""
     global CALLS
+    if svc in DEAD:
+        raise _Quota(svc)
     rows, page = [], 1
     while True:
         CALLS += 1
@@ -149,8 +160,16 @@ def fetch(svc, op, lawd, ym):
                 # (2026-08-08) 429 는 일시적 레이트리밋 — 실측상 수십 분 뒤 자동 해제된다.
                 # 며칠짜리 무인 백필이므로 포기하지 말고 길게 기다리며 계속 재시도한다.
                 # (짧은 백오프 5회로는 5개 지역 만에 작업이 통째로 끝나버렸다)
+                try:
+                    body = he.read().decode("utf-8", "replace")
+                except Exception:
+                    body = ""
+                if "일일" in body or "LIMITED_NUMBER_OF_SERVICE_REQUESTS" in body:
+                    DEAD.add(svc)
+                    raise _Quota(svc)
                 root = None
-                for wait in (60, 300, 900, 1800, 1800, 1800, 1800, 1800, 3600, 3600):
+                for wait in (10, 20, 40, 90, 180, 300, 600, 900, 1800, 1800, 3600):
+                    print(f"    ⏳ 429 — {wait}초 대기 후 재시도 ({svc} {lawd} {ym})", flush=True)
                     time.sleep(wait)
                     try:
                         d = urllib.request.urlopen(u, timeout=25).read()
@@ -170,8 +189,9 @@ def fetch(svc, op, lawd, ym):
             except Exception:
                 return rows
         rc = (root.findtext(".//resultCode") or "").strip()
-        if rc == "22":
-            raise _Stop("일일 트래픽 한도 초과")
+        if rc == "22":                                  # 200 으로 오는 일일 한도 초과
+            DEAD.add(svc)
+            raise _Quota(svc)
         if rc not in ("000", "00"):
             return rows
         items = root.findall(".//item")
@@ -209,7 +229,12 @@ def main():
     cx = apt_db.connect(); acache = {}                          # 단지별 시계열 DB(같은 응답 재활용)
     yms = months_back(MONTHS + 1)                               # 당월 포함(신고분 반영)
     yms.append(datetime.now().strftime("%Y%m"))
-    for i, (code, name) in enumerate(REGIONS.items()):
+    # (2026-08-08) 법정동코드 오름차순이면 서울 25구 다음이 부산이라 강남구(11680)가
+    #   서울 안에서도 늦게 온다. 실제로 종로·중·용산·성동만 21년치가 차고 강남은 2개월뿐이었다.
+    #   → 수도권(서울·경기·인천)·부산을 앞으로. done 표식 기반이라 순서 변경은 안전하다.
+    PRIOR = {"11": 0, "41": 1, "28": 2, "26": 3}
+    _order = sorted(REGIONS.items(), key=lambda kv: (PRIOR.get(kv[0][:2], 9), kv[0]))
+    for i, (code, name) in enumerate(_order):
         if ONLY and code not in ONLY: continue
         s = {t: (sale.get(code) or {}).get("m", {}).get(t) for t in (sale.get(code) or {}).get("m", {})} \
             if isinstance((sale.get(code) or {}).get("m"), dict) else {}
@@ -225,22 +250,30 @@ def main():
                         and apt_db.has(cx, code, ym, "apt_sale")
                         and apt_db.has(cx, code, ym, "apt_rent")):
                     continue
-                raw = fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym)
-                a = agg_sale(raw)
-                if a: s[ym] = a
-                apt_db.ingest_sale(cx, code, ym, raw, acache)
+                try:
+                    raw = fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym)
+                    a = agg_sale(raw)
+                    if a: s[ym] = a
+                    apt_db.ingest_sale(cx, code, ym, raw, acache)
+                except _Quota:
+                    pass                                 # 매매 한도 소진 — 전세는 계속
                 time.sleep(0.3)
-                raw = fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym)
-                b = agg_rent(raw)
-                if b: r_[ym] = b
-                apt_db.ingest_rent(cx, code, ym, raw, acache)
+                try:
+                    raw = fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym)
+                    b = agg_rent(raw)
+                    if b: r_[ym] = b
+                    apt_db.ingest_rent(cx, code, ym, raw, acache)
+                except _Quota:
+                    pass
+                if len(DEAD) >= 2:                       # 매매·전세 둘 다 소진이면 오늘은 끝
+                    raise _Stop("매매·전세 모두 일일 한도 소진 — 자정 리셋 후 재개")
                 cx.commit()          # 월마다 커밋 — 잠금 구간을 짧게(동시 수집 대비)
                 time.sleep(0.3)
         except _Stop as e:
             stopped = str(e)
         cx.commit()
         sale[code] = {"m": s}; rent[code] = {"m": r_}
-        print(f"  [{i+1}/{len(REGIONS)}] {name}: 매매 {len(s)}개월 · 전세 {len(r_)}개월"
+        print(f"  [{i+1}/{len(_order)}] {name}: 매매 {len(s)}개월 · 전세 {len(r_)}개월"
               + (f"  ⚠ {stopped} — 진행분 저장 후 종료" if stopped else ""), flush=True)
         # (2026-08-08) 20지역마다 중간 저장 — 장시간 백필이 강제 종료돼도 진행분이 남도록.
         # 합산(A*)은 이전 값이 그대로 유지되고 루프 종료 후 재계산된다.

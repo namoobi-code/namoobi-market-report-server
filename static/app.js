@@ -2076,7 +2076,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     rq.oninput=()=>{ clearTimeout(tmr2); tmr2=setTimeout(showReg,200); };
     rq.onfocus=showReg;
     document.addEventListener('click',e=>{ if(!e.target.closest('#ap_rq')&&!e.target.closest('#ap_rlist')) rlist.style.display='none'; });
-    fetch('/api/apt/regions').then(r=>r.ok?r.json():null).then(d=>{ if(d) REG=d; }).catch(()=>{});
+    fetch(`/api/apt/regions?kind=${_apKind}`).then(r=>r.ok?r.json():null).then(d=>{ if(d) REG=d; }).catch(()=>{});
     drawRcur();
     /* 유형 전환 — 국토부가 주는 식별정보가 달라 검색 단위가 유형마다 다르다 */
     const KINDS=[['apt','아파트','단지명'],['offi','오피스텔','건물명'],['rh','연립다세대','건물명'],
@@ -2091,12 +2091,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||300;
           g.clearRect(0,0,c.width,c.height);});
         $('ap_main_n').innerHTML='<span class="note">유형을 바꿨습니다 — 단지명 또는 지역으로 검색하세요.</span>';
+        // (2026-08-08) 아파트와 비아파트는 DB 파일이 달라 지역 목록도 유형마다 다시 받아야 한다.
+        fetch(`/api/apt/regions?kind=${_apKind}`).then(r=>r.ok?r.json():null).then(d=>{ if(d) REG=d; }).catch(()=>{});
         search();});};
     kbar();
 
     function loadApt(id){
       _apId=id;
-      fetch(`/api/apt/series?id=${id}&ar=${_apAr||0}`).then(r=>r.ok?r.json():null).then(d=>{
+      fetch(`/api/apt/series?id=${id}&ar=${_apAr||0}&kind=${_apKind}`).then(r=>r.ok?r.json():null).then(d=>{
         if(!d){ $('ap_head').textContent='조회 실패'; return; }
         _apAr=d.ar;
         const a=d.apt;

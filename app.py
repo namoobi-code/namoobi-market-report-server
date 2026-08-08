@@ -1456,11 +1456,18 @@ def admin_refresh(which: str, request: Request):
 
 # ── (2026-08-08) 아파트 단지별 실거래 — scripts/apt_db.py 가 rtms 수집과 함께 적재 ──
 APTDB = DB / "apt.sqlite"
+# (2026-08-08) 비아파트는 별도 파일 — 아파트 심층 백필과 동시에 수집하려면 파일을 나눠야
+# SQLite 쓰기 락이 충돌하지 않는다. 유형(kind)으로 어느 파일을 열지 고른다.
+APTDB_ETC = DB / "apt_etc.sqlite"
 
-def _aptcx():
-    if not APTDB.exists():
+def _aptpath(kind=""):
+    return APTDB if (kind or "apt") == "apt" else APTDB_ETC
+
+def _aptcx(kind=""):
+    path = _aptpath(kind)
+    if not path.exists():
         raise HTTPException(404, "단지 DB 미생성 — rtms 수집 후 사용 가능")
-    cx = sqlite3.connect(f"file:{APTDB}?mode=ro", uri=True, timeout=10)
+    cx = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=10)
     cx.row_factory = sqlite3.Row
     return cx
 
@@ -1498,7 +1505,7 @@ def apt_search(q: str = "", region: str = "", kind: str = "", n: int = 30):
                 region = " ".join(t[1:])
             where.append("a.umd LIKE ? ESCAPE '\\'"); args.append(f"%{esc(region)}%")
     args += [q, max(1, min(n, 200))]
-    with _aptcx() as cx:
+    with _aptcx(kind) as cx:
         rows = cx.execute(
             f"""SELECT a.id, a.name, a.umd, a.sgg, a.build_year, COALESCE(a.kind,'apt') AS kind,
                        (SELECT COUNT(*) FROM sale s WHERE s.apt_id=a.id) AS ns,
@@ -1508,9 +1515,9 @@ def apt_search(q: str = "", region: str = "", kind: str = "", n: int = 30):
     return {"rows": [dict(r) for r in rows]}
 
 @app.get("/api/apt/regions")
-def apt_regions():
+def apt_regions(kind: str = "apt"):
     """단지 DB 에 실제로 있는 지역 목록 — 지역 선택기용 (시도 / 시도+법정동)."""
-    with _aptcx() as cx:
+    with _aptcx(kind) as cx:
         rows = cx.execute(
             "SELECT sgg, umd, COUNT(*) n FROM apt GROUP BY sgg, umd HAVING n>0").fetchall()
         kinds = dict(cx.execute(
@@ -1529,9 +1536,9 @@ def apt_regions():
             "dong": [{"r": k, "n": v} for k, v in sorted(dong.items(), key=lambda x: -x[1])[:3000]]}
 
 @app.get("/api/apt/series")
-def apt_series(id: int, ar: int = 0):
+def apt_series(id: int, ar: int = 0, kind: str = "apt"):
     """단지 1개의 매매·전세·월세 월별 시계열. ar=0 이면 거래 최다 면적 자동 선택."""
-    with _aptcx() as cx:
+    with _aptcx(kind) as cx:
         a = cx.execute("SELECT * FROM apt WHERE id=?", (id,)).fetchone()
         if not a:
             raise HTTPException(404, "단지 없음")
@@ -1560,15 +1567,20 @@ def apt_series(id: int, ar: int = 0):
 @app.get("/api/apt/stat")
 def apt_stat():
     """단지 DB 적재 현황 — 프론트 안내 문구용."""
-    try:
-        with _aptcx() as cx:
-            q = lambda s: cx.execute(s).fetchone()[0]
-            return {"apt": q("SELECT COUNT(*) FROM apt"), "sale": q("SELECT COUNT(*) FROM sale"),
-                    "jeon": q("SELECT COUNT(*) FROM jeon"), "wol": q("SELECT COUNT(*) FROM wol"),
-                    "sgg": q("SELECT COUNT(DISTINCT sgg) FROM done"),
-                    "ym0": q("SELECT MIN(ym) FROM done"), "ym1": q("SELECT MAX(ym) FROM done")}
-    except HTTPException:
-        return {"apt": 0}
+    out = {"apt": 0, "sale": 0, "jeon": 0, "wol": 0, "sgg": 0, "ym0": None, "ym1": None}
+    for k in ("apt", "offi"):                      # 아파트 파일 + 비아파트 파일 합산
+        try:
+            with _aptcx(k) as cx:
+                q = lambda s: cx.execute(s).fetchone()[0]
+                out["apt"] += q("SELECT COUNT(*) FROM apt"); out["sale"] += q("SELECT COUNT(*) FROM sale")
+                out["jeon"] += q("SELECT COUNT(*) FROM jeon"); out["wol"] += q("SELECT COUNT(*) FROM wol")
+                out["sgg"] = max(out["sgg"], q("SELECT COUNT(DISTINCT sgg) FROM done"))
+                a, b = q("SELECT MIN(ym) FROM done"), q("SELECT MAX(ym) FROM done")
+                if a and (out["ym0"] is None or a < out["ym0"]): out["ym0"] = a
+                if b and (out["ym1"] is None or b > out["ym1"]): out["ym1"] = b
+        except HTTPException:
+            pass
+    return out
 
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.

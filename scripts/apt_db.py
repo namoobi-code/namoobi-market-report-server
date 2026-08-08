@@ -29,6 +29,12 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 DB = BASE / "data" / "db" / "apt.sqlite"
+# (2026-08-08) 비아파트는 **별도 파일**로 분리한다.
+#   SQLite 는 파일당 쓰기가 1개뿐이라 아파트 백필(rtms.py)과 비아파트 수집(rtms_etc.py)이
+#   한 파일을 쓰면 서로 "database is locked" 로 죽는다. 그래서 순차 실행할 수밖에 없었고,
+#   아파트 심층 백필(지역당 252개월)이 몇 시간씩 잡아먹는 동안 비아파트가 멈춰 있었다.
+#   파일을 나누면 둘을 동시에 돌릴 수 있어 전체 소요가 절반으로 준다.
+DB_ETC = BASE / "data" / "db" / "apt_etc.sqlite"
 
 SCHEMA = """
 PRAGMA journal_mode=WAL;
@@ -63,12 +69,13 @@ CREATE TABLE IF NOT EXISTS done(
 """
 
 
-def connect():
-    DB.parent.mkdir(parents=True, exist_ok=True)
+def connect(etc=False):
+    path = DB_ETC if etc else DB
+    path.parent.mkdir(parents=True, exist_ok=True)
     # (2026-08-08) 아파트 백필과 비아파트 수집이 이 DB 를 동시에 쓴다.
     # SQLite 는 쓰기가 1개만 가능하므로 넉넉히 기다리게 하고, 각 수집기는 월 단위로 커밋해
     # 잠금 구간을 짧게 유지한다(지역 단위로 커밋하면 7분씩 잡혀 상대가 타임아웃난다).
-    cx = sqlite3.connect(DB, timeout=180)
+    cx = sqlite3.connect(path, timeout=180)
     cx.execute("PRAGMA busy_timeout=180000")
     cx.executescript(SCHEMA)
     # (2026-08-08) 오피스텔·연립다세대까지 담기 위해 kind 컬럼 추가(기존 행은 'apt').

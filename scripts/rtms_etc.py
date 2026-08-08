@@ -270,7 +270,7 @@ def main():
     cx = sqlite3.connect(DB, timeout=180)
     cx.execute("PRAGMA busy_timeout=180000")
     cx.executescript(SCHEMA)
-    acx = apt_db.connect(); acache = {}     # 단지별 DB(아파트와 공용)
+    acx = apt_db.connect(etc=True); acache = {}   # 단지별 DB — 비아파트 전용 파일(락 충돌 회피)
     yms = months_back(MONTHS)
     recent = set(months_back(3))
     stopped = None
