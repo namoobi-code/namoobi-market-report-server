@@ -1644,8 +1644,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         preset:[
           ['경쟁률 TOP30','선택한 순위기간의 평균 경쟁률 상위 시군구 30',()=>{_ahLastPre=0; return topN(()=>true,30);}],
           ['서울 전체',   '서울 시군구 전부',()=>{_ahLastPre=1; return topN(r=>r.startsWith('서울 '),30);}],
-          ['경기 TOP30',  '경기 시군구 상위 30',()=>{_ahLastPre=2; return topN(r=>r.startsWith('경기 '),30);}],
-          ['시도 전체',   '전국·시도 단위만',()=>(d.sido||[]).slice(0,30)],
+          ['부산 전체',   '부산 시군구 전부',()=>{_ahLastPre=2; return topN(r=>r.startsWith('부산 '),30);}],
+          ['경기 TOP30',  '경기 시군구 상위 30',()=>{_ahLastPre=3; return topN(r=>r.startsWith('경기 '),30);}],
+          ['시도 전체',   '전국·시도 단위만',()=>{_ahLastPre=4; return (d.sido||[]).slice(0,30);}],
         ],
         onHover:r=>{_ahHi=r; drawApply();},
         onChange:s=>{_ahSel=s; drawApply();}});
