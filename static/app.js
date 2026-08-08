@@ -1112,21 +1112,46 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const wdn=['일','월','화','수','목','금','토'][new Date(key+'T00:00:00').getDay()];
         const old=document.querySelector('.mc-pop'); if(old) old.remove();
         const pop=document.createElement('div'); pop.className='mc-pop';
+        /* (2026-08-09) 한 줄에 '실적 → 전망 → 주가'가 한눈에 들어오게 확장.
+           실적만으로는 왜 움직였는지 모른다 — 샌디스크처럼 EPS 는 비트인데 가이던스가
+           나빠 빠지는 경우가 흔하다. 그래서 ①서프라이즈 ②가이던스/컨센 ③주가반응을 같이 둔다. */
+        const pct=(v,d)=>v==null?null:`<b class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(d==null?1:d)}%</b>`;
         const row=(r,i)=>{
-          const lv=LIVEBY[r.c];        // (2026-08-05) 발표 완료 → ✅ + 결과 요약 (KR=영업익YoY · US=EPS서프)
-          const rv=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
+          const lv=LIVEBY[r.c];        // 발표 완료 → ✅ + 결과 요약
+          const rv=lv?(mk==='us'?lv.spr:(lv.spr!=null?lv.spr:lv.op_yoy)):null;
           const t8p=lv&&(lv.tags||[]).find(t=>t.includes('접수'));
           const secU=(lv&&lv.cik&&lv.acc)?`https://www.sec.gov/Archives/edgar/data/${lv.cik}/${String(lv.acc).replace(/-/g,'')}/`:null;
-          const res=lv?(rv==null&&t8p
-            ? ` <span class="note">— ${esc(t8p.replace('📄 ',''))} · <b>수치 대기</b>${secU?` · <a href="${secU}" target="_blank" rel="noopener">SEC 원문</a>`:''}</span>`
-            : ` <span class="note">— ${mk==='us'?'EPS서프':'영업익YoY'} <b class="${(rv??0)>0?'up':'dn'}">${rv??'—'}%</b>${(lv.tags||[]).length?' · '+esc(lv.tags.filter(t=>!t.includes('접수')).join(' · ')):''}</span>`):'';
+          let res='';
+          if(lv&&rv==null&&t8p){
+            res=` <span class="note">— ${esc(t8p.replace('📄 ',''))} · <b>수치 대기</b>${secU?` · <a href="${secU}" target="_blank" rel="noopener">SEC 원문</a>`:''}</span>`;
+          }else if(lv){
+            const bits=[];
+            // ① 실적 — 컨센서스 대비가 있으면 그것을, 없으면 YoY
+            const sLab = mk==='us' ? 'EPS서프' : (lv.spr!=null?'영업익 컨센比':'영업익YoY');
+            bits.push(`${sLab} ${pct(rv)||'—'}`);
+            if(mk==='kr'&&lv.spr!=null&&lv.op_yoy!=null) bits.push(`<span class="note">YoY ${pct(lv.op_yoy)}</span>`);
+            // ② 전망 — 가이던스 갭(US) / 컨센 30일 리비전(KR·US 공통)
+            if(lv.g_rev_gap!=null) bits.push(`가이던스 매출 ${pct(lv.g_rev_gap)} <span class="note">vs 컨센</span>`);
+            else if(lv.g_eps_gap!=null) bits.push(`가이던스 EPS ${pct(lv.g_eps_gap)} <span class="note">vs 컨센</span>`);
+            if(lv.cons_rev30!=null) bits.push(`<span class="note">컨센30일</span> ${pct(lv.cons_rev30*100)}`);
+            // ③ 주가 — 실제로 어떻게 받아들였나
+            const rr=[]; if(lv.r1!=null) rr.push(`D+1 ${pct(lv.r1)}`);
+            if(lv.r5!=null) rr.push(`D+5 ${pct(lv.r5)}`);
+            if(lv.r20!=null) rr.push(`D+20 ${pct(lv.r20)}`);
+            if(rr.length) bits.push(rr.join(' '));
+            const tg=(lv.tags||[]).filter(t=>!t.includes('접수'));
+            if(tg.length) bits.push(esc(tg.join(' · ')));
+            res=` <span class="note">— ${bits.join(' · ')}</span>`;
+          }
           return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;};
         /* (2026-08-05) 정렬 토글 — 시가총액순 / 서프라이즈순(발표분 우선, |값| 큰 순) */
-        const sprLbl=mk==='us'?'EPS서프순':'영업익YoY순';
+        const sprLbl=mk==='us'?'EPS서프순':'실적서프순';
+        const KEYF={spr:r=>{const lv=LIVEBY[r.c]||{}; return mk==='us'?lv.spr:(lv.spr!=null?lv.spr:lv.op_yoy);},
+                    /* (2026-08-09) '비트인데 빠진 종목' 을 찾으려면 주가반응순이 필요하다 */
+                    r1:r=>(LIVEBY[r.c]||{}).r1,
+                    gap:r=>{const lv=LIVEBY[r.c]||{}; return lv.g_rev_gap!=null?lv.g_rev_gap:lv.g_eps_gap;}};
         const sorted=m=>{ const a=list.slice();
-          /* 서프순 = 부호 그대로 내림차순: +큰 것 → 0 → −큰 것(마지막). 미발표(null)는 맨 뒤 */
-          if(m==='spr') a.sort((x,y)=>{ const g=r=>{const lv=LIVEBY[r.c]; const v=lv?(mk==='us'?lv.spr:lv.op_yoy):null;
-              return v==null?-1e18:v; }; return g(y)-g(x); });
+          if(KEYF[m]) a.sort((x,y)=>{const g=r=>{const v=KEYF[m](r); return v==null?-1e18:v;}; return g(y)-g(x);});
           else a.sort((x,y)=>((y.cap||(LIVEBY[y.c]||{}).cap||0)-(x.cap||(LIVEBY[x.c]||{}).cap||0)));
           return a; };
         let mode='cap';
@@ -1134,14 +1159,17 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             <b>📅 ${key} (${wdn}) 실적발표 — ${list.length}종</b>
             <span style="margin-left:auto;display:inline-flex;gap:4px">
               <button class="cp-x" id="mcp_scap">시가총액순</button>
-              <button class="cp-x" id="mcp_sspr">${sprLbl}</button></span>
+              <button class="cp-x" id="mcp_sspr">${sprLbl}</button>
+              <button class="cp-x" id="mcp_sr1">주가반응순</button>
+              ${mk==='us'?'<button class="cp-x" id="mcp_sgap">가이던스갭순</button>':''}</span>
             <button class="cp-x" id="mcp_x">닫기 ✕</button></div>
           <div class="mc-pop-list"></div></div>`;
         const paint=()=>{ pop.querySelector('.mc-pop-list').innerHTML=sorted(mode).map(row).join('');
-          pop.querySelector('#mcp_scap').style.cssText=mode==='cap'?'background:#1f6feb;color:#fff;border-color:#1f6feb':'';
-          pop.querySelector('#mcp_sspr').style.cssText=mode==='spr'?'background:#1f6feb;color:#fff;border-color:#1f6feb':''; };
-        pop.querySelector('#mcp_scap').onclick=()=>{ mode='cap'; paint(); };
-        pop.querySelector('#mcp_sspr').onclick=()=>{ mode='spr'; paint(); };
+          [['mcp_scap','cap'],['mcp_sspr','spr'],['mcp_sr1','r1'],['mcp_sgap','gap']].forEach(([id,m])=>{
+            const b=pop.querySelector('#'+id); if(!b) return;
+            b.style.cssText=mode===m?'background:#1f6feb;color:#fff;border-color:#1f6feb':''; }); };
+        [['mcp_scap','cap'],['mcp_sspr','spr'],['mcp_sr1','r1'],['mcp_sgap','gap']].forEach(([id,m])=>{
+          const b=pop.querySelector('#'+id); if(b) b.onclick=()=>{ mode=m; paint(); }; });
         paint();
         pop.onclick=e=>{ if(e.target===pop) pop.remove(); };
         pop.querySelector('#mcp_x').onclick=()=>pop.remove();
@@ -3193,7 +3221,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       dinc:{label:'DPS 연속증가',fmt:v=>v.toFixed(0)+'년 연속↑',min:1,reqData:1,presets:[['전체',null],['1년 ↑',1],['2년 ↑',2],['3년 ↑',3]],def:[null,null]},   // (2026-08-06) DART 배당공시 5개년
       dgy:{label:'배당성장연수',fixed:'— (KR은 DPS 연속증가 사용)'},
       dcyc:{label:'배당주기',fixed:'— (US 전용 — KR은 연말 일괄 배당)'},
-      mdd5:{label:'최대낙폭 5Y',fixed:'— (US 전용)'}
+      mdd5:{label:'최대낙폭 5Y',fixed:'— (US 전용)'},
+      /* (2026-08-09) 실적발표 이벤트 — 한국은 DART 잠정실적 vs 증권사 컨센서스 — "그런 일이 있었던 종목"을 전체에서 걸러내는 축 */
+      spr:{label:'실적 서프라이즈',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['비트(+0%↑)',0,null],['+10% ↑',10,null],['미스(−0%↓)',null,0]],def:[null,null]},
+      sprb:{label:'연속 비트(4Q중)',fixed:'— (KR 미제공 · 분기 서프 이력 무료 소스 없음)'},
+      cr30:{label:'컨센 30일 리비전',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['상향 +2%↑',2,null],['상향 +5%↑',5,null],['하향 −2%↓',null,-2]],def:[null,null]},
+      gap:{label:'가이던스 갭',fixed:'— (한국은 기업 가이던스 공시 관행 없음)'},
+      r1:{label:'발표 후 1일',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['+5% ↑',5,null],['−5% ↓',null,-5]],def:[null,null]},
+      r20:{label:'발표 후 20일(PEAD)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['+10% ↑',10,null],['−10% ↓',null,-10]],def:[null,null]}
     },
     us:{
       sector:{label:'섹터',cat:1},
@@ -3267,7 +3306,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       dgy:{label:'배당성장연수',fmt:v=>(v>=30?'30년+':v.toFixed(0)+'년')+' 연속↑',min:1,reqData:1,presets:[['전체',null],['10년 ↑',10],['20년 ↑',20],['30년+',30]],def:[null,null]},
       dcyc:{label:'배당주기',cat:1,opts:['월배당(연12회)','분기 1·4·7·10월','분기 2·5·8·11월','분기 3·6·9·12월'],
         hint:{'월배당(연12회)':['up','매월 지급'],'분기 1·4·7·10월':['neu','그룹1'],'분기 2·5·8·11월':['neu','그룹2'],'분기 3·6·9·12월':['neu','그룹3 — 세 그룹 1종목씩=매월 수령']}},
-      mdd5:{label:'최대낙폭 5Y',fmt:v=>v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['−20% 이내',-20,null],['−30% 이내',-30,null],['−40% 이내',-40,null]],def:[null,null]}
+      mdd5:{label:'최대낙폭 5Y',fmt:v=>v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['−20% 이내',-20,null],['−30% 이내',-30,null],['−40% 이내',-40,null]],def:[null,null]},
+      /* (2026-08-09) 실적발표 이벤트 3종 — "그런 일이 있었던 종목"을 전체에서 걸러내는 축 */
+      spr:{label:'실적 서프라이즈',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['비트(+0%↑)',0,null],['+10% ↑',10,null],['미스(−0%↓)',null,0]],def:[null,null]},
+      sprb:{label:'연속 비트(4Q중)',fmt:v=>v.toFixed(0)+'/4회',reqData:1,
+        presets:[['전체',null,null],['3회 ↑',3,null],['4회 전부',4,null]],def:[null,null]},
+      cr30:{label:'컨센 30일 리비전',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['상향 +2%↑',2,null],['상향 +5%↑',5,null],['하향 −2%↓',null,-2]],def:[null,null]},
+      gap:{label:'가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
+      r1:{label:'발표 후 1일',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['+5% ↑',5,null],['−5% ↓',null,-5]],def:[null,null]},
+      r20:{label:'발표 후 20일(PEAD)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['+10% ↑',10,null],['−10% ↓',null,-10]],def:[null,null]}
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
@@ -3279,6 +3331,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
                  중복 컬럼을 없애고 mom 을 1Y 가 있던 자리(6M 뒤)로 옮긴다. */
               'r1m','r3m','r6m','mom','vol20','hi','frgn','frgn4w','fnb20','onb20','fst','ost','sr','lbr','srf','scov','inst','drvj',
               'ern','cov','upside','rec','rev','nan',
+              /* (2026-08-09) 실적발표 이벤트 — 실적(서프)·전망(리비전·가이던스)·주가(반응) 순 */
+              'spr','sprb','cr30','gap','r1','r20',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
      파생 z 3종(베이시스·풋콜(OI)·IV스큐 — 방향지표만, GEX·OI 제외):
@@ -3744,6 +3798,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'srf': return r.sr_f!=null?r.sr_f*100:null;               // US 공매도잔량/유통주식(%)
       case 'scov': return r.scov;                                    // US 커버일수(일)
       case 'inst': return r.inst!=null?r.inst*100:null;              // US 기관보유(%)
+      /* (2026-08-09) 실적 → 전망 → 주가 3종. '발표 때 무슨 일이 있었나'를 전체에서 필터하기 위한 축.
+         cr30 은 비율(0.05)로 저장돼 있어 %로 환산한다. */
+      case 'spr':  return r.spr;                                    // 최근 실적 서프라이즈%
+      case 'sprb': return r.sprb;                                   // 최근 4분기 중 컨센 상회 횟수
+      case 'cr30': return r.cr30!=null?r.cr30*100:null;             // 컨센서스 30일 리비전%
+      case 'gap':  return r.gap;                                    // 가이던스 vs 컨센 갭%(US)
+      case 'r1':   return r.r1;                                     // 발표 후 1거래일 등락%
+      case 'r20':  return r.r20;                                    // 발표 후 20거래일 수익%(PEAD)
       case 'ern': {                                                 // 어닝 D-day — 음수=발표 지남(D+, 사후 추적용)
         if(!r.ed) return null;
         const t=new Date(); t.setHours(0,0,0,0);
@@ -4055,6 +4117,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','mom']],
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
+      ['실적발표',['spr','sprb','cr30','gap','r1','r20']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
     ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
@@ -4260,6 +4323,7 @@ await _canvasFlow(c);
              ['기간수익률',['r1m','r3m','r6m','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
+      ['실적발표',['spr','sprb','cr30','gap','r1','r20']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
              ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
@@ -5667,10 +5731,12 @@ await _canvasFlow(c);
     kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
         ['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['g_new','성장',1],
         ['mom',(mkt==='kr'?'12M':'12-1M'),1],['near52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
+        ['spr','서프%',1],['sprb','비트4Q',1],['cr30','컨센30일',1],['gap','가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
         ['roe','ROE',1],['de','부채비율',1]],
     us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
         ['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['g_new','성장',1],
         ['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
+        ['spr','서프%',1],['sprb','비트4Q',1],['cr30','컨센30일',1],['gap','가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
         ['roe','ROE',1],['fcfy','FCF%',1],['de','부채비율',1]]
   };
   function cell2(r,c){const k=c[0];
@@ -5683,6 +5749,11 @@ await _canvasFlow(c);
     if(k==='near52'||k==='hi52'){const v=r[k]; return v==null?'—':'고점 '+(v*100).toFixed(0)+'%';}
     if(k==='vs200'){const v=r.vs200; return v==null?'—':(v>=0?'+':'')+(v*100).toFixed(0)+'%';}
     if(k==='rev'){const v=r.rev; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
+    /* (2026-08-09) 실적발표 3종 — 부호가 곧 의미라 색으로 즉시 구분되게 한다 */
+    if(k==='cr30'){const v=r.cr30; return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(v*100).toFixed(1)}%</span>`;}
+    if(k==='spr'||k==='gap'||k==='r1'||k==='r20'){const v=r[k];
+      return v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(1)}%</span>`;}
+    if(k==='sprb'){const v=r.sprb; return v==null?'—':`<span class="${v>=3?'up':'note'}">${v}/${r.sprn||4}</span>`;}
     if(k==='roe'){const v=r.roe; return v==null?'—':(mkt==='kr'?(+v).toFixed(1):(v*100).toFixed(1))+'%';}
     if(k==='de'){const v=r.de; return v==null?'—':(+v).toFixed(0)+'%';}
     if(k==='fcfy'){const v=r.fcfy; return v==null?'—':(v*100).toFixed(1)+'%';}
@@ -6038,6 +6109,30 @@ await _canvasFlow(c);
     set('mdd5',{min:-45,max:null});
     sort={k:'divy',d:-1};
     apply(); };}
+  /* (2026-08-09) 📈 어닝드리프트(PEAD) — 학계에서 반복 검증된 이례현상.
+     컨센을 이긴 종목의 주가는 발표 당일에 다 반영되지 않고 수 주간 같은 방향으로 흐른다.
+     그래서 '이겼고 + 추정치도 올라갔는데 + 아직 안 오른' 교집합을 초기 진입 후보로 본다. */
+  {const b=$('scr_pead'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('spr',{min:5,max:null});        // 컨센을 뚜렷하게 상회
+    set('cr30',{min:2,max:null});       // 발표 후 애널리스트가 추정치를 올림(전망 개선 확인)
+    set('r1',{min:null,max:5});         // 그런데 주가는 아직 크게 안 올랐다 = 남은 여지
+    set('cap',{min:mkt==='kr'?3000:2e9,max:null});
+    sort={k:'spr',d:-1}; apply(); };}
+  /* (2026-08-09) ⚠️ 가이던스쇼크 — 샌디스크형. 실적은 좋은데 전망이 나빠 빠진 경우.
+     반등 후보일 수도, 전망 악화가 진짜일 수도 있어 컨센 리비전을 반드시 함께 본다. */
+  {const b=$('scr_gshock'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('spr',{min:0,max:null});         // 실적 자체는 컨센 상회
+    set('r1',{min:null,max:-3});         // 그런데 주가는 하락 → 원인은 대개 가이던스
+    set('cap',{min:mkt==='kr'?3000:2e9,max:null});
+    sort={k:'r1',d:1}; apply(); };}
   /* (2026-08-05) 🌏 외인모멘텀 — '외국인 지분율 개선 + 이익모멘텀 개선' (증권사 리서치 아이디어).
      지분율 일별 시계열이 없어 '꾸준한 개선'은 외인 20일 순매수(+)·연속매수일로 프록시(지분율 상승과 동치).
      이익모멘텀 = 리비전(추정 상향) + 성장가속(직전 분기 대비 성장률 개선). */
