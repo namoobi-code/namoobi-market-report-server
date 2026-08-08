@@ -4749,6 +4749,10 @@ await _canvasFlow(c);
      한국 전용(네이버 공시 API). 미국은 SEC EDGAR 가 코드→CIK 매핑을 따로 요구하고
      공시 성격도 달라 같은 UX 로 묶기 어렵다. */
   let _DISC=null, _DSEL=null, _DHIT=[];   // 공시목록 · 선택된 마커 · 마커 히트박스
+  /* (2026-08-09) 실적발표 마커 — 공시 마커와 같은 UX(클릭하면 요약 상자).
+     같은 급등락이라도 실적 발표 직후냐 아니냐에 따라 해석이 완전히 달라지므로
+     캔들 위에 '실' 배지를 찍고, 누르면 캘린더 팝업과 같은 한 줄 요약을 띄운다. */
+  let _ESEL=null, _EHIT=[];
   /* (2026-07-21) 줌·팬 — 휠로 기간 확대/축소, 드래그로 좌우 이동.
      구조상 어렵지 않다: 지표는 이미 전체 시계열(full)로 계산한 뒤 표시 구간만 잘라 쓰므로,
      보이는 봉수(_CZ)와 뒤로 밀린 봉수(_COFF)만 바꾸면 MA·RSI·MACD·ADX 가 전부 그대로 맞는다.
@@ -5159,12 +5163,17 @@ await _canvasFlow(c);
 
         e.addEventListener('click',ev=>{
           if(_DMOVE>4) return;                        // 드래그였으면 클릭으로 치지 않는다
-          if(!_DHIT.length) return;
+          if(!_DHIT.length && !_EHIT.length) return;
           const r=e.getBoundingClientRect();
           const px=(ev.clientX-r.left)*(e.width/r.width), py=(ev.clientY-r.top)*(e.height/r.height);
+          // 실적 마커를 먼저 본다 — 공시 배지와 겹치는 날이면 실적 쪽이 정보량이 크다
+          let eh=null;
+          for(const m of _EHIT){ if((px-m.x)**2+(py-m.y)**2 <= (m.r+3)**2){ eh=m.d; break; } }
+          if(eh){ _ESEL=(eh!==_ESEL)?eh:null; _DSEL=null; _paint(); return; }
           let hit=null;
           for(const m of _DHIT){ if((px-m.x)**2+(py-m.y)**2 <= (m.r+3)**2){ hit=m.d; break; } }
           _DSEL = (hit && hit!==_DSEL) ? hit : null;   // 같은 마커 재클릭·빈 곳 클릭 → 닫기
+          _ESEL = null;
           _paint(); });
       }
       e.style.cursor='grab';
@@ -5199,7 +5208,7 @@ await _canvasFlow(c);
         if(i<0){ for(let k=_CT.length-1;k>=0;k--){ if(String(_CT[k]||'').replace(/-/g,'')<=d){ i=k; break; } } }
         if(i>=0&&i!==_CHI){ _CHI=i; _paint(); } });
       ei.addEventListener('mouseleave',()=>{ if(_CHI!=null){ _CHI=null; _paint(); } }); } }
-  function drawAll(D){ _CD=D; _CHI=null; _DISC=null; _DSEL=null; _DHIT=[];
+  function drawAll(D){ _CD=D; _CHI=null; _DISC=null; _DSEL=null; _DHIT=[]; _ESEL=null; _EHIT=[];
     _CZ=CZ0; _COFF=0;                    // 종목이 바뀌면 기본 구간으로
     _bindChart(); _paint(); }
   async function loadDisc(c){
@@ -5357,6 +5366,63 @@ await _canvasFlow(c);
       x.font='bold 10px sans-serif'; const w=x.measureText(lab).width;
       x.fillStyle='#2c3542'; x.fillRect(W-P.r+1, yy-7, w+7, 14);
       x.fillStyle='#fff'; x.fillText(lab, W-P.r+4, yy+3); }
+     /* (2026-08-09) 실적발표 마커 — 공시 마커와 같은 방식(캔들 위 배지 + 클릭 시 요약 상자).
+        🟩 '실' = 실제 발표를 감지한 날(edl · DART 잠정공시 / SEC 8-K Item 2.02)
+        ⬜ '예' = IR 예정일(ed · Yahoo·네이버 IR) — 아직 발표 전이거나 감지 못한 경우
+        클릭하면 캘린더 팝업과 같은 한 줄 요약(실적 → 전망 → 주가)이 뜬다. */
+     _EHIT=[];
+     {const rw=(POOL[mkt]||[]).find(z=>z.c===dcode)||{};
+      const idx2={}; for(let i=0;i<N;i++) idx2[String(t[i]||'').replace(/-/g,'').slice(0,8)]=i;
+      const ed8=String(rw.ed||'').replace(/-/g,'').slice(0,8);
+      const marks=[];
+      if(rw.edl && idx2[rw.edl]!=null) marks.push({d:rw.edl, i:idx2[rw.edl], t:'실', col:'#1f9d55'});
+      if(ed8 && ed8!==rw.edl && idx2[ed8]!=null) marks.push({d:ed8, i:idx2[ed8], t:'예', col:'#7a869a'});
+      marks.forEach(m=>{ const mx=X(m.i), sel=(_ESEL===m.d);
+        // 세로 가이드선 — 어느 봉이 발표일인지 한눈에
+        x.save(); x.setLineDash(m.t==='예'?[3,3]:[]); x.strokeStyle=m.col; x.globalAlpha=sel?.55:.3;
+        x.lineWidth=sel?2:1.2; x.beginPath(); x.moveTo(mx,P.t); x.lineTo(mx,H-P.b); x.stroke(); x.restore();
+        const my=Math.max(Y(hh[m.i])-26, P.t+8);
+        x.beginPath(); x.arc(mx, my, sel?8:6.5, 0, Math.PI*2);
+        x.fillStyle=sel?m.col:(m.col+'d9'); x.fill();
+        x.strokeStyle='#fff'; x.lineWidth=1.2; x.stroke(); x.lineWidth=1;
+        x.fillStyle='#fff'; x.font='bold 9px sans-serif'; x.textAlign='center';
+        x.fillText(m.t, mx, my+3); x.textAlign='left';
+        _EHIT.push({d:m.d, x:mx, y:my, r:9}); });
+
+      // 선택된 마커 → 요약 상자 (캘린더 팝업과 동일한 '실적 → 전망 → 주가' 순서)
+      const sm=marks.find(m=>m.d===_ESEL);
+      if(sm){
+        const pc=(v,suf)=>v==null?null:`${v>0?'+':''}${(+v).toFixed(1)}${suf||'%'}`;
+        const rows=[];
+        if(sm.t==='예'){ rows.push(['다음 실적발표 예정일','IR 공시 기준 — 확정 아님']); }
+        else{
+          rows.push(['실적', (mkt==='us'?'EPS 서프 ':'영업이익 컨센比 ')+(pc(rw.spr)||'—')
+            + (rw.sprb!=null?`  (4분기 중 ${rw.sprb}회 상회)`:'')]);
+          const gp = rw.gap!=null?pc(rw.gap):null;
+          const cv = rw.cr30!=null?pc(rw.cr30*100):(rw.tprv!=null?pc(rw.tprv):null);
+          rows.push(['전망', (gp?`가이던스 ${gp} vs 컨센`:'가이던스 —')
+            + '   ' + (cv?`${mkt==='us'?'컨센 30일':'목표가 30일'} ${cv}`:'')]);
+          const rr=[]; if(rw.r1!=null) rr.push('D+1 '+pc(rw.r1));
+          if(rw.r5!=null) rr.push('D+5 '+pc(rw.r5));
+          if(rw.r20!=null) rr.push('D+20 '+pc(rw.r20));
+          rows.push(['주가', rr.length?rr.join('   '):'집계 전']);
+        }
+        x.font='11px sans-serif';
+        const head=`${sm.d.slice(0,4)}.${sm.d.slice(4,6)}.${sm.d.slice(6,8)} ${sm.t==='예'?'실적발표 예정':'실적발표'}`;
+        const lines=rows.map(z=>z[0]+'  '+z[1]);
+        const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+18, 430);
+        const bh=22+lines.length*15;
+        let bx=Math.min(Math.max(X(sm.i)-wmax/2, P.l), W-P.r-wmax);
+        let by=Math.min(Y(hh[sm.i])+16, H-P.b-bh-4); if(by<P.t+18) by=P.t+18;
+        x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
+        if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,7); x.fill(); x.stroke(); }
+        else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
+        x.fillStyle=sm.col; x.font='bold 11px sans-serif'; x.fillText(head, bx+9, by+16);
+        rows.forEach((z,k)=>{ const yy=by+31+k*15;
+          x.fillStyle='#98a2ad'; x.font='10px sans-serif'; x.fillText(z[0], bx+9, yy);
+          x.fillStyle='#3d454f'; x.font='11px sans-serif'; x.fillText(z[1], bx+40, yy); });
+      }
+     }
      /* 공시 마커 — 날짜별로 묶어 최신부터 A·B·C… 를 부여하고 캔들 고가 위에 원형 배지로 찍는다.
         클릭 판정을 위해 화면좌표를 _DHIT 에 쌓아 둔다(캔버스는 DOM 이 없어 직접 히트테스트). */
      _DHIT=[];
@@ -6156,9 +6222,11 @@ await _canvasFlow(c);
      컨센을 이긴 종목의 주가는 발표 당일에 다 반영되지 않고 수 주간 같은 방향으로 흐른다.
      그래서 '이겼고 + 추정치도 올라갔는데 + 아직 안 오른' 교집합을 초기 진입 후보로 본다. */
   {const b=$('scr_pead'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    /* (2026-08-09) '전부 전체'가 아니라 **기본 하드컷(default) 위에** 조건을 얹는다.
+       전부 비우면 저가주·적자기업·초소형주까지 들어와 후보가 지저분해지고,
+       직전에 손으로 만져둔 값이 남아 결과가 들쭉날쭉해진다(가이던스갭이 남아 3종만 나온 사례). */
+    resetF(); F=F_ST[mkt];
     const d=DEF[mkt];
-    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
-      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
     const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
     set('spr',{min:5,max:null});        // 컨센을 뚜렷하게 상회
     /* 전망 개선 확인 — 미국은 이익추정 리비전, 한국은 스냅샷 30일이 쌓이기 전까지
@@ -6171,12 +6239,18 @@ await _canvasFlow(c);
   /* (2026-08-09) ⚠️ 가이던스쇼크 — 샌디스크형. 실적은 좋은데 전망이 나빠 빠진 경우.
      반등 후보일 수도, 전망 악화가 진짜일 수도 있어 컨센 리비전을 반드시 함께 본다. */
   {const b=$('scr_gshock'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    resetF(); F=F_ST[mkt];                 // 기본 하드컷 위에 조건을 얹는다(위 어닝드리프트와 동일)
     const d=DEF[mkt];
-    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
-      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
     const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
-    set('spr',{min:0,max:null});         // 실적 자체는 컨센 상회
-    set('r1',{min:null,max:-3});         // 그런데 주가는 하락 → 원인은 대개 가이던스
+    /* (2026-08-09 사용자 세팅 반영) '실적도 전망도 멀쩡한데 주가만 빠진' 교집합으로 좁힌다.
+       서프만 보면 전망이 실제로 나빠진 종목까지 섞여 반등 후보와 함정이 구분되지 않는다.
+       → 실적(서프·연속비트) + 전망(컨센 리비전·가이던스 갭)이 모두 마이너스가 아닌데
+         주가만 −3% 이상 빠진 경우 = 과잉 반응 의심 구간. */
+    set('spr',{min:0,max:null});         // 실적: 컨센 상회
+    set('sprb',{min:4,max:null});        // 실적: 최근 4분기 전부 상회(꾸준히 이기는 회사)
+    set('cr30',{min:0,max:null});        // 전망: 발표 후 추정치가 꺾이지 않음
+    set('gap',{min:0,max:null});         // 전망: 가이던스도 컨센 이상
+    set('r1',{min:null,max:-3});         // 그런데 주가는 하락 → 과잉 반응 의심
     set('cap',{min:mkt==='kr'?3000:2e9,max:null});
     sort={k:'r1',d:1}; apply(); };}
   /* (2026-08-05) 🌏 외인모멘텀 — '외국인 지분율 개선 + 이익모멘텀 개선' (증권사 리서치 아이디어).
