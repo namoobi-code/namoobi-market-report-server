@@ -46,6 +46,17 @@ class _Stop(Exception):
     pass
 
 
+class _Quota(Exception):
+    """이 서비스의 **일일** 요청제한이 소진됨 — 오늘은 이 유형만 건너뛰고 나머지는 계속한다."""
+
+
+# (2026-08-08) data.go.kr 은 활용신청 건(=유형)마다 일일 호출 한도가 따로 있다.
+# 예전엔 토지 한도가 소진되면 fetch 가 최대 1시간씩 자며 전체 수집을 붙잡아
+# 서울·부산 28곳에서 더 나아가지 못했다(사용자: "전지역 확인이 안된다").
+# → 한도 소진 유형은 DEAD 에 넣고 즉시 건너뛴다. 한도는 자정(KST)에 리셋된다.
+DEAD = set()
+
+
 # key: (서비스, 오퍼레이션, 금액필드, 면적필드)
 KINDS = {
     "offi_s": ("RTMSDataSvcOffiTrade", "getRTMSDataSvcOffiTrade", "dealAmount", "excluUseAr"),
@@ -93,17 +104,30 @@ def fetch(svc, op, lawd, ym):
             raise _Stop("호출 예산 소진")
         u = (f"https://apis.data.go.kr/1613000/{svc}/{op}"
              f"?serviceKey={KEY}&LAWD_CD={lawd}&DEAL_YMD={ym}&numOfRows=1000&pageNo={page}")
+        if svc in DEAD:
+            raise _Quota(svc)
         root = None
         try:
             root = ET.fromstring(urllib.request.urlopen(u, timeout=30).read())
         except urllib.error.HTTPError as he:
             if he.code != 429:
                 return rows
-            # 429 는 수십 분이면 풀린다 — 며칠짜리 무인 수집이므로 포기하지 않는다.
-            for w in (60, 300, 900, 1800, 1800, 1800, 3600):
+            try:
+                body = he.read().decode("utf-8", "replace")
+            except Exception:
+                body = ""
+            if "일일" in body or "LIMITED_NUMBER_OF_SERVICE_REQUESTS" in body:
+                DEAD.add(svc)
+                raise _Quota(svc)
+            # 429 는 대개 몇 분이면 풀린다. 예전 사다리는 첫 대기가 60초·다음이 300초라
+            # 이미 풀린 뒤에도 30분씩 자고 있었다(실측: 제한 해제 상태로 4분 넘게 sleep).
+            # → 짧게 자주 두드리고, 무엇을 하는 중인지 로그로 남긴다.
+            for w in (10, 20, 40, 90, 180, 300, 600, 900, 1800, 1800, 3600):
+                print(f"    ⏳ 429 — {w}초 대기 후 재시도 ({svc} {lawd} {ym})", flush=True)
                 time.sleep(w)
                 try:
                     root = ET.fromstring(urllib.request.urlopen(u, timeout=30).read())
+                    print("    ✔ 429 해제 — 재개", flush=True)
                     break
                 except Exception:
                     continue
@@ -116,8 +140,9 @@ def fetch(svc, op, lawd, ym):
             except Exception:
                 return rows
         rc = (root.findtext(".//resultCode") or "").strip()
-        if rc == "22":
-            raise _Stop("일일 트래픽 한도 초과")
+        if rc == "22":                       # 200 으로 오는 일일 한도 초과 — 이 유형만 중단
+            DEAD.add(svc)
+            raise _Quota(svc)
         if rc not in ("000", "00"):
             return rows
         items = root.findall(".//item")
@@ -258,39 +283,44 @@ def main():
         for i, (code, name) in enumerate(order):
             got = 0
             for kind, (svc, op, _, _) in KINDS.items():
-                for ym in reversed(yms):                    # 최신 → 과거
-                    if ym not in recent and cx.execute(
-                            "SELECT 1 FROM done WHERE kind=? AND sgg=? AND ym=?",
-                            (kind, code, ym)).fetchone():
-                        continue
-                    raw = fetch(svc, op, code, ym)
-                    # (2026-08-08) 같은 응답으로 단지별 시계열도 적재 — 추가 호출 0회.
-                    # 국토부가 건물명을 주는 오피스텔·연립다세대만 가능(단독·토지·상업용은 미제공).
-                    # 유형별 식별 가능 수준(실측 2026-08-08):
-                    #   오피스텔·연립다세대 = 건물명 / 상업업무용 = 법정동+지번(62%)
-                    #   단독다가구·토지 = 전부 마스킹 → 법정동 단위
-                    K2 = {"offi_s": ("offi", "offiNm"), "offi_r": ("offi", "offiNm"),
-                          "rh": ("rh", "mhouseNm"), "sh": ("sh", ""),
-                          "land": ("land", ""), "nrg": ("nrg", "")}
-                    if kind in K2:
-                        k2, nf = K2[kind]
-                        try:
-                            if kind == "offi_r":
-                                apt_db.ingest_rent(acx, code, ym, raw, acache, k2, nf)
-                            else:
-                                apt_db.ingest_sale(acx, code, ym, raw, acache, k2, nf)
-                            acx.commit()      # 잠금 구간 최소화
-                        except Exception as e:
-                            print(f"    ⚠ 단지DB 적재 실패({kind} {code} {ym}): {e}")
-                    a = agg(kind, raw)
-                    if a:
-                        cx.execute("INSERT OR REPLACE INTO agg"
-                                   "(kind,sgg,ym,n,amt,med,ar,n2,amt2,rent)"
-                                   " VALUES(?,?,?,?,?,?,?,?,?,?)", (kind, code, ym, *a))
-                        got += 1
-                    cx.execute("INSERT OR REPLACE INTO done(kind,sgg,ym) VALUES(?,?,?)",
-                               (kind, code, ym))
-                    time.sleep(SLEEP)
+                if svc in DEAD:
+                    continue
+                try:
+                  for ym in reversed(yms):                    # 최신 → 과거
+                     if ym not in recent and cx.execute(
+                             "SELECT 1 FROM done WHERE kind=? AND sgg=? AND ym=?",
+                             (kind, code, ym)).fetchone():
+                         continue
+                     raw = fetch(svc, op, code, ym)
+                     # (2026-08-08) 같은 응답으로 단지별 시계열도 적재 — 추가 호출 0회.
+                     # 국토부가 건물명을 주는 오피스텔·연립다세대만 가능(단독·토지·상업용은 미제공).
+                     # 유형별 식별 가능 수준(실측 2026-08-08):
+                     #   오피스텔·연립다세대 = 건물명 / 상업업무용 = 법정동+지번(62%)
+                     #   단독다가구·토지 = 전부 마스킹 → 법정동 단위
+                     K2 = {"offi_s": ("offi", "offiNm"), "offi_r": ("offi", "offiNm"),
+                           "rh": ("rh", "mhouseNm"), "sh": ("sh", ""),
+                           "land": ("land", ""), "nrg": ("nrg", "")}
+                     if kind in K2:
+                         k2, nf = K2[kind]
+                         try:
+                             if kind == "offi_r":
+                                 apt_db.ingest_rent(acx, code, ym, raw, acache, k2, nf)
+                             else:
+                                 apt_db.ingest_sale(acx, code, ym, raw, acache, k2, nf)
+                             acx.commit()      # 잠금 구간 최소화
+                         except Exception as e:
+                             print(f"    ⚠ 단지DB 적재 실패({kind} {code} {ym}): {e}")
+                     a = agg(kind, raw)
+                     if a:
+                         cx.execute("INSERT OR REPLACE INTO agg"
+                                    "(kind,sgg,ym,n,amt,med,ar,n2,amt2,rent)"
+                                    " VALUES(?,?,?,?,?,?,?,?,?,?)", (kind, code, ym, *a))
+                         got += 1
+                     cx.execute("INSERT OR REPLACE INTO done(kind,sgg,ym) VALUES(?,?,?)",
+                                (kind, code, ym))
+                     time.sleep(SLEEP)
+                except _Quota:
+                    print(f"  \u26d4 {LABEL[kind]} 일일 요청제한 소진 — 오늘은 건너뛴다", flush=True)
             cx.commit(); acx.commit()
             print(f"  [{i+1}/{len(REGIONS)}] {name}: {got}건 적재 (누적호출 {CALLS:,})", flush=True)
             if (i + 1) % 10 == 0:

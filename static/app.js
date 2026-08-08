@@ -1871,17 +1871,29 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            +` — 전세를 월세로 바꿀 때 적용되는 이율. 높을수록 <b>월세가 비싸다</b>.`
            +`<br><span class="note">⚠ ${s.conv_note||'근사치'}</span>`;
        }}
+     /* (2026-08-08) 전세·월세 '건수' 2선 → **월세 비중(%)** 1선으로 바꾸고 선택 지역 전부 그린다.
+        건수는 지역 규모에 비례해 커서 지역 간 비교가 안 됐고(그래서 첫 지역만 그렸다),
+        한 지역에 2선을 쓰니 다지역 겹쳐보기도 불가능했다. 비율로 정규화하면 둘 다 풀린다.
+        월세 비중 = 월세건수 / (전세건수 + 월세건수) × 100. */
      if(s&&s.n&&s.wol_n){
-       const r0=R[0];
-       if(s.n[r0]&&s.wol_n[r0]){
-         line('et_jw',[{t:s.t,v:s.n[r0],label:'전세',color:'#2f6fed'},
-                       {t:s.t,v:s.wol_n[r0],label:'월세',color:'#e08e3c'}],{provIdx:_provRT(s.t)});
-         const je=s.n[r0], wo=s.wol_n[r0];
-         let i=je.length-1; while(i>=0&&(je[i]==null&&wo[i]==null)) i--;
-         const rt=(i>=0&&(je[i]||0)+(wo[i]||0))?((wo[i]||0)/((je[i]||0)+(wo[i]||0))*100):null;
-         $('et_jw_n').innerHTML=`<b>${r0}</b> 최신 월세 비중 <b>${rt!=null?rt.toFixed(0)+'%':'—'}</b> (${i>=0?F(s.t[i]):'—'}) — 전세 ${je[i]??'—'}건 · 월세 ${wo[i]??'—'}건`
-           +`<br><span class="note">월세 비중 상승 = 전세 기피(역전세·보증금 미반환 우려) 또는 고금리로 전세대출 부담↑. <b>첫 번째 선택 지역</b> 기준.</span>`;
-       }}}
+       const L=R.map((r,i)=>{ const je=s.n[r], wo=s.wol_n[r]; if(!je||!wo) return null;
+         const v=s.t.map((_,k)=>{ const a=je[k]||0, b=wo[k]||0; return (a+b)?+(b/(a+b)*100).toFixed(1):null; });
+         return v.some(x=>x!=null)?{t:s.t,v,label:r,color:RP_PAL[i%RP_PAL.length]}:null; }).filter(Boolean);
+       if(L.length){
+         /* 표시·정렬은 **확정월** 기준. 잠정 달은 거래가 몇 건뿐이라
+            "1건 중 1건이 월세 = 100%" 같은 값이 나와 비교가 무의미해진다. */
+         const pi=_provRT(s.t); const ci=pi!=null?pi-1:s.t.length-1;
+         line('et_jw',L,{provIdx:pi,hi:_etHi,refIdx:ci});
+         const lastOf=a=>{for(let i=Math.min(ci,a.v.length-1);i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null;};
+         const sorted=[...L].sort((a,b)=>((lastOf(b)||{}).v??-1)-((lastOf(a)||{}).v??-1));
+         $('et_jw_n').innerHTML=
+           `<b>월세 비중(%)</b> = 월세 ÷ (전세+월세) × 100 · 지역 겹쳐보기 · 높을수록 월세화가 진행된 시장`
+           +`${ci>=0?` · <b>확정 ${F(s.t[ci])}</b> 기준`:''}`
+           +`<br>`+sorted.map(a=>{const l=lastOf(a);
+               return `<b style="color:${a.color}">${a.label}</b> ${l?l.v.toFixed(0)+'%':'—'}<span class="note">${l?`(${F(l.ym)})`:''}</span>`;}).join(' &nbsp;·&nbsp; ')
+           +`<br><span class="note">월세 비중 상승 = 전세 기피(역전세·보증금 미반환 우려) 또는 고금리로 전세대출 부담↑. 거래가 적은 달은 비율이 크게 튀니 추세로 볼 것.</span>`;
+       } else { wipe('et_jw'); $('et_jw_n').innerHTML=''; }
+     }}
   }
 
   /* ── (2026-08-08) 🏗 주택 공급 — molit.json (통계누리 무인증)
