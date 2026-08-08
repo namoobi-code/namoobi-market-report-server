@@ -1978,7 +1978,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          +`<br><span class="note">미분양↑ = 수요 약세·공급과잉. <b>준공후 미분양</b>은 다 짓고도 안 팔린 물량이라 건설사 자금압박·할인분양으로 이어지는 악성 신호(지역 1개만 고르면 함께 표시).</span>`;
      }}
     /* ② 공급 파이프라인 — 유량(flow) 지표라 12개월 누적이 기본 */
-    {const P=['permit','start','done'].map(_msPick).filter(Boolean);
+    /* (2026-08-08) `.map(_msPick)` 는 map 의 2번째 인자(인덱스)를 _msPick(key, reg) 의
+       reg 로 넘긴다. 인허가는 index 0 이 falsy 라 '전국'으로 잘 떨어졌지만
+       착공(1)·준공(2)은 존재하지 않는 지역 '1','2' 를 찾다 null 이 돼 사라졌다.
+       → 인자를 명시적으로 넘긴다. */
+    {const P=['permit','start','done'].map(k=>_msPick(k)).filter(Boolean);
      if(P.length){ const A=_msAlign(P);
        const CO={'주택 인허가':'#2f6fed','주택 착공':'#e08e3c','주택 준공':'#27ae60'};
        const arr=P.map(p=>{ const v=A.map(p); return {t:A.ts, v:_msMode==='12m'?_ms12(A.ts,v):v,
