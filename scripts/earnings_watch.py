@@ -17,6 +17,8 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "earnings_live.json"
+CONS = BASE / "data" / "db" / "kr_consensus.json"      # kr_consensus.py 산출(WISEreport 분기 컨센)
+CONSDB = BASE / "data" / "db" / "kr_consensus.sqlite"   # 일별 스냅샷 — 발표 직전 컨센을 되찾는 용도
 KEY = (BASE / "keys" / "opendart.txt").read_text().strip()
 DATE = None
 if "--date" in sys.argv:
@@ -107,6 +109,59 @@ def tags_of(p):
     if n[3] and not o[3]: tg.append("순이익 " + n[3])
     return tg
 
+def quarter_end(d8):
+    """공시일 → 해당 잠정실적의 분기말(YYYY/MM).
+
+    잠정실적은 분기 종료 직후 공시된다(1~3월=전년 4Q, 4~6월=1Q, 7~9월=2Q, 10~12월=3Q).
+    """
+    y, m = int(d8[:4]), int(d8[4:6])
+    if m <= 3:  return f"{y-1}/12"
+    if m <= 6:  return f"{y}/03"
+    if m <= 9:  return f"{y}/06"
+    return f"{y}/09"
+
+
+_CONS = None
+def surprise(code, op, sales):
+    """잠정 영업이익 vs 증권사 컨센서스 → 서프라이즈%.
+
+    컨센이 0 근처면 비율이 폭주하므로(적자→흑자 전환 등) 그럴 땐 비율을 내지 않고
+    금액 차이만 남긴다. 단위는 양쪽 다 억원.
+    """
+    global _CONS
+    if _CONS is None:
+        try:
+            _CONS = json.loads(CONS.read_text(encoding="utf-8")).get("r", {})
+        except Exception:
+            _CONS = {}
+    c = _CONS.get(code) or {}
+    if op is None:
+        return {}
+    qe = quarter_end(D8)
+    est = sales_est = None
+    if c.get("p") == qe:
+        est, sales_est = c.get("op"), c.get("sales")
+    else:
+        # 실적이 확정되면 WISEreport 의 (E) 는 다음 분기로 넘어간다. 그 전에 매일 떠 둔
+        # 스냅샷에서 **발표 직전 컨센**을 되찾는다 — 이게 없으면 서프라이즈를 못 잰다.
+        try:
+            import sqlite3
+            cx = sqlite3.connect(f"file:{CONSDB}?mode=ro", uri=True, timeout=10)
+            r = cx.execute("SELECT op,sales FROM snap WHERE code=? AND period=? ORDER BY d DESC LIMIT 1",
+                           (code, qe)).fetchone()
+            cx.close()
+            if r: est, sales_est = r[0], r[1]
+        except Exception:
+            pass
+    out = {"cons_p": qe, "cons_op": est, "cons_sales": sales_est,
+           "cons_rev30": c.get("op30"), "rc7": c.get("rc7"), "tp": c.get("tp")}
+    if est and abs(est) > 10:          # 10억원 미만 컨센은 비율이 무의미
+        out["spr"] = round((op / est - 1) * 100, 1)
+    else:
+        out["spr_amt"] = round(op - (est or 0), 1)
+    return out
+
+
 def main():
     old = {}
     try:
@@ -153,6 +208,9 @@ def main():
               "op": val("op", 0), "op_yoy": val("op", 2),
               "ni": val("ni", 0), "ni_yoy": val("ni", 2)}
         it["tags"] = tags_of(p)
+        # (2026-08-09) 컨센서스 대비 서프라이즈 — 한국은 가이던스가 없어 이게 곧 '전망 충격'의 크기다.
+        # YoY 만으로는 "잘했나"는 알아도 "시장이 놀랄 일인가"는 알 수 없다.
+        it.update(surprise(code, it.get("op"), it.get("sales")))
         days.setdefault(D8, [])
         days[D8] = [z for z in days[D8] if z["c"] != code] + [it]   # 정정 시 교체
         new += 1

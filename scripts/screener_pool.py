@@ -314,11 +314,62 @@ def _enrich_us(us):
             cur=(tr.get("current") or {}).get("raw"); ago=(tr.get("90daysAgo") or {}).get("raw")
             if cur is not None and ago and ago>0: revs.append(cur/ago-1.0)
         return (sum(revs)/len(revs)) if revs else None
+    def _cons(fd):
+        """(2026-08-09) 컨센서스 리비전 — '실적발표 후 애널리스트가 전망을 어떻게 바꿨나'.
+
+        Yahoo earningsTrend 는 epsTrend 에 **현재·7일전·30일전·90일전 추정치를 한꺼번에** 준다
+        (실측 SNDK: 0q 46.17 / 7d 44.29 / 30d 42.93 / 90d 39.29). 별도 일별 스냅샷을
+        몇 주 쌓을 필요 없이 즉시 리비전을 계산할 수 있다.
+        기간은 **0q(당분기)·+1q(다음분기)** — 연간(0y)보다 실적발표 반응이 빠르다.
+        """
+        et=(fd.get("earningsTrend") or {}).get("trend",[]) or []
+        def rv(days):
+            out=[]
+            for per in ("0q","+1q"):
+                t=next((x for x in et if x.get("period")==per),None)
+                if not t: continue
+                tr=t.get("epsTrend") or {}
+                cur=(tr.get("current") or {}).get("raw"); ago=(tr.get(days) or {}).get("raw")
+                # 추정치가 음수거나 0 근처면 비율이 폭주한다 → 양수만 사용
+                if cur is not None and ago and ago>0: out.append(cur/ago-1.0)
+            return (sum(out)/len(out)) if out else None
+        up=dn=0; eq1=rq1=nan1=None
+        t1=next((x for x in et if x.get("period")=="+1q"),None)
+        if t1:
+            rr=t1.get("epsRevisions") or {}
+            up=(rr.get("upLast30days") or {}).get("raw") or 0
+            dn=(rr.get("downLast30days") or {}).get("raw") or 0
+            ee=t1.get("earningsEstimate") or {}; re_=t1.get("revenueEstimate") or {}
+            eq1=(ee.get("avg") or {}).get("raw"); nan1=(ee.get("numberOfAnalysts") or {}).get("raw")
+            rq1=(re_.get("avg") or {}).get("raw")
+        return {"cr30":rv("30daysAgo"),"cr7":rv("7daysAgo"),"cr90":rv("90daysAgo"),
+                "cup":up,"cdn":dn,"eq1":eq1,"rq1":rq1,"nan1":nan1}
+
+    def _spr(fd):
+        """어닝 서프라이즈 이력 — 최근 분기 서프%, 최근 4분기 비트 횟수·평균.
+
+        '꾸준히 컨센을 이기는 회사'는 다음 분기도 이길 확률이 높다(어닝 서프라이즈 지속성).
+        surprisePercent 는 비율(0.1372 = +13.7%)로 온다 — 실측 SNDK 4분기 연속 비트.
+        """
+        hs=(fd.get("earningsHistory") or {}).get("history",[]) or []
+        vs=[]
+        for h in hs:
+            v=(h.get("surprisePercent") or {}).get("raw")
+            q=(h.get("quarter") or {}).get("fmt")
+            if v is not None: vs.append((q or "",v))
+        if not vs: return {}
+        vs.sort(key=lambda x:x[0])                    # 과거→최신
+        last4=sorted(v for _,v in vs[-4:])
+        # 평균이 아니라 **중위값**. 추정치가 0 근처면 서프라이즈%가 폭주해 평균이 무의미해진다
+        # (실측 INTC: 4분기 평균 +1361% ← 적자→흑자 전환 분기 하나가 전부를 지배).
+        n=len(last4); med=last4[n//2] if n%2 else (last4[n//2-1]+last4[n//2])/2
+        return {"spr":vs[-1][1],"sprb":sum(1 for v in last4 if v>0),"sprn":n,"spra":med}
+
     def yqs(r):
         for att in range(3):
             try:
                 j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
-                         f"?modules=financialData,assetProfile,earningsTrend,summaryDetail,defaultKeyStatistics&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                         f"?modules=financialData,assetProfile,earningsTrend,earningsHistory,summaryDetail,defaultKeyStatistics&crumb={_up.quote(crumb)}",opener=op,timeout=12)
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
                 fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{}); sd=fd.get("summaryDetail",{})
                 ks=fd.get("defaultKeyStatistics",{})   # (2026-07-24) US 수급 프록시 — 공매도잔량·커버일수·기관보유
@@ -333,7 +384,7 @@ def _enrich_us(us):
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
                         "tplo":v(fdd.get("targetLowPrice")),"rec":v(fdd.get("recommendationMean")),
                         "nan":v(fdd.get("numberOfAnalystOpinions")),"oploss":_op3neg_us(r["c"]),
-                        "eps_rev":_eps_rev(fd)}
+                        "eps_rev":_eps_rev(fd),**_cons(fd),**_spr(fd)}
             except Exception:
                 time.sleep(0.5*(att+1))
         return r
@@ -348,7 +399,8 @@ def _enrich_us(us):
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
-    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev","opm","psr")
+    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev","opm","psr",
+        "cr30","cr7","cr90","cup","cdn","eq1","rq1","nan1","spr","sprb","sprn","spra")
     cf=0
     for c in by:
         if "sector" not in by[c] and c in prev:
