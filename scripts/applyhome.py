@@ -19,7 +19,7 @@
 산출: data/db/applyhome.json {asof, months, regions, series{지역:[경쟁률]}, recent[공고 40건]}
 """
 import json, sys, time, urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -64,6 +64,37 @@ def num(x):
         return None
 
 
+# 시도 정식명 → 짧은 이름 (공고의 SUBSCRPT_AREA_CODE_NM 과 표기를 맞춘다)
+SD_SHORT = {"서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구", "인천광역시": "인천",
+            "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산",
+            "세종특별자치시": "세종", "경기도": "경기", "강원특별자치도": "강원", "강원도": "강원",
+            "충청북도": "충북", "충청남도": "충남", "전북특별자치도": "전북", "전라북도": "전북",
+            "전라남도": "전남", "경상북도": "경북", "경상남도": "경남", "제주특별자치도": "제주"}
+
+
+def parse_sgg(addr, fallback_sd):
+    """공급위치 주소 → '시도 시군구'. 예) '경기도 용인시 처인구 역북동 …' → '경기 용인시 처인구'
+
+    실측 주소 형식이 '시도 시군구 [자치구] 읍면동 …' 로 일정하다.
+    창원·용인·수원 등 특례시는 '○○시 ○○구' 두 토큰을 합쳐야 실제 행정구역이 된다.
+    """
+    t = (addr or "").split()
+    if len(t) < 2:
+        return None
+    sd = SD_SHORT.get(t[0])
+    if not sd:
+        return None
+    if sd != fallback_sd and fallback_sd:      # 공고 지역과 주소 시도가 다르면 주소를 신뢰
+        pass
+    g = t[1]
+    if not g.endswith(("시", "군", "구")):
+        return None
+    # 특례시의 일반구 (용인시 처인구 / 창원시 마산회원구 …)
+    if len(t) > 2 and g.endswith("시") and t[2].endswith("구"):
+        g = f"{g} {t[2]}"
+    return f"{sd} {g}"
+
+
 def main():
     print("[apply] 분양공고 수집")
     pb = fetch_all("ApplyhomeInfoDetailSvc/v1/getAPTLttotPblancDetail", "공고")
@@ -87,6 +118,7 @@ def main():
             "kind": r.get("HOUSE_SECD_NM"), "rent": r.get("RENT_SECD_NM"),
             "addr": r.get("HSSPLY_ADRES"), "url": r.get("PBLANC_URL"),
             "biz": r.get("BSNS_MBY_NM"), "cons": r.get("CNSTRCT_ENTRPS_NM"),
+            "sgg": parse_sgg(r.get("HSSPLY_ADRES"), r.get("SUBSCRPT_AREA_CODE_NM")),
             "req": 0, "req1": 0, "top": None,
         }
     # 경쟁률 집계
@@ -108,20 +140,27 @@ def main():
         a["rate"] = round(a["req"] / a["sup"], 2)
         a["rate1"] = round(a["req1"] / a["sup"], 2) if a["req1"] else None
 
-    # 월별·지역별 가중평균 (총접수/총공급)
-    acc = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0]))     # ym → reg → [접수, 공급]
+    # 월별·지역별 가중평균 (총접수/총공급) — 시도 + 시군구 둘 다
+    acc = defaultdict(lambda: defaultdict(lambda: [0.0, 0.0, 0]))  # ym → reg → [접수, 공급, 공고수]
     for a in done:
-        for reg in (a["reg"], "전국"):
+        for reg in (a["reg"], a.get("sgg"), "전국"):
             if not reg:
                 continue
-            acc[a["ym"]][reg][0] += a["req"]
-            acc[a["ym"]][reg][1] += a["sup"]
+            x = acc[a["ym"]][reg]
+            x[0] += a["req"]; x[1] += a["sup"]; x[2] += 1
     ts = sorted(acc)
-    regs = [r for r in SIDO_ORDER if any(r in acc[t] for t in ts)]
+    sido = [r for r in SIDO_ORDER if any(r in acc[t] for t in ts)]
+    # 시군구는 공고가 3건 이상인 곳만(1~2건짜리는 노이즈)
+    sgg_n = Counter()
+    for t in ts:
+        for r, x in acc[t].items():
+            if " " in r:
+                sgg_n[r] += x[2]
+    sgg = [r for r, n in sgg_n.most_common() if n >= 3]
+    regs = sido + sgg
     series = {r: [round(acc[t][r][0] / acc[t][r][1], 2)
                   if (r in acc[t] and acc[t][r][1]) else None for t in ts] for r in regs}
-    cnt = {r: [len([a for a in done if a["ym"] == t and (a["reg"] == r or r == "전국")]) or None
-               for t in ts] for r in regs}
+    cnt = {r: [(acc[t][r][2] if r in acc[t] else 0) or None for t in ts] for r in regs}
 
     recent = sorted(done, key=lambda a: a["de"], reverse=True)[:40]
     for a in recent:
@@ -132,7 +171,9 @@ def main():
         "asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "src": "한국부동산원 청약홈 (data.go.kr)",
         "note": "경쟁률 = 총 청약건수 ÷ 총 공급세대. 월별·지역별은 가중평균(단지 단순평균이 아님)",
-        "t": ts, "regions": regs, "series": series, "cnt": cnt,
+        "t": ts, "regions": regs, "sido": sido, "sgg": sgg,
+        "n_pblanc": {r: sgg_n[r] for r in sgg},
+        "series": series, "cnt": cnt,
         "recent": recent}, ensure_ascii=False), encoding="utf-8")
     n = series.get("전국") or []
     lv = next((f"{ts[i]} {v}:1" for i in range(len(n) - 1, -1, -1) if (v := n[i]) is not None), "—")
