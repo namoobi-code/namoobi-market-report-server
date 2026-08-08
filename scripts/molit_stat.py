@@ -141,6 +141,42 @@ def collect(form_id, style, y0, keep, region_col, value_col, label, unit, note,
             "prov": ts[pi] if pi is not None else None}
 
 
+LAG = 27          # 착공 → 준공 실측 시차(개월). 2026-08-08 전국 12개월이동합 기준
+                  # 상관계수 최대점: 27개월에서 +0.833 (표본 148). 아파트 표준 공사기간과 일치.
+                  # ※ 인허가→준공은 23개월에서 상관이 더 높게(+0.869) 나오지만 인허가가
+                  #   착공보다 앞서는 순서와 모순되므로, 사이클 동조를 잡은 것으로 보고 채택하지 않음.
+
+
+def derive_movein(S):
+    """향후 입주물량 추정 — 공식 통계가 없어 착공을 LAG 만큼 밀어 만든다.
+
+    입주물량(준공)은 전세가격의 가장 강한 선행 변수인데 '예정' 통계가 공표되지 않는다.
+    이미 확정된 착공 실적을 공사기간만큼 이동시키면 향후 약 2년치가 보인다.
+    확정(준공 실적)과 추정(착공 이동)을 **다른 계열로 분리**해 섞이지 않게 한다.
+    """
+    st, dn = S.get("start"), S.get("done")
+    if not st or not dn:
+        return None
+    def shift(t):
+        y, m = int(t[:4]), int(t[4:]) + LAG
+        y += (m - 1) // 12; m = (m - 1) % 12 + 1
+        return f"{y}{m:02d}"
+    ts = sorted(set(dn["t"]) | {shift(t) for t in st["t"]})
+    regs = [r for r in dn["r"] if r in st["r"]]
+    act, prj = {}, {}
+    for r in regs:
+        a = dict(zip(dn["t"], dn["r"][r]))
+        p = {shift(t): v for t, v in zip(st["t"], st["r"][r])}
+        last = max((t for t in dn["t"] if a.get(t) is not None), default=None)
+        act[r] = [a.get(t) for t in ts]
+        # 실적이 있는 구간은 추정을 그리지 않는다(겹쳐 보이면 혼동)
+        prj[r] = [p.get(t) if (last is None or t > last) else None for t in ts]
+    return {"label": "입주물량(준공)", "unit": "호", "t": ts, "r": act, "p": prj,
+            "lag": LAG,
+            "note": (f"확정=준공 실적 · 추정=착공을 <b>{LAG}개월</b> 뒤로 민 값"
+                     f"(착공→준공 실측 시차, 상관 +0.83). 공식 '입주예정' 통계가 없어 자체 산출한 값이다.")}
+
+
 def main():
     y0 = 2001 if FULL else datetime.now().year - 4
     print(f"[molit] 수집 시작 (from {y0}) — 통계누리 무인증 JSON")
@@ -173,6 +209,10 @@ def main():
                          cumulative=cum)
 
     S = {k: v for k, v in S.items() if v}
+    mv = derive_movein(S)                    # 착공 → 향후 입주물량 추정(파생 · 추가 수집 없음)
+    if mv:
+        S["movein"] = mv
+        print(f"  ④ 입주물량 추정 (착공 +{LAG}개월)")
     if not S:
         print("[molit] ❌ 수집 실패 — 저장 생략(기존 파일 보존)")
         return

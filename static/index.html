@@ -60,6 +60,8 @@
   #ms_unsold,#ms_pipe{height:300px!important;max-height:none!important} /* 주택 공급 차트 — 동일 캡 해제 */
   #et_main{height:340px!important;max-height:none!important}            /* 비아파트 실거래 — 동일 캡 해제 */
   #ah_main{height:320px!important;max-height:none!important}            /* 청약경쟁률 — 동일 캡 해제 */
+  #ms_move{height:300px!important;max-height:none!important}            /* 입주물량 — 동일 캡 해제 */
+  #uh_start,#uh_mort{height:260px!important;max-height:none!important}  /* 미국 주택 — 동일 캡 해제 */
   a{color:var(--dn);text-decoration:none}a:hover{text-decoration:underline}
   .links{display:flex;flex-wrap:wrap;gap:7px}
   .links a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--tx)}
@@ -785,6 +787,45 @@
             <div class="note" id="ms_pipe_n" style="margin-top:4px;line-height:1.6"></div>
           </div>
         </div>
+        <div style="margin-top:12px">
+          <div class="note" style="margin-bottom:3px"><b>🔑 입주물량 — 확정 + 향후 추정</b> (전세가격의 가장 강한 선행 변수)</div>
+          <canvas id="ms_move" style="width:100%;height:300px"></canvas>
+          <div class="note" id="ms_move_n" style="margin-top:4px;line-height:1.6"></div>
+        </div>
+      </div>
+      <!-- (2026-08-08) 서울 정비사업 — 클린업시스템 무인증 -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🏗 서울 재개발·재건축 <span class="note">(클린업시스템 · 단계 통과가 곧 향후 3~10년 공급 일정이자 가격 촉매)</span></b>
+        <div class="note" id="rd_head" style="margin:6px 0"></div>
+        <div class="grid g2">
+          <div>
+            <div class="note" style="margin-bottom:4px"><b>진행단계별 사업장 수</b> — 아래로 갈수록 사업 확정성↑</div>
+            <div id="rd_stages"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:4px"><b>최근 단계 전환</b> — 수집 시작 이후 감지분</div>
+            <div id="rd_chg" style="max-height:330px;overflow:auto"></div>
+          </div>
+        </div>
+        <div class="note" style="margin:10px 0 3px"><b>자치구별 주요 단계 분포</b></div>
+        <div id="rd_gu" style="max-height:280px;overflow:auto"></div>
+      </div>
+      <!-- (2026-08-08) 미국 주택 선행지표 — FRED 무인증 CSV -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🇺🇸 미국 주택 선행지표 <span class="note">(FRED · 건축허가는 착공에 6개월 선행 · 글로벌 유동성 사이클 참고)</span></b>
+        <div class="note" id="uh_asof" style="margin:6px 0"></div>
+        <div class="grid g2">
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>건축허가 · 주택착공</b> (천호, 연율)</div>
+            <canvas id="uh_start" style="width:100%;height:260px"></canvas>
+            <div class="note" id="uh_start_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>30년 고정 모기지 금리</b> (%)</div>
+            <canvas id="uh_mort" style="width:100%;height:260px"></canvas>
+            <div class="note" id="uh_mort_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+        </div>
       </div>
       <!-- (2026-08-08) 단지별 실거래 — apt.sqlite (rtms 수집과 동시 적재 · 추가 API 호출 0회) -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
@@ -1496,8 +1537,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260808d"></script>
-<script src="/etf.js?v=20260808d"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260808e"></script>
+<script src="/etf.js?v=20260808e"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

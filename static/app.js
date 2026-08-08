@@ -1424,6 +1424,94 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }).catch(()=>{});
     }).catch(()=>{});
   };
+  /* ── (2026-08-08) 🏗 서울 재개발·재건축 — redev.json (클린업시스템 무인증)
+     현황보다 '변화'가 신호다 — 매일 스냅샷을 비교해 단계 전환을 잡아낸다. ── */
+  let _rdInit=false;
+  function initRedev(){
+    if(_rdInit) return; _rdInit=true;
+    fetch('/api/db/redev').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.gu){ const e=$('rd_head'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 08:05)부터 표시됩니다.'; return; }
+      const E6=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      const KEY=new Set(d.key_stages||[]);
+      $('rd_head').innerHTML=`전체 <b>${(d.n||0).toLocaleString()}</b>개 사업장 · 자치구 ${Object.keys(d.gu).length} · `
+        +Object.entries(d.kinds||{}).slice(0,5).map(([k,v])=>`${E6(k)} <b>${v}</b>`).join(' · ')
+        +` <span style="margin-left:6px">수집 ${E6(d.asof||'')}</span>`;
+      /* 단계별 막대 — canvas 대신 div 폭으로(가로 막대가 더 읽기 쉽다) */
+      const tot={}; (d.stages||[]).forEach(s=>tot[s]=0);
+      Object.values(d.gu).forEach(c=>Object.entries(c).forEach(([s,v])=>tot[s]=(tot[s]||0)+v));
+      const mx=Math.max(...Object.values(tot),1);
+      $('rd_stages').innerHTML=(d.stages||[]).filter(s=>s&&tot[s]).map(s=>{
+        const w=tot[s]/mx*100, hot=KEY.has(s);
+        return `<div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;font-size:11.5px">
+          <span style="width:118px;text-align:right;${hot?'font-weight:700;color:#111':'color:#5b6672'}">${E6(s)}</span>
+          <span style="flex:1;background:#f0f2f5;border-radius:3px;height:14px;position:relative">
+            <span style="display:block;width:${w}%;height:100%;background:${hot?'#b45309':'#9fb0c4'};border-radius:3px"></span></span>
+          <b style="width:34px;text-align:right">${tot[s]}</b></div>`;}).join('');
+      /* 단계 전환 이력 */
+      const C=d.changes||[];
+      $('rd_chg').innerHTML=C.length?C.slice(0,60).map(c=>
+        `<div style="padding:5px 7px;border-bottom:1px solid #f2f4f7;font-size:12px">
+           <span class="note">${E6(c.de)}</span> <b>[${E6(c.gu)}]</b> ${E6(c.name)}
+           <br><span style="color:${c.key?'#b45309':'#5b6672'};font-weight:${c.key?'700':'400'}">
+             ${c.from?E6(c.from)+' → ':'신규 등재 → '}${E6(c.to)}</span>
+             ${c.fwd===false?' <span style="color:#8a94a0">(단계 후퇴)</span>':''}</div>`).join('')
+        : `<div class="note" style="padding:8px">아직 감지된 전환이 없습니다 — 매일 스냅샷을 비교해 <b>내일부터</b> 쌓입니다.
+             (오늘이 첫 수집이라 비교 대상이 없습니다)</div>`;
+      /* 자치구 × 주요단계 표 */
+      const KS=(d.key_stages||[]).filter(s=>tot[s]);
+      const gus=Object.keys(d.gu).sort((a,b)=>
+        KS.reduce((s,k)=>s+(d.gu[b][k]||0),0)-KS.reduce((s,k)=>s+(d.gu[a][k]||0),0));
+      $('rd_gu').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="position:sticky;top:0;background:#f7f8fa">
+          <th style="padding:4px 7px;text-align:left;border-bottom:1px solid #e3e7ec">자치구</th>
+          ${KS.map(s=>`<th style="padding:4px 7px;text-align:right;border-bottom:1px solid #e3e7ec;white-space:nowrap">${E6(s)}</th>`).join('')}
+          <th style="padding:4px 7px;text-align:right;border-bottom:1px solid #e3e7ec">전체</th></tr></thead>
+        <tbody>${gus.map(g=>{const c=d.gu[g], all=Object.values(c).reduce((a,b)=>a+b,0);
+          return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 7px">${E6(g)}</td>
+            ${KS.map(s=>`<td style="padding:3px 7px;text-align:right;${c[s]?'font-weight:600':'color:#c3cad3'}">${c[s]||'·'}</td>`).join('')}
+            <td style="padding:3px 7px;text-align:right" class="note">${all}</td></tr>`;}).join('')}</tbody></table>`;
+    }).catch(()=>{});
+  }
+
+  /* ── (2026-08-08) 🇺🇸 미국 주택 선행지표 — us_housing.json (FRED 무인증 CSV) ── */
+  let _uhInit=false;
+  function initUsHouse(){
+    if(_uhInit) return; _uhInit=true;
+    fetch('/api/db/us_housing').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.series) return;
+      const S=d.series;
+      {const e=$('uh_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 출처 FRED (인증키 불필요)`;}
+      const cut=(s,n)=>({t:s.t.slice(-n), v:s.v.slice(-n)});
+      const F=t=>t?`${t.slice(0,4)}.${t.slice(4,6)}`:'—';
+      const yoy=(s)=>{const n=s.v.length; if(n<13) return null;
+        const a=s.v[n-1], b=s.v[n-13]; return b?((a/b-1)*100):null;};
+      /* 허가·착공 — 최근 25년(300개월) */
+      {const P=S.permit, H=S.start;
+       if(P&&H){ const p=cut(P,300), h=cut(H,300);
+         line('uh_start',[{...p,label:'건축허가',color:'#2f6fed'},{...h,label:'착공',color:'#d9534f'}]);
+         const yp=yoy(P), yh=yoy(H);
+         $('uh_start_n').innerHTML=
+           `허가 <b>${P.v[P.v.length-1].toLocaleString()}</b>천호${yp!=null?` <span class="${yp>0?'up':'dn'}">(${yp>0?'+':''}${yp.toFixed(0)}% YoY)</span>`:''}`
+           +` · 착공 <b>${H.v[H.v.length-1].toLocaleString()}</b>천호${yh!=null?` <span class="${yh>0?'up':'dn'}">(${yh>0?'+':''}${yh.toFixed(0)}% YoY)</span>`:''}`
+           +` <span class="note">(${F(P.t[P.t.length-1])})</span>`
+           +`<br><span class="note">${E7(P.note)}</span>`;
+       }}
+      /* 모기지 금리 — 최근 25년(주간 1300개) */
+      {const M=S.mort;
+       if(M){ const m=cut(M,1300);
+         line('uh_mort',[{...m,label:'30년',color:'#7c3aed'}]);
+         const n=M.v.length, cur=M.v[n-1], p52=n>52?M.v[n-53]:null;
+         const lo=Math.min(...M.v.slice(-260)), hi=Math.max(...M.v.slice(-260));
+         $('uh_mort_n').innerHTML=
+           `현재 <b>${cur.toFixed(2)}%</b> (${F(M.t[M.t.length-1])})`
+           +`${p52!=null?` · 1년 전 ${p52.toFixed(2)}% <span class="${cur>p52?'up':'dn'}">(${cur>p52?'+':''}${(cur-p52).toFixed(2)}%p)</span>`:''}`
+           +` · 최근 5년 범위 ${lo.toFixed(2)}~${hi.toFixed(2)}%`
+           +`<br><span class="note">${E7(M.note)}</span>`;
+       }}
+    }).catch(()=>{});
+  }
+  const E7=s=>String(s??'').replace(/[&<>]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[m]));
+
   /* ── (2026-08-08) 🎯 청약경쟁률 — applyhome.json (청약홈)
      실거래는 계약 끝난 뒤에 잡히는 후행 지표지만, 청약은 지금 수요가 얼마나
      달려드는지를 보여주는 선행 지표. 지역 격차가 워낙 커서(서울 33:1 vs 지방 2:1)
@@ -1609,6 +1697,31 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              return `${a.label} <b>${l?K(l.v):'—'}</b>${y!=null?` <span class="${y>0?'up':'dn'}">(${y>0?'+':''}${y.toFixed(0)}% YoY)</span>`:''}`;}).join(' · ')
          +`<br><span class="note">인허가 → 착공까지 6개월~1년, 착공 → 준공까지 2~3년. <b>인허가·착공 급감은 2~3년 뒤 공급절벽</b>(가격 상승 압력), <b>준공 급증은 입주물량 증가</b>(전세 약세) 신호.</span>`;
      }}
+    /* ③ 입주물량 — 확정(준공 실적) + 추정(착공을 실측 시차만큼 이동) */
+    {const m=(_msD.series||{}).movein;
+     if(m&&m.r[_msReg]){
+       const A=m.r[_msReg], P=(m.p||{})[_msReg]||[];
+       const a12=_ms12(m.t,A), p12=_ms12(m.t,P);
+       // 추정 구간은 실적이 끊긴 뒤부터라 12개월 합이 경계에서 비므로, 두 계열을 이어 붙여 계산
+       const join=m.t.map((_,i)=>A[i]!=null?A[i]:(P[i]!=null?P[i]:null));
+       const j12=_ms12(m.t,join);
+       let cutI=-1; for(let i=A.length-1;i>=0;i--) if(A[i]!=null){cutI=i;break;}
+       const act=j12.map((v,i)=>i<=cutI?v:null), prj=j12.map((v,i)=>i>=cutI?v:null);
+       line('ms_move',[{t:m.t,v:act,label:'확정',color:'#27ae60'},
+                       {t:m.t,v:prj,label:'추정',color:'#e08e3c'}]);
+       const lastOf=v=>{for(let i=v.length-1;i>=0;i--) if(v[i]!=null) return {i,v:v[i]}; return null;};
+       const la=lastOf(act), lp=lastOf(prj);
+       const K=n=>Math.round(n).toLocaleString();
+       const F2=t=>t?`${t.slice(0,4)}.${t.slice(4)}`:'—';
+       const chg=(la&&lp&&la.v)?((lp.v/la.v-1)*100):null;
+       $('ms_move_n').innerHTML=
+         `<b>${_msReg}</b> · <b>12개월 누적</b>(연간 입주물량) · 단위 호`
+         +`<br>확정 <b class="up">${la?K(la.v):'—'}</b>(${la?F2(m.t[la.i]):'—'})`
+         +` → 추정 <b class="dn">${lp?K(lp.v):'—'}</b>(${lp?F2(m.t[lp.i]):'—'})`
+         +`${chg!=null?` · <b class="${chg>0?'up':'dn'}">${chg>0?'+':''}${chg.toFixed(0)}%</b>`:''}`
+         +`<br><span class="note">${m.note||''}</span>`
+         +`<br><span style="color:#a06010">⚠ 추정치는 착공 물량이 예정대로 준공된다는 가정이다. 공사 지연·중단(PF 부실 등)이 있으면 실제 입주는 더 늦고 적을 수 있다. <b>입주물량↑ → 전세 약세</b>, <b>↓ → 전세 강세</b>가 일반적 관계.</span>`;
+     }}
   }
 
   /* ── (2026-08-08) 🏢 아파트 단지별 실거래 — /api/apt/* (apt.sqlite)
@@ -1704,7 +1817,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
 
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc(); initApply();
+    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
