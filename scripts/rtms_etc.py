@@ -187,7 +187,11 @@ def build_json(cx):
             sd = SIDO.get(pre.get(sgg, ""), None)
             if not sd:
                 continue
-            for reg in (sd, "전국"):
+            # (2026-08-08) 시군구 계열도 함께 — 지역 선택기가 시도·시군구를 같이 훑는다.
+            # 이름에 시도가 없는 도 단위("수원 장안구")는 앞에 붙여 검색되게 한다.
+            nm = REGIONS.get(sgg, sgg)
+            sub = nm if nm.startswith(sd) else f"{sd} {nm}"
+            for reg in (sd, sub, "전국"):
                 a = acc.setdefault(ym, {}).setdefault(reg, [0, 0.0, 0, 0.0, 0.0])
                 if n:
                     a[0] += n
@@ -200,9 +204,13 @@ def build_json(cx):
                     if rent is not None:
                         a[4] += n2 * rent
         ts = sorted(acc)
-        regs = sorted({r for t in ts for r in acc[t]})
+        SD_SET = set(SIDO.values()) | {"전국"}
+        regs = sorted({r for t in ts for r in acc[t]},
+                      key=lambda r: (r not in SD_SET, r))     # 시도 먼저, 그 다음 시군구
         g = lambda r, i, d: [(acc[t].get(r) or [0, 0, 0, 0, 0])[i] if t in acc else None for t in ts]
         o = {"label": LABEL.get(kind, kind), "t": ts,
+             "sido": [r for r in regs if r in SD_SET],
+             "sgg": [r for r in regs if r not in SD_SET],
              "n": {r: [(acc[t].get(r) or [0])[0] or None for t in ts] for r in regs},
              "avg": {r: [round((acc[t][r][1] / acc[t][r][0]), 3)
                          if (t in acc and r in acc[t] and acc[t][r][0]) else None for t in ts]

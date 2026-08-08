@@ -89,7 +89,7 @@ def decum(ts, vs):
 
 
 def collect(form_id, style, y0, keep, region_col, value_col, label, unit, note,
-            cumulative=False):
+            cumulative=False, sido_col=None):
     """keep(row)->bool 로 총계 행만 남기고, region_col 을 지역명·value_col 을 값으로 뽑는다."""
     acc, prov = {}, set()                               # {ym: {region: v}}, 잠정치 월 집합
     for s, e in chunks(y0):
@@ -111,6 +111,10 @@ def collect(form_id, style, y0, keep, region_col, value_col, label, unit, note,
             v = num(r.get(value_col))
             if not reg or v is None:
                 continue
+            if sido_col:                       # 시군구는 시도를 앞에 붙여 동명이인 구분(중구·동구 등)
+                sd = str(r.get(sido_col, "")).replace(" ", "")
+                if sd:
+                    reg = f"{sd} {reg}"
             acc.setdefault(ym, {})[reg] = v
         time.sleep(1.2)                                 # 서버 배려
     if not acc:
@@ -188,6 +192,22 @@ def main():
                           lambda r: str(r.get("2", "")).strip() == "계",
                           "1", "3", "미분양", "호",
                           "시도별 미분양 재고 — 공급과잉·침체 국면의 정석 지표")
+    # (2026-08-08) 미분양은 원자료가 시군구 단위라 세부 지역까지 뽑을 수 있다.
+    # 인허가·착공·준공은 통계누리가 시도까지만 공표해 시군구가 없다.
+    print("  ①-2 미분양 (시군구 세부)")
+    sub = collect(2082, 128, max(y0, 2001),
+                  lambda r: str(r.get("2", "")).strip() not in ("계", ""),
+                  "2", "3", "미분양(시군구)", "호", "", sido_col="1")
+    if sub and S.get("unsold"):
+        # 시도 계열에 시군구를 합쳐 하나의 계열로 제공(프론트 지역 선택기가 함께 훑는다)
+        base, ts = S["unsold"], S["unsold"]["t"]
+        pos = {t: i for i, t in enumerate(sub["t"])}
+        for r, v in sub["r"].items():
+            if r in base["r"]:
+                continue
+            base["r"][r] = [v[pos[t]] if t in pos else None for t in ts]
+        base["sgg"] = [r for r in sub["r"] if r not in ("전국", "수도권")]
+        print(f"      시군구 {len(base['sgg'])}곳 편입")
 
     print("  ② 준공후 미분양 (악성 미분양)")
     S["unsold_done"] = collect(5328, 1, max(y0, 2007),
