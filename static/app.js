@@ -1451,15 +1451,27 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   const RP_PAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e7490','#be185d','#65a30d',
                 '#5d4037','#455a64','#9e9d24','#00838f'];
   function regionPicker(o){
-    /* o = {q,list,chips, all:()=>[names], isSido:(r)=>bool, count:(r)=>n|null, sel:[], onChange} */
+    /* o = {q,list,chips, all:()=>[names], isSido, count, sel:[], onChange,
+            preset?:[[라벨,툴팁,()=>[names]]], presetEl?, sortVal?:(r)=>number|null, onHover?}
+       (2026-08-08) 지역비교 카드에서 검증된 방식을 공통화 —
+       최대 30개 · 값 내림차순 정렬 · 칩 hover 로 계열 강조 · 원클릭 프리셋. */
     const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const q=$(o.q), list=$(o.list), chips=$(o.chips);
     if(!q||!list||!chips) return null;
-    const api={sel:o.sel.slice()};
+    const MAX=o.max||30;
+    const api={sel:o.sel.slice(), hi:null};
+    api.sort=()=>{ if(!o.sortVal) return;
+      api.sel=api.sel.map(r=>[r,o.sortVal(r)]).sort((a,b)=>(b[1]??-1e18)-(a[1]??-1e18)).map(x=>x[0]);};
     const drawChips=()=>{chips.innerHTML=api.sel.map((r,i)=>{const c=RP_PAL[i%RP_PAL.length];
-      return `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${c}18;border:1px solid ${c};color:#333"><b style="color:${c}">●</b>${E(r)}<b data-rm="${E(r)}" style="cursor:pointer;color:#888">✕</b></span>`;}).join('');
-      chips.querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{
-        api.sel=api.sel.filter(r=>r!==x.dataset.rm); drawChips(); o.onChange(api.sel);});};
+      const on=api.hi===r;
+      return `<span data-hi="${E(r)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${c}18;border:1px solid ${c};color:#333;cursor:pointer;${on?'box-shadow:0 0 0 2px #1f2937;font-weight:700':''}"><b style="color:${c}">●</b>${E(r)}<b data-rm="${E(r)}" style="cursor:pointer;color:#888">✕</b></span>`;}).join('');
+      chips.querySelectorAll('[data-rm]').forEach(x=>x.onclick=e=>{
+        e.stopPropagation(); api.sel=api.sel.filter(r=>r!==x.dataset.rm); drawChips(); o.onChange(api.sel);});
+      chips.querySelectorAll('[data-hi]').forEach(x=>{
+        x.onmouseenter=()=>{api.hi=x.dataset.hi; drawChips(); o.onHover&&o.onHover(api.hi);};
+        x.onmouseleave=()=>{api.hi=null; drawChips(); o.onHover&&o.onHover(null);};});};
+    api.setHi=(r)=>{ if(api.hi===r) return; api.hi=r; drawChips(); };
+    api.redraw=()=>{api.sort(); drawChips();};
     const show=()=>{const kw=(q.value||'').trim().toLowerCase();
       const cand=o.all().filter(r=>!api.sel.includes(r)&&(!kw||String(r).toLowerCase().includes(kw)));
       const sd=cand.filter(o.isSido), sg=cand.filter(r=>!o.isSido(r)).sort();
@@ -1469,14 +1481,24 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }).join('')||'<div style="padding:6px 10px" class="note">없음</div>';
       list.style.display='';
       list.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{
-        if(api.sel.length>=12){alert('최대 12개까지');return;}
+        if(api.sel.length>=MAX){alert('최대 '+MAX+'개까지');return;}
         api.sel.push(x.dataset.add); q.value=''; list.style.display='none';
-        drawChips(); o.onChange(api.sel);});};
+        api.sort(); drawChips(); o.onChange(api.sel);});};
     q.oninput=show; q.onfocus=show;
     document.addEventListener('click',e=>{
       if(!e.target.closest('#'+o.q)&&!e.target.closest('#'+o.list)) list.style.display='none';});
+    /* 원클릭 프리셋 — 자주 쓰는 조합을 버튼으로 */
+    if(o.preset&&o.presetEl&&$(o.presetEl)){
+      const el=$(o.presetEl);
+      el.innerHTML=o.preset.map(([lab,tip],i)=>
+        `<button data-p="${i}" title="${E(tip)}" style="padding:3px 9px;font-size:11.5px;border:1px solid #b45309;color:#b45309;background:#fff;border-radius:6px;cursor:pointer">${E(lab)}</button>`).join('')
+        +`<button data-clr="1" title="선택 비우기" style="padding:3px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff;color:#888">비우기</button>`;
+      el.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
+        api.sel=o.preset[+b.dataset.p][2]().slice(0,MAX); api.sort(); drawChips(); o.onChange(api.sel);});
+      el.querySelector('[data-clr]').onclick=()=>{api.sel=[]; drawChips(); o.onChange(api.sel);};
+    }
     api.refresh=()=>drawChips();
-    drawChips();
+    api.sort(); drawChips();
     return api;
   }
   const RP_SIDO=new Set(['전국','수도권','서울','부산','대구','인천','광주','대전','울산','세종',
@@ -1589,7 +1611,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      실거래는 계약 끝난 뒤에 잡히는 후행 지표지만, 청약은 지금 수요가 얼마나
      달려드는지를 보여주는 선행 지표. 지역 격차가 워낙 커서(서울 33:1 vs 지방 2:1)
      선택 지역 + 전국 기준선을 함께 그린다. ── */
-  let _ahInit=false, _ahD=null, _ahSel=['전국','서울','경기'];
+  let _ahInit=false, _ahD=null, _ahSel=['전국','서울','경기'], _ahHi=null, _ahPick=null, _ahArr=null;
   const AHPAL=RP_PAL; const AHPAL_OLD=['#be185d','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e7490','#d9534f','#65a30d',
                '#5d4037','#455a64','#9e9d24','#00838f'];
   function initApply(){
@@ -1600,9 +1622,24 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       {const e=$('ah_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 청약홈 · 시도 ${(d.sido||[]).length} · 시군구 ${(d.sgg||[]).length}`;}
       _ahSel=_ahSel.filter(r=>d.series[r]);
       if(!_ahSel.length) _ahSel=(d.sido||[]).slice(0,3);
-      regionPicker({q:'ah_q',list:'ah_list',chips:'ah_chips',sel:_ahSel,
-        all:()=>d.regions||[], isSido:r=>RP_SIDO.has(r),
+      /* 정렬·랭킹 기준 — 최근 12개월 중 값이 있는 달의 평균.
+         청약은 단지 하나로 월값이 크게 튀어서 단월 기준으로 줄 세우면 순위가 매달 뒤집힌다. */
+      const recentAvg=r=>{const v=d.series[r]; if(!v) return null;
+        const s=v.slice(-12).filter(x=>x!=null); if(!s.length) return null;
+        return s.reduce((a,b)=>a+b,0)/s.length;};
+      const topN=(f,n)=>(d.regions||[]).filter(r=>!RP_SIDO.has(r)&&f(r))
+        .map(r=>[r,recentAvg(r)]).filter(x=>x[1]!=null)
+        .sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
+      _ahPick=regionPicker({q:'ah_q',list:'ah_list',chips:'ah_chips',presetEl:'ah_preset',sel:_ahSel,
+        all:()=>d.regions||[], isSido:r=>RP_SIDO.has(r), sortVal:recentAvg, max:30,
         count:r=>{const n=(d.n_pblanc||{})[r]; return n?`공고 ${n}건`:null;},
+        preset:[
+          ['경쟁률 TOP30','최근 12개월 평균 경쟁률 상위 시군구 30',()=>topN(()=>true,30)],
+          ['서울 전체',   '서울 시군구 전부',()=>topN(r=>r.startsWith('서울 '),30)],
+          ['경기 TOP30',  '경기 시군구 상위 30',()=>topN(r=>r.startsWith('경기 '),30)],
+          ['시도 전체',   '전국·시도 단위만',()=>(d.sido||[]).slice(0,30)],
+        ],
+        onHover:r=>{_ahHi=r; drawApply();},
         onChange:s=>{_ahSel=s; drawApply();}});
       drawApply();
     }).catch(()=>{});
@@ -1612,7 +1649,31 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const E5=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const F=x=>x?`${x.slice(0,4)}.${x.slice(4)}`:'—';
     const arr=_ahSel.filter(r=>S[r]).map((r,i)=>({t,v:S[r],label:r,color:AHPAL[i%AHPAL.length]}));
-    if(arr.length) line('ah_main',arr);
+    if(arr.length) line('ah_main',arr,{hi:_ahHi});
+    /* 차트 위 마우스 → 근접 선 강조 + 해당 칩 활성 (지역비교와 동일 동작) */
+    {const cv=$('ah_main');
+     if(cv&&!cv._hiBound){ cv._hiBound=1;
+       cv.addEventListener('mousemove',e=>{
+         if(!_ahD) return; const A=_ahArr; if(!A||!A.length) return;
+         const r=cv.getBoundingClientRect(), P={l:8,rr:52,t:10,b:18};
+         const N0=Math.max(...A.map(a=>a.v.length));
+         const fx=(e.clientX-r.left)/(cv.clientWidth||900)*cv.width;
+         const fy=(e.clientY-r.top)/(cv.clientHeight||320)*cv.height;
+         const iw=(cv.width-P.l-P.rr)/Math.max(1,N0-1);
+         let idx=Math.max(0,Math.min(N0-1,Math.round((fx-P.l)/Math.max(1,iw))));
+         const all=A.flatMap(a=>a.v).filter(v=>v!=null); if(!all.length) return;
+         let lo=Math.min(...all), hi2=Math.max(...all);
+         const pad=(hi2-lo)*0.06||1; lo-=pad; hi2+=pad;
+         const Yv=v=>P.t+(cv.height-P.t-P.b)*(1-(v-lo)/(hi2-lo));
+         let best=null, bd=1e9;
+         A.forEach(a=>{ let v=a.v[idx];
+           if(v==null){ for(let k=1;k<6&&v==null;k++) v=a.v[idx-k]??a.v[idx+k]; }
+           if(v==null) return; const dd=Math.abs(Yv(v)-fy); if(dd<bd){bd=dd; best=a.label;} });
+         const nl=(bd<26)?best:null;
+         if(nl!==_ahHi){ _ahHi=nl; _ahPick&&_ahPick.setHi(nl); drawApply(); } });
+       cv.addEventListener('mouseleave',()=>{ if(_ahHi){_ahHi=null; _ahPick&&_ahPick.setHi(null); drawApply();} });
+     }}
+    _ahArr=arr;
     const info=arr.map(a=>{
       const v=a.v; let li=-1; for(let i=v.length-1;i>=0;i--) if(v[i]!=null){li=i;break;}
       let pk=-1; for(let i=0;i<v.length;i++) if(v[i]!=null&&(pk<0||v[i]>v[pk])) pk=i;
