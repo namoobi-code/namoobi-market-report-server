@@ -202,10 +202,10 @@ def main():
                     continue
                 a = agg_sale(fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym))
                 if a: s[ym] = a
-                time.sleep(0.12)
+                time.sleep(0.3)
                 b = agg_rent(fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym))
                 if b: r_[ym] = b
-                time.sleep(0.12)
+                time.sleep(0.3)
         except _Stop as e:
             stopped = str(e)
         sale[code] = {"m": s}; rent[code] = {"m": r_}

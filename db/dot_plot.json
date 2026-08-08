@@ -1,6 +1,6 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-06",
+ "as_of": "2026-08-08",
  "data": {
   "rows": [
    {
@@ -29,11 +29,11 @@
    }
   ],
   "unit": "%",
-  "summary": "2026-06-17 SEP(점도표)에서 2026년말 정책금리 중간값이 3월 3.4%→6월 3.8%로 매파적 급선회(18명 중 9명이 연내 1회 이상 인상 전망) — 관세발 인플레·노동시장 견조함 반영. 2027년말 3.6%, 2028년말 3.4%로 상향, 장기중립금리는 3.1%로 유지. 다음 SEP는 2026-09-15~16 예정(변경 시까지 6월 전망 유지, 2026-08-06 WebSearch 재확인 — 9월 FOMC 아직 미개최로 변동 없음).",
+  "summary": "2026-06-17 SEP(점도표)에서 2026년말 정책금리 중간값이 3월 3.4%→6월 3.8%로 매파적 급선회(18명 중 9명이 연내 1회 이상 인상 전망) — 관세발 인플레·노동시장 견조함 반영. 2027년말 3.6%, 2028년말 3.4%로 상향, 장기중립금리는 3.1%로 유지. 다음 SEP는 2026-09-15~16 예정.",
   "policy_rate": "3.50~3.75% (2026-07-29 FOMC, 5회 연속 동결)",
   "next_meeting": "2026-09-15~16 (SEP 점도표 발표 예정)",
-  "as_of": "2026-08-06",
-  "reuse_note": "직전 SEP(2026-06-17) 이후 변동 없음 — DB db/dot_plot.json(marker 2026-08, as_of 2026-08-05) 값 재사용. 2026-08-06 WebSearch로 FOMC 캘린더 재확인(federalreserve.gov) 결과 다음 SEP는 2026-09-16으로 변동 없음. 다음 갱신은 2026-09-16 SEP 발표 후.",
+  "as_of": "2026-08-08",
+  "reuse_note": "2026-08-08 재확인: python3 nmr_db.py check dot_plot 2026-06-17 결과 'due'(DB marker='2026-08'≠관측값)였으나, WebSearch(tradingkey.com, forbes.com) 재확인 결과 직전 SEP(2026-06-17) 이후 신규 SEP·긴급 FOMC 없음(7/28-29 FOMC도 SEP 미실시 재확인). 다음 SEP는 2026-09-15~16 예정. DB db/dot_plot.json 값 그대로 재사용, 신규 조사 없음(추정 아님).",
   "source": "federalreserve.gov FOMC Summary of Economic Projections (fomcprojtabl20260617.htm, fomcprojtabl20260318.htm)",
   "source_url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm"
  }
