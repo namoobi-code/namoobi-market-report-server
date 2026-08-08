@@ -6,3 +6,4 @@ data/
 charts/
 /nmr_krx_brief.json
 data/db/apt.sqlite*
+data/db/rtms_etc.sqlite*

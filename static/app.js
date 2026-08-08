@@ -1424,6 +1424,65 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }).catch(()=>{});
     }).catch(()=>{});
   };
+  /* ── (2026-08-08) 🏬 비아파트 실거래 5종 — rtms_etc.json
+     아파트만 보면 시장의 절반을 놓친다. 오피스텔은 매매+전월세가 다 있어
+     전월세전환율까지 직접 산출된다(단, 표본이 달라 근사치 — 추세로 읽을 것). ── */
+  let _etInit=false, _etD=null, _etReg='전국', _etMet='n';
+  const ETC=[['offi_s','오피스텔','#2f6fed'],['rh','연립다세대','#27ae60'],
+             ['sh','단독다가구','#e08e3c'],['land','토지','#7c3aed'],['nrg','상업업무용','#d9534f']];
+  function initEtc(){
+    if(_etInit) return; _etInit=true;
+    fetch('/api/db/rtms_etc').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.types){ const e=$('et_main_n'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:50)부터 표시됩니다.'; return; }
+      _etD=d;
+      {const e=$('et_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 국토부 실거래가`;}
+      const cnt={}; Object.values(d.types).forEach(v=>Object.keys(v.n||{}).forEach(r=>cnt[r]=1));
+      const PREF=['전국','서울','인천','경기','부산','대구','광주','대전','울산','세종','강원','충북','충남','전북','전남','경북','경남','제주'];
+      const regs=PREF.filter(r=>cnt[r]);
+      const rb=()=>{$('et_reg').innerHTML=regs.map(r=>`<button data-r="${r}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${r===_etReg?'#1f2937':'#fff'};color:${r===_etReg?'#fff':'#333'}">${r}</button>`).join('');
+        $('et_reg').querySelectorAll('button').forEach(b=>b.onclick=()=>{_etReg=b.dataset.r; rb(); drawEtc();});};
+      const mb=()=>{$('et_met').innerHTML=[['n','거래 건수'],['avg','평균 거래가(억)']].map(([k,l])=>`<button data-m="${k}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===_etMet?'#1f2937':'#fff'};color:${k===_etMet?'#fff':'#333'}">${l}</button>`).join('');
+        $('et_met').querySelectorAll('button').forEach(b=>b.onclick=()=>{_etMet=b.dataset.m; mb(); drawEtc();});};
+      rb(); mb(); drawEtc();
+    }).catch(()=>{});
+  }
+  function drawEtc(){
+    if(!_etD) return; const T=_etD.types||{};
+    const K=n=>n==null?'—':(_etMet==='n'?Math.round(n).toLocaleString():n.toFixed(2)+'억');
+    const F=t=>t?`${t.slice(0,4)}.${t.slice(4)}`:'—';
+    /* ① 유형별 겹쳐보기 */
+    {const L=ETC.map(([k,lab,c])=>{const s=T[k]; if(!s||!s[_etMet]||!s[_etMet][_etReg]) return null;
+       return {t:s.t, v:s[_etMet][_etReg], label:lab, color:c};}).filter(Boolean);
+     if(L.length){ const A=_msAlign(L);
+       line('et_main', L.map(a=>({t:A.ts, v:A.map(a), label:a.label, color:a.color})));
+       const last=a=>{const v=A.map(a); for(let i=v.length-1;i>=0;i--) if(v[i]!=null) return {ym:A.ts[i],v:v[i]}; return null;};
+       $('et_main_n').innerHTML=
+         `<b>${_etReg}</b> · ${_etMet==='n'?'월별 <b>거래 건수</b>':'월별 <b>평균 거래가</b>(억원)'}`
+         +`<br>`+L.map(a=>{const l=last(a); return `${a.label} <b>${l?K(l.v):'—'}</b>`;}).join(' · ')
+         +` <span class="note">(${last(L[0])?F(last(L[0]).ym):'—'})</span>`
+         +`<br><span class="note">토지·상업업무용은 건당 금액 편차가 커서 평균이 크게 튄다 — 건수 추이가 더 안정적인 신호. 최근 1~2개월은 신고 진행 중이라 과소 집계.</span>`;
+     }}
+    /* ② 오피스텔 전월세전환율 */
+    {const s=T.offi_r;
+     if(s&&s.conv&&s.conv[_etReg]){
+       line('et_conv',[{t:s.t,v:s.conv[_etReg],label:'전환율%',color:'#be185d'}]);
+       const v=s.conv[_etReg]; let l=null; for(let i=v.length-1;i>=0;i--) if(v[i]!=null){l={ym:s.t[i],v:v[i]};break;}
+       $('et_conv_n').innerHTML=`최신 <b>${l?l.v.toFixed(2)+'%':'—'}</b> (${l?F(l.ym):'—'}) — 전세를 월세로 바꿀 때 적용되는 이율. 높을수록 <b>월세가 비싸다</b>(전세 대비).`
+         +`<br><span class="note">⚠ ${s.conv_note||'근사치'}</span>`;
+     }}
+    /* ③ 전세 vs 월세 건수 — 월세화 진행도 */
+    {const s=T.offi_r;
+     if(s&&s.n&&s.n[_etReg]&&s.wol_n){
+       line('et_jw',[{t:s.t,v:s.n[_etReg],label:'전세',color:'#2f6fed'},
+                     {t:s.t,v:s.wol_n[_etReg],label:'월세',color:'#e08e3c'}]);
+       const je=s.n[_etReg], wo=s.wol_n[_etReg];
+       let i=je.length-1; while(i>=0&&(je[i]==null&&wo[i]==null)) i--;
+       const r=(i>=0&&(je[i]||0)+(wo[i]||0))?((wo[i]||0)/((je[i]||0)+(wo[i]||0))*100):null;
+       $('et_jw_n').innerHTML=`최신 월세 비중 <b>${r!=null?r.toFixed(0)+'%':'—'}</b> (${i>=0?F(s.t[i]):'—'}) — 전세 ${je[i]??'—'}건 · 월세 ${wo[i]??'—'}건`
+         +`<br><span class="note">월세 비중 상승 = 전세 기피(역전세·보증금 미반환 우려) 또는 고금리로 전세대출 부담↑. 오피스텔은 주거용 중 월세화가 가장 빠른 유형.</span>`;
+     }}
+  }
+
   /* ── (2026-08-08) 🏗 주택 공급 — molit.json (통계누리 무인증)
      미분양=재고(수요 약세 신호) · 인허가/착공/준공=공급 파이프라인(1~3년 선행).
      월별 원자료는 계절성·노이즈가 커서 기본은 12개월 이동합으로 본다. ── */
@@ -1593,7 +1652,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
 
   window.renderEstate=function(){
-    initApt(); initMolit();
+    initApt(); initMolit(); initEtc();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
