@@ -1469,7 +1469,7 @@ SGG2 = {"11": "서울", "26": "부산", "27": "대구", "28": "인천", "29": "�
         "47": "경북", "48": "경남", "50": "제주", "51": "강원", "52": "전북"}
 
 @app.get("/api/apt/search")
-def apt_search(q: str = "", region: str = "", n: int = 30):
+def apt_search(q: str = "", region: str = "", kind: str = "", n: int = 30):
     """단지 검색 — 단지명(q)과 지역(region)을 함께 쓸 수 있다.
 
     (2026-08-08) 지역만으로도 훑을 수 있게 확장. region 은 '서울'(시도) 또는
@@ -1481,6 +1481,8 @@ def apt_search(q: str = "", region: str = "", n: int = 30):
         return {"rows": []}
     esc = lambda s: s.replace("%", chr(92) + "%").replace("_", chr(92) + "_")
     where, args = [], []
+    if kind in ("apt", "offi", "rh"):
+        where.append("COALESCE(a.kind,'apt')=?"); args.append(kind)
     if len(q) >= 2:
         where.append("a.name LIKE ? ESCAPE '\\'"); args.append(f"%{esc(q)}%")
     if region:
@@ -1498,7 +1500,7 @@ def apt_search(q: str = "", region: str = "", n: int = 30):
     args += [q, max(1, min(n, 200))]
     with _aptcx() as cx:
         rows = cx.execute(
-            f"""SELECT a.id, a.name, a.umd, a.sgg, a.build_year,
+            f"""SELECT a.id, a.name, a.umd, a.sgg, a.build_year, COALESCE(a.kind,'apt') AS kind,
                        (SELECT COUNT(*) FROM sale s WHERE s.apt_id=a.id) AS ns,
                        (SELECT MAX(ym)   FROM sale s WHERE s.apt_id=a.id) AS last
                 FROM apt a WHERE {' AND '.join(where)}
@@ -1511,6 +1513,8 @@ def apt_regions():
     with _aptcx() as cx:
         rows = cx.execute(
             "SELECT sgg, umd, COUNT(*) n FROM apt GROUP BY sgg, umd HAVING n>0").fetchall()
+        kinds = dict(cx.execute(
+            "SELECT COALESCE(kind,'apt'), COUNT(*) FROM apt GROUP BY 1").fetchall())
     sido, dong = {}, {}
     for r in rows:
         sd = SGG2.get(str(r["sgg"])[:2])
@@ -1520,7 +1524,8 @@ def apt_regions():
         if r["umd"]:
             k = f"{sd} {r['umd']}"
             dong[k] = dong.get(k, 0) + r["n"]
-    return {"sido": [{"r": k, "n": v} for k, v in sorted(sido.items(), key=lambda x: -x[1])],
+    return {"kinds": kinds,
+            "sido": [{"r": k, "n": v} for k, v in sorted(sido.items(), key=lambda x: -x[1])],
             "dong": [{"r": k, "n": v} for k, v in sorted(dong.items(), key=lambda x: -x[1])[:3000]]}
 
 @app.get("/api/apt/series")

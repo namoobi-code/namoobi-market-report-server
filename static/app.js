@@ -1983,7 +1983,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         /* (2026-08-06) 단일지역 드롭다운·거래량·가격 카드 삭제(지역 비교와 중복 — 사용자 요청).
            기존 `if(!re_rt_sel) return` 가드가 아래 지역 비교 초기화까지 스킵시키던 버그 함께 제거 */
         /* ── 지역 비교 대형 차트 — 다중 선택(검색+칩) · 지표 토글 (2026-08-02) ── */
-        {const N=R.names||{}, PAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e9aa7','#c2185b','#5d4037','#455a64','#9e9d24','#00838f','#6d4c41'];
+        {const N=R.names||{}, MAXSEL=30;
+         // 30개까지 겹쳐 그리므로 색상도 30개 — 인접 색이 붙지 않게 색상환을 넓게 돈다
+         const PAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e9aa7','#c2185b','#5d4037',
+                    '#455a64','#9e9d24','#00838f','#6d4c41','#e91e63','#3f51b5','#009688','#ff9800',
+                    '#673ab7','#00acc1','#8bc34a','#795548','#f44336','#1976d2','#43a047','#fb8c00',
+                    '#512da8','#0097a7','#afb42b','#4e342e','#ad1457','#283593'];
          const E=z=>String(z??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));  // 부동산 IIFE엔 전역 E 없음(ReferenceError 수정)
          const METRICS=[['avg','평균가(억)'],['med','중위가(억)'],['n','매매 거래량'],['dep','전세 보증금(억)']];
          let mset=['A11','A26','A41'].filter(c=>N[c]); if(!mset.length) mset=Object.keys(N).slice(0,3);
@@ -2012,8 +2017,31 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              return `<div data-add="${c}" style="padding:5px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">${c.startsWith('A')?'★ ':''}${pre}${E(nm)}</div>`;
            }).join('')||'<div style="padding:6px 10px" class="note">없음</div>';
            list.style.display='';
-           list.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{if(mset.length>=12){alert('최대 12개까지');return;}
+           list.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{if(mset.length>=MAXSEL){alert('최대 '+MAXSEL+'개까지');return;}
              mset.push(x.dataset.add); q.value=''; list.style.display='none'; chips(); drawBig(true);});};
+         /* (2026-08-08) 원클릭 프리셋 — 하나씩 고르기 번거로운 조합을 버튼으로.
+            'TOP30' 은 현재 선택된 지표의 최신값 기준 상위 30(시군구만, 시도 합산 ★ 제외) */
+         const isAgg=c=>String(c).startsWith('A');
+         const latestOf=c=>{const src=met==='dep'?(R.rent||{}):(R.sale||{});
+           const m=((src[c]||{}).m)||{}; const ts=Object.keys(m).sort();
+           for(let i=ts.length-1;i>=0;i--){const e=m[ts[i]]; const v=e?(e[met]??null):null; if(v!=null) return v;}
+           return null;};
+         const topN=(filter,n)=>Object.keys(N).filter(c=>!isAgg(c)&&filter(c))
+           .map(c=>[c,latestOf(c)]).filter(x=>x[1]!=null)
+           .sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
+         const PRESET=[
+           ['서울 전체구','서울 25개구 전부', ()=>Object.keys(N).filter(c=>!isAgg(c)&&c.startsWith('11'))],
+           ['부산 전체구','부산 16개 구·군 전부', ()=>Object.keys(N).filter(c=>!isAgg(c)&&c.startsWith('26'))],
+           ['경기 TOP30','경기 시군구 중 상위 30', ()=>topN(c=>c.startsWith('41'),30)],
+           ['전국 TOP30','전국 시군구 중 상위 30', ()=>topN(()=>true,30)],
+         ];
+         const pbar=()=>{$('re_cmp_preset').innerHTML=PRESET.map(([lab,tip],i)=>
+             `<button data-p="${i}" title="${tip}" style="padding:3px 9px;font-size:11.5px;border:1px solid #b45309;color:#b45309;background:#fff;border-radius:6px;cursor:pointer">${lab}</button>`).join('')
+             +`<button data-clr="1" title="선택 비우기" style="padding:3px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff;color:#888">비우기</button>`;
+           $('re_cmp_preset').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
+             mset=PRESET[+b.dataset.p][2]().slice(0,MAXSEL); chips(); drawBig(true);});
+           $('re_cmp_preset').querySelector('[data-clr]').onclick=()=>{mset=[]; chips(); drawBig(true);};};
+         pbar();
          q.oninput=showList; q.onfocus=showList;
          document.addEventListener('click',e=>{ if(!e.target.closest('#re_cmp_q')&&!e.target.closest('#re_cmp_list')) list.style.display='none'; });
          let vN=null, vOff=0, curL=0;                       // 휠 확대/축소 상태 (null=전체)

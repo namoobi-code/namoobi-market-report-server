@@ -222,8 +222,8 @@ def main():
                 # 지역 JSON·단지 DB 가 **둘 다** 있어야 스킵 — 단지 DB 는 2026-08 신설이라
                 # 이미 지역집계가 끝난 달도 단지별로는 비어 있어 다시 훑어야 한다.
                 if (EXTEND and ym not in recent and (ym in s or ym in r_)
-                        and apt_db.has(cx, code, ym, "sale")
-                        and apt_db.has(cx, code, ym, "rent")):
+                        and apt_db.has(cx, code, ym, "apt_sale")
+                        and apt_db.has(cx, code, ym, "apt_rent")):
                     continue
                 raw = fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym)
                 a = agg_sale(raw)

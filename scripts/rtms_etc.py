@@ -28,6 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from rtms import REGIONS, SIDO                      # 시군구 목록·시도 접두사 재사용
+import apt_db                                       # 단지별 시계열(오피스텔·연립다세대)도 함께 적재
 
 BASE = Path(__file__).resolve().parent.parent
 DB = BASE / "data" / "db" / "rtms_etc.sqlite"
@@ -243,6 +244,7 @@ def main():
     DB.parent.mkdir(parents=True, exist_ok=True)
     cx = sqlite3.connect(DB, timeout=60)
     cx.executescript(SCHEMA)
+    acx = apt_db.connect(); acache = {}     # 단지별 DB(아파트와 공용)
     yms = months_back(MONTHS)
     recent = set(months_back(3))
     stopped = None
@@ -255,7 +257,20 @@ def main():
                             "SELECT 1 FROM done WHERE kind=? AND sgg=? AND ym=?",
                             (kind, code, ym)).fetchone():
                         continue
-                    a = agg(kind, fetch(svc, op, code, ym))
+                    raw = fetch(svc, op, code, ym)
+                    # (2026-08-08) 같은 응답으로 단지별 시계열도 적재 — 추가 호출 0회.
+                    # 국토부가 건물명을 주는 오피스텔·연립다세대만 가능(단독·토지·상업용은 미제공).
+                    if kind in ("offi_s", "offi_r", "rh"):
+                        k2 = "offi" if kind.startswith("offi") else "rh"
+                        nf = "offiNm" if k2 == "offi" else "mhouseNm"
+                        try:
+                            if kind == "offi_r":
+                                apt_db.ingest_rent(acx, code, ym, raw, acache, k2, nf)
+                            else:
+                                apt_db.ingest_sale(acx, code, ym, raw, acache, k2, nf)
+                        except Exception as e:
+                            print(f"    ⚠ 단지DB 적재 실패({kind} {code} {ym}): {e}")
+                    a = agg(kind, raw)
                     if a:
                         cx.execute("INSERT OR REPLACE INTO agg"
                                    "(kind,sgg,ym,n,amt,med,ar,n2,amt2,rent)"
@@ -264,7 +279,7 @@ def main():
                     cx.execute("INSERT OR REPLACE INTO done(kind,sgg,ym) VALUES(?,?,?)",
                                (kind, code, ym))
                     time.sleep(SLEEP)
-            cx.commit()
+            cx.commit(); acx.commit()
             print(f"  [{i+1}/{len(REGIONS)}] {name}: {got}건 적재 (누적호출 {CALLS:,})", flush=True)
             if (i + 1) % 10 == 0:
                 OUT.write_text(json.dumps({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
@@ -275,7 +290,7 @@ def main():
     except _Stop as e:
         stopped = str(e)
         print(f"  ⚠ {stopped} — 진행분 저장 후 종료")
-    cx.commit()
+    cx.commit(); acx.commit()
     OUT.write_text(json.dumps({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
                                "src": "국토교통부 실거래가 (data.go.kr) · 시군구 집계 → 시도",
                                "types": build_json(cx)}, ensure_ascii=False), encoding="utf-8")
@@ -283,7 +298,8 @@ def main():
     for k, v in d.items():
         print(f"[etc] ✅ {k:7s} {v['label']:8s} {len(v['t'])}개월 {v['t'][0]}~{v['t'][-1]}")
     print(f"[etc] 호출 {CALLS:,}회 → {OUT}")
-    cx.close()
+    print(f"[etc] 단지DB {apt_db.stats(acx)}")
+    acx.close(); cx.close()
 
 
 if __name__ == "__main__":

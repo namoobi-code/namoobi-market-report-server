@@ -67,6 +67,18 @@ def connect():
     DB.parent.mkdir(parents=True, exist_ok=True)
     cx = sqlite3.connect(DB, timeout=60)
     cx.executescript(SCHEMA)
+    # (2026-08-08) 오피스텔·연립다세대까지 담기 위해 kind 컬럼 추가(기존 행은 'apt').
+    # 같은 (sgg,umd,name,jibun) 이 두 유형으로 동시에 존재하는 경우는 없어 UNIQUE 는 그대로 둔다.
+    cols = {r[1] for r in cx.execute("PRAGMA table_info(apt)")}
+    if "kind" not in cols:
+        cx.execute("ALTER TABLE apt ADD COLUMN kind TEXT DEFAULT 'apt'")
+        cx.execute("UPDATE apt SET kind='apt' WHERE kind IS NULL")
+        cx.execute("CREATE INDEX IF NOT EXISTS ix_apt_kind ON apt(kind)")
+        # done 표식도 유형별로 바뀌었다('sale'→'apt_sale'). 그대로 두면 이미 끝낸
+        # 수만 개월을 처음부터 다시 훑게 되므로 반드시 함께 이관한다.
+        cx.execute("UPDATE done SET kind='apt_sale' WHERE kind='sale'")
+        cx.execute("UPDATE done SET kind='apt_rent' WHERE kind='rent'")
+        cx.commit()
     return cx
 
 
@@ -83,9 +95,12 @@ def _med(xs):
     return xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
 
 
-def _apt_id(cx, sgg, r, cache):
-    """단지 마스터 upsert → id. cache 는 실행 중 중복 조회 방지용 dict."""
-    key = (sgg, r.get("umdNm", ""), r.get("aptNm", ""), r.get("jibun", ""))
+def _apt_id(cx, sgg, r, cache, kind="apt", name_field="aptNm"):
+    """단지 마스터 upsert → id. cache 는 실행 중 중복 조회 방지용 dict.
+
+    name_field: 아파트=aptNm · 오피스텔=offiNm · 연립다세대=mhouseNm (실측 확인한 필드명)
+    """
+    key = (sgg, r.get("umdNm", ""), r.get(name_field, "") or r.get("aptNm", ""), r.get("jibun", ""))
     if key in cache:
         return cache[key]
     if not key[2]:
@@ -96,19 +111,20 @@ def _apt_id(cx, sgg, r, cache):
     except Exception:
         pass
     cx.execute(
-        "INSERT INTO apt(sgg,umd,name,jibun,build_year,apt_seq,road) VALUES(?,?,?,?,?,?,?) "
+        "INSERT INTO apt(sgg,umd,name,jibun,build_year,apt_seq,road,kind) VALUES(?,?,?,?,?,?,?,?) "
         "ON CONFLICT(sgg,umd,name,jibun) DO UPDATE SET "
         "  build_year=COALESCE(apt.build_year,excluded.build_year),"
         "  apt_seq   =COALESCE(apt.apt_seq,   excluded.apt_seq),"
-        "  road      =COALESCE(apt.road,      excluded.road)",
-        (*key, by, r.get("aptSeq") or None, r.get("roadnm") or None))
+        "  road      =COALESCE(apt.road,      excluded.road),"
+        "  kind      =COALESCE(apt.kind,      excluded.kind)",
+        (*key, by, r.get("aptSeq") or None, r.get("roadnm") or None, kind))
     aid = cx.execute("SELECT id FROM apt WHERE sgg=? AND umd=? AND name=? AND jibun=?",
                      key).fetchone()[0]
     cache[key] = aid
     return aid
 
 
-def ingest_sale(cx, sgg, ym, rows, cache):
+def ingest_sale(cx, sgg, ym, rows, cache, kind="apt", name_field="aptNm"):
     """매매 원시행 → 단지·면적별 월간 집계 upsert. 해제거래(cdealType='O') 제외."""
     buck = {}
     for r in rows:
@@ -118,7 +134,7 @@ def ingest_sale(cx, sgg, ym, rows, cache):
         ar = _f(r.get("excluUseAr"))
         if not px or not ar:
             continue
-        aid = _apt_id(cx, sgg, r, cache)
+        aid = _apt_id(cx, sgg, r, cache, kind, name_field)
         if aid is None:
             continue
         buck.setdefault((aid, round(ar)), []).append(px / 10000)      # 만원 → 억
@@ -126,11 +142,11 @@ def ingest_sale(cx, sgg, ym, rows, cache):
         "INSERT OR REPLACE INTO sale(apt_id,ym,ar,n,avg,med,mn,mx) VALUES(?,?,?,?,?,?,?,?)",
         [(aid, ym, ar, len(v), round(sum(v) / len(v), 3), round(_med(v), 3),
           round(min(v), 3), round(max(v), 3)) for (aid, ar), v in buck.items()])
-    cx.execute("INSERT OR REPLACE INTO done(sgg,ym,kind) VALUES(?,?,'sale')", (sgg, ym))
+    cx.execute("INSERT OR REPLACE INTO done(sgg,ym,kind) VALUES(?,?,?)", (sgg, ym, kind + "_sale"))
     return len(buck)
 
 
-def ingest_rent(cx, sgg, ym, rows, cache):
+def ingest_rent(cx, sgg, ym, rows, cache, kind="apt", name_field="aptNm"):
     """전월세 원시행 → 전세(월세0)·월세(월세>0) 분리 집계 upsert."""
     jb, wb = {}, {}
     for r in rows:
@@ -139,7 +155,7 @@ def ingest_rent(cx, sgg, ym, rows, cache):
         ar = _f(r.get("excluUseAr"))
         if dep is None or not ar:
             continue
-        aid = _apt_id(cx, sgg, r, cache)
+        aid = _apt_id(cx, sgg, r, cache, kind, name_field)
         if aid is None:
             continue
         k = (aid, round(ar))
@@ -154,7 +170,7 @@ def ingest_rent(cx, sgg, ym, rows, cache):
         [(aid, ym, ar, len(v),
           round(sum(d for d, _ in v) / len(v), 3),
           round(sum(m for _, m in v) / len(v), 1)) for (aid, ar), v in wb.items()])
-    cx.execute("INSERT OR REPLACE INTO done(sgg,ym,kind) VALUES(?,?,'rent')", (sgg, ym))
+    cx.execute("INSERT OR REPLACE INTO done(sgg,ym,kind) VALUES(?,?,?)", (sgg, ym, kind + "_rent"))
     return len(jb) + len(wb)
 
 
