@@ -3699,6 +3699,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     peg:{l:'PEG',n:1,m:'both'}, psr:{l:'PSR',n:1,m:'both'},
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
+    /* (2026-08-09) 실적발표 — 필터 6종과 1:1 대응. 필터가 있으면 컬럼도 있어야 표에서 값을 확인할 수 있다. */
+    spr:{l:'실적서프%',n:1,m:'both'}, sprb:{l:'비트4Q',n:1,m:'us'}, cr30:{l:'컨센30일',n:1,m:'both'},
+    tprv:{l:'목표가30일',n:1,m:'kr'}, gap:{l:'가이던스갭',n:1,m:'us'},
+    r1:{l:'발표D+1',n:1,m:'both'}, r20:{l:'발표D+20',n:1,m:'both'},
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
     payout:{l:'배당성향',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'}
@@ -3887,6 +3891,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'qtoby': return v?'<span class="up" title="전년동기 적자→당분기 흑자 (계절성 안전)">전환</span>':'<span class="note">—</span>';
       case 'qtobq': return v?'<span class="up" title="직전분기 적자→당분기 흑자 (가장 빠름·계절성 주의)">전환</span>':'<span class="note">—</span>';
       case 'opmch': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="당분기 영업이익률 − 전년동기 영업이익률 (%p)">${v>0?'+':''}${v.toFixed(1)}%p</span>`;
+      /* (2026-08-09) 실적발표 6종 — 부호가 곧 의미라 색으로 즉시 구분 */
+      case 'spr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'최근 분기 EPS':'잠정 영업이익'} 컨센서스 대비">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      case 'sprb': return `<span class="${v>=3?'up':'note'}" title="최근 ${r.sprn||4}분기 중 컨센 상회 횟수">${v.toFixed(0)}/${r.sprn||4}</span>`;
+      case 'cr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 30일 변화 · 상향 ${r.cup??'—'}명 / 하향 ${r.cdn??'—'}명">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      case 'tprv': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="최근 30일 증권사 목표주가 평균 변동률 · 리포트 ${r.tpn??'—'}건(상향 ${r.tpu??'—'}·하향 ${r.tpd??'—'})">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      case 'gap': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="회사 가이던스 중간값 vs 애널리스트 컨센서스">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      case 'r1': case 'r20': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="발표 직전 종가 대비 ${key==='r1'?'다음 거래일':'20거래일 뒤'}${r.edl?' · 발표 '+r.edl.slice(4,6)+'/'+r.edl.slice(6):''}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
       case 'sr': return `<span class="${v>=5?'dn':''}">${v.toFixed(1)}%</span>`;
