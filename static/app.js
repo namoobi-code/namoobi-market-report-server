@@ -1248,18 +1248,29 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(opts&&opts.base!=null){ x.setLineDash([4,3]); x.strokeStyle='#b7860b';
       x.beginPath();x.moveTo(P.l,Y(opts.base));x.lineTo(W-P.r,Y(opts.base));x.stroke(); x.setLineDash([]);
       x.fillStyle='#b7860b'; x.fillText(String(opts.base),P.l+2,Y(opts.base)-3); }
-    if(opts&&opts.provIdx!=null&&opts.provIdx>0&&opts.provIdx<N){   // (2026-08-02) 잠정 구간 음영 — 실거래 신고 진행 중
-      const x0=X(opts.provIdx);
-      x.fillStyle='rgba(230,140,0,0.07)'; x.fillRect(x0,P.t,(W-P.r)-x0,H-P.t-P.b);
-      x.save(); x.setLineDash([3,3]); x.strokeStyle='#e08e3c'; x.beginPath(); x.moveTo(x0,P.t); x.lineTo(x0,H-P.b); x.stroke(); x.restore();
-      x.fillStyle='#c47b1e'; x.fillText('⚠ 잠정(신고 진행 중)',x0+3,P.t+10); }
-    /* (2026-08-08) 순위 기준월 표식 — 어느 점으로 줄 세웠는지 안 보이면
-       잠정 구간의 값을 보고 "순위가 틀렸다"고 오해하게 된다. */
+    /* (2026-08-02 → 2026-08-08 정밀화) 잠정 구간 표시.
+       기존엔 경계선을 '첫 잠정 월' 위치에 그어 음영을 시작했는데, 그러면 첫 잠정 점이
+       음영의 왼쪽 끝선 위에 정확히 얹혀 확정치처럼 보인다. 실제로 이 때문에
+       "잠정 직전엔 은평구가 1등인데 순위는 4등"이라는 오해가 생겼다(그 값은 잠정 7월치였다).
+       → 경계선을 마지막 확정 월과 첫 잠정 월의 **중간**으로 옮겨, 모든 잠정 점이
+         음영 안쪽에 확실히 들어오게 한다. 잠정 점은 아래에서 선까지 점선으로 그린다. */
+    const PI=(opts&&opts.provIdx!=null&&opts.provIdx>0&&opts.provIdx<N)?opts.provIdx:null;
+    if(PI!=null){
+      const x0=(X(PI)+X(PI-1))/2;
+      x.fillStyle='rgba(230,140,0,0.10)'; x.fillRect(x0,P.t,(W-P.r)-x0,H-P.t-P.b);
+      x.save(); x.setLineDash([3,3]); x.strokeStyle='#e08e3c'; x.lineWidth=1.4;
+      x.beginPath(); x.moveTo(x0,P.t); x.lineTo(x0,H-P.b); x.stroke(); x.restore();
+      const fm=s=>{s=String(s); return s.length===6?`${s.slice(0,4)}.${s.slice(4)}`:s;};
+      x.fillStyle='#c47b1e'; x.fillText(`⚠ 여기부터 잠정(${fm(arr[0].t[PI])}~) — 신고 진행 중`,x0+4,P.t+10);
+      x.fillStyle='#5b6673'; x.textAlign='right';
+      x.fillText(`확정 최신 ${fm(arr[0].t[PI-1])} ▶`,x0-4,P.t+10); x.textAlign='left'; }
+    /* 순위 기준월 — 몇 월로 줄 세웠는지 월까지 같이 적는다. */
     if(opts&&opts.refIdx!=null&&opts.refIdx>=0&&opts.refIdx<N){
-      const xr=X(opts.refIdx);
-      x.save(); x.setLineDash([2,3]); x.strokeStyle='#1f2937'; x.globalAlpha=.55;
-      x.beginPath(); x.moveTo(xr,P.t); x.lineTo(xr,H-P.b); x.stroke(); x.restore();
-      x.fillStyle='#1f2937'; x.fillText('▲순위 기준',xr-24,H-P.b+ -2); }
+      const xr=X(opts.refIdx), rs=String(arr[0].t[opts.refIdx]);
+      x.save(); x.setLineDash([2,3]); x.strokeStyle='#1f2937'; x.globalAlpha=.5;
+      x.beginPath(); x.moveTo(xr,P.t+14); x.lineTo(xr,H-P.b); x.stroke(); x.restore();
+      x.fillStyle='#1f2937'; x.textAlign='center';
+      x.fillText(`▲순위 기준 ${rs.length===6?rs.slice(0,4)+'.'+rs.slice(4):rs}`,xr,H-P.b-3); x.textAlign='left'; }
     const t0=arr[0].t;                                  // X축 눈금 — 연간(YYYY)·월간(YYYYMM) 모두 지원
     x.fillStyle='#98a2ad';
     for(let i=0;i<t0.length;i++){ const s=String(t0[i]);
@@ -1272,10 +1283,19 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const ordered=HI?[...arr.filter(a=>a.label!==HI),...arr.filter(a=>a.label===HI)]:arr;
     ordered.forEach(a=>{ const on=!HI||a.label===HI;
       x.save(); x.globalAlpha=on?1:0.15;
-      x.strokeStyle=a.color; x.lineWidth=on&&HI?2.6:1.6; x.beginPath(); let st=false;
-      for(let i=0;i<a.v.length;i++){ if(a.v[i]==null) continue;
-        st?x.lineTo(X(i),Y(a.v[i])):(x.moveTo(X(i),Y(a.v[i])),st=true); }
-      x.stroke(); x.restore(); });
+      x.strokeStyle=a.color; x.lineWidth=on&&HI?2.6:1.6;
+      /* 확정 구간은 실선, 잠정 구간은 점선 — 선 모양만 봐도 어느 점이 잠정인지 알 수 있게. */
+      const seg=(a0,a1,dash)=>{ x.save(); if(dash) x.setLineDash([4,3]);
+        x.beginPath(); let st=false;
+        for(let i=a0;i<=a1&&i<a.v.length;i++){ if(a.v[i]==null) continue;
+          st?x.lineTo(X(i),Y(a.v[i])):(x.moveTo(X(i),Y(a.v[i])),st=true); }
+        x.stroke(); x.restore(); };
+      if(PI!=null){ seg(0,PI-1,false); seg(PI-1,a.v.length-1,true);
+        for(let i=PI;i<a.v.length;i++) if(a.v[i]!=null){      // 잠정 점은 속 빈 원으로
+          x.beginPath(); x.arc(X(i),Y(a.v[i]),on&&HI?3:2.2,0,7);
+          x.fillStyle='#fff'; x.fill(); x.stroke(); } }
+      else seg(0,a.v.length-1,false);
+      x.restore(); });
     x.lineWidth=1;
     /* 라벨 — 마지막 값 위치를 기준으로 잡되, 위아래로 겹치면 최소 간격만큼 밀어낸다 */
     const labs=[];

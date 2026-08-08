@@ -8,6 +8,16 @@ cd /home/ubuntu/namoobi || exit 1
 # "database is locked" 로 죽는다(실제로 4개까지 떠서 비아파트 수집이 계속 실패했다).
 exec 9>/tmp/nmr_backfill.lock
 flock -n 9 || { echo "이미 실행 중 — 중복 기동 중단"; exit 0; }
+# (2026-08-08) 고아 수집기 정리 — 이 루프가 죽으면 자식(rtms/rtms_etc)이 ppid 1 로 살아남는다.
+#   그 상태에서 루프를 다시 띄우면 아파트·비아파트가 **동시에** apt.sqlite 를 써서
+#   "database is locked" 로 단지 적재가 통째로 실패한다(오피스텔이 0건이던 원인).
+#   flock 을 잡은 시점엔 정상 자식이 있을 수 없으므로 남은 건 전부 고아다.
+pkill -f "scripts/rtms.py --backfill" 2>/dev/null
+pkill -f "scripts/rtms_etc.py"       2>/dev/null
+sleep 3
+# 비아파트를 먼저 한 바퀴 — 36개월 × 5종이라 짧고, 단지 검색이 바로 살아난다.
+echo "=== [pre] $(date '+%F %T') 비아파트 선행 ===" >> logs/rtms_etc.log
+python3 -u scripts/rtms_etc.py --months 36 --sleep 0.5 --budget 20000 >> logs/rtms_etc.log 2>&1
 LOG=logs/apt_backfill.log
 LOG2=logs/rtms_etc.log
 for i in $(seq 1 400); do
