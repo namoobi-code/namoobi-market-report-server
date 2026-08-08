@@ -718,6 +718,23 @@
         <canvas id="re_tdep" style="width:100%;height:230px"></canvas>
         <div class="note" id="re_tdep_n" style="margin-top:4px;line-height:1.6"></div>
       </div>
+      <!-- (2026-08-08) 미국 주택 선행지표 — FRED 무인증 CSV -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🇺🇸 미국 주택 선행지표 <span class="note">(FRED · 건축허가는 착공에 6개월 선행 · 글로벌 유동성 사이클 참고)</span></b>
+        <div class="note" id="uh_asof" style="margin:6px 0"></div>
+        <div class="grid g2">
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>건축허가 · 주택착공</b> (천호, 연율)</div>
+            <canvas id="uh_start" style="width:100%;height:260px"></canvas>
+            <div class="note" id="uh_start_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>30년 고정 모기지 금리</b> (%)</div>
+            <canvas id="uh_mort" style="width:100%;height:260px"></canvas>
+            <div class="note" id="uh_mort_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+        </div>
+      </div>
       <!-- (2026-08-06) '월별 거래량'·'평균·중위 가격' 단일지역 카드 2개 삭제 — 아래 '지역 비교'와 중복 (사용자 요청) -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
         <b style="font-size:13px">아파트 실거래 — 지역 비교 <span class="note">(원하는 지역을 여러 개 골라 겹쳐보기 · 시도 전체·개별 시군구 모두 선택 가능 · <b>최대 30개</b>)</span></b>
@@ -831,23 +848,6 @@
         </div>
         <div class="note" style="margin:10px 0 3px"><b>자치구별 주요 단계 분포</b></div>
         <div id="rd_gu" style="max-height:280px;overflow:auto"></div>
-      </div>
-      <!-- (2026-08-08) 미국 주택 선행지표 — FRED 무인증 CSV -->
-      <div class="box" style="padding:12px 14px;grid-column:1/-1">
-        <b style="font-size:13px">🇺🇸 미국 주택 선행지표 <span class="note">(FRED · 건축허가는 착공에 6개월 선행 · 글로벌 유동성 사이클 참고)</span></b>
-        <div class="note" id="uh_asof" style="margin:6px 0"></div>
-        <div class="grid g2">
-          <div>
-            <div class="note" style="margin-bottom:3px"><b>건축허가 · 주택착공</b> (천호, 연율)</div>
-            <canvas id="uh_start" style="width:100%;height:260px"></canvas>
-            <div class="note" id="uh_start_n" style="margin-top:4px;line-height:1.6"></div>
-          </div>
-          <div>
-            <div class="note" style="margin-bottom:3px"><b>30년 고정 모기지 금리</b> (%)</div>
-            <canvas id="uh_mort" style="width:100%;height:260px"></canvas>
-            <div class="note" id="uh_mort_n" style="margin-top:4px;line-height:1.6"></div>
-          </div>
-        </div>
       </div>
       <!-- (2026-08-08) 단지별 실거래 — apt.sqlite (rtms 수집과 동시 적재 · 추가 API 호출 0회) -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
@@ -1569,8 +1569,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260810c"></script>
-<script src="/etf.js?v=20260810c"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260810d"></script>
+<script src="/etf.js?v=20260810d"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
