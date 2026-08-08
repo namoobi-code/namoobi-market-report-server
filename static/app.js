@@ -1733,7 +1733,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   /* ── (2026-08-08) 🏬 비아파트 실거래 5종 — rtms_etc.json
      아파트만 보면 시장의 절반을 놓친다. 오피스텔은 매매+전월세가 다 있어
      전월세전환율까지 직접 산출된다(단, 표본이 달라 근사치 — 추세로 읽을 것). ── */
-  let _etInit=false, _etD=null, _etSel=['전국'], _etMet='n', _etKind='offi_s', _etPick=null;
+  let _etInit=false, _etD=null, _etSel=['전국'], _etMet='n', _etKind='offi_s', _etPick=null, _etHi=null;
   const ETC=[['offi_s','오피스텔'],['rh','연립다세대'],['sh','단독다가구'],['land','토지'],['nrg','상업업무용']];
   function initEtc(){
     if(_etInit) return; _etInit=true;
@@ -1744,10 +1744,28 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const all=[...new Set(Object.values(T).flatMap(v=>Object.keys(v.n||{})))];
       {const e=$('et_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 국토부 실거래가 · 지역 ${all.length}`;}
       _etSel=_etSel.filter(r=>all.includes(r)); if(!_etSel.length) _etSel=['전국'];
-      _etPick=regionPicker({q:'et_q',list:'et_list',chips:'et_chips',sel:_etSel,
-        all:()=>all, isSido:r=>RP_SIDO.has(r), onChange:s=>{_etSel=s; drawEtc();}});
+      /* 순위 기준 — 현재 선택한 유형·지표의 확정 최신값(잠정 2개월 제외) */
+      const lastConf=r=>{const S=T[_etKind]; if(!S||!S[_etMet]||!S[_etMet][r]) return null;
+        const d2=new Date(); d2.setMonth(d2.getMonth()-2);
+        const cut=`${d2.getFullYear()}${String(d2.getMonth()+1).padStart(2,'0')}`;
+        const v=S[_etMet][r];
+        for(let i=S.t.length-1;i>=0;i--) if(S.t[i]<=cut&&v[i]!=null) return v[i];
+        return null;};
+      const topN=(f,n)=>all.filter(r=>!RP_SIDO.has(r)&&f(r))
+        .map(r=>[r,lastConf(r)]).filter(x=>x[1]!=null)
+        .sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
+      _etPick=regionPicker({q:'et_q',list:'et_list',chips:'et_chips',presetEl:'et_preset',sel:_etSel,
+        all:()=>all, isSido:r=>RP_SIDO.has(r), sortVal:lastConf, max:30,
+        preset:[
+          ['서울 전체구','서울 시군구 전부',()=>topN(r=>r.startsWith('서울 '),30)],
+          ['부산 전체구','부산 시군구 전부',()=>topN(r=>r.startsWith('부산 '),30)],
+          ['경기 TOP30','경기 시군구 상위 30',()=>topN(r=>r.startsWith('경기 ')||/^(수원|성남|고양|용인|안양|안산|화성|평택|부천)/.test(r),30)],
+          ['전국 TOP30','전국 시군구 상위 30',()=>topN(()=>true,30)],
+        ],
+        onHover:r=>{_etHi=r; drawEtc();},
+        onChange:s=>{_etSel=s; drawEtc();}});
       const bar=(id,items,cur,set)=>{$(id).innerHTML=items.map(([k,l])=>`<button data-k="${k}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===cur()?'#1f2937':'#fff'};color:${k===cur()?'#fff':'#333'}">${l}</button>`).join('');
-        $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{set(b.dataset.k); mb(); kb(); drawEtc();});};
+        $(id).querySelectorAll('button').forEach(b=>b.onclick=()=>{set(b.dataset.k); mb(); kb(); _etPick&&_etPick.redraw(); drawEtc();});};
       const mb=()=>bar('et_met',[['n','거래 건수'],['avg','평균 거래가(억)']],()=>_etMet,v=>_etMet=v);
       const kb=()=>bar('et_kind',ETC,()=>_etKind,v=>_etKind=v);
       mb(); kb(); drawEtc();
@@ -1769,7 +1787,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     /* ① 선택 유형을 지역별로 겹쳐보기 (유형 전환은 버튼으로) */
     {const s=T[_etKind];
      const L=s?_etSel.map((r,i)=>(s[_etMet]&&s[_etMet][r])?{t:s.t,v:s[_etMet][r],label:r,color:RP_PAL[i%RP_PAL.length]}:null).filter(Boolean):[];
-     if(L.length){ line('et_main',L,{provIdx:_provRT(L[0].t)});
+     if(L.length){ line('et_main',L,{provIdx:_provRT(L[0].t),hi:_etHi});
        const last=a=>{for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null;};
        $('et_main_n').innerHTML=
          `<b>${kindLab}</b> · ${_etMet==='n'?'월별 <b>거래 건수</b>':'월별 <b>평균 거래가</b>(억원)'} · 지역 겹쳐보기(최대 12)`
