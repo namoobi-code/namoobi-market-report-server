@@ -1481,7 +1481,7 @@ def apt_search(q: str = "", region: str = "", kind: str = "", n: int = 30):
         return {"rows": []}
     esc = lambda s: s.replace("%", chr(92) + "%").replace("_", chr(92) + "_")
     where, args = [], []
-    if kind in ("apt", "offi", "rh"):
+    if kind in ("apt", "offi", "rh", "sh", "land", "nrg"):
         where.append("COALESCE(a.kind,'apt')=?"); args.append(kind)
     if len(q) >= 2:
         where.append("a.name LIKE ? ESCAPE '\\'"); args.append(f"%{esc(q)}%")

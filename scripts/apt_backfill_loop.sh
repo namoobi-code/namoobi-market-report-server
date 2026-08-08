@@ -4,6 +4,10 @@
 #   병렬로 돌리면 서로 "database is locked" 로 죽는다. 한 루프에서 차례로 돌린다.
 #   각 스크립트는 --extend + done 표식으로 완전 재개 가능하므로 중단돼도 이어서 진행된다.
 cd /home/ubuntu/namoobi || exit 1
+# (2026-08-08) 중복 실행 방지 — 루프가 여러 개 뜨면 rtms_etc 가 서로 SQLite 를 물고
+# "database is locked" 로 죽는다(실제로 4개까지 떠서 비아파트 수집이 계속 실패했다).
+exec 9>/tmp/nmr_backfill.lock
+flock -n 9 || { echo "이미 실행 중 — 중복 기동 중단"; exit 0; }
 LOG=logs/apt_backfill.log
 LOG2=logs/rtms_etc.log
 for i in $(seq 1 400); do

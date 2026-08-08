@@ -1736,7 +1736,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   /* ── (2026-08-08) 🏬 비아파트 실거래 5종 — rtms_etc.json
      아파트만 보면 시장의 절반을 놓친다. 오피스텔은 매매+전월세가 다 있어
      전월세전환율까지 직접 산출된다(단, 표본이 달라 근사치 — 추세로 읽을 것). ── */
-  let _etInit=false, _etD=null, _etSel=['전국'], _etMet='n', _etKind='offi_s', _etPick=null, _etHi=null;
+  let _etInit=false, _etD=null, _etSel=['전국'], _etMet='n', _etKind='offi_s', _etPick=null, _etHi=null, _etRef=null;
   const ETC=[['offi_s','오피스텔'],['rh','연립다세대'],['sh','단독다가구'],['land','토지'],['nrg','상업업무용']];
   function initEtc(){
     if(_etInit) return; _etInit=true;
@@ -1747,13 +1747,18 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const all=[...new Set(Object.values(T).flatMap(v=>Object.keys(v.n||{})))];
       {const e=$('et_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 국토부 실거래가 · 지역 ${all.length}`;}
       _etSel=_etSel.filter(r=>all.includes(r)); if(!_etSel.length) _etSel=['전국'];
-      /* 순위 기준 — 현재 선택한 유형·지표의 확정 최신값(잠정 2개월 제외) */
-      const lastConf=r=>{const S=T[_etKind]; if(!S||!S[_etMet]||!S[_etMet][r]) return null;
+      /* 순위 기준 — **모든 지역 공통의 기준월**(잠정 직전 확정 최신월) 값.
+         (2026-08-08) 지역별로 '각자의 마지막 확정월'을 쓰면 서로 다른 달을 비교하게 돼
+         서초구(옛 고가 거래)가 양천구(최신 최고가)보다 위로 올라가는 문제가 있었다. */
+      const refIdx=()=>{const S=T[_etKind]; if(!S) return -1;
         const d2=new Date(); d2.setMonth(d2.getMonth()-2);
         const cut=`${d2.getFullYear()}${String(d2.getMonth()+1).padStart(2,'0')}`;
-        const v=S[_etMet][r];
-        for(let i=S.t.length-1;i>=0;i--) if(S.t[i]<=cut&&v[i]!=null) return v[i];
-        return null;};
+        const V=S[_etMet]||{};
+        for(let i=S.t.length-1;i>=0;i--)
+          if(S.t[i]<=cut && Object.values(V).some(v=>v&&v[i]!=null)){ _etRef=S.t[i]; return i; }
+        return -1;};
+      const lastConf=r=>{const S=T[_etKind]; if(!S||!S[_etMet]||!S[_etMet][r]) return null;
+        const i=refIdx(); return i<0?null:(S[_etMet][r][i]??null);};
       const topN=(f,n)=>all.filter(r=>!RP_SIDO.has(r)&&f(r))
         .map(r=>[r,lastConf(r)]).filter(x=>x[1]!=null)
         .sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);
@@ -1803,7 +1808,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      if(L.length){ line('et_main',L,{provIdx:_provRT(L[0].t),hi:_etHi});
        const last=a=>{for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null;};
        $('et_main_n').innerHTML=
-         `<b>${kindLab}</b> · ${_etMet==='n'?'월별 <b>거래 건수</b>':'월별 <b>평균 거래가</b>(억원)'} · 지역 겹쳐보기(최대 12)`
+         `<b>${kindLab}</b> · ${_etMet==='n'?'월별 <b>거래 건수</b>':'월별 <b>평균 거래가</b>(억원)'} · 지역 겹쳐보기(최대 30)`
+         +`${_etRef?` · <b>순위 기준 ${_etRef.slice(0,4)}.${_etRef.slice(4)}</b>(잠정 직전 확정월 — 아래 표시값은 잠정 포함 최신치라 순위와 다를 수 있음)`:''}`
          +`<br>`+L.map(a=>{const l=last(a); return `<b style="color:${a.color}">${a.label}</b> ${l?K(l.v):'—'}<span class="note">${l?`(${F(l.ym)})`:''}</span>`;}).join(' &nbsp;·&nbsp; ')
          +`<br><span class="note">토지·상업업무용은 건당 금액 편차가 커서 평균이 크게 튄다 — 건수 추이가 더 안정적인 신호. 최근 1~2개월은 신고 진행 중이라 과소 집계. 단독다가구·토지·상업업무용은 국토부가 건물명을 제공하지 않아 단지별 조회는 불가.</span>`;
      } else { $('et_main_n').innerHTML='<span class="note">선택한 지역·유형에 데이터가 없습니다 — 백필이 진행 중이면 수집이 끝난 지역부터 나옵니다.</span>'; }}
@@ -1957,7 +1963,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   /* ── (2026-08-08) 🏢 아파트 단지별 실거래 — /api/apt/* (apt.sqlite)
      매매·전세·월세를 한 단지 기준으로 겹쳐 본다. 면적(전용 m²)별로 분리해야
      평균이 의미를 갖기 때문에 면적 선택을 필수로 두고, 거래 최다 면적을 기본값으로 잡는다. ── */
-  let _apInit=false, _apAr=0, _apId=0, _apReg="";
+  let _apInit=false, _apAr=0, _apId=0, _apReg="", _apKind="apt";
   function initApt(){
     if(_apInit) return; _apInit=true;
     const E4=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
@@ -1969,7 +1975,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const kw=(q.value||'').trim();
       // 단지명 2자 이상 또는 지역이 지정돼 있으면 조회(둘 다 주면 AND 로 좁힌다)
       if(kw.length<2&&!_apReg){ list.style.display='none'; return; }
-      fetch(`/api/apt/search?q=${encodeURIComponent(kw)}&region=${encodeURIComponent(_apReg)}&n=60`)
+      fetch(`/api/apt/search?q=${encodeURIComponent(kw)}&region=${encodeURIComponent(_apReg)}&kind=${_apKind}&n=60`)
         .then(r=>r.ok?r.json():null).then(d=>{
         const rows=(d&&d.rows)||[];
         list.innerHTML=rows.length?rows.map(r=>
@@ -2008,6 +2014,21 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     document.addEventListener('click',e=>{ if(!e.target.closest('#ap_rq')&&!e.target.closest('#ap_rlist')) rlist.style.display='none'; });
     fetch('/api/apt/regions').then(r=>r.ok?r.json():null).then(d=>{ if(d) REG=d; }).catch(()=>{});
     drawRcur();
+    /* 유형 전환 — 국토부가 주는 식별정보가 달라 검색 단위가 유형마다 다르다 */
+    const KINDS=[['apt','아파트','단지명'],['offi','오피스텔','건물명'],['rh','연립다세대','건물명'],
+                 ['nrg','상업업무용','법정동+지번'],['sh','단독다가구','법정동'],['land','토지','법정동']];
+    const kbar=()=>{$('ap_kind').innerHTML=KINDS.map(([k,l,u])=>
+        `<button data-k="${k}" title="${u} 단위로 조회" style="margin-right:3px;padding:3px 9px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===_apKind?'#1f2937':'#fff'};color:${k===_apKind?'#fff':'#333'}">${l}</button>`).join('')
+        +`<span class="note" style="margin-left:6px">${(KINDS.find(x=>x[0]===_apKind)||[])[2]||''} 단위</span>`;
+      $('ap_kind').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+        _apKind=b.dataset.k; kbar(); q.value=''; list.style.display='none';
+        $('ap_head').innerHTML=''; $('ap_ars').innerHTML='';
+        ['ap_main','ap_rent','ap_vol'].forEach(id=>{const c=$(id); if(!c) return;
+          const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||300;
+          g.clearRect(0,0,c.width,c.height);});
+        $('ap_main_n').innerHTML='<span class="note">유형을 바꿨습니다 — 단지명 또는 지역으로 검색하세요.</span>';
+        search();});};
+    kbar();
 
     function loadApt(id){
       _apId=id;
@@ -2143,7 +2164,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          let met='avg';
          const q=$('re_cmp_q'), list=$('re_cmp_list');
          const mbar=()=>{$('re_cmp_metric').innerHTML=METRICS.map(([k,l])=>`<button data-m="${k}" style="margin-right:4px;padding:3px 10px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===met?'#1f2937':'#fff'};color:${k===met?'#fff':'#333'}">${l}</button>`).join('');
-           $('re_cmp_metric').querySelectorAll('button').forEach(b=>b.onclick=()=>{met=b.dataset.m; mbar(); drawBig(true);});};
+           $("re_cmp_metric").querySelectorAll("button").forEach(b=>b.onclick=()=>{met=b.dataset.m; _refYm=null; mbar(); pbar(); drawBig(true);});};
          let hiLab=null;                     // 강조 중인 계열 라벨(칩 hover / 차트 hover)
          const chips=()=>{$('re_cmp_chips').innerHTML=mset.map((c,i)=>`<span data-hi="${E(N[c]||c)}" style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${PAL[i%PAL.length]}18;border:1px solid ${PAL[i%PAL.length]};color:#333;cursor:pointer"><b style="color:${PAL[i%PAL.length]}">●</b>${E(N[c]||c)}<b data-rm="${c}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
            $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=e=>{
@@ -2180,11 +2201,18 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             최근 2개월은 실거래 신고가 덜 들어와 값이 과소·요동치므로 순위 기준으로 부적합하다. */
          const confCut=()=>{const d=new Date(); d.setMonth(d.getMonth()-2);
            return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}`;};
+         /* (2026-08-08) 기준월을 지역마다 따로 잡으면 서로 다른 달을 비교하게 된다
+            (옛 고가 거래가 남은 구가 최신 최고가 구보다 위로 올라가는 문제).
+            → 전 지역 공통의 '잠정 직전 최신월'을 하나 정하고 그 달 값으로만 줄 세운다. */
+         let _refYm=null;
+         const refYm=()=>{ if(_refYm) return _refYm;
+           const src=met==='dep'?(R.rent||{}):(R.sale||{}); const cut=confCut();
+           const all=new Set();
+           Object.keys(N).forEach(c=>Object.keys((src[c]||{}).m||{}).forEach(t=>{if(t<=cut) all.add(t);}));
+           const ts=[...all].sort(); _refYm=ts.length?ts[ts.length-1]:null; return _refYm;};
          const latestOf=c=>{const src=met==='dep'?(R.rent||{}):(R.sale||{});
-           const m=((src[c]||{}).m)||{}; const cut=confCut();
-           const ts=Object.keys(m).filter(t=>t<=cut).sort();
-           for(let i=ts.length-1;i>=0;i--){const e=m[ts[i]]; const v=e?(e[met]??null):null; if(v!=null) return v;}
-           return null;};
+           const t=refYm(); if(!t) return null;
+           const e=((src[c]||{}).m||{})[t]; return e?(e[met]??null):null;};
          const topN=(filter,n)=>Object.keys(N).filter(c=>!isAgg(c)&&filter(c))
            .map(c=>[c,latestOf(c)]).filter(x=>x[1]!=null)
            .sort((a,b)=>b[1]-a[1]).slice(0,n).map(x=>x[0]);

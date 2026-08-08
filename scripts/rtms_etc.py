@@ -261,9 +261,14 @@ def main():
                     raw = fetch(svc, op, code, ym)
                     # (2026-08-08) 같은 응답으로 단지별 시계열도 적재 — 추가 호출 0회.
                     # 국토부가 건물명을 주는 오피스텔·연립다세대만 가능(단독·토지·상업용은 미제공).
-                    if kind in ("offi_s", "offi_r", "rh"):
-                        k2 = "offi" if kind.startswith("offi") else "rh"
-                        nf = "offiNm" if k2 == "offi" else "mhouseNm"
+                    # 유형별 식별 가능 수준(실측 2026-08-08):
+                    #   오피스텔·연립다세대 = 건물명 / 상업업무용 = 법정동+지번(62%)
+                    #   단독다가구·토지 = 전부 마스킹 → 법정동 단위
+                    K2 = {"offi_s": ("offi", "offiNm"), "offi_r": ("offi", "offiNm"),
+                          "rh": ("rh", "mhouseNm"), "sh": ("sh", ""),
+                          "land": ("land", ""), "nrg": ("nrg", "")}
+                    if kind in K2:
+                        k2, nf = K2[kind]
                         try:
                             if kind == "offi_r":
                                 apt_db.ingest_rent(acx, code, ym, raw, acache, k2, nf)

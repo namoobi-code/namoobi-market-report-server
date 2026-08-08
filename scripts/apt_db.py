@@ -99,12 +99,29 @@ def _med(xs):
     return xs[n // 2] if n % 2 else (xs[n // 2 - 1] + xs[n // 2]) / 2
 
 
-def _apt_id(cx, sgg, r, cache, kind="apt", name_field="aptNm"):
-    """단지 마스터 upsert → id. cache 는 실행 중 중복 조회 방지용 dict.
+def _name_of(r, kind, name_field):
+    """유형별 '무엇을 하나의 단위로 볼 것인가' — 국토부가 주는 식별정보가 제각각이다(실측 2026-08-08).
 
-    name_field: 아파트=aptNm · 오피스텔=offiNm · 연립다세대=mhouseNm (실측 확인한 필드명)
+      아파트/오피스텔/연립다세대 : 건물명 그대로 (지번 마스킹 0%)
+      상업업무용                 : 건물명 없음 → '법정동 지번' (지번 38% 마스킹, 나머지만)
+      단독다가구·토지            : 건물명 없음 + 지번 100% 마스킹 → **법정동 단위**까지만
     """
-    key = (sgg, r.get("umdNm", ""), r.get(name_field, "") or r.get("aptNm", ""), r.get("jibun", ""))
+    if kind in ("sh", "land"):
+        return r.get("umdNm", "") or ""
+    if kind == "nrg":
+        jb = (r.get("jibun") or "").strip()
+        if not jb or "*" in jb:
+            return ""                                 # 마스킹 건은 개별 식별 불가 → 버림
+        return f"{r.get('umdNm','')} {jb}".strip()
+    return r.get(name_field, "") or r.get("aptNm", "")
+
+
+def _apt_id(cx, sgg, r, cache, kind="apt", name_field="aptNm"):
+    """단지(또는 그에 준하는 단위) 마스터 upsert → id."""
+    nm = _name_of(r, kind, name_field)
+    # 단독·토지는 법정동이 곧 단위라 지번을 키에서 뺀다(안 그러면 마스킹 지번마다 새 행이 생긴다)
+    jb = "" if kind in ("sh", "land", "nrg") else (r.get("jibun", "") or "")
+    key = (sgg, r.get("umdNm", ""), nm, jb)
     if key in cache:
         return cache[key]
     if not key[2]:
@@ -135,13 +152,16 @@ def ingest_sale(cx, sgg, ym, rows, cache, kind="apt", name_field="aptNm"):
         if (r.get("cdealType") or "") == "O":
             continue
         px = _f(r.get("dealAmount"))
-        ar = _f(r.get("excluUseAr"))
-        if not px or not ar:
+        # 유형마다 면적 필드가 다르다. 토지·단독은 전용면적이 없어 0(=면적 무관)으로 담는다.
+        ar = (_f(r.get("excluUseAr")) or _f(r.get("totalFloorAr"))
+              or _f(r.get("dealArea")) or _f(r.get("buildingAr")))
+        if not px:
             continue
+        ar = ar or 0
         aid = _apt_id(cx, sgg, r, cache, kind, name_field)
         if aid is None:
             continue
-        buck.setdefault((aid, round(ar)), []).append(px / 10000)      # 만원 → 억
+        buck.setdefault((aid, round(ar)), []).append(px / 10000)      # 만원 → 억 (ar=0 은 면적 무관)
     cx.executemany(
         "INSERT OR REPLACE INTO sale(apt_id,ym,ar,n,avg,med,mn,mx) VALUES(?,?,?,?,?,?,?,?)",
         [(aid, ym, ar, len(v), round(sum(v) / len(v), 3), round(_med(v), 3),
