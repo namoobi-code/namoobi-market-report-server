@@ -1904,10 +1904,24 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            $('re_cmp_metric').querySelectorAll('button').forEach(b=>b.onclick=()=>{met=b.dataset.m; mbar(); drawBig(true);});};
          const chips=()=>{$('re_cmp_chips').innerHTML=mset.map((c,i)=>`<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${PAL[i%PAL.length]}18;border:1px solid ${PAL[i%PAL.length]};color:#333"><b style="color:${PAL[i%PAL.length]}">●</b>${E(N[c]||c)}<b data-rm="${c}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
            $('re_cmp_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{mset=mset.filter(c=>c!==x.dataset.rm); chips(); drawBig(true);});};
+         /* (2026-08-08) 시도로 검색이 안 되던 문제 —
+            광역시 시군구는 이름에 시도가 붙어 있지만("부산 중구") 도 단위는 안 붙어 있어서
+            ("수원 장안구","춘천시") '경기'·'강원' 으로 검색하면 하나도 안 걸렸다.
+            법정동코드 앞 2자리로 시도를 유추해 검색어와 표시에 함께 쓴다. */
+         const SD={'11':'서울','26':'부산','27':'대구','28':'인천','29':'광주','30':'대전','31':'울산',
+                   '36':'세종','41':'경기','43':'충북','44':'충남','46':'전남','47':'경북','48':'경남',
+                   '50':'제주','51':'강원','52':'전북'};
+         const sdOf=c=>SD[String(c).replace(/^A/,'').slice(0,2)]||'';
          const showList=()=>{const kw=(q.value||'').trim().toLowerCase();
-           const cand=Object.keys(N).filter(c=>!mset.includes(c)&&(!kw||String(N[c]).toLowerCase().includes(kw)));
+           const hay=c=>`${sdOf(c)} ${N[c]||c}`.toLowerCase();
+           const cand=Object.keys(N).filter(c=>!mset.includes(c)&&(!kw||hay(c).includes(kw)));
            const aggs=cand.filter(c=>c.startsWith('A')), regs=cand.filter(c=>!c.startsWith('A'));
-           list.innerHTML=[...aggs,...regs].slice(0,40).map(c=>`<div data-add="${c}" style="padding:5px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">${c.startsWith('A')?'★ ':''}${E(N[c]||c)}</div>`).join('')||'<div style="padding:6px 10px" class="note">없음</div>';
+           regs.sort((a,b)=>hay(a)<hay(b)?-1:1);                    // 시도 → 시군구 순으로 묶어 보여준다
+           list.innerHTML=[...aggs,...regs].slice(0,60).map(c=>{
+             const sd=sdOf(c), nm=String(N[c]||c);
+             const pre=(!c.startsWith('A')&&sd&&!nm.startsWith(sd))?`<span class="note">${E(sd)}</span> `:'';
+             return `<div data-add="${c}" style="padding:5px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">${c.startsWith('A')?'★ ':''}${pre}${E(nm)}</div>`;
+           }).join('')||'<div style="padding:6px 10px" class="note">없음</div>';
            list.style.display='';
            list.querySelectorAll('[data-add]').forEach(x=>x.onclick=()=>{if(mset.length>=12){alert('최대 12개까지');return;}
              mset.push(x.dataset.add); q.value=''; list.style.display='none'; chips(); drawBig(true);});};
