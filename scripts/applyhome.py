@@ -72,6 +72,24 @@ SD_SHORT = {"서울특별시": "서울", "부산광역시": "부산", "대구광
             "전라남도": "전남", "경상북도": "경북", "경상남도": "경남", "제주특별자치도": "제주"}
 
 
+def load_umd():
+    """법정동 → 실거래 시군구명 매핑 (umd_map.py 산출물).
+
+    소스마다 시군구 쪼개는 방식이 달라(실거래는 화성을 봉담권/병점권/동탄으로 3분할,
+    청약 주소는 2026 신설 일반구 표기) 그대로 두면 같은 지역이 서로 다른 이름으로 갈린다.
+    실거래 기준으로 통일해야 두 카드의 지역 목록이 맞물린다.
+    """
+    p = BASE / "data" / "db" / "umd_map.json"
+    try:
+        d = json.loads(p.read_text(encoding="utf-8"))
+        return d.get("map") or {}, d.get("map_sd") or {}
+    except Exception:
+        return {}, {}
+
+
+UMD, UMD_SD = load_umd()
+
+
 def parse_sgg(addr, fallback_sd):
     """공급위치 주소 → '시도 시군구'. 예) '경기도 용인시 처인구 역북동 …' → '경기 용인시 처인구'
 
@@ -89,7 +107,15 @@ def parse_sgg(addr, fallback_sd):
     g = t[1]
     if not g.endswith(("시", "군", "구")):
         return None
-    # 특례시의 일반구 (용인시 처인구 / 창원시 마산회원구 …)
+    # ① 읍면동으로 실거래 시군구를 역조회 — 가장 정확하다.
+    #    (화성처럼 실거래가 권역으로 쪼개는 곳도 여기서 정확히 맞춰진다)
+    for tok in t[2:6]:
+        if not tok.endswith(("동", "읍", "면", "리", "가")):
+            continue
+        hit = UMD_SD.get(f"{sd} {tok}") or UMD.get(tok)
+        if hit:
+            return hit if hit.startswith(sd) else f"{sd} {hit}"
+    # ② 매핑 실패 시 주소 그대로 — 특례시의 일반구는 합쳐 준다
     if len(t) > 2 and g.endswith("시") and t[2].endswith("구"):
         g = f"{g} {t[2]}"
     return f"{sd} {g}"

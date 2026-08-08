@@ -1229,14 +1229,20 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const P={l:8,r:52,t:10,b:18};
     const N=Math.max(...arr.map(a=>a.v.length));
     const all=arr.flatMap(a=>a.v).filter(v=>v!=null);
-    let lo=Math.min(...all), hi=Math.max(...all);
-    if(opts&&opts.base!=null){ lo=Math.min(lo,opts.base); hi=Math.max(hi,opts.base); }
-    const pad=(hi-lo)*0.06||1; lo-=pad; hi+=pad;
-    const X=i=>P.l+(W-P.l-P.r)*i/Math.max(1,N-1), Y=v=>P.t+(H-P.t-P.b)*(1-(v-lo)/(hi-lo));
+    /* (2026-08-08) 로그 스케일 — 청약경쟁률처럼 0.02~35,000 같이 자릿수가 크게 벌어지는
+       지표는 선형축에서 이상치 하나가 나머지를 전부 바닥에 눌러버린다. */
+    const LG=!!(opts&&opts.log);
+    const tf=v=>LG?Math.log10(Math.max(v,0.01)):v;
+    const itf=y=>LG?Math.pow(10,y):y;
+    let lo=Math.min(...all.map(tf)), hi=Math.max(...all.map(tf));
+    if(opts&&opts.base!=null){ lo=Math.min(lo,tf(opts.base)); hi=Math.max(hi,tf(opts.base)); }
+    const pad=(hi-lo)*0.06||(LG?0.2:1); lo-=pad; hi+=pad;
+    const X=i=>P.l+(W-P.l-P.r)*i/Math.max(1,N-1), Y=v=>P.t+(H-P.t-P.b)*(1-(tf(v)-lo)/(hi-lo));
+    const fmtA=v=>v>=1000?Math.round(v).toLocaleString():(v>=10?v.toFixed(0):v.toFixed(v<1?2:1));
     x.font='10px sans-serif'; x.strokeStyle='#eceff3'; x.fillStyle='#98a2ad';
-    for(let g=0;g<=4;g++){ const v=lo+(hi-lo)*g/4, y=Y(v);
+    for(let g=0;g<=4;g++){ const yv=lo+(hi-lo)*g/4, y=P.t+(H-P.t-P.b)*(1-(yv-lo)/(hi-lo));
       x.beginPath();x.moveTo(P.l,y);x.lineTo(W-P.r,y);x.stroke();
-      x.fillText(v.toFixed(hi-lo<10?1:0),W-P.r+4,y+3); }
+      x.fillText(LG?fmtA(itf(yv)):yv.toFixed(hi-lo<10?1:0),W-P.r+4,y+3); }
     if(opts&&opts.base!=null){ x.setLineDash([4,3]); x.strokeStyle='#b7860b';
       x.beginPath();x.moveTo(P.l,Y(opts.base));x.lineTo(W-P.r,Y(opts.base));x.stroke(); x.setLineDash([]);
       x.fillStyle='#b7860b'; x.fillText(String(opts.base),P.l+2,Y(opts.base)-3); }
@@ -1274,7 +1280,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     labs.forEach(L=>{ const on=!HI||L.a.label===HI;
       x.save(); x.globalAlpha=on?1:0.25;
       x.fillStyle=L.a.color; x.font=(on&&hi?'bold ':'')+'10px sans-serif';
-      const t=L.a.label+' '+L.v.toFixed(1);
+      const t=L.a.label+' '+(L.v>=1000?Math.round(L.v).toLocaleString():L.v.toFixed(L.v<1?2:1));
       x.fillText(t, Math.max(P.l+2, X(L.li)-x.measureText(t).width-4), L.y+3);
       x.restore(); });
     x.font='10px sans-serif';
@@ -1611,7 +1617,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      실거래는 계약 끝난 뒤에 잡히는 후행 지표지만, 청약은 지금 수요가 얼마나
      달려드는지를 보여주는 선행 지표. 지역 격차가 워낙 커서(서울 33:1 vs 지방 2:1)
      선택 지역 + 전국 기준선을 함께 그린다. ── */
-  let _ahInit=false, _ahD=null, _ahSel=['전국','서울','경기'], _ahHi=null, _ahPick=null, _ahArr=null;
+  let _ahInit=false, _ahD=null, _ahSel=['전국','서울','경기'], _ahHi=null, _ahPick=null, _ahArr=null, _ahLog=true, _ahWin=12, _ahLastPre=null;
   const AHPAL=RP_PAL; const AHPAL_OLD=['#be185d','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e7490','#d9534f','#65a30d',
                '#5d4037','#455a64','#9e9d24','#00838f'];
   function initApply(){
@@ -1624,8 +1630,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       if(!_ahSel.length) _ahSel=(d.sido||[]).slice(0,3);
       /* 정렬·랭킹 기준 — 최근 12개월 중 값이 있는 달의 평균.
          청약은 단지 하나로 월값이 크게 튀어서 단월 기준으로 줄 세우면 순위가 매달 뒤집힌다. */
+      /* 순위 기준 = 선택한 기간의 평균 경쟁률.
+         기간에 따라 '요즘 뜨는 곳'(3M)과 '꾸준히 센 곳'(24M)이 갈린다. */
       const recentAvg=r=>{const v=d.series[r]; if(!v) return null;
-        const s=v.slice(-12).filter(x=>x!=null); if(!s.length) return null;
+        const s=(_ahWin>0?v.slice(-_ahWin):v).filter(x=>x!=null); if(!s.length) return null;
         return s.reduce((a,b)=>a+b,0)/s.length;};
       const topN=(f,n)=>(d.regions||[]).filter(r=>!RP_SIDO.has(r)&&f(r))
         .map(r=>[r,recentAvg(r)]).filter(x=>x[1]!=null)
@@ -1634,14 +1642,29 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         all:()=>d.regions||[], isSido:r=>RP_SIDO.has(r), sortVal:recentAvg, max:30,
         count:r=>{const n=(d.n_pblanc||{})[r]; return n?`공고 ${n}건`:null;},
         preset:[
-          ['경쟁률 TOP30','최근 12개월 평균 경쟁률 상위 시군구 30',()=>topN(()=>true,30)],
-          ['서울 전체',   '서울 시군구 전부',()=>topN(r=>r.startsWith('서울 '),30)],
-          ['경기 TOP30',  '경기 시군구 상위 30',()=>topN(r=>r.startsWith('경기 '),30)],
+          ['경쟁률 TOP30','선택한 순위기간의 평균 경쟁률 상위 시군구 30',()=>{_ahLastPre=0; return topN(()=>true,30);}],
+          ['서울 전체',   '서울 시군구 전부',()=>{_ahLastPre=1; return topN(r=>r.startsWith('서울 '),30);}],
+          ['경기 TOP30',  '경기 시군구 상위 30',()=>{_ahLastPre=2; return topN(r=>r.startsWith('경기 '),30);}],
           ['시도 전체',   '전국·시도 단위만',()=>(d.sido||[]).slice(0,30)],
         ],
         onHover:r=>{_ahHi=r; drawApply();},
         onChange:s=>{_ahSel=s; drawApply();}});
-      drawApply();
+      /* 축 토글 — 경쟁률은 0.02~35,000 까지 벌어져 기본을 로그로 둔다.
+         (선형이면 서초 35,076:1 같은 이상치 하나가 나머지 29개를 바닥에 눌러버린다) */
+      const sbar=()=>{$('ah_scale').innerHTML=[[true,'로그축'],[false,'선형축']].map(([k,l])=>
+          `<button data-l="${k}" style="padding:3px 9px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===_ahLog?'#1f2937':'#fff'};color:${k===_ahLog?'#fff':'#333'}">${l}</button>`).join('');
+        $('ah_scale').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+          _ahLog=(b.dataset.l==='true'); sbar(); drawApply();});};
+      const WINS=[[3,'3M'],[6,'6M'],[12,'12M'],[24,'24M'],[0,'전체']];
+      const wbar=()=>{$('ah_win').innerHTML=WINS.map(([k,l])=>
+          `<button data-w="${k}" style="padding:3px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===_ahWin?'#1f2937':'#fff'};color:${k===_ahWin?'#fff':'#333'}">${l}</button>`).join('');
+        $('ah_win').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+          _ahWin=+b.dataset.w; wbar();
+          // 프리셋으로 뽑은 목록이면 새 기간으로 다시 뽑아준다(기간만 바꾸고 목록이 그대로면 헷갈린다)
+          if(_ahLastPre!=null&&_ahPick){ const el=$('ah_preset');
+            const btn=el&&el.querySelector(`[data-p="${_ahLastPre}"]`); if(btn){ btn.click(); return; } }
+          _ahPick&&_ahPick.redraw(); drawApply();});};
+      sbar(); wbar(); drawApply();
     }).catch(()=>{});
   }
   function drawApply(){
@@ -1649,7 +1672,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const E5=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const F=x=>x?`${x.slice(0,4)}.${x.slice(4)}`:'—';
     const arr=_ahSel.filter(r=>S[r]).map((r,i)=>({t,v:S[r],label:r,color:AHPAL[i%AHPAL.length]}));
-    if(arr.length) line('ah_main',arr,{hi:_ahHi});
+    if(arr.length) line('ah_main',arr,{hi:_ahHi,log:_ahLog});
     else { const c=$('ah_main');                       // 비우기 후 잔상 제거
       if(c){const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||320; g.clearRect(0,0,c.width,c.height);}
       _ahArr=null; _ahHi=null;
@@ -1684,7 +1707,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       let pk=-1; for(let i=0;i<v.length;i++) if(v[i]!=null&&(pk<0||v[i]>v[pk])) pk=i;
       return {r:a.label,c:a.color,li,pk,v};});
     $('ah_main_n').innerHTML=
-      `경쟁률 = <b>총 청약건수 ÷ 총 공급세대</b> · 월별 <b>가중평균</b>(단지 단순평균 아님) · <b>시도·시군구 최대 12개</b> 겹쳐보기`
+      `경쟁률 = <b>총 청약건수 ÷ 총 공급세대</b> · 월별 <b>가중평균</b> · 최대 30개 · 순위기간 <b>${_ahWin?_ahWin+'개월':'전체'}</b> · ${_ahLog?'<b>로그축</b>(자릿수 차이가 커서 기본값 — 선형은 이상치 하나에 눌린다)':'<b>선형축</b>'}`
       +`<br>`+info.map(x=>`<b style="color:${x.c}">${E5(x.r)}</b> 최신 <b>${x.li>=0?x.v[x.li].toFixed(2):'—'}</b>`
           +`${x.li>=0?`<span class="note">(${F(t[x.li])})</span>`:''}`
           +`${x.pk>=0?` · 최고 ${x.v[x.pk].toFixed(0)}<span class="note">(${F(t[x.pk])})</span>`:''}`).join(' &nbsp;·&nbsp; ')

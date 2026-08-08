@@ -57,10 +57,30 @@ def fetch(lawd, ym):
     return []
 
 
+def targets():
+    """매핑이 실제로 필요한 시군구만 고른다.
+
+    대부분의 시군구는 주소 표기와 실거래 이름이 그대로 맞는다("서울 강남구", "수원 장안구").
+    문제는 국토부가 **임의 권역으로 쪼갠 곳**뿐이다 — 화성 봉담권/병점권/동탄처럼
+    두 번째 토큰이 '구'로 끝나지 않는 경우. 여기만 법정동 매핑이 필요하다.
+    (전국 246개를 다 훑으면 738회 호출이 들고 백필과 레이트리밋을 다툰다)
+    """
+    if "--full" in sys.argv:
+        return dict(REGIONS)
+    out = {}
+    for code, name in REGIONS.items():
+        t = name.split()
+        if len(t) > 1 and not t[1].endswith("구"):
+            out[code] = name
+    return out
+
+
 def main():
     per = defaultdict(Counter)                       # 법정동 → {시군구명: 건수}
     months = yms(MONTHS)
-    for i, (code, name) in enumerate(REGIONS.items()):
+    TGT = targets()
+    print(f"[umd] 대상 {len(TGT)}개 시군구: {list(TGT.values())}")
+    for i, (code, name) in enumerate(TGT.items()):
         got = set()
         for ym in months:
             for u in fetch(code, ym):
