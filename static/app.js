@@ -3231,6 +3231,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       gap:{label:'가이던스 갭',fixed:'— (한국은 기업 가이던스 공시 관행 없음)'},
       tprv:{label:'목표주가 30일 리비전',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상향 +3%↑',3,null],['상향 +10%↑',10,null],['하향 −3%↓',null,-3],['하향 −10%↓',null,-10]],def:[null,null]},
+      edld:{label:'발표 후 경과일',fmt:v=>v===0?'오늘':`D+${v.toFixed(0)}`,reqData:1,
+        presets:[['전체',null,null],['3일 이내',null,3],['7일 이내',null,7],['30일 이내',null,30]],def:[null,null]},
       r1:{label:'발표 후 1일',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['+5% ↑',5,null],['−5% ↓',null,-5]],def:[null,null]},
       r20:{label:'발표 후 20일(PEAD)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
@@ -3319,6 +3321,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       gap:{label:'가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
       tprv:{label:'목표주가 30일 리비전',fixed:'— (US 는 이익추정 리비전(컨센30일)이 정식 지표)'},
+      edld:{label:'발표 후 경과일',fmt:v=>v===0?'오늘':`D+${v.toFixed(0)}`,reqData:1,
+        presets:[['전체',null,null],['3일 이내',null,3],['7일 이내',null,7],['30일 이내',null,30]],def:[null,null]},
       r1:{label:'발표 후 1일',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['+5% ↑',5,null],['−5% ↓',null,-5]],def:[null,null]},
       r20:{label:'발표 후 20일(PEAD)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
@@ -3335,7 +3339,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               'r1m','r3m','r6m','mom','vol20','hi','frgn','frgn4w','fnb20','onb20','fst','ost','sr','lbr','srf','scov','inst','drvj',
               'ern','cov','upside','rec','rev','nan',
               /* (2026-08-09) 실적발표 이벤트 — 실적(서프)·전망(리비전·가이던스)·주가(반응) 순 */
-              'spr','sprb','cr30','tprv','gap','r1','r20',
+              'edld','spr','sprb','cr30','tprv','gap','r1','r20',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
      파생 z 3종(베이시스·풋콜(OI)·IV스큐 — 방향지표만, GEX·OI 제외):
@@ -3700,7 +3704,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     tp:{l:'목표주가',n:1,m:'both'}, upside:{l:'상승여력',n:1,m:'both'},
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
     /* (2026-08-09) 실적발표 — 필터 6종과 1:1 대응. 필터가 있으면 컬럼도 있어야 표에서 값을 확인할 수 있다. */
-    spr:{l:'실적서프%',n:1,m:'both'}, sprb:{l:'비트4Q',n:1,m:'us'}, cr30:{l:'컨센30일',n:1,m:'both'},
+    edld:{l:'실적발표일',n:1,m:'both'}, spr:{l:'실적서프%',n:1,m:'both'}, sprb:{l:'비트4Q',n:1,m:'us'}, cr30:{l:'컨센30일',n:1,m:'both'},
     tprv:{l:'목표가30일',n:1,m:'kr'}, gap:{l:'가이던스갭',n:1,m:'us'},
     r1:{l:'발표D+1',n:1,m:'both'}, r20:{l:'발표D+20',n:1,m:'both'},
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
@@ -3814,6 +3818,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'r1':   return r.r1;                                     // 발표 후 1거래일 등락%
       case 'r20':  return r.r20;                                    // 발표 후 20거래일 수익%(PEAD)
       case 'tprv': return r.tprv;                                   // 목표주가 30일 리비전%(KR)
+      /* (2026-08-09) 실적발표일 — '어닝일(ern)'은 Yahoo·네이버 IR 의 **예정일**이라
+         실제 발표를 감지한 날(edl)과 다를 수 있다. 서프·반응 값은 전부 edl 기준이므로
+         "며칠 전에 발표했나"를 따로 둔다. */
+      case 'edld': { if(!r.edl) return null;
+        const y=+r.edl.slice(0,4), m=+r.edl.slice(4,6)-1, d=+r.edl.slice(6,8);
+        const t=new Date(); t.setHours(0,0,0,0);
+        return Math.round((t-new Date(y,m,d))/86400000); }
       case 'ern': {                                                 // 어닝 D-day — 음수=발표 지남(D+, 사후 추적용)
         if(!r.ed) return null;
         const t=new Date(); t.setHours(0,0,0,0);
@@ -3891,6 +3902,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'qtoby': return v?'<span class="up" title="전년동기 적자→당분기 흑자 (계절성 안전)">전환</span>':'<span class="note">—</span>';
       case 'qtobq': return v?'<span class="up" title="직전분기 적자→당분기 흑자 (가장 빠름·계절성 주의)">전환</span>':'<span class="note">—</span>';
       case 'opmch': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="당분기 영업이익률 − 전년동기 영업이익률 (%p)">${v>0?'+':''}${v.toFixed(1)}%p</span>`;
+      case 'edld': return `<span class="${v<=7?'up':'note'}" title="실제 발표 감지일 ${r.edl?r.edl.slice(0,4)+'-'+r.edl.slice(4,6)+'-'+r.edl.slice(6):'—'} (어닝일 컬럼은 IR 예정일)">${v===0?'오늘':'D+'+v.toFixed(0)}</span>`;
       /* (2026-08-09) 실적발표 6종 — 부호가 곧 의미라 색으로 즉시 구분 */
       case 'spr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'최근 분기 EPS':'잠정 영업이익'} 컨센서스 대비">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'sprb': return `<span class="${v>=3?'up':'note'}" title="최근 ${r.sprn||4}분기 중 컨센 상회 횟수">${v.toFixed(0)}/${r.sprn||4}</span>`;
@@ -4036,6 +4048,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['투자의견','컨센서스 등급을 0~100 매수강도로 환산(높을수록 매수)'],
         ['리비전','EPS 추정치 90일 변화율(FY1+FY2) — 애널리스트 상향세'],
         ['애널수','커버하는 애널리스트 수'],
+        ['발표 후 경과일','<b>실제 실적발표를 감지한 날</b>로부터 며칠 지났나. 위쪽 <b>어닝일(D±)</b>은 Yahoo·네이버 IR 의 <b>예정일</b>이라 실제 발표일과 다를 수 있는데, 서프라이즈·발표 후 반응 값은 전부 이 실제 발표일 기준이다. 최근 45일치만 추적한다'],
         ['실적 서프라이즈','실제 실적이 증권사 컨센서스를 몇 % 웃돌았나. <b>미국=EPS · 한국=영업이익</b>(잠정공시 vs 컨센). <b>함정</b>: 발표 직전 컨센이 낮아졌다면 쉬운 허들을 넘은 것 — 반드시 <b>컨센30일</b>과 같이 볼 것'],
         ['연속 비트(4Q중)','최근 4분기 중 컨센 상회 횟수. 꾸준히 이기는 회사는 다음 분기도 이길 확률이 높다(서프라이즈 지속성). 평균 대신 중위값 사용 — 적자→흑자 분기 하나가 평균을 왜곡한다(실측 INTC 평균 +1,361%)'],
         ['컨센 30일 리비전','다음 분기 컨센서스 추정치의 30일 전 대비 변화율. <b>가이던스가 시장에 어떻게 소화됐나</b>의 결과다. +5%↑=애널리스트가 전망 상향. 미국은 즉시 산출, <b>한국은 스냅샷 30일 누적 후(2026-09-08~)</b>'],
@@ -4115,6 +4128,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['투자의견','컨센서스 등급을 0~100 매수강도로 환산(높을수록 매수)'],
         ['리비전','목표주가 90일 변화율(누적/백필) — 애널리스트 상향세'],
         ['애널수','KR 미제공'],
+        ['발표 후 경과일','<b>실제 실적발표를 감지한 날</b>로부터 며칠 지났나. 위쪽 <b>어닝일(D±)</b>은 Yahoo·네이버 IR 의 <b>예정일</b>이라 실제 발표일과 다를 수 있는데, 서프라이즈·발표 후 반응 값은 전부 이 실제 발표일 기준이다. 최근 45일치만 추적한다'],
         ['실적 서프라이즈','실제 실적이 증권사 컨센서스를 몇 % 웃돌았나. <b>한국=영업이익</b>(DART 잠정공시 vs WISEreport 컨센). <b>함정</b>: 발표 직전 컨센이 낮아졌다면 쉬운 허들을 넘은 것 — <b>컨센30일</b>과 같이 볼 것'],
         ['연속 비트(4Q중)','KR 미제공 — 분기별 서프라이즈 이력을 주는 무료 소스가 없다'],
         ['컨센 30일 리비전','영업이익 컨센서스 추정치의 30일 전 대비 변화율. 발표 후 애널리스트가 전망을 올렸는지 확인. 한국은 현재값만 오므로 <b>일별 스냅샷 30일 누적 후 유효(2026-09-08~)</b>'],
@@ -4146,7 +4160,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','mom']],
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-      ['실적발표',['spr','sprb','cr30','tprv','gap','r1','r20']],
+      ['실적발표',['edld','spr','sprb','cr30','tprv','gap','r1','r20']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
     ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
@@ -4352,7 +4366,7 @@ await _canvasFlow(c);
              ['기간수익률',['r1m','r3m','r6m','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-      ['실적발표',['spr','sprb','cr30','tprv','gap','r1','r20']],
+      ['실적발표',['edld','spr','sprb','cr30','tprv','gap','r1','r20']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
              ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
@@ -5760,12 +5774,12 @@ await _canvasFlow(c);
     kr:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
         ['fper','PER',1],['pbr','PBR',1],['divy','배당%',1],['g_new','성장',1],
         ['mom',(mkt==='kr'?'12M':'12-1M'),1],['near52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
-        ['spr','서프%',1],['sprb','비트4Q',1],['cr30','컨센30일',1],['tprv','목표가30일',1],['gap','가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
+        ['edld','발표일',1],['spr','서프%',1],['sprb','비트4Q',1],['cr30','컨센30일',1],['tprv','목표가30일',1],['gap','가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
         ['roe','ROE',1],['de','부채비율',1]],
     us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
         ['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['g_new','성장',1],
         ['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
-        ['spr','서프%',1],['sprb','비트4Q',1],['cr30','컨센30일',1],['tprv','목표가30일',1],['gap','가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
+        ['edld','발표일',1],['spr','서프%',1],['sprb','비트4Q',1],['cr30','컨센30일',1],['tprv','목표가30일',1],['gap','가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
         ['roe','ROE',1],['fcfy','FCF%',1],['de','부채비율',1]]
   };
   function cell2(r,c){const k=c[0];

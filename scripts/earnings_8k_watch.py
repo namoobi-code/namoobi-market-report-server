@@ -128,7 +128,10 @@ def parse_guidance(txt):
     out = {}
     sents = re.split(r"(?<=[.;])\s+", txt)
     lead = [x for x in sents
-            if re.search(r"\b(expect|expects|guidance|outlook|anticipat|forecast|project)", x, re.I)]
+            if re.search(r"\b(expect|expects|guidance|outlook|anticipat|forecast|project)", x, re.I)
+            # 연간(FY) 전망 문장은 버린다 — 분기 컨센서스와 비교하면 4배 차이가 나
+            # "+292%" 같은 엉터리 갭이 만들어진다(실측 WGO·FDS·GBX·AVAV).
+            and not re.search(r"full[- ]year|fiscal year|for the year|annual|FY\s?20\d\d", x, re.I)]
 
     def grab(seg, label_re, is_eps):
         m = re.search(label_re + r"[^$%]{0,80}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM, seg, re.I)
@@ -179,14 +182,21 @@ def guidance_gap(sym, g, pool_us):
     """
     r = pool_us.get(sym) or {}
     out = {}
+    # 분기 가이던스가 컨센서스와 ±60% 넘게 벌어지는 일은 사실상 없다.
+    # 그 정도면 연간↔분기를 잘못 물렸거나 파싱이 틀린 것 → 버린다(틀린 값보다 빈칸이 낫다).
+    LIM = 60.0
     if g.get("rev_lo") and r.get("rq1"):
         mid = (g["rev_lo"] + g["rev_hi"]) / 2
-        out["g_rev"] = round(mid / 1e6, 1)                  # 백만 달러
-        out["g_rev_gap"] = round((mid / r["rq1"] - 1) * 100, 1)
-    if g.get("eps_lo") and r.get("eq1"):
+        gp = (mid / r["rq1"] - 1) * 100
+        if abs(gp) <= LIM:
+            out["g_rev"] = round(mid / 1e6, 1)              # 백만 달러
+            out["g_rev_gap"] = round(gp, 1)
+    if g.get("eps_lo") and r.get("eq1") and r["eq1"] > 0:
         mid = (g["eps_lo"] + g["eps_hi"]) / 2
-        out["g_eps"] = round(mid, 2)
-        out["g_eps_gap"] = round((mid / r["eq1"] - 1) * 100, 1)
+        gp = (mid / r["eq1"] - 1) * 100
+        if abs(gp) <= LIM:
+            out["g_eps"] = round(mid, 2)
+            out["g_eps_gap"] = round(gp, 1)
     return out
 
 
