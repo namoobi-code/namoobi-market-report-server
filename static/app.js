@@ -1463,19 +1463,34 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
 
   /* ── (2026-08-08) 🏗 서울 재개발·재건축 — redev.json (클린업시스템 무인증)
      현황보다 '변화'가 신호다 — 매일 스냅샷을 비교해 단계 전환을 잡아낸다. ── */
-  let _rdInit=false;
+  let _rdInit=false, _rdSd='전체';
   function initRedev(){
     if(_rdInit) return; _rdInit=true;
     fetch('/api/db/redev').then(r=>r.ok?r.json():null).then(d=>{
       if(!d||!d.gu){ const e=$('rd_head'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 08:05)부터 표시됩니다.'; return; }
+      const sds=['전체',...Object.keys(d.sd||{})];
+      const bar=()=>{$('rd_sd').innerHTML=sds.map(s=>`<button data-s="${s}" style="margin-right:3px;padding:2px 9px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${s===_rdSd?'#1f2937':'#fff'};color:${s===_rdSd?'#fff':'#333'}">${s}${s!=='전체'?` <span style="opacity:.7">${d.sd[s]}</span>`:''}</button>`).join('');
+        $('rd_sd').querySelectorAll('button').forEach(b=>b.onclick=()=>{_rdSd=b.dataset.s; bar(); render();});};
+      const render=()=>_rdRender(d);
+      bar(); render();
+    }).catch(()=>{});
+  }
+  function _rdRender(d){
+    {
       const E6=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
       const KEY=new Set(d.key_stages||[]);
-      $('rd_head').innerHTML=`전체 <b>${(d.n||0).toLocaleString()}</b>개 사업장 · 자치구 ${Object.keys(d.gu).length} · `
-        +Object.entries(d.kinds||{}).slice(0,5).map(([k,v])=>`${E6(k)} <b>${v}</b>`).join(' · ')
-        +` <span style="margin-left:6px">수집 ${E6(d.asof||'')}</span>`;
+      /* 시도 필터 — 자치구 키가 "서울 강남구" 형태라 접두어로 거른다 */
+      const inSd=g=>_rdSd==='전체'||String(g).startsWith(_rdSd+' ');
+      const GU=Object.fromEntries(Object.entries(d.gu).filter(([g])=>inSd(g)));
+      const nSel=Object.values(GU).reduce((a,c)=>a+Object.values(c).reduce((x,y)=>x+y,0),0);
+      $('rd_head').innerHTML=`<b>${E6(_rdSd)}</b> <b>${nSel.toLocaleString()}</b>개 사업장 · 자치구 ${Object.keys(GU).length}`
+        +(_rdSd==='전체'?` · `+Object.entries(d.sd||{}).map(([k,v])=>`${E6(k)} ${v}`).join(' · '):'')
+        +` <span style="margin-left:6px">수집 ${E6(d.asof||'')}</span>`
+        +`<br><span class="note">지역마다 운영 시스템이 달라 단계 명칭이 제각각이라(46종) <b>표준 단계로 통일</b>했습니다. 경기는 사업일정·세대수까지, 인천은 컬럼이 가장 적습니다.</span>`;
       /* 단계별 막대 — canvas 대신 div 폭으로(가로 막대가 더 읽기 쉽다) */
       const tot={}; (d.stages||[]).forEach(s=>tot[s]=0);
-      Object.values(d.gu).forEach(c=>Object.entries(c).forEach(([s,v])=>tot[s]=(tot[s]||0)+v));
+      Object.values(GU).forEach(c=>Object.entries(c).forEach(([s,v])=>tot[s]=(tot[s]||0)+v));
+      const gu=GU;
       const mx=Math.max(...Object.values(tot),1);
       $('rd_stages').innerHTML=(d.stages||[]).filter(s=>s&&tot[s]).map(s=>{
         const w=tot[s]/mx*100, hot=KEY.has(s);
@@ -1496,18 +1511,18 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              (오늘이 첫 수집이라 비교 대상이 없습니다)</div>`;
       /* 자치구 × 주요단계 표 */
       const KS=(d.key_stages||[]).filter(s=>tot[s]);
-      const gus=Object.keys(d.gu).sort((a,b)=>
-        KS.reduce((s,k)=>s+(d.gu[b][k]||0),0)-KS.reduce((s,k)=>s+(d.gu[a][k]||0),0));
+      const gus=Object.keys(gu).sort((a,b)=>
+        KS.reduce((s,k)=>s+(gu[b][k]||0),0)-KS.reduce((s,k)=>s+(gu[a][k]||0),0));
       $('rd_gu').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px">
         <thead><tr style="position:sticky;top:0;background:#f7f8fa">
           <th style="padding:4px 7px;text-align:left;border-bottom:1px solid #e3e7ec">자치구</th>
           ${KS.map(s=>`<th style="padding:4px 7px;text-align:right;border-bottom:1px solid #e3e7ec;white-space:nowrap">${E6(s)}</th>`).join('')}
           <th style="padding:4px 7px;text-align:right;border-bottom:1px solid #e3e7ec">전체</th></tr></thead>
-        <tbody>${gus.map(g=>{const c=d.gu[g], all=Object.values(c).reduce((a,b)=>a+b,0);
+        <tbody>${gus.map(g=>{const c=gu[g], all=Object.values(c).reduce((a,b)=>a+b,0);
           return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 7px">${E6(g)}</td>
             ${KS.map(s=>`<td style="padding:3px 7px;text-align:right;${c[s]?'font-weight:600':'color:#c3cad3'}">${c[s]||'·'}</td>`).join('')}
             <td style="padding:3px 7px;text-align:right" class="note">${all}</td></tr>`;}).join('')}</tbody></table>`;
-    }).catch(()=>{});
+    }
   }
 
   /* ── (2026-08-08) 🇺🇸 미국 주택 선행지표 — us_housing.json (FRED 무인증 CSV) ── */

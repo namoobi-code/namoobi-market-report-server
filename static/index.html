@@ -808,8 +808,11 @@
       </div>
       <!-- (2026-08-08) 서울 정비사업 — 클린업시스템 무인증 -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
-        <b style="font-size:13px">🏗 서울 재개발·재건축 <span class="note">(클린업시스템 · 단계 통과가 곧 향후 3~10년 공급 일정이자 가격 촉매)</span></b>
-        <div class="note" id="rd_head" style="margin:6px 0"></div>
+        <b style="font-size:13px">🏗 재개발·재건축 <span class="note">(서울·경기·인천·부산 · 단계 통과가 곧 향후 3~10년 공급 일정이자 가격 촉매)</span></b>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 2px">
+          <span class="note">지역</span><span id="rd_sd"></span>
+        </div>
+        <div class="note" id="rd_head" style="margin:4px 0"></div>
         <div class="grid g2">
           <div>
             <div class="note" style="margin-bottom:4px"><b>진행단계별 사업장 수</b> — 아래로 갈수록 사업 확정성↑</div>
@@ -1555,8 +1558,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260808j"></script>
-<script src="/etf.js?v=20260808j"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260808k"></script>
+<script src="/etf.js?v=20260808k"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
