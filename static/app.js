@@ -6228,11 +6228,16 @@ await _canvasFlow(c);
     resetF(); F=F_ST[mkt];
     const d=DEF[mkt];
     const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
-    set('spr',{min:5,max:null});        // 컨센을 뚜렷하게 상회
+    /* (2026-08-09 사용자 세팅 반영) 실적·전망이 **모두** 좋은데 주가만 아직 안 오른 교집합.
+       서프라이즈 하나만 보면 '이번에만 잘한' 종목과 가이던스가 나빠 이미 꺾인 종목이
+       섞여 들어와 PEAD 후보로서 신뢰가 떨어진다. 가이던스쇼크와 같은 축을 쓰되
+       주가 조건만 반대(아직 안 올랐다)로 둔다. */
+    set('spr',{min:5,max:null});        // 실적: 컨센을 뚜렷하게 상회
+    set('sprb',{min:4,max:null});       // 실적: 최근 4분기 전부 상회 = 꾸준히 이기는 회사
     /* 전망 개선 확인 — 미국은 이익추정 리비전, 한국은 스냅샷 30일이 쌓이기 전까지
        증권사 목표주가 리비전으로 대신한다(같은 '전망이 올라갔나' 축). */
-    if(mkt==='us') set('cr30',{min:2,max:null});
-    else           set('tprv',{min:3,max:null});
+    if(mkt==='us'){ set('cr30',{min:2,max:null}); set('gap',{min:2,max:null}); }
+    else            set('tprv',{min:3,max:null});
     set('r1',{min:null,max:5});         // 그런데 주가는 아직 크게 안 올랐다 = 남은 여지
     set('cap',{min:mkt==='kr'?3000:2e9,max:null});
     sort={k:'spr',d:-1}; apply(); };}
