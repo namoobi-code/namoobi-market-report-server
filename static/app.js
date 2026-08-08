@@ -1226,6 +1226,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const cv=$(cvId); if(!cv) return;
     const W=cv.clientWidth||700,H=cv.clientHeight||230; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    // (2026-08-08) 계열이 비면 지우고 끝낸다 — 호출부마다 잔상 제거를 빠뜨리는 실수를 원천 차단
+    if(!arr||!arr.length||!arr.some(a=>a&&a.v&&a.v.some(v=>v!=null))) return;
     const P={l:8,r:52,t:10,b:18};
     const N=Math.max(...arr.map(a=>a.v.length));
     const all=arr.flatMap(a=>a.v).filter(v=>v!=null);
@@ -1782,6 +1784,16 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
   function drawEtc(){
     if(!_etD) return; const T=_etD.types||{};
+    /* (2026-08-08) '비우기' 후 이전 그림이 남던 버그 — 선택이 비면 세 캔버스를 모두 지운다 */
+    const wipe=id=>{const c=$(id); if(!c) return;
+      const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||300;
+      g.clearRect(0,0,c.width,c.height);};
+    if(!_etSel.length){
+      ['et_main','et_conv','et_jw'].forEach(wipe); _etHi=null;
+      $('et_main_n').innerHTML='<span class="note">지역을 선택하세요 — 위 버튼(서울 전체구·전국 TOP30 등)이나 검색으로 추가할 수 있습니다.</span>';
+      $('et_conv_n').innerHTML=''; $('et_jw_n').innerHTML='';
+      return;
+    }
     const K=n=>n==null?'—':(_etMet==='n'?Math.round(n).toLocaleString():n.toFixed(2)+'억');
     const F=t=>t?`${t.slice(0,4)}.${t.slice(4)}`:'—';
     const kindLab=(ETC.find(x=>x[0]===_etKind)||[,'?'])[1];
@@ -1871,6 +1883,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
   function drawMolit(){
     if(!_msD) return;
+    if(!_msSel.length){                       // '비우기'/전체 삭제 시 잔상 제거
+      ['ms_unsold','ms_pipe','ms_move'].forEach(id=>{const c=$(id); if(!c) return;
+        const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||300;
+        g.clearRect(0,0,c.width,c.height);});
+      $('ms_unsold_n').innerHTML='<span class="note">지역을 선택하세요 — 검색으로 추가할 수 있습니다.</span>';
+      $('ms_pipe_n').innerHTML=''; $('ms_move_n').innerHTML=''; return;
+    }
     const K=n=>Math.round(n).toLocaleString();
     const F=t=>t?`${t.slice(0,4)}.${t.slice(4)}`:'—';
     /* ① 미분양 — 재고 지표라 이동합이 무의미(이미 스톡) → 항상 원자료. 지역 겹쳐보기 */
