@@ -146,10 +146,11 @@ def fetch(svc, op, lawd, ym):
                 except Exception:
                     return rows
             else:
-                # (2026-08-08) 429 는 일시적 레이트리밋 — 즉시 중단하지 말고 백오프 후 재시도.
-                # 무인 장시간 백필 중 단 한 번의 429 로 전체 작업이 끝나던 문제를 막는다.
+                # (2026-08-08) 429 는 일시적 레이트리밋 — 실측상 수십 분 뒤 자동 해제된다.
+                # 며칠짜리 무인 백필이므로 포기하지 말고 길게 기다리며 계속 재시도한다.
+                # (짧은 백오프 5회로는 5개 지역 만에 작업이 통째로 끝나버렸다)
                 root = None
-                for wait in (30, 60, 120, 240, 480):
+                for wait in (60, 300, 900, 1800, 1800, 1800, 1800, 1800, 3600, 3600):
                     time.sleep(wait)
                     try:
                         d = urllib.request.urlopen(u, timeout=25).read()
@@ -161,7 +162,7 @@ def fetch(svc, op, lawd, ym):
                     except Exception:
                         return rows
                 if root is None:
-                    raise _Stop("HTTP 429 지속(국토부 레이트리밋) — 백오프 5회 소진")
+                    raise _Stop("HTTP 429 지속(국토부 레이트리밋) — 총 4.5시간 대기 후에도 미해제")
         except Exception:
             time.sleep(1)
             try:

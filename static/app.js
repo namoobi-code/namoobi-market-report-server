@@ -1424,6 +1424,82 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }).catch(()=>{});
     }).catch(()=>{});
   };
+  /* ── (2026-08-08) 🏗 주택 공급 — molit.json (통계누리 무인증)
+     미분양=재고(수요 약세 신호) · 인허가/착공/준공=공급 파이프라인(1~3년 선행).
+     월별 원자료는 계절성·노이즈가 커서 기본은 12개월 이동합으로 본다. ── */
+  let _msInit=false, _msD=null, _msReg='전국', _msMode='12m';
+  function initMolit(){
+    if(_msInit) return; _msInit=true;
+    fetch('/api/db/molit').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.series){ const e=$('ms_unsold_n'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:40)부터 표시됩니다.'; return; }
+      _msD=d;
+      {const e=$('ms_asof'); if(e) e.textContent=`수집 ${d.asof||''} · 출처 국토교통 통계누리`;}
+      /* 지역 버튼 — 전 계열에 공통으로 있는 지역만 */
+      const S=d.series, keys=Object.keys(S);
+      const cnt={}; keys.forEach(k=>Object.keys(S[k].r||{}).forEach(r=>cnt[r]=(cnt[r]||0)+1));
+      const PREF=['전국','수도권','서울','인천','경기','부산','대구','광주','대전','울산','세종','강원','충북','충남','전북','전남','경북','경남','제주'];
+      const regs=PREF.filter(r=>cnt[r]>=2);
+      const rbar=()=>{$('ms_reg').innerHTML=regs.map(r=>`<button data-r="${r}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${r===_msReg?'#1f2937':'#fff'};color:${r===_msReg?'#fff':'#333'}">${r}</button>`).join('');
+        $('ms_reg').querySelectorAll('button').forEach(b=>b.onclick=()=>{_msReg=b.dataset.r; rbar(); drawMolit();});};
+      const mbar=()=>{$('ms_mode').innerHTML=[['12m','12개월 누적'],['m','월별 원자료']].map(([k,l])=>`<button data-m="${k}" style="margin-right:3px;padding:2px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${k===_msMode?'#1f2937':'#fff'};color:${k===_msMode?'#fff':'#333'}">${l}</button>`).join('');
+        $('ms_mode').querySelectorAll('button').forEach(b=>b.onclick=()=>{_msMode=b.dataset.m; mbar(); drawMolit();});};
+      rbar(); mbar(); drawMolit();
+    }).catch(()=>{});
+  }
+  function _msPick(key){                       // 계열 1개를 현재 지역 기준으로 뽑기
+    const s=(_msD.series||{})[key]; if(!s||!s.r[_msReg]) return null;
+    return {t:s.t, v:s.r[_msReg], label:s.label, unit:s.unit, note:s.note};
+  }
+  function _ms12(t,v){                         // 12개월 이동합(직전 12개월 전부 있어야 값)
+    return v.map((_,i)=>{ if(i<11) return null;
+      let s=0; for(let j=i-11;j<=i;j++){ if(v[j]==null) return null; s+=v[j]; } return s; });
+  }
+  function _msAlign(list){                     // 서로 다른 t 를 공통 월축으로 정렬
+    const all=[...new Set(list.flatMap(a=>a.t))].sort(); if(!all.length) return null;
+    const ts=[]; let y=+all[0].slice(0,4), m=+all[0].slice(4);
+    const ey=+all[all.length-1].slice(0,4), em=+all[all.length-1].slice(4);
+    while(y<ey||(y===ey&&m<=em)){ ts.push(`${y}${String(m).padStart(2,'0')}`); if(++m>12){m=1;y++;} }
+    return {ts, map:a=>{const mp={}; a.t.forEach((t,i)=>mp[t]=a.v[i]); return ts.map(t=>mp[t]??null);}};
+  }
+  function drawMolit(){
+    if(!_msD) return;
+    const K=n=>Math.round(n).toLocaleString();
+    const F=t=>t?`${t.slice(0,4)}.${t.slice(4)}`:'—';
+    /* ① 미분양 — 재고 지표라 이동합이 무의미(이미 스톡) → 항상 원자료 */
+    {const a=_msPick('unsold'), b=_msPick('unsold_done');
+     const L=[a,b].filter(Boolean);
+     if(L.length){ const A=_msAlign(L);
+       const arr=[]; if(a) arr.push({t:A.ts,v:A.map(a),label:'미분양',color:'#d9534f'});
+       if(b) arr.push({t:A.ts,v:A.map(b),label:'준공후',color:'#7c2d12'});
+       line('ms_unsold',arr);
+       const lv=x=>{ if(!x) return null; for(let i=x.v.length-1;i>=0;i--) if(x.v[i]!=null) return {ym:x.t[i],v:x.v[i]}; return null; };
+       const la=lv(a), lb=lv(b);
+       const pk=a?a.v.reduce((p,c,i)=>(c!=null&&(p==null||c>a.v[p]))?i:p,null):null;
+       $('ms_unsold_n').innerHTML=
+         `<b>${_msReg}</b> · 단위 <b>호</b> · 재고 지표라 원자료 그대로 (이동합 미적용)`
+         +`<br>최신 미분양 <b class="dn">${la?K(la.v)+'호 ('+F(la.ym)+')':'—'}</b>`
+         +`${lb?` · 준공후 <b>${K(lb.v)}호</b>${la&&la.v?` (미분양의 <b>${(lb.v/la.v*100).toFixed(0)}%</b>)`:''}`:''}`
+         +`${pk!=null?` · 역대 최다 <b>${K(a.v[pk])}호</b>(${F(a.t[pk])})`:''}`
+         +`<br><span class="note">미분양↑ = 수요 약세·공급과잉. 특히 <b>준공후 미분양</b>은 다 짓고도 안 팔린 물량이라 건설사 자금압박·할인분양으로 이어지는 악성 신호.</span>`;
+     }}
+    /* ② 공급 파이프라인 — 유량(flow) 지표라 12개월 누적이 기본 */
+    {const P=['permit','start','done'].map(_msPick).filter(Boolean);
+     if(P.length){ const A=_msAlign(P);
+       const CO={'주택 인허가':'#2f6fed','주택 착공':'#e08e3c','주택 준공':'#27ae60'};
+       const arr=P.map(p=>{ const v=A.map(p); return {t:A.ts, v:_msMode==='12m'?_ms12(A.ts,v):v,
+                                                     label:p.label.replace('주택 ',''), color:CO[p.label]||'#64748b'}; });
+       line('ms_pipe',arr);
+       const last=a=>{ for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null) return {ym:a.t[i],v:a.v[i]}; return null; };
+       const yoy=a=>{ const l=last(a); if(!l) return null; const i=a.t.indexOf(l.ym), j=i-12;
+         return (j>=0&&a.v[j])?((l.v/a.v[j]-1)*100):null; };
+       $('ms_pipe_n').innerHTML=
+         `<b>${_msReg}</b> · 단위 <b>호</b> · ${_msMode==='12m'?'<b>12개월 누적</b>(계절성 제거 — 연간 물량으로 읽으면 됨)':'월별 원자료(노이즈 큼)'}`
+         +`<br>`+arr.map(a=>{const l=last(a), y=yoy(a);
+             return `${a.label} <b>${l?K(l.v):'—'}</b>${y!=null?` <span class="${y>0?'up':'dn'}">(${y>0?'+':''}${y.toFixed(0)}% YoY)</span>`:''}`;}).join(' · ')
+         +`<br><span class="note">인허가 → 착공까지 6개월~1년, 착공 → 준공까지 2~3년. <b>인허가·착공 급감은 2~3년 뒤 공급절벽</b>(가격 상승 압력), <b>준공 급증은 입주물량 증가</b>(전세 약세) 신호.</span>`;
+     }}
+  }
+
   /* ── (2026-08-08) 🏢 아파트 단지별 실거래 — /api/apt/* (apt.sqlite)
      매매·전세·월세를 한 단지 기준으로 겹쳐 본다. 면적(전용 m²)별로 분리해야
      평균이 의미를 갖기 때문에 면적 선택을 필수로 두고, 거래 최다 면적을 기본값으로 잡는다. ── */
@@ -1517,7 +1593,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   }
 
   window.renderEstate=function(){
-    initApt();
+    initApt(); initMolit();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
