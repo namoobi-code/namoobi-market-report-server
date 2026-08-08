@@ -1650,6 +1650,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const F=x=>x?`${x.slice(0,4)}.${x.slice(4)}`:'—';
     const arr=_ahSel.filter(r=>S[r]).map((r,i)=>({t,v:S[r],label:r,color:AHPAL[i%AHPAL.length]}));
     if(arr.length) line('ah_main',arr,{hi:_ahHi});
+    else { const c=$('ah_main');                       // 비우기 후 잔상 제거
+      if(c){const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||320; g.clearRect(0,0,c.width,c.height);}
+      _ahArr=null; _ahHi=null;
+      $('ah_main_n').innerHTML='<span class="note">지역을 선택하세요 — 위 버튼(경쟁률 TOP30 등)이나 검색으로 추가할 수 있습니다.</span>';
+      $('ah_tbl').innerHTML=''; return; }
     /* 차트 위 마우스 → 근접 선 강조 + 해당 칩 활성 (지역비교와 동일 동작) */
     {const cv=$('ah_main');
      if(cv&&!cv._hiBound){ cv._hiBound=1;
@@ -2147,7 +2152,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             if(ord.join('|')!==mset.join('|')){ mset=ord; chips(); }}
            const src=met==='dep'?(R.rent||{}):(R.sale||{});
            const tset=new Set(); mset.forEach(c=>Object.keys((src[c]||{}).m||{}).forEach(t=>tset.add(t)));
-           const full=[...tset].sort(); if(!full.length){$('re_rt_big_n').textContent='선택된 지역의 데이터가 없습니다'; return;}
+           /* (2026-08-08) '비우기' 후에도 이전 그림이 남던 버그 — 조기 return 전에 캔버스를 비운다 */
+           const clearCv=()=>{const c=$('re_rt_big'); if(!c) return;
+             const g=c.getContext('2d'); c.width=c.clientWidth||900; c.height=c.clientHeight||600;
+             g.clearRect(0,0,c.width,c.height); _bigArr=null; hiLab=null;};
+           const full=[...tset].sort();
+           if(!mset.length){ clearCv(); $('re_rt_big_n').innerHTML='<span class="note">지역을 선택하세요 — 위 버튼(서울 전체구·전국 TOP30 등)이나 검색으로 추가할 수 있습니다.</span>'; return; }
+           if(!full.length){ clearCv(); $('re_rt_big_n').textContent='선택된 지역의 데이터가 없습니다'; return;}
            curL=full.length;
            const n=vN?Math.max(6,Math.min(vN,curL)):curL, off=Math.max(0,Math.min(vOff,curL-n));
            const end=curL-off, st=Math.max(0,end-n);
