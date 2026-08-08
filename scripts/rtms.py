@@ -14,6 +14,9 @@ import xml.etree.ElementTree as ET
 from datetime import datetime
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import apt_db          # (2026-08-08) 같은 응답으로 단지별 시계열도 적재 — 추가 API 호출 0회
+
 BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "rtms.json"
 KEY = (BASE / "keys" / "data.go.kr.txt").read_text().strip()
@@ -136,13 +139,29 @@ def fetch(svc, op, lawd, ym):
             d = urllib.request.urlopen(u, timeout=25).read()
             root = ET.fromstring(d)
         except urllib.error.HTTPError as he:
-            if he.code == 429:
-                raise _Stop("HTTP 429 요청 과다(국토부 레이트리밋)")
-            time.sleep(1)
-            try:
-                d = urllib.request.urlopen(u, timeout=25).read(); root = ET.fromstring(d)
-            except Exception:
-                return rows
+            if he.code != 429:
+                time.sleep(1)
+                try:
+                    d = urllib.request.urlopen(u, timeout=25).read(); root = ET.fromstring(d)
+                except Exception:
+                    return rows
+            else:
+                # (2026-08-08) 429 는 일시적 레이트리밋 — 즉시 중단하지 말고 백오프 후 재시도.
+                # 무인 장시간 백필 중 단 한 번의 429 로 전체 작업이 끝나던 문제를 막는다.
+                root = None
+                for wait in (30, 60, 120, 240, 480):
+                    time.sleep(wait)
+                    try:
+                        d = urllib.request.urlopen(u, timeout=25).read()
+                        root = ET.fromstring(d)
+                        break
+                    except urllib.error.HTTPError as h2:
+                        if h2.code != 429:
+                            return rows
+                    except Exception:
+                        return rows
+                if root is None:
+                    raise _Stop("HTTP 429 지속(국토부 레이트리밋) — 백오프 5회 소진")
         except Exception:
             time.sleep(1)
             try:
@@ -186,6 +205,7 @@ def main():
     try: old = json.loads(OUT.read_text(encoding="utf-8"))
     except Exception: pass
     sale = old.get("sale") or {}; rent = old.get("rent") or {}
+    cx = apt_db.connect(); acache = {}                          # 단지별 시계열 DB(같은 응답 재활용)
     yms = months_back(MONTHS + 1)                               # 당월 포함(신고분 반영)
     yms.append(datetime.now().strftime("%Y%m"))
     for i, (code, name) in enumerate(REGIONS.items()):
@@ -198,19 +218,37 @@ def main():
         stopped = None
         try:
             for ym in (reversed(yms) if EXTEND else yms):    # 심층 백필은 최신→과거 순(가까운 과거부터 완성)
-                if EXTEND and ym not in recent and (ym in s or ym in r_):
+                # 지역 JSON·단지 DB 가 **둘 다** 있어야 스킵 — 단지 DB 는 2026-08 신설이라
+                # 이미 지역집계가 끝난 달도 단지별로는 비어 있어 다시 훑어야 한다.
+                if (EXTEND and ym not in recent and (ym in s or ym in r_)
+                        and apt_db.has(cx, code, ym, "sale")
+                        and apt_db.has(cx, code, ym, "rent")):
                     continue
-                a = agg_sale(fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym))
+                raw = fetch("RTMSDataSvcAptTrade", "getRTMSDataSvcAptTrade", code, ym)
+                a = agg_sale(raw)
                 if a: s[ym] = a
+                apt_db.ingest_sale(cx, code, ym, raw, acache)
                 time.sleep(0.3)
-                b = agg_rent(fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym))
+                raw = fetch("RTMSDataSvcAptRent", "getRTMSDataSvcAptRent", code, ym)
+                b = agg_rent(raw)
                 if b: r_[ym] = b
+                apt_db.ingest_rent(cx, code, ym, raw, acache)
                 time.sleep(0.3)
         except _Stop as e:
             stopped = str(e)
+        cx.commit()
         sale[code] = {"m": s}; rent[code] = {"m": r_}
         print(f"  [{i+1}/{len(REGIONS)}] {name}: 매매 {len(s)}개월 · 전세 {len(r_)}개월"
-              + (f"  ⚠ {stopped} — 진행분 저장 후 종료" if stopped else ""))
+              + (f"  ⚠ {stopped} — 진행분 저장 후 종료" if stopped else ""), flush=True)
+        # (2026-08-08) 20지역마다 중간 저장 — 장시간 백필이 강제 종료돼도 진행분이 남도록.
+        # 합산(A*)은 이전 값이 그대로 유지되고 루프 종료 후 재계산된다.
+        if (i + 1) % 20 == 0:
+            OUT.parent.mkdir(parents=True, exist_ok=True)
+            OUT.write_text(json.dumps({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
+                                       "names": {**REGIONS, **(old.get("names") or {})},
+                                       "sale": sale, "rent": rent}, ensure_ascii=False),
+                           encoding="utf-8")
+            print(f"      💾 중간 저장 ({i+1}지역) · 단지DB {apt_db.stats(cx)}", flush=True)
         if stopped:
             break
     # 합산 의사지역 — 서울(25구)·부산(16구군)
@@ -249,6 +287,7 @@ def main():
                                "names": names, "sale": sale, "rent": rent}, ensure_ascii=False),
                    encoding="utf-8")
     print(f"[rtms] ✅ {len(REGIONS)}지역 · 서울합산 {len(sale['A11']['m'])}개월 → {OUT}")
+    cx.commit(); print(f"[apt ] 단지DB {apt_db.stats(cx)}"); cx.close()
 
 if __name__ == "__main__":
     main()

@@ -5,3 +5,4 @@ data/
 *.key
 charts/
 /nmr_krx_brief.json
+data/db/apt.sqlite*

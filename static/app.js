@@ -1424,7 +1424,100 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }).catch(()=>{});
     }).catch(()=>{});
   };
+  /* ── (2026-08-08) 🏢 아파트 단지별 실거래 — /api/apt/* (apt.sqlite)
+     매매·전세·월세를 한 단지 기준으로 겹쳐 본다. 면적(전용 m²)별로 분리해야
+     평균이 의미를 갖기 때문에 면적 선택을 필수로 두고, 거래 최다 면적을 기본값으로 잡는다. ── */
+  let _apInit=false, _apAr=0, _apId=0;
+  function initApt(){
+    if(_apInit) return; _apInit=true;
+    const E4=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    const q=$('ap_q'), list=$('ap_list'); if(!q) return;
+    const SGG={'11':'서울','26':'부산','27':'대구','28':'인천','30':'대전','31':'울산','36':'세종','41':'경기',
+               '51':'강원','43':'충북','44':'충남','52':'전북','46':'전남','47':'경북','48':'경남','50':'제주'};
+    let tmr=null;
+    const search=()=>{
+      const kw=(q.value||'').trim();
+      if(kw.length<2){ list.style.display='none'; return; }
+      fetch('/api/apt/search?q='+encodeURIComponent(kw)).then(r=>r.ok?r.json():null).then(d=>{
+        const rows=(d&&d.rows)||[];
+        list.innerHTML=rows.length?rows.map(r=>
+          `<div data-id="${r.id}" style="padding:6px 10px;font-size:12.5px;cursor:pointer;border-bottom:1px solid #f2f4f7">
+             <b>${E4(r.name)}</b> <span class="note">${E4(SGG[String(r.sgg).slice(0,2)]||'')} ${E4(r.umd)}${r.build_year?' · '+r.build_year+'년':''} · 거래 ${r.ns}건</span></div>`).join('')
+          : '<div style="padding:7px 10px" class="note">검색 결과 없음 — 수집이 끝난 지역만 조회됩니다</div>';
+        list.style.display='';
+        list.querySelectorAll('[data-id]').forEach(el=>el.onclick=()=>{
+          list.style.display='none'; q.value=''; _apAr=0; loadApt(+el.dataset.id); });
+      }).catch(()=>{});
+    };
+    q.oninput=()=>{ clearTimeout(tmr); tmr=setTimeout(search,220); };
+    q.onfocus=search;
+    document.addEventListener('click',e=>{ if(!e.target.closest('#ap_q')&&!e.target.closest('#ap_list')) list.style.display='none'; });
+
+    function loadApt(id){
+      _apId=id;
+      fetch(`/api/apt/series?id=${id}&ar=${_apAr||0}`).then(r=>r.ok?r.json():null).then(d=>{
+        if(!d){ $('ap_head').textContent='조회 실패'; return; }
+        _apAr=d.ar;
+        const a=d.apt;
+        $('ap_head').innerHTML=`<b style="font-size:14px;color:#111">${E4(a.name)}</b> · ${E4(SGG[String(a.sgg).slice(0,2)]||'')} ${E4(a.umd)} ${E4(a.jibun||'')}`
+          +`${a.build_year?` · <b>${a.build_year}년 준공</b>(${new Date().getFullYear()-a.build_year}년차)`:''}`
+          +`${a.road?` · ${E4(a.road)}`:''}`;
+        /* 면적 칩 — 거래 많은 순, 전용 m² + 대략 평 병기 */
+        $('ap_ars').innerHTML=d.ars.map(r=>`<button data-ar="${r.ar}" style="padding:3px 9px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${r.ar===d.ar?'#1f2937':'#fff'};color:${r.ar===d.ar?'#fff':'#333'}">${r.ar}㎡<span style="opacity:.7">·${Math.round(r.ar/3.3058)}평 (${r.n})</span></button>`).join('');
+        $('ap_ars').querySelectorAll('button').forEach(b=>b.onclick=()=>{ _apAr=+b.dataset.ar; loadApt(_apId); });
+        drawApt(d);
+      }).catch(()=>{});
+    }
+
+    function drawApt(d){
+      /* 공통 월 축 — 세 계열의 최소~최대 월을 1개월 간격으로 채운다(중간 공백은 null → 선 연결) */
+      const all=[...d.sale,...d.jeon,...d.wol].map(r=>r.ym).sort();
+      if(!all.length){ $('ap_main_n').textContent='해당 면적의 거래 기록이 없습니다'; return; }
+      const ts=[]; let y=+all[0].slice(0,4), m=+all[0].slice(4);
+      const ey=+all[all.length-1].slice(0,4), em=+all[all.length-1].slice(4);
+      while(y<ey||(y===ey&&m<=em)){ ts.push(`${y}${String(m).padStart(2,'0')}`); if(++m>12){m=1;y++;} }
+      const pick=(rows,f)=>{ const mp={}; rows.forEach(r=>mp[r.ym]=f(r)); return ts.map(t=>mp[t]??null); };
+      const S=pick(d.sale,r=>r.avg), J=pick(d.jeon,r=>r.avg), W=pick(d.wol,r=>r.dep);
+      const arr=[];
+      if(S.some(v=>v!=null)) arr.push({t:ts,v:S,label:'매매',color:'#d9534f'});
+      if(J.some(v=>v!=null)) arr.push({t:ts,v:J,label:'전세',color:'#2f6fed'});
+      if(W.some(v=>v!=null)) arr.push({t:ts,v:W,label:'월세보증금',color:'#27ae60'});
+      if(arr.length) line('ap_main',arr);
+      /* 월 임대료(만원) · 거래 건수 — 단위가 달라 별도 축 */
+      const R=pick(d.wol,r=>r.rent);
+      if(R.some(v=>v!=null)) line('ap_rent',[{t:ts,v:R,label:'월임대료',color:'#7c3aed'}]);
+      else {const c=$('ap_rent'); if(c) c.getContext('2d').clearRect(0,0,c.width,c.height);}
+      const VS=pick(d.sale,r=>r.n), VJ=pick(d.jeon,r=>r.n), VW=pick(d.wol,r=>r.n);
+      const va=[]; if(VS.some(v=>v!=null)) va.push({t:ts,v:VS,label:'매매',color:'#d9534f'});
+      if(VJ.some(v=>v!=null)) va.push({t:ts,v:VJ,label:'전세',color:'#2f6fed'});
+      if(VW.some(v=>v!=null)) va.push({t:ts,v:VW,label:'월세',color:'#27ae60'});
+      if(va.length) line('ap_vol',va);
+      /* 요약 — 최신 실거래 + 전세가율(같은 달 전세/매매) */
+      const lastOf=rows=>rows.length?rows[rows.length-1]:null;
+      const ls=lastOf(d.sale), lj=lastOf(d.jeon), lw=lastOf(d.wol);
+      let jr=null;
+      for(let i=d.jeon.length-1;i>=0&&jr==null;i--){ const s=d.sale.find(x=>x.ym===d.jeon[i].ym);
+        if(s&&s.avg) jr={ym:d.jeon[i].ym,v:d.jeon[i].avg/s.avg*100}; }
+      const F=t=>t?`${t.slice(0,4)}.${t.slice(4)}`:'—';
+      $('ap_main_n').innerHTML=
+        `전용 <b>${d.ar}㎡</b>(약 ${Math.round(d.ar/3.3058)}평) · 단위 <b>억원</b> — 월별 <b>평균 실거래가</b>(거래가 없는 달은 선으로 이어 표시)`
+        +`<br>최신 — 매매 <b class="up">${ls?ls.avg.toFixed(2)+'억 ('+F(ls.ym)+' · '+ls.n+'건)':'—'}</b>`
+        +` · 전세 <b>${lj?lj.avg.toFixed(2)+'억 ('+F(lj.ym)+')':'—'}</b>`
+        +` · 월세 <b>${lw?lw.dep.toFixed(2)+'억 / 월 '+Math.round(lw.rent)+'만원 ('+F(lw.ym)+')':'—'}</b>`
+        +`${jr?` · <b>전세가율 ${jr.v.toFixed(0)}%</b>(${F(jr.ym)}) — 높을수록 갭 작아 매매 전환 압력↑`:''}`
+        +`<br><span style="color:#a06010">⚠ 거래가 적은 달은 1~2건 평균이라 튈 수 있습니다. 같은 면적이라도 층·향·수리 상태 차이가 반영되지 않은 원본 신고가입니다.</span>`;
+    }
+    /* 적재 현황 안내 — 백필 진행 중이면 검색 범위가 제한적임을 알린다 */
+    fetch('/api/apt/stat').then(r=>r.ok?r.json():null).then(s=>{
+      if(!s) return;
+      $('ap_head').innerHTML=s.apt
+        ? `<span class="note">단지 <b>${s.apt.toLocaleString()}</b>곳 적재 · 시군구 ${s.sgg}곳 · ${s.ym0?String(s.ym0).slice(0,4)+'.'+String(s.ym0).slice(4):''}~${s.ym1?String(s.ym1).slice(0,4)+'.'+String(s.ym1).slice(4):''} — 전국 백필 진행 중이라 수집이 끝난 지역부터 검색됩니다. 단지명을 입력해 보세요.</span>`
+        : `<span class="note">단지 DB 생성 대기 — 다음 수집(매일 07:20)부터 채워집니다.</span>`;
+    }).catch(()=>{});
+  }
+
   window.renderEstate=function(){
+    initApt();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};

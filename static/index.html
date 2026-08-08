@@ -56,6 +56,7 @@
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
   #re_rt_big{height:680px!important;max-height:none!important} /* 부동산 지역비교 대형차트 — 동일 캡 해제 */
   #tr_nv_cv{height:520px!important;max-height:none!important} /* 네이버 쇼핑 클릭추이 — 동일 캡 해제 */
+  #ap_main{height:520px!important;max-height:none!important}   /* 단지별 실거래 대형차트 — 동일 캡 해제 */
   a{color:var(--dn);text-decoration:none}a:hover{text-decoration:underline}
   .links{display:flex;flex-wrap:wrap;gap:7px}
   .links a{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 13px;font-size:12.5px;color:var(--tx)}
@@ -725,6 +726,30 @@
         </div>
         <canvas id="re_rt_big" style="width:100%;height:680px"></canvas>
         <div class="note" id="re_rt_big_n" style="margin-top:4px;line-height:1.6"></div>
+      </div>
+      <!-- (2026-08-08) 단지별 실거래 — apt.sqlite (rtms 수집과 동시 적재 · 추가 API 호출 0회) -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🏢 아파트 단지별 실거래 <span class="note">(단지명을 입력해 매매·전세·월세를 한 화면에서 · 국토부 실거래 신고 원본)</span></b>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
+          <span style="position:relative">
+            <input type="text" id="ap_q" placeholder="🔎 단지명 2자 이상 (예: 도곡렉슬, 은마, 헬리오시티)" style="width:320px;padding:5px 9px;font-size:12.5px;border:1px solid #d7dce3;border-radius:6px">
+            <div id="ap_list" style="display:none;position:absolute;top:30px;left:0;z-index:30;background:#fff;border:1px solid #d7dce3;border-radius:6px;max-height:300px;overflow:auto;min-width:340px;box-shadow:0 4px 14px rgba(0,0,0,.12)"></div>
+          </span>
+          <span id="ap_ars" style="display:inline-flex;gap:4px;flex-wrap:wrap"></span>
+        </div>
+        <div id="ap_head" class="note" style="margin:2px 0 6px;line-height:1.6"></div>
+        <canvas id="ap_main" style="width:100%;height:520px"></canvas>
+        <div class="note" id="ap_main_n" style="margin-top:4px;line-height:1.6"></div>
+        <div class="grid g2" style="margin-top:10px">
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>월세 — 월 임대료(만원)</b> · 보증금은 위 차트에 포함</div>
+            <canvas id="ap_rent" style="width:100%;height:200px"></canvas>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>월별 거래 건수</b> · 해당 면적 기준</div>
+            <canvas id="ap_vol" style="width:100%;height:200px"></canvas>
+          </div>
+        </div>
       </div>
     </div>
     <div class="note" style="margin-top:10px;line-height:1.7">
@@ -1412,8 +1437,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260807b"></script>
-<script src="/etf.js?v=20260807b"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260808a"></script>
+<script src="/etf.js?v=20260808a"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

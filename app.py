@@ -1454,6 +1454,74 @@ def admin_refresh(which: str, request: Request):
         raise HTTPException(500, f"갱신 실행 실패: {e}")
     return {"started": True, "which": which}
 
+# ── (2026-08-08) 아파트 단지별 실거래 — scripts/apt_db.py 가 rtms 수집과 함께 적재 ──
+APTDB = DB / "apt.sqlite"
+
+def _aptcx():
+    if not APTDB.exists():
+        raise HTTPException(404, "단지 DB 미생성 — rtms 수집 후 사용 가능")
+    cx = sqlite3.connect(f"file:{APTDB}?mode=ro", uri=True, timeout=10)
+    cx.row_factory = sqlite3.Row
+    return cx
+
+@app.get("/api/apt/search")
+def apt_search(q: str, n: int = 30):
+    """단지명 자동완성 — 거래건수 많은 순. q 는 2자 이상."""
+    q = (q or "").strip()
+    if len(q) < 2:
+        return {"rows": []}
+    with _aptcx() as cx:
+        rows = cx.execute(
+            """SELECT a.id, a.name, a.umd, a.sgg, a.build_year,
+                      (SELECT COUNT(*) FROM sale s WHERE s.apt_id=a.id) AS ns,
+                      (SELECT MAX(ym)   FROM sale s WHERE s.apt_id=a.id) AS last
+               FROM apt a WHERE a.name LIKE ? ESCAPE '\\'
+               ORDER BY (a.name = ?) DESC, ns DESC LIMIT ?""",
+            (f"%{q.replace('%', chr(92) + '%').replace('_', chr(92) + '_')}%", q, max(1, min(n, 100)))).fetchall()
+    return {"rows": [dict(r) for r in rows]}
+
+@app.get("/api/apt/series")
+def apt_series(id: int, ar: int = 0):
+    """단지 1개의 매매·전세·월세 월별 시계열. ar=0 이면 거래 최다 면적 자동 선택."""
+    with _aptcx() as cx:
+        a = cx.execute("SELECT * FROM apt WHERE id=?", (id,)).fetchone()
+        if not a:
+            raise HTTPException(404, "단지 없음")
+        # 면적 목록 — 매매+전세 거래건수 합 기준 정렬
+        ars = cx.execute(
+            """SELECT ar, SUM(n) AS n FROM (
+                   SELECT ar,n FROM sale WHERE apt_id=:i
+                   UNION ALL SELECT ar,n FROM jeon WHERE apt_id=:i
+                   UNION ALL SELECT ar,n FROM wol  WHERE apt_id=:i)
+               GROUP BY ar ORDER BY n DESC""", {"i": id}).fetchall()
+        if not ars:
+            raise HTTPException(404, "거래 없음")
+        if ar <= 0:
+            ar = ars[0]["ar"]
+        g = lambda sql: [dict(r) for r in cx.execute(sql, (id, ar)).fetchall()]
+        out = {
+            "apt": dict(a), "ar": ar,
+            "ars": [{"ar": r["ar"], "n": r["n"]} for r in ars],
+            "sale": g("SELECT ym,n,avg,med,mn,mx FROM sale WHERE apt_id=? AND ar=? ORDER BY ym"),
+            "jeon": g("SELECT ym,n,avg,med FROM jeon WHERE apt_id=? AND ar=? ORDER BY ym"),
+            "wol":  g("SELECT ym,n,dep,rent FROM wol  WHERE apt_id=? AND ar=? ORDER BY ym"),
+        }
+    return Response(content=json.dumps(out, ensure_ascii=False),
+                    media_type="application/json", headers={"Cache-Control": "max-age=600"})
+
+@app.get("/api/apt/stat")
+def apt_stat():
+    """단지 DB 적재 현황 — 프론트 안내 문구용."""
+    try:
+        with _aptcx() as cx:
+            q = lambda s: cx.execute(s).fetchone()[0]
+            return {"apt": q("SELECT COUNT(*) FROM apt"), "sale": q("SELECT COUNT(*) FROM sale"),
+                    "jeon": q("SELECT COUNT(*) FROM jeon"), "wol": q("SELECT COUNT(*) FROM wol"),
+                    "sgg": q("SELECT COUNT(DISTINCT sgg) FROM done"),
+                    "ym0": q("SELECT MIN(ym) FROM done"), "ym1": q("SELECT MAX(ym) FROM done")}
+    except HTTPException:
+        return {"apt": 0}
+
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
 CHARTS = BASE / "data" / "charts"
