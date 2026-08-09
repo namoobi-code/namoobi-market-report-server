@@ -660,9 +660,12 @@ def us_fin(sym: str):
         # 스냅샷(매일 08:00, 08-09 시작)의 rq0 중 '분기말 < d < 발표일' 구간 마지막 값
         # = 발표 직전 컨센. 우선순위는 MarketBeat → 스냅샷 순으로 고정해 두 값이 섞이지 않는다.
         # (08-09 이전 발표 분기는 폴백도 불가 — 공란이 정직한 표기)
-        # 스냅샷 rq0 도 야후 US$ 추정이므로 현지통화 결산 ADR 에는 같은 이유로 쓰지 않는다.
+        # (2026-08-10 정정) 야후 매출컨센(rq0)은 **결산 통화** 기준이다 — 실측:
+        #   ASML €11.66B · TSM NT$1,449B · MFG ¥957B · HSBC $19.2B (financialCurrency 와 일치).
+        # 따라서 스냅샷 폴백은 현지통화 ADR 에도 유효하다(실적과 같은 통화 — 환율 왜곡 없음).
+        # ADR 의 매출컨센(발표시점)은 이 스냅샷이 유일한 소스이고, 08-09 이후 발표부터 채워진다.
         try:
-            if cur in (None, "USD") and any(r2.get("sE") is None for r2 in q) and snap:
+            if any(r2.get("sE") is None for r2 in q) and snap:
                 anns = set()
                 try:
                     lv = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
