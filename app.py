@@ -436,7 +436,9 @@ def kr_seg(code: str):
                            "url": f"https://navercomp.wisereport.co.kr/v2/company/c1020001.aspx?cmp_cd={code}"}
     except Exception:
         pass
-    IRS = {"000660": "https://www.skhynix.com/kor/ir/financialInfo/earningsCall.do",
+    # (2026-08-09 실측) skhynix 옛 경로(kor/ir/financialInfo/earningsCall.do)는 404 —
+    # 개편 후 UI-FR-IR06 이 'Latest Earnings Release'(분기 실적자료 PDF 목록)
+    IRS = {"000660": "https://www.skhynix.com/ir/UI-FR-IR06/",
            "005930": "https://www.samsung.com/global/ir/reports-disclosures/earnings-release/"}
     res["ir"] = IRS.get(code)
     _seg_cache[code] = (now, res)
