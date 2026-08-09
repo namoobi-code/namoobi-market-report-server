@@ -625,12 +625,46 @@ def us_fin(sym: str):
                 if len(row) < 4:
                     continue
                 r2, vE, vA = _zq(_zc(row[1])), _zv(row[2]), _zv(row[3])
-                if r2 is None or vE is None or r2["p"] in zs:
+                if r2 is None or r2["p"] in zs:
                     continue
-                r2["sE"] = vE
                 zs.add(r2["p"])
-                if vA is not None:              # 판정은 Zacks 쌍 안에서 (부호 보존 분모)
-                    r2["sSpr"] = round((vA - vE) / abs(vE) * 100, 1)
+                # (2026-08-10) ADR 매출 열 US$ 통일 후보 — Zacks 실제 매출(US$).
+                # 아래 일관성 검사를 통과해야만 유지된다.
+                if vA is not None and cur not in (None, "USD"):
+                    r2["sUS"] = vA
+                if vE is not None:
+                    r2["sE"] = vE
+                    if vA is not None:          # 판정은 Zacks 쌍 안에서 (부호 보존 분모)
+                        r2["sSpr"] = round((vA - vE) / abs(vE) * 100, 1)
+            # (2026-08-10) sUS 검증 — 공시 매출(현지통화)/Zacks US$ 비율이 **실제 환율**과
+            # 같아야 같은 매출이다(중앙 비율을 야후 USD{cur}=X 환율에 앵커, ±35% = 5년 환율
+            # 변동 허용). 실측: TSM 중앙 ~31 ≈ NT$ 환율 ✓ · ASML ~0.88 ≈ € 환율 ✓ ·
+            # MUFG ~92 ≠ ¥ 환율 148 ✗(Zacks 은행 '매출'은 공시 총수익과 정의가 다름 → 버림).
+            # 통과 시에도 개별 행이 중앙에서 20%+ 벗어나면(연간치 섞임 등) 그 행만 제거.
+            if cur not in (None, "USD"):
+                pairs = [(r2, r2["s"] / r2["sUS"]) for r2 in q
+                         if r2.get("s") and r2.get("sUS") and r2["s"] > 0 and r2["sUS"] > 0]
+                ok = False
+                if len(pairs) >= 4:
+                    rts = sorted(x[1] for x in pairs)
+                    med = rts[len(rts) // 2]
+                    fx = None
+                    try:
+                        jf = json.loads(urllib.request.urlopen(urllib.request.Request(
+                            f"https://query1.finance.yahoo.com/v8/finance/chart/USD{cur}=X?range=1d&interval=1d",
+                            headers=UA2), timeout=10).read())
+                        fx = jf["chart"]["result"][0]["meta"]["regularMarketPrice"]
+                    except Exception:
+                        pass
+                    ok = bool(fx) and 0.65 <= med / fx <= 1.35
+                    if ok:
+                        for r2, rt0 in pairs:
+                            if not (0.8 <= rt0 / med <= 1.25):
+                                r2.pop("sUS", None)
+                        ok = sum(1 for r2 in q if r2.get("sUS") is not None) >= 4
+                if not ok:
+                    for r2 in q:
+                        r2.pop("sUS", None)
             for row in (dz.get("earnings_announcements_earnings_table") or []):
                 if len(row) < 4:
                     continue

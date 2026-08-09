@@ -5535,17 +5535,23 @@ await _canvasFlow(c);
        (stockanalysis · ADR 은 현지통화)과 비교하지 않으므로 통화 섞임 오판정이 없다.
        ADR 은 Zacks 값이 US$ ADR 기준이라 왼쪽 실적 열과 통화가 다름을 라벨로 명시. */
     const isADR=J.cur&&J.cur!=='USD';
+    /* (2026-08-10) 매출컨센 열은 항상 표시 — 값이 없으면 숨기지 않고 '—'+사유 툴팁
+       (사용자 지시: 마음대로 숨기지 말 것). hasSE 는 각주 문구 분기용. */
     const hasSE=q.some(r=>r.sE!=null);
-    const showSE=!isADR||hasSE;
     /* (2026-08-10) ADR 은 EPS 실적 열도 Zacks 조정 EPS(US$ ADR)로 표시 — EPS·EPS컨센·
        판정이 전부 같은 소스(Zacks)·같은 통화(US$ ADR)가 된다 (실측 MUFG: ¥ EPS 와
        $ 컨센이 나란히 있어 혼란). YoY/QoQ/흑전 도 같은 시리즈로 계산. */
     const epsK=isADR?'epsA':'eps';
+    /* (2026-08-10) 매출도 가능하면 US$ 통일 — 서버가 일관성 검사(공시매출/Zacks 비율이
+       환율처럼 일정한지)를 통과시킨 경우에만 sUS 가 온다 (실측: TSM·ASML 통과,
+       MUFG·MFG 는 Zacks '매출' 정의가 달라 탈락 → 현지통화 유지가 정직). */
+    const hasSUS=q.filter(r=>r.sUS!=null).length>=4;
+    const sK=(isADR&&hasSUS)?'sUS':'s';
     let t1=`<table style="width:100%;font-size:11.5px;border-collapse:collapse">
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
-      <th>매출<span class="note">(백만${isADR?' '+J.cur:'$'})</span></th><th>YoY</th><th>QoQ</th>
+      <th>매출<span class="note">(백만${isADR?(sK==='sUS'?' US$ ADR':' '+J.cur):'$'})</span></th><th>YoY</th><th>QoQ</th>
       <th>EPS<span class="note">(${isADR?'US$ ADR·조정':'$'})</span></th><th>YoY</th><th>QoQ</th>
-      ${showSE?`<th>매출컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>`:''}<th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
+      <th>매출컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th><th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
        (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
@@ -5556,13 +5562,13 @@ await _canvasFlow(c);
          실적(stockanalysis)과 비교. ADR 은 sSpr 만 유효(통화가 다르므로). */
       const ssp=r.sSpr!=null?r.sSpr:((!isADR&&r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
-        <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
+        <td style="text-align:right">${F(r[sK])}</td><td style="text-align:right">${P(yoy(i,sK))}</td><td style="text-align:right">${P(qoq(i,sK))}</td>
         <td style="text-align:right"><b>${eF(r[epsK])}</b></td><td style="text-align:right">${P(yoy(i,epsK))}</td><td style="text-align:right">${P(qoq(i,epsK))}${turn(i,epsK)}</td>
-        ${showSE?`<td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 없음 — Zacks 발표 이력에 이 분기 없음':''}">${cCell(r.sE,ssp,false)}</td>`:''}
+        <td style="text-align:right" title="${r.sE==null?(hasSE?'발표시점 매출컨센 없음 — Zacks 발표 이력에 이 분기 추정치 없음':'발표시점 매출컨센 없음 — Zacks 에 이 종목 매출 추정치가 없음(실제만 제공 · 매출 추정 애널 미커버)'):''}">${cCell(r.sE,ssp,false)}</td>
         <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}${isADR?'':' (왼쪽 EPS 열은 GAAP 희석EPS)'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · '
-      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — EPS·EPS컨센·판정은 전부 Zacks <b>US$ ADR·조정 EPS 기준으로 통일</b>(매출·영업이익률만 ${J.cur})${hasSE?' · 매출컨센도 Zacks US$ ADR':' · 매출컨센은 Zacks 에 추정치 없음(실제만 제공 — 열 숨김)'}`
+      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — ${sK==='sUS'?`매출·EPS·컨센·판정 전부 Zacks <b>US$ ADR 기준으로 통일</b>(영업이익률만 현지 공시 재무의 비율 — 통화 무관)`:`EPS·EPS컨센·판정은 Zacks <b>US$ ADR·조정 EPS 통일</b> · 매출은 ${J.cur} 유지(Zacks 매출 실제가 공시 매출과 규모 불일치 — 정의가 달라 US$ 통일 시 틀린 값이 됨)`}${hasSE?'':` · 매출컨센 «—» = Zacks 에 매출 추정치 없음(실제만 제공 · 추정 애널 미커버)`}`
              :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')
       +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
@@ -6054,12 +6060,14 @@ await _canvasFlow(c);
               const tn=k=>{ const b=_bs(3), pv=b?b[k]:null, cv=qq[qi][k];
                 if(pv==null||cv==null) return '';
                 if(pv<0&&cv>0) return ' ⚡흑전'; if(pv>0&&cv<0) return ' ⚡적전'; return ''; };
-              /* ADR 은 표와 동일하게 EPS 를 Zacks 조정 EPS(US$ ADR) 시리즈로 */
-              const epsK2=(_USFIN&&_USFIN.cur&&_USFIN.cur!=='USD')?'epsA':'eps';
-              const l2=[]; if(gy('s')!=null) l2.push('매출 '+pc(gy('s')));
+              /* ADR 은 표와 동일하게 EPS=Zacks 조정(US$ ADR), 매출=sUS(일관성 통과 시) */
+              const _adr2=_USFIN&&_USFIN.cur&&_USFIN.cur!=='USD';
+              const epsK2=_adr2?'epsA':'eps';
+              const sK2=(_adr2&&qq.filter(z=>z.sUS!=null).length>=4)?'sUS':'s';
+              const l2=[]; if(gy(sK2)!=null) l2.push('매출 '+pc(gy(sK2)));
               if(gy(epsK2)!=null) l2.push('EPS '+pc(gy(epsK2)));
               if(l2.length) rows.push([`YoY`, l2.join('   ')+`  (${qq[qi].p})`]);
-              const l3=[]; if(gq('s')!=null) l3.push('매출 '+pc(gq('s')));
+              const l3=[]; if(gq(sK2)!=null) l3.push('매출 '+pc(gq(sK2)));
               if(gq(epsK2)!=null) l3.push('EPS '+pc(gq(epsK2))+tn(epsK2));
               if(l3.length) rows.push(['QoQ', l3.join('   ')]);
               /* 서프 — 매출·EPS 각각. 매출 판정은 서버가 Zacks 쌍으로 계산한 sSpr 우선
