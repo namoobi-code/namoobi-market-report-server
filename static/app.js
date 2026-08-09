@@ -5159,6 +5159,22 @@ await _canvasFlow(c);
       b.onclick=()=>{ _TF=b.dataset.tf; sync(); if(dcode) showDetail(dcode); }; });
     sync(); }
 
+  /* (2026-08-09) 캔버스 히트테스트 클릭이 환경에 따라 안 먹어(팝업 차단·요소 겹침 추정)
+     팝업의 링크 자리에 **실제 <a> 태그**를 절대배치로 겹친다. 네이티브 링크라 항상 열린다.
+     캔버스는 CSS px = 그리기 px (1:1, _cvs) 이므로 좌표를 그대로 쓴다. */
+  function _syncLinks(){
+    const cv=$('sd_main'); if(!cv||!cv.parentElement) return;
+    const host=cv.parentElement;
+    let ov=host.querySelector(':scope > .plkov');
+    if(!_PLK.length){ if(ov) ov.remove(); return; }
+    if(getComputedStyle(host).position==='static') host.style.position='relative';
+    if(!ov){ ov=document.createElement('div'); ov.className='plkov'; host.appendChild(ov); }
+    const ox=cv.offsetLeft, oy=cv.offsetTop;
+    ov.innerHTML=_PLK.map(L=>
+      `<a href="${L.u}" target="_blank" rel="noopener" title="공시 원본 열기"
+         onmouseover="this.style.background='rgba(31,111,235,.10)'" onmouseout="this.style.background='transparent'"
+         style="position:absolute;left:${(ox+L.x).toFixed(0)}px;top:${(oy+L.y).toFixed(0)}px;width:${L.w.toFixed(0)}px;height:${L.h}px;z-index:30;border-radius:4px;cursor:pointer"></a>`).join('');
+  }
   function _bindChart(){ if(_CBOUND) return; _CBOUND=true;
     /* (2026-08-09) 팝업 '원본 열기' 클릭 — 캔버스 위에 다른 요소가 겹쳐도 동작하도록
        문서 캡처 단계에서 sd_main 좌표로 환산해 판정하고, 팝업 차단을 피해
@@ -5688,25 +5704,25 @@ await _canvasFlow(c);
         const url = (mkt==='kr'&&sm.rno) ? `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${sm.rno}`
                   : (mkt==='us'&&sm.acc&&_ECIK) ? `https://www.sec.gov/Archives/edgar/data/${parseInt(_ECIK,10)}/${String(sm.acc).replace(/-/g,'')}/${sm.acc}-index.htm`
                   : null;
-        /* (2026-08-09) 글자 확대 — 11px 이 작다는 피드백. 13px 기준으로 전부 재계산 */
-        x.font='13px sans-serif';
+        /* (2026-08-09 2차 확대) 15px 기준 — '더 크게' 피드백 반영 */
+        x.font='15px sans-serif';
         const head=`${sm.d.slice(0,4)}.${sm.d.slice(4,6)}.${sm.d.slice(6,8)} ${sm.t==='예'?'실적발표 예정':'실적발표'}`;
         const lines=rows.map(z=>z[0]+'  '+z[1]);
-        const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+26, 520);
-        const bh=27+lines.length*19+(url?22:0);
+        const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+32, 640);
+        const bh=32+lines.length*23+(url?27:0);
         let bx=Math.min(Math.max(X(sm.i)-wmax/2, P.l), W-P.r-wmax);
         let by=Math.min(Y(hh[sm.i])+16, H-P.b-bh-4); if(by<P.t+18) by=P.t+18;
         x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
-        if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,7); x.fill(); x.stroke(); }
+        if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,8); x.fill(); x.stroke(); }
         else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
-        x.fillStyle=sm.col; x.font='bold 13px sans-serif'; x.fillText(head, bx+10, by+19);
-        rows.forEach((z,k)=>{ const yy=by+38+k*19;
-          x.fillStyle='#98a2ad'; x.font='12px sans-serif'; x.fillText(z[0], bx+10, yy);
-          x.fillStyle='#3d454f'; x.font='13px sans-serif'; x.fillText(z[1], bx+50, yy); });
-        if(url){ const ly=by+38+rows.length*19;
+        x.fillStyle=sm.col; x.font='bold 15px sans-serif'; x.fillText(head, bx+11, by+22);
+        rows.forEach((z,k)=>{ const yy=by+46+k*23;
+          x.fillStyle='#98a2ad'; x.font='13px sans-serif'; x.fillText(z[0], bx+11, yy);
+          x.fillStyle='#3d454f'; x.font='15px sans-serif'; x.fillText(z[1], bx+58, yy); });
+        if(url){ const ly=by+46+rows.length*23;
           const lt=(mkt==='kr'?'📄 DART 공시 원본 열기 ↗':'📄 SEC 8-K 원본 열기 ↗');
-          x.fillStyle='#1f6feb'; x.font='bold 13px sans-serif'; x.fillText(lt, bx+10, ly);
-          _PLK.push({x:bx+6, y:ly-15, w:x.measureText(lt).width+12, h:20, u:url});
+          x.fillStyle='#1f6feb'; x.font='bold 15px sans-serif'; x.fillText(lt, bx+11, ly);
+          _PLK.push({x:bx+7, y:ly-18, w:x.measureText(lt).width+14, h:24, u:url});
         }
       }
      }
@@ -5734,29 +5750,29 @@ await _canvasFlow(c);
        // 선택된 공시 내용 상자
        if(_DSEL&&byD[_DSEL]){
          const its=byD[_DSEL].slice(0,6), i=idx[_DSEL];
-         /* (2026-08-09) 글자 확대(13px) + 행 클릭 → 공시 원본 */
-         x.font='13px sans-serif';
+         /* (2026-08-09 2차 확대) 15px + 행 클릭 → 공시 원본(실제 <a> 오버레이) */
+         x.font='15px sans-serif';
          const lines=its.map(z=>'· '+z.t);
          const head=`${_DSEL.slice(0,4)}.${_DSEL.slice(4,6)}.${_DSEL.slice(6,8)} 공시 ${byD[_DSEL].length}건`;
-         const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+22, 520);
-         const bh=25+lines.length*18+(byD[_DSEL].length>6?18:0)+19;   // +19: 원본 안내줄
+         const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+26, 640);
+         const bh=29+lines.length*22+(byD[_DSEL].length>6?22:0)+23;   // +23: 원본 안내줄
          let bx=Math.min(Math.max(X(i)-wmax/2, P.l), W-P.r-wmax), by=Math.min(Y(hh[i])+14, H-P.b-bh-4);
          if(by<P.t+18) by=P.t+18;
          x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
-         if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,7); x.fill(); x.stroke(); }
+         if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,8); x.fill(); x.stroke(); }
          else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
-         x.fillStyle='#c0392b'; x.font='bold 13px sans-serif'; x.fillText(head, bx+9, by+18);
-         x.fillStyle='#3d454f'; x.font='13px sans-serif';
+         x.fillStyle='#c0392b'; x.font='bold 15px sans-serif'; x.fillText(head, bx+10, by+21);
+         x.fillStyle='#3d454f'; x.font='15px sans-serif';
          lines.forEach((z,q)=>{ let tx=z;
-           while(x.measureText(tx).width>wmax-18 && tx.length>4) tx=tx.slice(0,-2);
+           while(x.measureText(tx).width>wmax-20 && tx.length>4) tx=tx.slice(0,-2);
            if(tx!==z) tx=tx.slice(0,-1)+'…';
-           x.fillText(tx, bx+9, by+36+q*18); });
+           x.fillText(tx, bx+10, by+42+q*22); });
          its.forEach((z,q)=>{ if(z.id!=null)
-           _PLK.push({x:bx+6, y:by+36+q*18-14, w:wmax-12, h:18, u:'/dv/'+dcode+'/'+z.id}); });
+           _PLK.push({x:bx+7, y:by+42+q*22-17, w:wmax-14, h:22, u:'/dv/'+dcode+'/'+z.id}); });
          if(byD[_DSEL].length>6){ x.fillStyle='#98a2ad';
-           x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+9, by+36+lines.length*18); }
-         x.fillStyle='#1f6feb'; x.font='bold 12px sans-serif';
-         x.fillText('📄 행 클릭 → 공시 원본 열기 ↗', bx+9, by+bh-7);
+           x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+10, by+42+lines.length*22); }
+         x.fillStyle='#1f6feb'; x.font='bold 13px sans-serif';
+         x.fillText('📄 행 클릭 → 공시 원본 열기 ↗', bx+10, by+bh-8);
        }
      }
      // 십자선 — 호버 중인 봉 위치
@@ -5788,6 +5804,7 @@ await _canvasFlow(c);
       put2('휠=확대·축소 · 드래그=좌우이동 · 더블클릭=원래대로','#b0b8c2');
      }
      if(useLog){ x.font='bold 10px sans-serif'; x.fillStyle='#8e44ad'; x.fillText('로그 스케일 (상승률 기준 균등)', P.l+4, 38); }
+     _syncLinks();   // (2026-08-09) 팝업 링크를 실제 <a> 오버레이로 — 캔버스 클릭 판정 불필요
     };
     drawMain('sd_main',false);   // 로그 판은 (2026-07-26) 제거 — drawMain 의 useLog 경로는 남겨둠
     // ② 거래량
