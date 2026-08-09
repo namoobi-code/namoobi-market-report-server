@@ -477,27 +477,32 @@ def kr_fin(code: str):
             if m0:
                 _wise_enc["v"] = m0.group(1); _wise_enc["at"] = now
         enc = _wise_enc["v"]
-        # ① 분기 재무(cF1001) — 확정+컨센(E)
-        h = _get(f"https://navercomp.wisereport.co.kr/v2/company/ajax/cF1001.aspx"
-                 f"?cmp_cd={code}&fin_typ=0&freq_typ=Q&encparam={enc}")
-        heads = [CL(t) for t in re.findall(r"<th[^>]*>(.*?)</th>", h, re.S)]
-        pers = [x for x in heads if re.search(r"\d{4}/\d{2}", x)]
-        rows = {}
-        for r0 in re.findall(r"<tr[^>]*>(.*?)</tr>", h, re.S):
-            c = [CL(x) for x in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r0, re.S)]
-            if not c:
-                continue
-            key = {"매출액": "sales", "영업이익(발표기준)": "op", "당기순이익": "ni"}.get(c[0])
-            if key and (key != "op" or "op" not in rows):
-                rows[key] = c[1:1 + len(pers)]
-        q = []
-        for i, per in enumerate(pers):
-            m = re.match(r"(\d{4}/\d{2})(\(E\))?", per)
-            if not m:
-                continue
-            gv = lambda k: _num(rows[k][i]) if rows.get(k) and i < len(rows[k]) else None
-            q.append({"p": m.group(1), "e": bool(m.group(2)),
-                      "s": gv("sales"), "o": gv("op"), "n": gv("ni")})
+        # ① 분기(freq_typ=Q) + 연간(freq_typ=Y) 재무 — 확정+컨센(E)
+        #    연간은 분기 컨센이 못 미치는 2027(E)·2028(E)까지 준다(실측 SK하이닉스 — 2029는 미제공)
+        def _cf1001(freq):
+            h = _get(f"https://navercomp.wisereport.co.kr/v2/company/ajax/cF1001.aspx"
+                     f"?cmp_cd={code}&fin_typ=0&freq_typ={freq}&encparam={enc}")
+            heads = [CL(t) for t in re.findall(r"<th[^>]*>(.*?)</th>", h, re.S)]
+            pers = [x for x in heads if re.search(r"\d{4}/\d{2}", x)]
+            rows = {}
+            for r0 in re.findall(r"<tr[^>]*>(.*?)</tr>", h, re.S):
+                c = [CL(x) for x in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r0, re.S)]
+                if not c:
+                    continue
+                key = {"매출액": "sales", "영업이익(발표기준)": "op", "당기순이익": "ni"}.get(c[0])
+                if key and (key != "op" or "op" not in rows):
+                    rows[key] = c[1:1 + len(pers)]
+            out = []
+            for i, per in enumerate(pers):
+                m = re.match(r"(\d{4}/\d{2})(\(E\))?", per)
+                if not m:
+                    continue
+                gv = lambda k: _num(rows[k][i]) if rows.get(k) and i < len(rows[k]) else None
+                out.append({"p": m.group(1), "e": bool(m.group(2)),
+                            "s": gv("sales"), "o": gv("op"), "n": gv("ni")})
+            return out
+        q = _cf1001("Q")
+        yr = _cf1001("Y")
         # ② 목표주가 변동표(cTB24) — 개별 종목 페이지에서
         b = _get(f"https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={code}")
         tp = []
@@ -520,14 +525,14 @@ def kr_fin(code: str):
                 cx.close()
         except Exception:
             pass
-        res = {"q": q, "tp": tp, "snap": snap, "unit": "억원",
+        res = {"q": q, "y": yr, "tp": tp, "snap": snap, "unit": "억원",
                "src": "WISEreport 분기표·증권사 목표가 + 컨센 일별 스냅샷"}
         _krfin_cache[code] = (now, res)
         if len(_krfin_cache) > 200:
             _krfin_cache.clear()
         return res
     except Exception as ex:
-        return {"q": [], "tp": [], "snap": [], "err": repr(ex)[:80]}
+        return {"q": [], "y": [], "tp": [], "snap": [], "err": repr(ex)[:80]}
 
 
 def _logged_in(request) -> bool:
