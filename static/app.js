@@ -5530,11 +5530,10 @@ await _canvasFlow(c);
     /* (2026-08-10) 영업이익률 미제공이면 열 자체를 뺀다 — 은행 등 금융주는
        stockanalysis 손익에 영업이익 항목이 없어(실측 BAC 전분기 null) 전부 '—' 였다. */
     const hasOPM=q.some((_,i)=>opm(i)!=null);
-    /* (2026-08-10) 현지통화 결산 ADR(EUR·TWD·JPY 등) — MarketBeat 의 US$ 매출컨센은
-       환율 노이즈로 판정이 뒤집혀 못 쓴다(실측 ASML). 대신 야후 매출컨센은 **결산 통화**
-       기준(실측)이라 자체 일별 스냅샷(08-09 시작)으로 발표시점 값이 만들어진다 —
-       값이 하나라도 생기면 열이 자동으로 나타나고, 없는 동안은 열을 숨긴다.
-       EPS컨센은 야후 ADR US$ 기준 내부 일관 판정 — 통화가 다름을 라벨로 명시. */
+    /* (2026-08-10) 발표시점 매출·EPS 컨센+판정 = Zacks 단일 소스 (~17년치).
+       판정(sSpr·sprE)은 Zacks 의 컨센·실제 쌍 안에서 서버가 계산해 온다 — 실적 열
+       (stockanalysis · ADR 은 현지통화)과 비교하지 않으므로 통화 섞임 오판정이 없다.
+       ADR 은 Zacks 값이 US$ ADR 기준이라 왼쪽 실적 열과 통화가 다름을 라벨로 명시. */
     const isADR=J.cur&&J.cur!=='USD';
     const hasSE=q.some(r=>r.sE!=null);
     const showSE=!isADR||hasSE;
@@ -5542,23 +5541,25 @@ await _canvasFlow(c);
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
       <th>매출<span class="note">(백만${isADR?' '+J.cur:'$'})</span></th><th>YoY</th><th>QoQ</th>
       <th>EPS<span class="note">(${isADR?J.cur:'$'})</span></th><th>YoY</th><th>QoQ</th>
-      ${showSE?`<th>매출컨센<span class="note">(발표시점${isADR?' · '+J.cur:''})</span></th>`:''}<th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
+      ${showSE?`<th>매출컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>`:''}<th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
        (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
        앞의 2행이 늘 공란이었다. 컨센 있는 범위에 맞춘다. */
     const VIS=Math.max(0,q.length-8);
     q.forEach((r,i)=>{ if(i<VIS) return; const m=opm(i);
-      const ssp=(r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null;
+      /* 판정: 서버가 Zacks 쌍으로 계산한 sSpr 우선 — 없을 때만(스냅샷 폴백 등)
+         실적(stockanalysis)과 비교. ADR 은 sSpr 만 유효(통화가 다르므로). */
+      const ssp=r.sSpr!=null?r.sSpr:((!isADR&&r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
         <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
-        ${showSE?`<td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 없음 — '+(isADR?'야후 현지통화 컨센 스냅샷(2026-08-09 적립 시작) 이전 발표':'MarketBeat 이력 누락(발표 행 미반영) + 스냅샷(2026-08-09 시작) 이전 발표')+' — 다음 발표부터 자동 제공':''}">${cCell(r.sE,ssp,false)}</td>`:''}
+        ${showSE?`<td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 없음 — Zacks 발표 이력에 이 분기 없음':''}">${cCell(r.sE,ssp,false)}</td>`:''}
         <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'} (왼쪽 EPS 열은 GAAP 희석EPS)`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · '
-      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — 매출컨센(발표시점)은 야후 ${J.cur} 컨센 일별 스냅샷(08-09 적립 시작)으로 다음 발표부터 자동 제공${hasSE?'':' (아직 값 없음 → 열 숨김)'} · EPS컨센·판정은 야후 ADR US$ 기준(왼쪽 EPS 열은 ${J.cur} 라 값이 다름 — 판정은 US$ 끼리 비교라 유효)`
-             :'매출·EPS 컨센(발표시점)·판정은 MarketBeat 어닝 이력(2년 · 조정 EPS 기준)')
+      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — 매출·EPS 컨센(발표시점)·판정은 Zacks <b>US$ ADR 기준</b>(왼쪽 실적 열은 ${J.cur} 라 값 규모가 다름 — 판정은 Zacks 의 컨센·실제 쌍끼리 비교라 유효)`
+             :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')
       +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
        자동 파싱 가능한 두 항목만 숫자로, 마진·EBITDA·FCF·CAPEX·가입자 등은 보도자료·어닝콜
@@ -6055,10 +6056,13 @@ await _canvasFlow(c);
               const l3=[]; if(gq('s')!=null) l3.push('매출 '+pc(gq('s')));
               if(gq('eps')!=null) l3.push('EPS '+pc(gq('eps'))+tn('eps'));
               if(l3.length) rows.push(['QoQ', l3.join('   ')]);
-              /* 서프 — 매출·EPS 각각 (매출 컨센은 스냅샷 적립 후 채워짐) */
+              /* 서프 — 매출·EPS 각각. 매출 판정은 서버가 Zacks 쌍으로 계산한 sSpr 우선
+                 (ADR 은 실적 열과 통화가 달라 직접 비교 금지 — 표와 동일 규칙) */
               const sl2=[];
-              if(qq[qi].sE&&qq[qi].s!=null){ const sv=(qq[qi].s/qq[qi].sE-1)*100;
-                sl2.push(`매출 ${sv>0?'비트':'미스'} ${pc(sv)}`); }
+              const _sv=qq[qi].sSpr!=null?qq[qi].sSpr
+                :((_USFIN&&_USFIN.cur&&_USFIN.cur!=='USD')?null
+                  :((qq[qi].sE&&qq[qi].s!=null)?((qq[qi].s/qq[qi].sE-1)*100):null));
+              if(_sv!=null) sl2.push(`매출 ${_sv>0?'비트':'미스'} ${pc(_sv)}`);
               /* (2026-08-09) '실제'는 서프라이즈와 같은 기준인 **조정 EPS**(epsA)를 쓴다.
                  위 YoY/QoQ 의 eps 는 GAAP 희석 EPS 라 섞으면 문장이 모순된다
                  (실측 ESE: 실제 1.26(GAAP) vs 컨센 2.12(조정) 인데 비트 +3.9%). */

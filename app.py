@@ -580,92 +580,76 @@ def us_fin(sym: str):
                 cx.close()
         except Exception:
             pass
-        # ③-2 (2026-08-10) 매출 컨센(발표 시점) — MarketBeat 어닝 이력 표 **단일 소스**.
-        # Yahoo 는 과거 매출 컨센을 안 준다(어닝 캘린더 API 에 revenue 필드를 넣으면
-        # HTTP 400 — 실측). MarketBeat /stocks/{거래소}/{sym}/earnings/ 의
-        # earnings-history 표가 발표일·매출컨센·실제매출을 기본 2년(8분기) 제공한다
-        # (거래소가 틀려도 자동 리다이렉트 — 실측 NYSE/ABNB→NASDAQ/ABNB, 서버 IP 허용 확인).
-        # 예전의 자체 스냅샷 유도값(rq0)과 섞으면 열 안에서 소스가 갈리므로 이 열은 이것만 쓴다.
-        # (2026-08-10) **US$ 결산 종목만** — 현지통화 결산 ADR 은 MB 데이터가 신뢰 불가:
-        #   · 통화 뒤섞임 (실측 TSM: US$ 와 NT$ 가 한 열에, MFG: ¥ 값을 $ 로 오표기)
-        #   · 환율 시점 차이로 판정 부호까지 뒤집힘 (실측 ASML Q1'25: € 기준 소폭 미스인데
-        #     MB US$ 쌍은 +11% 비트 — 추정은 환율 1.05 시점, 실제는 1.13 시점 환산)
-        #   · EPS 도 오염 (실측 ASML Q2'25: 실제는 비트인데 MB 는 −23.4% 미스)
-        # ADR 은 EPS 컨센을 기존 야후(ADR US$ · 내부 일관)로 쓰고 매출컨센 열은 프론트가 숨긴다.
+        # ③-2 (2026-08-10 교체) 발표시점 매출·EPS 컨센+판정 — **Zacks earnings-announcements
+        # 단일 소스**. 페이지 내장 obj_data JSON 의 sales_table·earnings_table 이
+        # [발표일, 회계분기말(M/YYYY), 컨센, 실제, 차이, 서프%, 시점] 을 ~17년치 준다.
+        # MarketBeat(2년·행 누락·통화 혼재·오염값) 대신 이걸 쓰는 근거 — 전부 실측:
+        #   · NVDA 실제매출 81,615 = stockanalysis 와 정확히 일치 (백만$ 단위 동일)
+        #   · BAC 7/14 발표 행 존재 (MB 는 한 달째 누락)
+        #   · ADR 도 US$ ADR 기준 컨센·실제 쌍 제공 — ASML 7/15 est 7.98/act 8.81 비트
+        #     (MB 는 반대 부호), TSM 매출도 US$ 로 일관
+        # 판정(서프%)은 Zacks 쌍(est vs act) **안에서만** 계산 — 실적표(stockanalysis,
+        # ADR 은 현지통화)와 절대 비교하지 않으므로 통화 섞임 오판정이 원천 차단된다.
+        # 야후 earningsHistory·캘린더 이력 값은 Zacks 미커버 종목의 폴백으로만 남는다.
         try:
-            if cur not in (None, "USD"):
-                raise ValueError("non-USD reporter — MB skip")
-            hmb = urllib.request.urlopen(urllib.request.Request(
-                f"https://www.marketbeat.com/stocks/NASDAQ/{sym.upper()}/earnings/",
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126"}),
-                timeout=20).read().decode("utf-8", "ignore")
-            i0 = hmb.find('id="earnings-history"')
-            mnq = lambda p: int(p[:4]) * 12 + int(p[5:7])
+            hz = urllib.request.urlopen(urllib.request.Request(
+                f"https://www.zacks.com/stock/research/{sym.upper()}/earnings-announcements",
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                                       "AppleWebKit/537.36 Chrome/126 Safari/537.36"}),
+                timeout=25).read().decode("utf-8", "ignore")
+            mz = re.search(r"obj_data\s*=\s*(\{.*?\});", hz, re.S)
+            dz = json.loads(mz.group(1)) if mz else {}
+            _zc = lambda s: re.sub(r"<[^>]+>", "", s or "").strip()
 
-            def _mbv(s):                       # "$78.42B" → 백만$ (표의 s 와 같은 단위)
-                m2 = re.search(r"\$([\d,.]+)\s*([BMK]?)", s or "")
-                if not m2:
+            def _zv(s):                        # "$78,752.78" → float (매출=백만$ · EPS=$)
+                t = _zc(s).replace("$", "").replace(",", "")
+                try:
+                    return float(t)
+                except Exception:
                     return None
-                return float(m2.group(1).replace(",", "")) * {"B": 1e3, "M": 1.0, "K": 1e-3}.get(m2.group(2), 1e-6)
 
-            def _mbd(s):                       # "$1.76" · "($0.12)" · "-$0.12" → float
-                m2 = re.search(r"\$([\d,.]+)", s or "")
-                if not m2:
+            def _zq(pe):                       # '4/2026'(회계분기말) → 분기 행 (±1개월 nearest)
+                try:
+                    m0, y0 = pe.split("/")
+                    t = int(y0) * 12 + int(m0)
+                except Exception:
                     return None
-                v2 = float(m2.group(1).replace(",", ""))
-                return -v2 if ("(" in s or s.strip().startswith("-")) else v2
-            if i0 > 0:
-                mb_rev, mb_eps = set(), set()   # 분기당 1회만 — MB 는 같은 분기에 중복 행이 있다
-                for tr0 in re.findall(r"<tr[^>]*>(.*?)</tr>", hmb[i0:i0 + 60000], re.S):
-                    cs = [re.sub(r"<[^>]+>", "", c).strip()
-                          for c in re.findall(r"<td[^>]*>(.*?)</td>", tr0, re.S)]
-                    # 열: 발표일|회계분기|EPS컨센|보고EPS|Beat/Miss|GAAP EPS|매출컨센|실제매출
-                    if len(cs) < 8 or "Estimated" in cs[0]:
-                        continue                # 미래 예정 행
-                    m3 = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", cs[0])
-                    if not m3:
-                        continue
-                    am3 = int(m3.group(3)) * 12 + int(m3.group(1))
-                    cand3 = [r2 for r2 in q if 0 <= am3 - mnq(r2["p"]) <= 3]  # 발표일 직전 분기
-                    if not cand3:
-                        continue
-                    r2 = max(cand3, key=lambda z: mnq(z["p"]))
-                    # (2026-08-10) 타당성 검사 — 해외 ADR 은 MB 매출컨센의 통화가 뒤섞여 있다
-                    # (실측 TSM: $22.72B(US$)와 $834.10B(NT$ 를 $ 로 오표기)가 한 열에 공존).
-                    # 실적(stockanalysis · 현지통화) 대비 0.5~2배 밖이면 통화가 다른 값
-                    # → 버린다(비트 +3243% 같은 오판정보다 빈칸). 정상 종목은 비율 ≈1.
-                    revE = _mbv(cs[6])
-                    if (revE is not None and r2["p"] not in mb_rev and r2.get("s")
-                            and 0.5 <= revE / r2["s"] <= 2.0):
-                        r2["sE"] = round(revE, 1)
-                        mb_rev.add(r2["p"])
-                    # (2026-08-10) EPS 컨센(발표시점)도 이 표를 1순위로 쓴다 — 야후는
-                    # earningsHistory(최근 4분기) 와 캘린더 이력(최신 1년 누락 — 실측
-                    # AAPL 2025-07-31 행 부재) 사이에 사각지대가 있어 그 분기만 '—' 였다.
-                    # 컨센·보고 EPS 를 같은 행에서 주므로 서프% 도 한 소스 안에서 계산된다
-                    # (조정 EPS 기준). 야후 값은 이 표 범위 밖(2년 이전)의 폴백으로만 남는다.
-                    # 컨센 없는 행(정정·재공시 — 실측 TSM 11/14 행 epsA $14.3160 쓰레기)은
-                    # 발표 행이 아니므로 통째로 무시한다.
-                    ee3, ea3 = _mbd(cs[2]), _mbd(cs[3])
-                    if ee3 is not None and r2["p"] not in mb_eps:
-                        r2["epsE"] = ee3
-                        mb_eps.add(r2["p"])
-                        if ea3 is not None:
-                            r2["epsA"] = ea3
-                            r2["sprE"] = round((ea3 - ee3) / abs(ee3) * 100, 1)
+                best, bd = None, 99
+                for r0 in q:
+                    d0 = abs(int(r0["p"][:4]) * 12 + int(r0["p"][5:7]) - t)
+                    if d0 < bd:
+                        bd, best = d0, r0
+                return best if bd <= 1 else None
+            zs, ze = set(), set()               # 분기당 1회 (표는 최신순 — 첫 행 우선)
+            for row in (dz.get("earnings_announcements_sales_table") or []):
+                if len(row) < 4:
+                    continue
+                r2, vE, vA = _zq(_zc(row[1])), _zv(row[2]), _zv(row[3])
+                if r2 is None or vE is None or r2["p"] in zs:
+                    continue
+                r2["sE"] = vE
+                zs.add(r2["p"])
+                if vA is not None:              # 판정은 Zacks 쌍 안에서 (부호 보존 분모)
+                    r2["sSpr"] = round((vA - vE) / abs(vE) * 100, 1)
+            for row in (dz.get("earnings_announcements_earnings_table") or []):
+                if len(row) < 4:
+                    continue
+                r2, vE, vA = _zq(_zc(row[1])), _zv(row[2]), _zv(row[3])
+                if r2 is None or vE is None or r2["p"] in ze:
+                    continue
+                r2["epsE"] = vE
+                ze.add(r2["p"])
+                if vA is not None:
+                    r2["epsA"] = vA
+                    r2["sprE"] = round((vA - vE) / abs(vE) * 100, 1)
         except Exception:
             pass
-        # ③-3 (2026-08-10) MarketBeat 이력에 구멍이 난 분기만 자체 스냅샷으로 폴백.
-        # 실측 BAC: 7/14 발표 행이 한 달 지나도 이력에 없다(최근 실적이 4/15 로 표시).
-        # 스냅샷(매일 08:00, 08-09 시작)의 rq0 중 '분기말 < d < 발표일' 구간 마지막 값
-        # = 발표 직전 컨센. 우선순위는 MarketBeat → 스냅샷 순으로 고정해 두 값이 섞이지 않는다.
-        # (08-09 이전 발표 분기는 폴백도 불가 — 공란이 정직한 표기)
-        # (2026-08-10 정정) 야후 매출컨센(rq0)은 **결산 통화** 기준이다 — 실측:
-        #   ASML €11.66B · TSM NT$1,449B · MFG ¥957B · HSBC $19.2B (financialCurrency 와 일치).
-        # 따라서 스냅샷 폴백은 현지통화 ADR 에도 유효하다(실적과 같은 통화 — 환율 왜곡 없음).
-        # ADR 의 매출컨센(발표시점)은 이 스냅샷이 유일한 소스이고, 08-09 이후 발표부터 채워진다.
+        # ③-3 (2026-08-10) Zacks 에 없는 분기만 자체 스냅샷(야후 rq0 · 매일 08:00)으로 폴백.
+        # 야후 매출컨센은 결산 통화 기준(실측: ASML €·TSM NT$·MFG ¥·HSBC $)이지만,
+        # Zacks 열은 US$ ADR 기준이라 **현지통화 ADR 에는 폴백하지 않는다**(한 열에 통화 섞임).
+        # US$ 결산 종목만 폴백 — 그 경우 두 값 모두 US$ 라 기준이 같다.
         try:
-            if any(r2.get("sE") is None for r2 in q) and snap:
+            if cur in (None, "USD") and any(r2.get("sE") is None for r2 in q) and snap:
                 anns = set()
                 try:
                     lv = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
@@ -705,7 +689,7 @@ def us_fin(sym: str):
         # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
         res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg, "cur": cur,
                "unit": "백만$ · EPS=$",
-               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + MarketBeat(발표시점 매출·EPS컨센) + 일별 스냅샷"}
+               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + Zacks(발표시점 매출·EPS컨센·판정) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
         if len(_usfin_cache) > 300:
             _usfin_cache.clear()
