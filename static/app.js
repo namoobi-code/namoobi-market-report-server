@@ -5329,8 +5329,8 @@ await _canvasFlow(c);
           (a30?`30일 평균 ${a30}`:'')+(a30&&a90?' · ':'')+(a90?`90일 평균 ${a90}`:'')+
           ` <span class="note">— % 는 현재가 대비 상승여력</span></div>`;
       }
-      t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 ~90일 · ${tp.length}건 · 상향 ${up}·하향 ${dn})</b> ${svg}${avgLine}
-        <div style="max-height:150px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
+      t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 90일)</b> ${svg}${avgLine}
+        <div style="max-height:230px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">일자</th><th style="text-align:left">증권사</th><th>목표가</th><th>직전</th><th>변동</th><th>의견</th></tr>`+
         tp.slice().reverse().map(z=>`<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px">${z.d}</td><td>${E(z.b)}</td>
           <td style="text-align:right">${F(z.tp)}</td><td style="text-align:right;color:var(--tx2)">${F(z.prev)}</td>
@@ -5351,12 +5351,12 @@ await _canvasFlow(c);
         const w=560,hh=90;
         const all=sn.filter(z=>d90.includes(z.d)).map(z=>z.o),
               lo=Math.min(...all), hi=Math.max(...all), rg=(hi-lo)||1;
-        const COLS=['#1f6feb','#e08e3c','#27ae60','#8e44ad'];
+        const COLS=['#1f6feb','#e08e3c','#27ae60','#8e44ad','#c0392b','#16a085'];
         const lines=ps.map((pp,k)=>{
           const xy=d90.filter(d=>byP[pp][d]!=null)
             .map(d=>`${(d90.indexOf(d)/(d90.length-1)*(w-8)+4).toFixed(1)},${(hh-8-(byP[pp][d]-lo)/rg*(hh-18)).toFixed(1)}`);
-          return xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="${COLS[k%4]}" stroke-width="1.6"/>`:''; }).join('');
-        const leg=ps.map((pp,k)=>`<span style="color:${COLS[k%4]}">● ${pp}(E)</span>`).join(' ');
+          return xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="${COLS[k%COLS.length]}" stroke-width="1.6"/>`:''; }).join('');
+        const leg=ps.map((pp,k)=>`<span style="color:${COLS[k%COLS.length]}">● ${pp}(E)</span>`).join(' ');
         svg=`<svg width="${w}" height="${hh}" style="max-width:100%">${lines}</svg><div class="note">${leg}</div>`;
       }
       /* 표: 최신이 위 — 분기별 추정치 + 직전 스냅샷 대비 % */
@@ -5368,7 +5368,7 @@ await _canvasFlow(c);
           return `<td style="text-align:right">${v==null?'<span class="note">—</span>':Math.round(v).toLocaleString()}`+
             (ch==null?'':` <span class="${ch>0?'up':(ch<0?'dn':'note')}" style="font-size:10px">${ch>0?'+':''}${ch.toFixed(1)}%</span>`)+'</td>';
         }).join('')+'</tr>'; }).join('');
-      const tbl=`<div style="max-height:150px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
+      const tbl=`<div style="max-height:230px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">일자</th>${ps.map(pp=>`<th style="text-align:right">${pp}(E) 영업익</th>`).join('')}</tr>${rows}</table></div>`;
       t3=`<div style="margin-top:10px"><b style="font-size:12px">영업이익 컨센서스 리비전 (90일)</b> <span class="note">(일별 스냅샷 · 억원 · %는 직전 스냅샷 대비)</span><br>
         ${svg}${tbl}<div class="note" style="margin-top:2px">매일 07:20 적립(2026-08-09 시작)${d90.length<2?' · 아직 1일치 — 그래프는 2일차부터 자동 표시':''} · 30/90일 리비전 필터는 스냅샷이 그만큼 쌓인 뒤 유효</div></div>`;

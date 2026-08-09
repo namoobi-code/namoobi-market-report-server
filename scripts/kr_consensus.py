@@ -83,10 +83,11 @@ def encparam():
     return m.group(1)
 
 
-def quarters(code, enc):
-    """→ [(period, is_est, sales, op, ni)]  기간 오름차순. 억원 단위(DART 파서와 동일)."""
+def quarters(code, enc, freq="Q"):
+    """→ [(period, is_est, sales, op, ni)]  기간 오름차순. 억원 단위(DART 파서와 동일).
+    freq='Y' 면 연간 표 — 같은 구조라 파서를 공유한다(실측: 2028/12(E)까지 제공)."""
     h = get(f"https://navercomp.wisereport.co.kr/v2/company/ajax/cF1001.aspx"
-            f"?cmp_cd={code}&fin_typ=0&freq_typ=Q&encparam={enc}")
+            f"?cmp_cd={code}&fin_typ=0&freq_typ={freq}&encparam={enc}")
     heads = [_CLEAN(t) for t in re.findall(r"<th[^>]*>(.*?)</th>", h, re.S)]
     pers = [x for x in heads if re.search(r"\d{4}/\d{2}", x)]
     if not pers:
@@ -190,10 +191,18 @@ def main():
     print(f"[cons] 대상 {len(codes)}종목 · encparam {enc[:12]}…", flush=True)
 
     def one(code):
+        """분기 + 연간(2026-08-09 추가). 연간은 분기 컨센이 못 미치는 2027(E)·2028(E)까지
+        주므로, 장기 전망 리비전은 연간 스냅샷으로만 쌓을 수 있다. period 키는 'FY2027'
+        형식으로 저장해 분기('2027/03')와 구분한다. 종목당 호출이 1→2회가 되는 비용."""
         try:
-            return code, quarters(code, enc)
+            qs = quarters(code, enc)
         except Exception:
-            return code, []
+            qs = []
+        try:
+            ys = [(f"FY{p[:4]}", est, s, o, ni) for p, est, s, o, ni in quarters(code, enc, "Y")]
+        except Exception:
+            ys = []
+        return code, qs + ys
 
     got = {}
     with ThreadPoolExecutor(max_workers=WORKERS) as ex:
