@@ -5629,6 +5629,7 @@ await _canvasFlow(c);
         ⬜ '예' = IR 예정일(ed · Yahoo·네이버 IR) — 아직 발표 전이거나 감지 못한 경우
         클릭하면 캘린더 팝업과 같은 한 줄 요약(실적 → 전망 → 주가)이 뜬다. */
      _EHIT=[]; _PLK=[];        // _PLK: 팝업 안 클릭 가능한 링크(원본 열기) — 매 프레임 재계산
+     let _epop=null;           // (2026-08-09) 실적팝업을 공시 마커 이후에 그리기 위한 지연 실행
      {const rw=(POOL[mkt]||[]).find(z=>z.c===dcode)||{};
       const idx2={}; for(let i=0;i<N;i++) idx2[String(t[i]||'').replace(/-/g,'').slice(0,8)]=i;
       const ed8=String(rw.ed||'').replace(/-/g,'').slice(0,8);
@@ -5660,8 +5661,9 @@ await _canvasFlow(c);
         _EHIT.push({d:m.d, x:mx, y:my, r:9}); });
 
       // 선택된 마커 → 요약 상자 (캘린더 팝업과 동일한 '실적 → 전망 → 주가' 순서)
+      // ※ 팝업은 공시 마커(빨간 배지)까지 다 그린 뒤 마지막에 그린다 — 겹치면 팝업이 위
       const sm=marks.find(m=>m.d===_ESEL);
-      if(sm){
+      if(sm){ _epop=()=>{
         const pc=(v,suf)=>v==null?null:`${v>0?'+':''}${(+v).toFixed(1)}${suf||'%'}`;
         const rows=[];
         if(sm.t==='예'){ rows.push(['다음 실적발표 예정일','IR 공시 기준 — 확정 아님']); }
@@ -5724,7 +5726,7 @@ await _canvasFlow(c);
           x.fillStyle='#1f6feb'; x.font='bold 15px sans-serif'; x.fillText(lt, bx+11, ly);
           _PLK.push({x:bx+7, y:ly-18, w:x.measureText(lt).width+14, h:24, u:url});
         }
-      }
+      };}
      }
      /* 공시 마커 — 날짜별로 묶어 최신부터 A·B·C… 를 부여하고 캔들 고가 위에 원형 배지로 찍는다.
         클릭 판정을 위해 화면좌표를 _DHIT 에 쌓아 둔다(캔버스는 DOM 이 없어 직접 히트테스트). */
@@ -5778,6 +5780,7 @@ await _canvasFlow(c);
          x.fillText('파란 제목 클릭 = 공시 원본 새 탭', bx+10, by+bh-8);
        }
      }
+     if(_epop) _epop();        // 실적팝업은 모든 마커 위에
      // 십자선 — 호버 중인 봉 위치
      if(_CHI!=null){ x.save(); x.setLineDash([3,3]); x.strokeStyle='#9aa4b0';
        x.beginPath(); x.moveTo(X(HI),P.t); x.lineTo(X(HI),H-P.b); x.stroke();
