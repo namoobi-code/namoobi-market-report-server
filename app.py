@@ -434,6 +434,17 @@ def kr_seg(code: str):
         if items:
             res["wise"] = {"asof": asof, "items": items[:8],
                            "url": f"https://navercomp.wisereport.co.kr/v2/company/c1020001.aspx?cmp_cd={code}"}
+        # (2026-08-09) 최근연혁(cTB202) — 기업개요 아래 표시용
+        mt2 = re.search(r'id="cTB202".*?</table>', h, re.S)
+        hist = []
+        if mt2:
+            for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", mt2.group(0), re.S):
+                cs = [CL(x2) for x2 in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", tr, re.S)]
+                cs = [c2 for c2 in cs if c2]
+                if len(cs) >= 2 and re.match(r"\d{4}/\d{2}", cs[0]):
+                    hist.append({"d": cs[0], "t": cs[1]})
+        if hist:
+            res["hist"] = hist[:8]
     except Exception:
         pass
     # (2026-08-09 실측) skhynix 옛 경로(kor/ir/financialInfo/earningsCall.do)는 404 —

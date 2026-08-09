@@ -4394,6 +4394,7 @@ await _canvasFlow(c);
           ov.style.display='';
           ov.innerHTML=`<div class="sgt">기업개요</div>
             <div style="font-size:12px;line-height:1.65;padding:2px 2px 0">${o.lines.slice(0,6).map(t=>'· '+E(t)).join('<br>')}</div>`;
+          _ovHist();   // (2026-08-09) 최근연혁이 먼저 도착해 있었으면 다시 붙인다(innerHTML 덮임)
         }).catch(()=>{}); } }
     const G=[['시세',['px','chg','cap','tv','turn']],
              ['기간수익률',['r1m','r3m','r6m','mom']],
@@ -5464,13 +5465,27 @@ await _canvasFlow(c);
         (실측: SK하이닉스는 'DRAM, NAND Flash 등' 단일 항목 + 부문별 기재 생략)
      ② WISEreport(FnGuide 계열) 주요제품 매출구성% 요약
      ③ 회사 IR 실적발표 — 분기 제품·응용처 비중의 유일한 정본(PDF·링크 제공) */
+  /* (2026-08-09) 최근연혁 — 기업개요(sd_ov) 아래에 붙인다. 기업개요는 /api/overview 로
+     따로 오므로, 어느 쪽이 먼저 도착하든 한 번만 붙도록 양쪽에서 _ovHist() 를 부른다. */
+  let _HISTC=null, _HIST=null;
+  function _ovHist(){
+    const ov=$('sd_ov'); if(!ov||!_HIST||!_HIST.length) return;
+    if(ov.dataset.c!==_HISTC || ov.querySelector('.ovh')) return;
+    const d=document.createElement('div'); d.className='ovh';
+    d.innerHTML=`<div class="sgt" style="margin-top:6px">최근연혁</div>
+      <table style="width:100%;font-size:11.5px;border-collapse:collapse">`+
+      _HIST.map(z=>`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:2px 4px;white-space:nowrap;color:var(--tx2)">${E(z.d)}</td><td style="padding:2px 4px">${E(z.t)}</td></tr>`).join('')+'</table>';
+    ov.appendChild(d); ov.style.display='';
+  }
   async function loadKrSeg(c){
     const el=$('sd_seg'); if(!el) return;
+    _HISTC=c; _HIST=null;
     if(mkt!=='kr'){ el.style.display='none'; el.innerHTML=''; return; }
     el.style.display=''; el.innerHTML='<span class="note">매출 구성 로드 중… (첫 조회는 DART 보고서 3건 파싱 — 수십 초)</span>';
     let J=null;
     try{ J=await (await fetch('/api/kr_seg/'+encodeURIComponent(c))).json(); }catch(e){}
     if(dcode!==c) return;
+    if(J&&(J.hist||[]).length){ _HIST=J.hist; _ovHist(); }   // 최근연혁 → 기업개요 아래
     if(!J||(!((J.reports||[]).length)&&!J.wise)){ el.innerHTML='<span class="note">매출 구성 정보 없음</span>'; return; }
     let hh='<b style="font-size:12.5px">📦 매출 구성·제품 정보</b> <span class="note">(소스 비교 · 24h 캐시 자동 갱신)</span>';
     (J.reports||[]).forEach(r=>{
