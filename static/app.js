@@ -5314,7 +5314,9 @@ await _canvasFlow(c);
     if(dcode!==c) return;
     if(!J||!(J.q||[]).length){ el.innerHTML='<span class="note">분기 재무 데이터 없음 (컨센서스 미커버 종목)</span>'; return; }
     const q=J.q, F=v=>v==null?'—':Math.round(v).toLocaleString();
-    const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>1)?((a/Math.abs(b)-(b<0?-1:1))* (b<0?-100:100)):null;
+    /* (2026-08-09 수정) 변화율 = (현재−기저)÷|기저|. 예전 식은 적자 기저에서 부호가 뒤집혀
+       적자(−0.55)→흑자(0.41) 가 −174.5% 로 나왔다(개선인데 마이너스). 지금은 +174.5%. */
+    const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>1)?((a-b)/Math.abs(b)*100):null;
     const yoy=(i,k)=>i>=4?pct(q[i][k],q[i-4][k]):null;
     const qoq=(i,k)=>i>=1?pct(q[i][k],q[i-1][k]):null;
     const P=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
@@ -5495,7 +5497,9 @@ await _canvasFlow(c);
     if(!J||!(J.q||[]).length){ el.innerHTML='<span class="note">분기 재무 데이터 없음</span>'; el.style.display='none'; return; }
     _USFIN=J; _paint();                   // 팝업 YoY/QoQ 즉시 반영
     const q=J.q, F=v=>v==null?'—':Math.round(v).toLocaleString();
-    const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
+    /* (2026-08-09 수정) 변화율 = (현재−기저)÷|기저| — 적자 기저 부호 뒤집힘 수정
+       (실측 ABNB 2024/03: EPS −0.55→0.41 이 −174.5% 로 나오던 것을 +174.5% 로) */
+    const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a-b)/Math.abs(b)*100):null;
     /* (2026-08-09) YoY/QoQ 를 **인덱스가 아니라 기간 라벨로** 매칭한다.
        SEC XBRL 은 4분기(12월)를 따로 신고하지 않는 회사가 있어 분기가 비는데,
        인덱스로 i−4 를 쓰면 엉뚱한 분기와 비교된다(실측 ABNB: 2023/12·2024/12 결측). */
@@ -5916,7 +5920,7 @@ await _canvasFlow(c);
               const df=am-qm2; if(df>=1&&df<=4){ qi=i2; break; } }
             if(qi>=0){
               /* (2026-08-09) 미국식 보는 순서 — 매출 → EPS → 서프 판정 → 이익률 */
-              const pctu=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
+              const pctu=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a-b)/Math.abs(b)*100):null;
               /* 분기 결측(4Q 미신고 회사)이 있어 인덱스가 아니라 기간 라벨로 매칭한다 */
               const _sh=(p,mm)=>{ let y=+p.slice(0,4), m=+p.slice(5,7)+mm;
                 while(m<=0){m+=12;y--;} while(m>12){m-=12;y++;}
