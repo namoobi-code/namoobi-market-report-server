@@ -441,6 +441,95 @@ def earn_dates_kr(code: str, days: int = 400):
         return {"items": [], "err": repr(ex)[:80]}
 
 
+_krfin_cache = {}
+_wise_enc = {"at": 0, "v": ""}
+
+@app.get("/api/kr_fin/{code}")
+def kr_fin(code: str):
+    """한국 종목 분기 재무 + 컨센서스 + 목표주가 변동 — 차트 하단 표용 (2026-08-09).
+
+    한 번의 WISEreport 조회로 세 가지를 돌려준다(온디맨드 · 6시간 캐시):
+      q     분기 매출/영업익/순익 — 확정 5분기 + 컨센(E) 3분기 → 프론트가 YoY·QoQ 계산
+      tp    증권사별 목표주가 변동표(cTB24 · 최근 ~90일) — 발간일·목표가·직전比
+      snap  컨센 영업이익 추정치의 일별 스냅샷(kr_consensus.sqlite) — 추이 그래프용
+    """
+    if not re.fullmatch(r"\d{6}", code or ""):
+        raise HTTPException(400, "bad code")
+    now = time.time()
+    hit = _krfin_cache.get(code)
+    if hit and now - hit[0] < 21600:
+        return hit[1]
+    UA2 = {"User-Agent": "Mozilla/5.0", "Referer": "https://navercomp.wisereport.co.kr/"}
+    def _get(u):
+        return urllib.request.urlopen(urllib.request.Request(u, headers=UA2), timeout=25).read().decode("utf-8", "replace")
+    CL = lambda x: re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", x)).strip()
+    def _num(t):
+        t = (t or "").replace(",", "").strip()
+        try:
+            return float(t)
+        except Exception:
+            return None
+    try:
+        # encparam — 전 종목 공용(실측), 1시간 캐시
+        if now - _wise_enc["at"] > 3600 or not _wise_enc["v"]:
+            b0 = _get("https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd=005930")
+            m0 = re.search(r"encparam\s*[:=]\s*['\"]([^'\"]+)", b0)
+            if m0:
+                _wise_enc["v"] = m0.group(1); _wise_enc["at"] = now
+        enc = _wise_enc["v"]
+        # ① 분기 재무(cF1001) — 확정+컨센(E)
+        h = _get(f"https://navercomp.wisereport.co.kr/v2/company/ajax/cF1001.aspx"
+                 f"?cmp_cd={code}&fin_typ=0&freq_typ=Q&encparam={enc}")
+        heads = [CL(t) for t in re.findall(r"<th[^>]*>(.*?)</th>", h, re.S)]
+        pers = [x for x in heads if re.search(r"\d{4}/\d{2}", x)]
+        rows = {}
+        for r0 in re.findall(r"<tr[^>]*>(.*?)</tr>", h, re.S):
+            c = [CL(x) for x in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r0, re.S)]
+            if not c:
+                continue
+            key = {"매출액": "sales", "영업이익(발표기준)": "op", "당기순이익": "ni"}.get(c[0])
+            if key and (key != "op" or "op" not in rows):
+                rows[key] = c[1:1 + len(pers)]
+        q = []
+        for i, per in enumerate(pers):
+            m = re.match(r"(\d{4}/\d{2})(\(E\))?", per)
+            if not m:
+                continue
+            gv = lambda k: _num(rows[k][i]) if rows.get(k) and i < len(rows[k]) else None
+            q.append({"p": m.group(1), "e": bool(m.group(2)),
+                      "s": gv("sales"), "o": gv("op"), "n": gv("ni")})
+        # ② 목표주가 변동표(cTB24) — 개별 종목 페이지에서
+        b = _get(f"https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={code}")
+        tp = []
+        mt = re.search(r'id="cTB24".*?</table>', b, re.S)
+        if mt:
+            for r0 in re.findall(r"<tr[^>]*>(.*?)</tr>", mt.group(0), re.S):
+                c = [CL(x) for x in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r0, re.S)]
+                if len(c) >= 6 and re.match(r"\d\d/\d\d/\d\d", c[1] or ""):
+                    tp.append({"b": c[0], "d": c[1], "tp": _num(c[2]),
+                               "prev": _num(c[3]), "chg": _num(c[4]), "op": c[5]})
+        # ③ 컨센 영업이익 스냅샷(일별) — 추이 그래프
+        snap = []
+        try:
+            db = DB / "kr_consensus.sqlite"
+            if db.exists():
+                cx = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=10)
+                snap = [{"d": r0[0], "p": r0[1], "o": r0[2], "s": r0[3]}
+                        for r0 in cx.execute(
+                            "SELECT d,period,op,sales FROM snap WHERE code=? ORDER BY d,period", (code,))]
+                cx.close()
+        except Exception:
+            pass
+        res = {"q": q, "tp": tp, "snap": snap, "unit": "억원",
+               "src": "WISEreport 분기표·증권사 목표가 + 컨센 일별 스냅샷"}
+        _krfin_cache[code] = (now, res)
+        if len(_krfin_cache) > 200:
+            _krfin_cache.clear()
+        return res
+    except Exception as ex:
+        return {"q": [], "tp": [], "snap": [], "err": repr(ex)[:80]}
+
+
 def _logged_in(request) -> bool:
     """namoobi 로그인 세션 여부. KIS 를 쓰는 엔드포인트는 이걸로 막는다.
 

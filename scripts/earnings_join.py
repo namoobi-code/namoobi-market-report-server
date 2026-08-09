@@ -78,13 +78,16 @@ def kr_surprise_backfill(ev):
     for c, (d8, it) in ev.items():
         if it.get("spr") is not None or it.get("op") is None:
             continue
-        r = cx.execute("SELECT op FROM snap WHERE code=? AND period=? ORDER BY d DESC LIMIT 1",
+        r = cx.execute("SELECT op,sales FROM snap WHERE code=? AND period=? ORDER BY d DESC LIMIT 1",
                        (c, quarter_end(d8))).fetchone()
-        est = r[0] if r else None
+        est, sest = (r[0], r[1]) if r else (None, None)
         if est and abs(est) > 10:                       # 컨센 10억원 미만은 비율이 무의미
             it["spr"] = round((it["op"] / est - 1) * 100, 1)
             it["cons_op"] = est
             n += 1
+        if sest and sest > 10 and it.get("sales") is not None:
+            it["spr_s"] = round((it["sales"] / sest - 1) * 100, 1)
+            it["cons_sales"] = sest
     cx.close()
     return n
 
@@ -117,11 +120,15 @@ def main():
                 cc = cons.get(c) or {}
                 if cc.get("op30") is not None:
                     patch["cr30"] = cc["op30"]          # 비율(0.05 = +5%)
+                if cc.get("op90") is not None:
+                    patch["cr90"] = cc["op90"]
                 # 목표주가 리비전 — 한국의 이익추정 리비전(op30)은 스냅샷 30일이 필요해
                 # 당장은 비어 있다. 증권사 목표가 변동은 오늘 바로 쓸 수 있는 대체 신호다.
                 if cc.get("tp30") is not None:
                     patch["tprv"] = cc["tp30"]          # % 단위
                     patch["tpn"] = cc.get("tpn"); patch["tpu"] = cc.get("tpu"); patch["tpd"] = cc.get("tpd")
+                if cc.get("tp90") is not None:
+                    patch["tprv90"] = cc["tp90"]
             d8, it = ev.get(c, (None, None))
             if it:
                 patch["edl"] = d8
@@ -134,8 +141,15 @@ def main():
                 if g is not None:
                     patch["gap"] = g
                 # KR 서프라이즈는 발표 이벤트에만 있다(US 는 풀에 이미 있음)
-                if mk == "kr" and it.get("spr") is not None:
-                    patch["spr"] = it["spr"]
+                if mk == "kr":
+                    # (2026-08-09) 서프 2종 + YoY/QoQ/마진 상세 — 차트 팝업과 스크리너가 동일 소스를 쓴다
+                    for src_k, dst_k in (("spr", "spr"), ("spr_s", "sspr"),
+                                         ("sales_yoy", "syoy"), ("op_yoy", "oyoy"), ("ni_yoy", "nyoy"),
+                                         ("sales_qoq", "sqoq"), ("op_qoq", "oqoq"), ("ni_qoq", "nqoq"),
+                                         ("opm", "opmn"), ("opm_ch", "opmy"),
+                                         ("op_qturn", "oqt"), ("ni_qturn", "nqt")):
+                        if it.get(src_k) is not None:
+                            patch[dst_k] = it[src_k]
             if patch:
                 r.update(patch); n += 1
         stat[mk] = n

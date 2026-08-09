@@ -126,23 +126,28 @@ def tp_revision(html):
     m = _TPRV_RE.search(html)
     if not m:
         return {}
-    cut = (datetime.now() - timedelta(days=30)).strftime("%y/%m/%d")
-    vals, ups, dns = [], 0, 0
+    now = datetime.now()
+    cut30 = (now - timedelta(days=30)).strftime("%y/%m/%d")
+    cut90 = (now - timedelta(days=90)).strftime("%y/%m/%d")
+    rows = []
     for r in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(0), re.S):
         c = [_CLEAN(x) for x in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", r, re.S)]
         if len(c) < 5 or not re.match(r"\d\d/\d\d/\d\d", c[1] or ""):
             continue
-        if c[1] < cut:
-            continue
         v = num(c[4])
         if v is None:
             continue
-        vals.append(v)
-        if v > 0: ups += 1
-        elif v < 0: dns += 1
-    if not vals:
-        return {}
-    return {"tp30": round(sum(vals) / len(vals), 2), "tpn": len(vals), "tpu": ups, "tpd": dns}
+        rows.append((c[1], v))
+    out = {}
+    for lab, cut in (("tp30", cut30), ("tp90", cut90)):
+        vals = [v for d, v in rows if d >= cut]
+        if vals:
+            out[lab] = round(sum(vals) / len(vals), 2)
+            if lab == "tp30":
+                out["tpn"] = len(vals)
+                out["tpu"] = sum(1 for v in vals if v > 0)
+                out["tpd"] = sum(1 for v in vals if v < 0)
+    return out
 
 
 def naver_extra(code):
@@ -225,7 +230,7 @@ def main():
             continue
         p, _, s, o, ni = est[0]                      # 가장 가까운 미래 분기
         rec = {"p": p, "sales": s, "op": o, "ni": ni}
-        for lab, dd in (("op7", 7), ("op30", 30)):
+        for lab, dd in (("op7", 7), ("op30", 30), ("op90", 90)):
             prev = rev(code, p, dd)
             rec[lab] = round(o / prev - 1.0, 4) if (o and prev and prev > 0) else None
         out[code] = rec

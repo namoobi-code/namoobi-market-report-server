@@ -1218,6 +1218,8 @@
               <!-- (2026-07-21) 차트 하단 패널 — 분봉이면 호가·체결, 일/주/월이면 외국인·기관 순매매 표 -->
               <div id="sd_book" style="display:none;margin-top:8px"></div>
               <div id="sd_invt" style="display:none;margin-top:8px"></div>
+              <!-- (2026-08-09) KR 실적·전망 패널 — 분기 재무표(YoY·QoQ·컨센E) + 목표주가 90일 변동 + 컨센 추이 -->
+              <div id="sd_fin" style="display:none;margin-top:10px"></div>
             </div>
             <!-- (2026-07-24) 우측 열 = 파생 포지셔닝(위) + 요약표(아래).
                  dgrid 직계 형제로 두면 그리드 3번째 칸으로 밀려 행 높이만큼 늘어나(빈공간) 컨테이너로 묶고,
@@ -1569,8 +1571,8 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260810e"></script>
-<script src="/etf.js?v=20260810e"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/app.js?v=20260810f"></script>
+<script src="/etf.js?v=20260810f"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

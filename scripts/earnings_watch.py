@@ -87,17 +87,27 @@ def parse_doc(rno):
         # 실측 구조: [당해, 직전, 직전比, 전년동기, 전년比] — 전년 쌍 = 마지막 두 숫자
         yoy_v = nums[-2] if len(nums) >= 4 else None
         yoy_p = nums[-1] if len(nums) >= 5 else None
+        # (2026-08-09) 직전 분기(QoQ) 쌍 — 5칸이 다 있을 때만 신뢰(그 미만이면 자리 확정 불가)
+        qoq_v = nums[1] if len(nums) >= 5 else None
+        qoq_p = nums[2] if len(nums) >= 5 else None
         if yoy_p is not None and abs(yoy_p) > 5000:      # % 자리로 보기 어려운 값 방어
             yoy_p = None
+        if qoq_p is not None and abs(qoq_p) > 5000:
+            qoq_p = None
         if turn is None and yoy_v is not None:           # 텍스트가 없어도 부호로 판정
             if yoy_v < 0 <= now: turn = "흑자전환"
             elif now < 0 <= yoy_v: turn = "적자전환"
-        out[k] = (now, yoy_v, yoy_p, turn)
+        # QoQ 전환(가장 빠른 포착 — 분기흑자QoQ 필터와 같은 정의. 계절성 주의)
+        qturn = None
+        if qoq_v is not None:
+            if qoq_v < 0 <= now: qturn = "흑자전환(QoQ)"
+            elif now < 0 <= qoq_v: qturn = "적자전환(QoQ)"
+        out[k] = (now, yoy_v, yoy_p, turn, qoq_v, qoq_p, qturn)
     return out
 
 def tags_of(p):
     tg = []
-    def g(k): return p.get(k) or (None, None, None, None)
+    def g(k): return p.get(k) or (None,) * 7
     s, o, n = g("sales"), g("op"), g("ni")
     if o[3]: tg.append("영업익 " + o[3])
     elif o[2] is not None:
@@ -159,6 +169,9 @@ def surprise(code, op, sales):
         out["spr"] = round((op / est - 1) * 100, 1)
     else:
         out["spr_amt"] = round(op - (est or 0), 1)
+    # (2026-08-09) 매출 서프라이즈 — 매출은 음수가 없어 비율이 항상 안전하다
+    if sales is not None and sales_est and sales_est > 10:
+        out["spr_s"] = round((sales / sales_est - 1) * 100, 1)
     return out
 
 
@@ -199,14 +212,31 @@ def main():
             continue
         u = p.get("unit", 1/100)
         def val(k, i):
-            v = (p.get(k) or (None,)*4)[i]
-            return round(v * u, 1) if (i in (0, 1) and v is not None) else v
+            v = (p.get(k) or (None,) * 7)[i]
+            # 0=당해, 1=전년동기, 4=직전분기 → 금액(억원 환산) · 2=YoY%, 5=QoQ% → 비율 그대로
+            return round(v * u, 1) if (i in (0, 1, 4) and v is not None) else v
         it = {"c": code, "n": x["corp_name"], "rno": rno,
               "t": datetime.now().strftime("%H:%M"),
               "cons": "연결" if "연결" in x.get("report_nm", "") else "별도",
               "sales": val("sales", 0), "sales_yoy": val("sales", 2),
               "op": val("op", 0), "op_yoy": val("op", 2),
-              "ni": val("ni", 0), "ni_yoy": val("ni", 2)}
+              "ni": val("ni", 0), "ni_yoy": val("ni", 2),
+              # (2026-08-09) QoQ — 공시 원문의 '직전실적' 쌍. 전환 텍스트도 함께.
+              "sales_qoq": val("sales", 5), "op_qoq": val("op", 5), "ni_qoq": val("ni", 5),
+              "op_qturn": (p.get("op") or (None,)*7)[6],
+              "ni_qturn": (p.get("ni") or (None,)*7)[6]}
+        # 영업이익률(당분기) + 전년동기 영업이익률 → YoY 마진 변화(%p)
+        try:
+            s_now, s_yoy = it["sales"], val("sales", 1)
+            o_now, o_yoy = it["op"], val("op", 1)
+            if s_now and o_now is not None:
+                it["opm"] = round(o_now / s_now * 100, 1)
+            if s_yoy and o_yoy is not None:
+                it["opm_y"] = round(o_yoy / s_yoy * 100, 1)
+            if it.get("opm") is not None and it.get("opm_y") is not None:
+                it["opm_ch"] = round(it["opm"] - it["opm_y"], 1)
+        except Exception:
+            pass
         it["tags"] = tags_of(p)
         # (2026-08-09) 컨센서스 대비 서프라이즈 — 한국은 가이던스가 없어 이게 곧 '전망 충격'의 크기다.
         # YoY 만으로는 "잘했나"는 알아도 "시장이 놀랄 일인가"는 알 수 없다.
