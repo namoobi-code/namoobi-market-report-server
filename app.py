@@ -381,8 +381,8 @@ def us_fin(sym: str):
         p2 = int(time.time()); p1 = p2 - 3 * 365 * 86400
         ts = json.loads(urllib.request.urlopen(urllib.request.Request(
             f"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{sym}"
-            f"?type=quarterlyTotalRevenue,quarterlyOperatingIncome,quarterlyNetIncome&period1={p1}&period2={p2}",
-            headers=UA2), timeout=25).read())
+            f"?type=quarterlyTotalRevenue,quarterlyOperatingIncome,quarterlyNetIncome,quarterlyDilutedEPS"
+            f"&period1={p1}&period2={p2}", headers=UA2), timeout=25).read())
         acc = {}
         for r0 in (ts.get("timeseries", {}).get("result") or []):
             k = next((x for x in r0 if x.startswith("quarterly")), None)
@@ -390,10 +390,12 @@ def us_fin(sym: str):
                 continue
             for z in (r0.get(k) or []):
                 if z and z.get("asOfDate") and (z.get("reportedValue") or {}).get("raw") is not None:
-                    acc.setdefault(z["asOfDate"], {})[k[9:10].lower() if False else k] = z["reportedValue"]["raw"] / 1e6
+                    v0 = z["reportedValue"]["raw"]
+                    acc.setdefault(z["asOfDate"], {})[k] = v0 if k == "quarterlyDilutedEPS" else v0 / 1e6
         q = [{"p": d[:7].replace("-", "/"),
               "s": v.get("quarterlyTotalRevenue"), "o": v.get("quarterlyOperatingIncome"),
-              "n": v.get("quarterlyNetIncome")} for d, v in sorted(acc.items())]
+              "n": v.get("quarterlyNetIncome"), "eps": v.get("quarterlyDilutedEPS")}
+             for d, v in sorted(acc.items())]
         # ② 컨센 추정 + 리비전 곡선 (quoteSummary — crumb 필요)
         est, rev = [], []
         try:
@@ -408,8 +410,20 @@ def us_fin(sym: str):
             crumb = op.open("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=10).read().decode()
             j = json.loads(op.open(
                 f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{sym}"
-                f"?modules=earningsTrend&crumb={urllib.parse.quote(crumb)}", timeout=15).read())
-            et = ((j["quoteSummary"]["result"] or [{}])[0].get("earningsTrend") or {}).get("trend") or []
+                f"?modules=earningsTrend,earningsHistory&crumb={urllib.parse.quote(crumb)}", timeout=15).read())
+            _res0 = (j["quoteSummary"]["result"] or [{}])[0]
+            et = (_res0.get("earningsTrend") or {}).get("trend") or []
+            # (2026-08-09) 발표 시점 EPS 컨센 + 서프라이즈 — 최근 4분기(earningsHistory).
+            # 분기표의 'EPS컨센(발표시점)·서프판정' 열 재료. 매출 쪽은 소스가 없어(야후 미제공)
+            # 오늘 시작한 0q 스냅샷이 쌓인 뒤부터 채워진다.
+            for h0 in ((_res0.get("earningsHistory") or {}).get("history") or []):
+                qf = ((h0.get("quarter") or {}).get("fmt") or "")[:7].replace("-", "/")
+                for r2 in q:
+                    if r2["p"] == qf:
+                        if raw(h0.get("epsEstimate")) is not None:
+                            r2["epsE"] = raw(h0.get("epsEstimate"))
+                        if raw(h0.get("surprisePercent")) is not None:
+                            r2["sprE"] = round(raw(h0.get("surprisePercent")) * 100, 1)
             for t0 in et:
                 per = t0.get("period")
                 if per in ("0q", "+1q", "0y", "+1y"):
@@ -434,7 +448,18 @@ def us_fin(sym: str):
                 cx.close()
         except Exception:
             pass
-        res = {"q": q[-10:], "est": est, "rev": rev, "snap": snap,
+        # ④ 최근 가이던스 (8-K 보도자료 파싱 · earnings_live_us) — 매출·EPS 중간값 + 컨센 갭
+        gd = None
+        try:
+            live = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
+            for d8 in sorted(live.get("days") or {}):
+                for it in live["days"][d8]:
+                    if it.get("c") == sym and (it.get("g_rev") is not None or it.get("g_eps") is not None):
+                        gd = {"d": d8, "rev": it.get("g_rev"), "revGap": it.get("g_rev_gap"),
+                              "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"), "acc": it.get("acc")}
+        except Exception:
+            pass
+        res = {"q": q[-10:], "est": est, "rev": rev, "snap": snap, "gd": gd,
                "unit": "백만$ · EPS=$", "src": "Yahoo timeseries·earningsTrend + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
         if len(_usfin_cache) > 300:

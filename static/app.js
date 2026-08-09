@@ -5498,19 +5498,49 @@ await _canvasFlow(c);
     const turn=(i,k)=>{ if(i<1||q[i][k]==null||q[i-1][k]==null) return '';
       if(q[i-1][k]<0&&q[i][k]>0) return ' <b style="color:#1f9d55">⚡흑전</b>';
       if(q[i-1][k]>0&&q[i][k]<0) return ' <b style="color:#c0392b">⚡적전</b>'; return ''; };
-    /* ① 분기 실적표 */
+    /* ① 분기 실적표 — (2026-08-09) 미국식 보는 순서: 매출 → EPS → 서프라이즈 → 영업이익률.
+       영업익·순익 열은 빼고(이익률 계산에만 사용) EPS 를 전면에 — 미국 시장의 정식 지표. */
+    const eF=v=>v==null?'—':(+v).toFixed(2);
+    const sprB=v=>v==null?'<span class="note">—</span>':
+      `<span class="${v>0?'up':'dn'}"><b>${v>0?'비트':'미스'}</b> ${v>0?'+':''}${v.toFixed(1)}%</span>`;
     let t1=`<table style="width:100%;font-size:11.5px;border-collapse:collapse">
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
       <th>매출<span class="note">(백만$)</span></th><th>YoY</th><th>QoQ</th>
-      <th>영업익<span class="note">(백만$)</span></th><th>YoY</th><th>QoQ</th>
-      <th>순익<span class="note">(백만$)</span></th><th>YoY</th><th>QoQ</th><th>영업이익률</th></tr>`;
+      <th>EPS<span class="note">($)</span></th><th>YoY</th><th>QoQ</th>
+      <th>EPS컨센<span class="note">(발표시점)</span></th><th>EPS서프</th><th>영업이익률</th></tr>`;
     q.forEach((r,i)=>{ const m=opm(i);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
-        <td style="text-align:right">${F(r.o)}</td><td style="text-align:right">${P(yoy(i,'o'))}</td><td style="text-align:right">${P(qoq(i,'o'))}${turn(i,'o')}</td>
-        <td style="text-align:right">${F(r.n)}</td><td style="text-align:right">${P(yoy(i,'n'))}</td><td style="text-align:right">${P(qoq(i,'n'))}${turn(i,'n')}</td>
+        <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
+        <td style="text-align:right">${eF(r.epsE)}</td><td style="text-align:right">${sprB(r.sprE)}</td>
         <td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td></tr>`; });
-    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K 기준) — 최신 분기는 보고서 제출까지 며칠 지연될 수 있음 · 음수 기저 구간의 비율은 부호 왜곡 가능</div>';
+    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)·매출 서프 판정은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b> · 음수 기저 비율은 부호 왜곡 가능</div>';
+    /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
+       자동 파싱 가능한 두 항목만 숫자로, 마진·EBITDA·FCF·CAPEX·가입자 등은 보도자료·어닝콜
+       원문에만 있어(형식 자유) 링크로 안내한다. 비교 대상은 '회사 가이던스 vs 애널 컨센'
+       — 회사가 EPS 가이던스를 안 주면 매출 가이던스+마진 전망으로 이익 방향을 추정할 것. */
+    { const rw0=(POOL.us||[]).find(z=>z.c===c)||{};
+      const gd=J.gd, rows2=[];
+      if(gd&&gd.rev!=null) rows2.push(['다음 분기 매출(백만$)', gd.rev, (rw0.rq1!=null?rw0.rq1/1e6:null), gd.revGap]);
+      if(gd&&gd.eps!=null) rows2.push(['다음 분기 EPS($)', gd.eps, rw0.eq1??null, gd.epsGap]);
+      if(rows2.length){
+        const fmt2=(v,isEps)=>v==null?'—':(isEps?(+v).toFixed(2):Math.round(v).toLocaleString());
+        t1+=`<div style="margin-top:8px"><b style="font-size:12px">가이던스 vs 컨센서스</b>
+          <span class="note">(회사 8-K 보도자료 파싱 · 발표일 ${E(gd.d||'')} · 갭 = 가이던스 중간값 ÷ 컨센 − 1)</span>
+          <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
+          <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">항목</th>
+          <th>회사 가이던스</th><th>컨센서스</th><th>갭</th><th style="width:40%"></th></tr>`+
+          rows2.map(([nm,g,cn,gp])=>{ const isE=nm.includes('EPS');
+            const mx=Math.max(g||0,cn||0)||1, bw=v=>Math.max(2,(v||0)/mx*100);
+            return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px">${nm}</td>
+              <td style="text-align:right"><b>${fmt2(g,isE)}</b></td><td style="text-align:right">${fmt2(cn,isE)}</td>
+              <td style="text-align:right">${gp==null?'—':`<span class="${gp>0?'up':'dn'}"><b>${gp>0?'+':''}${(+gp).toFixed(1)}%</b></span>`}</td>
+              <td style="padding:2px 6px"><div style="background:#1f6feb;height:7px;width:${bw(g)}%;border-radius:2px"></div>
+                <div style="background:#c3ccd8;height:7px;width:${bw(cn)}%;border-radius:2px;margin-top:2px"></div></td></tr>`; }).join('')+
+          `</table><div class="note"><span style="color:#1f6feb">■</span> 가이던스 · <span style="color:#9aa4b0">■</span> 컨센서스
+           — 마진·EBITDA·FCF·CAPEX·가입자 등 그 외 가이던스 항목은 형식이 자유로워 자동 파싱 미지원(보도자료·어닝콜 원문 확인)</div></div>`;
+      } else t1+=`<div class="note" style="margin-top:4px">다음 분기 가이던스: 파싱된 값 없음 — 숫자 가이던스를 안 주는 회사(애플형)이거나 최근 발표가 없음. 마진·CAPEX 등은 어닝콜 원문 확인</div>`;
+    }
     /* ①-b 컨센 추정 — 분기·연간 (회사가 공식으로 주는 미래치는 가이던스(매출·EPS), 여긴 애널 컨센) */
     const LBL={'0q':'진행분기','+1q':'다음분기','0y':'올해(FY)','+1y':'내년(FY)'};
     if((J.est||[]).length){
@@ -5865,16 +5895,22 @@ await _canvasFlow(c);
             for(let i2=qq.length-1;i2>=0;i2--){ const qm2=+qq[i2].p.slice(0,4)*12 + +qq[i2].p.slice(5,7);
               const df=am-qm2; if(df>=1&&df<=4){ qi=i2; break; } }
             if(qi>=0){
-              const pctu=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>1)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
+              /* (2026-08-09) 미국식 보는 순서 — 매출 → EPS → 서프 판정 → 이익률 */
+              const pctu=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
               const gy=k=>qi>=4?pctu(qq[qi][k],qq[qi-4][k]):null, gq=k=>qi>=1?pctu(qq[qi][k],qq[qi-1][k]):null;
               const tn=k=>{ if(qi<1||qq[qi][k]==null||qq[qi-1][k]==null) return '';
                 if(qq[qi-1][k]<0&&qq[qi][k]>0) return ' ⚡흑전'; if(qq[qi-1][k]>0&&qq[qi][k]<0) return ' ⚡적전'; return ''; };
               const l2=[]; if(gy('s')!=null) l2.push('매출 '+pc(gy('s')));
-              if(gy('o')!=null) l2.push('영업익 '+pc(gy('o'))); if(gy('n')!=null) l2.push('순익 '+pc(gy('n')));
+              if(gy('eps')!=null) l2.push('EPS '+pc(gy('eps')));
               if(l2.length) rows.push([`YoY`, l2.join('   ')+`  (${qq[qi].p})`]);
               const l3=[]; if(gq('s')!=null) l3.push('매출 '+pc(gq('s')));
-              if(gq('o')!=null) l3.push('영업익 '+pc(gq('o'))+tn('o')); if(gq('n')!=null) l3.push('순익 '+pc(gq('n'))+tn('n'));
+              if(gq('eps')!=null) l3.push('EPS '+pc(gq('eps'))+tn('eps'));
               if(l3.length) rows.push(['QoQ', l3.join('   ')]);
+              if(qq[qi].sprE!=null) rows.push(['서프', `EPS ${qq[qi].sprE>0?'비트':'미스'} ${pc(qq[qi].sprE)}`
+                +(qq[qi].epsE!=null?`  (실제 ${(+qq[qi].eps).toFixed(2)} vs 컨센 ${(+qq[qi].epsE).toFixed(2)})`:'')]);
+              const om=(qq[qi].s&&qq[qi].o!=null)?(qq[qi].o/qq[qi].s*100):null;
+              const omY=(qi>=4&&qq[qi-4].s&&qq[qi-4].o!=null)?(qq[qi-4].o/qq[qi-4].s*100):null;
+              if(om!=null) rows.push(['마진', `영업이익률 ${om.toFixed(1)}%`+(omY!=null?`  (YoY ${om-omY>0?'+':''}${(om-omY).toFixed(1)}%p)`:'')]);
             }
           }
           const rc = latest ? {r1:rw.r1, r5:rw.r5, r20:rw.r20} : reactAt(sm.i);
