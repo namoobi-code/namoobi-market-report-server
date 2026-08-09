@@ -355,6 +355,95 @@ def disclosure_doc(code: str, disc_id: int):
         raise HTTPException(502, f"공시 원문 조회 실패: {repr(e)[:60]}")
 
 
+_usfin_cache = {}
+
+@app.get("/api/us_fin/{sym}")
+def us_fin(sym: str):
+    """미국 종목 분기 실적 + 컨센 추정 + 목표가 스냅샷 — 차트 하단 표용 (2026-08-09 · KR 대칭).
+
+      q     분기 매출/영업익/순익 실적 (Yahoo fundamentals-timeseries · 최신 분기는 10-Q 제출까지 며칠 지연)
+      est   컨센 추정 — 0q/+1q 분기(EPS·매출) + 0y/+1y 연간(EPS·매출) (earningsTrend)
+      rev   EPS 추정 리비전 곡선 — 90/30/7일 전 값과 현재 (Yahoo 가 과거값을 직접 제공 → 즉시 4점)
+      snap  일별 스냅샷(us_consensus.sqlite · 2026-08-09 시작) — 목표가·추정 누적
+    6시간 캐시. 단위: 매출/영업익/순익 = 백만$ · EPS = $.
+    """
+    if not re.fullmatch(r"[A-Za-z.\-]{1,10}", sym or ""):
+        raise HTTPException(400, "bad sym")
+    sym = sym.upper()
+    now = time.time()
+    hit = _usfin_cache.get(sym)
+    if hit and now - hit[0] < 21600:
+        return hit[1]
+    UA2 = {"User-Agent": "Mozilla/5.0"}
+    raw = lambda x: (x or {}).get("raw") if isinstance(x, dict) else None
+    try:
+        # ① 분기 실적 3종 (백만$ 로 환산)
+        p2 = int(time.time()); p1 = p2 - 3 * 365 * 86400
+        ts = json.loads(urllib.request.urlopen(urllib.request.Request(
+            f"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{sym}"
+            f"?type=quarterlyTotalRevenue,quarterlyOperatingIncome,quarterlyNetIncome&period1={p1}&period2={p2}",
+            headers=UA2), timeout=25).read())
+        acc = {}
+        for r0 in (ts.get("timeseries", {}).get("result") or []):
+            k = next((x for x in r0 if x.startswith("quarterly")), None)
+            if not k:
+                continue
+            for z in (r0.get(k) or []):
+                if z and z.get("asOfDate") and (z.get("reportedValue") or {}).get("raw") is not None:
+                    acc.setdefault(z["asOfDate"], {})[k[9:10].lower() if False else k] = z["reportedValue"]["raw"] / 1e6
+        q = [{"p": d[:7].replace("-", "/"),
+              "s": v.get("quarterlyTotalRevenue"), "o": v.get("quarterlyOperatingIncome"),
+              "n": v.get("quarterlyNetIncome")} for d, v in sorted(acc.items())]
+        # ② 컨센 추정 + 리비전 곡선 (quoteSummary — crumb 필요)
+        est, rev = [], []
+        try:
+            import http.cookiejar
+            cj = http.cookiejar.CookieJar()
+            op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+            op.addheaders = list(UA2.items())
+            try:
+                op.open("https://fc.yahoo.com", timeout=8)
+            except Exception:
+                pass
+            crumb = op.open("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=10).read().decode()
+            j = json.loads(op.open(
+                f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{sym}"
+                f"?modules=earningsTrend&crumb={urllib.parse.quote(crumb)}", timeout=15).read())
+            et = ((j["quoteSummary"]["result"] or [{}])[0].get("earningsTrend") or {}).get("trend") or []
+            for t0 in et:
+                per = t0.get("period")
+                if per in ("0q", "+1q", "0y", "+1y"):
+                    ee, re_ = t0.get("earningsEstimate") or {}, t0.get("revenueEstimate") or {}
+                    est.append({"per": per, "end": t0.get("endDate"),
+                                "eps": raw(ee.get("avg")), "rev": (raw(re_.get("avg")) or 0) / 1e6 or None,
+                                "nan": raw(ee.get("numberOfAnalysts")),
+                                "epsY": raw(ee.get("yearAgoEps")), "revY": (raw(re_.get("yearAgoRevenue")) or 0) / 1e6 or None})
+                    tr = t0.get("epsTrend") or {}
+                    rev.append({"per": per, "cur": raw(tr.get("current")), "d7": raw(tr.get("7daysAgo")),
+                                "d30": raw(tr.get("30daysAgo")), "d90": raw(tr.get("90daysAgo"))})
+        except Exception:
+            pass
+        # ③ 스냅샷 (목표가·추정 일별 — 2026-08-09 적립 시작)
+        snap = []
+        try:
+            db = DB / "us_consensus.sqlite"
+            if db.exists():
+                cx = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=10)
+                snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4], "tp": r0[5]}
+                        for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp FROM snap WHERE sym=? ORDER BY d", (sym,))]
+                cx.close()
+        except Exception:
+            pass
+        res = {"q": q[-10:], "est": est, "rev": rev, "snap": snap,
+               "unit": "백만$ · EPS=$", "src": "Yahoo timeseries·earningsTrend + 일별 스냅샷"}
+        _usfin_cache[sym] = (now, res)
+        if len(_usfin_cache) > 300:
+            _usfin_cache.clear()
+        return res
+    except Exception as ex:
+        return {"q": [], "est": [], "rev": [], "snap": [], "err": repr(ex)[:80]}
+
+
 _seg_cache = {}
 
 @app.get("/api/kr_seg/{code}")

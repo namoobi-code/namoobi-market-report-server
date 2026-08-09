@@ -22,7 +22,7 @@ cron: 풀 빌드와 별개로 매일 08:00 (미 정규장 마감 후)
 """
 import http.cookiejar, json, sys, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
@@ -82,6 +82,14 @@ def parse(fd):
                      ("nan1", _raw(ee.get("numberOfAnalysts")))):
             if v is not None:
                 out[k] = v
+    # (2026-08-09) 0q(진행 분기) 추정 — 매출 서프라이즈 소급 계산용 스냅샷 재료.
+    # 발표 후 0q 가 다음 분기로 넘어가므로, 매일 저장해 둬야 '발표 시점 컨센'을 알 수 있다.
+    t0 = next((x for x in et if x.get("period") == "0q"), None)
+    if t0:
+        ee0, re0 = t0.get("earningsEstimate") or {}, t0.get("revenueEstimate") or {}
+        for k, v in (("eq0", _raw(ee0.get("avg"))), ("rq0", _raw(re0.get("avg")))):
+            if v is not None:
+                out[k] = v
 
     hs = (fd.get("earningsHistory") or {}).get("history", []) or []
     vs = sorted([((h.get("quarter") or {}).get("fmt") or "", _raw(h.get("surprisePercent")))
@@ -130,10 +138,46 @@ def main():
         d = got.get(r.get("c"))
         if d:
             r.update(d); n += 1
+    # ── (2026-08-09) 일별 스냅샷 적립 + 목표가 30/90일 리비전 ──────────────────
+    #    한국(kr_consensus.sqlite)과 동일 설계. 미국 목표가는 '현재 유효 평균'만 제공되므로
+    #    (기간 개념 없음 — 커버리지 중단 시에만 제외) 스냅샷을 쌓아야 30/90일 변화율이 나온다.
+    #    0q/1q 추정(EPS·매출)도 함께 쌓아 발표 시점 컨센(매출 서프라이즈 소급)에 쓴다.
+    #    유효 시점: 30일 리비전 2026-09-08 · 90일 2026-11-07 (KR 과 동일).
+    import sqlite3
+    db = POOL.parent / "us_consensus.sqlite"
+    cx = sqlite3.connect(db, timeout=60)
+    cx.executescript("CREATE TABLE IF NOT EXISTS snap(sym TEXT,d TEXT,eq0 REAL,rq0 REAL,eq1 REAL,rq1 REAL,tp REAL,"
+                     "PRIMARY KEY(sym,d));")
+    today = datetime.now().strftime("%Y-%m-%d")
+    ns = 0
+    for r in us:
+        sym, d = r.get("c"), got.get(r.get("c")) or {}
+        if not sym or (d.get("eq0") is None and d.get("eq1") is None and r.get("tp") is None):
+            continue
+        cx.execute("INSERT OR REPLACE INTO snap(sym,d,eq0,rq0,eq1,rq1,tp) VALUES(?,?,?,?,?,?,?)",
+                   (sym, today, d.get("eq0"), d.get("rq0"), d.get("eq1"), d.get("rq1"), r.get("tp")))
+        ns += 1
+    cx.commit()
+    def tprev(sym, days):
+        d0 = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+        r0 = cx.execute("SELECT tp FROM snap WHERE sym=? AND d<=? AND tp IS NOT NULL ORDER BY d DESC LIMIT 1",
+                        (sym, d0)).fetchone()
+        return r0[0] if r0 else None
+    ntp = 0
+    for r in us:
+        tp = r.get("tp")
+        if not tp:
+            continue
+        for lab, dd in (("tprv", 30), ("tprv90", 90)):
+            pv = tprev(r["c"], dd)
+            if pv and pv > 0:
+                r[lab] = round((tp / pv - 1) * 100, 2); ntp += 1
+    cx.close()
     pool["us_cons_asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     POOL.write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")
     have = lambda k: sum(1 for r in us if r.get(k) is not None)
-    print(f"[uscons] 패치 {n}/{len(us)} · spr {have('spr')} · cr30 {have('cr30')} · rq1 {have('rq1')}")
+    print(f"[uscons] 패치 {n}/{len(us)} · spr {have('spr')} · cr30 {have('cr30')} · rq1 {have('rq1')}"
+          f" · 스냅샷 {ns}행 · 목표가리비전 {ntp}")
 
 
 if __name__ == "__main__":
