@@ -142,6 +142,12 @@ def main():
                 for k in ("r1", "r5", "r20"):
                     if it.get(k) is not None:
                         patch[k] = it[k]
+                # (2026-08-10) 가이던스 갭 매출·EPS 분리 — 스크리너 필터가 두 축을 따로 쓴다
+                # (gap=병합값은 구버전 호환으로 유지)
+                if it.get("g_rev_gap") is not None:
+                    patch["gapR"] = it["g_rev_gap"]
+                if it.get("g_eps_gap") is not None:
+                    patch["gapE"] = it["g_eps_gap"]
                 g = it.get("g_rev_gap")
                 if g is None:
                     g = it.get("g_eps_gap")
