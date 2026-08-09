@@ -356,6 +356,20 @@ def disclosure_doc(code: str, disc_id: int):
 
 
 _usfin_cache = {}
+_cikmap_cache = {"at": 0, "m": {}}     # 티커→CIK (us_fin·earn_dates 공용 · 주 1회 갱신)
+
+
+def _cik_map():
+    """티커→CIK (SEC 공식 목록 · 주 1회 갱신) — us_fin 의 SEC XBRL 조회에 쓴다."""
+    now = time.time()
+    if now - _cikmap_cache["at"] > 604800 or not _cikmap_cache["m"]:
+        j = json.loads(urllib.request.urlopen(urllib.request.Request(
+            "https://www.sec.gov/files/company_tickers.json",
+            headers={"User-Agent": "namoobi research namoobi@gmail.com"}), timeout=30).read())
+        _cikmap_cache["m"] = {v["ticker"].upper(): str(v["cik_str"]) for v in j.values()}
+        _cikmap_cache["at"] = now
+    return _cikmap_cache["m"]
+
 
 @app.get("/api/us_fin/{sym}")
 def us_fin(sym: str):
@@ -396,6 +410,60 @@ def us_fin(sym: str):
               "s": v.get("quarterlyTotalRevenue"), "o": v.get("quarterlyOperatingIncome"),
               "n": v.get("quarterlyNetIncome"), "eps": v.get("quarterlyDilutedEPS")}
              for d, v in sorted(acc.items())]
+        # (2026-08-09) Yahoo 무료 timeseries 는 **분기 5개**만 준다(실측 — 기간을 8년으로 늘려도 동일).
+        # 그래서 YoY(t−4) 가 마지막 행에서만 계산돼 앞 행이 전부 '—' 로 보였다.
+        # SEC XBRL companyconcept 는 같은 값을 5년+ 로 주므로(실측 ABNB 23분기) 이걸 우선 쓰고
+        # 부족한 항목만 Yahoo 로 메운다. EPS 는 태그가 회사마다 달라 후보를 순회한다.
+        try:
+            cikm = _cik_map()
+            cik = cikm.get(sym.upper())
+            if cik:
+                H2 = {"User-Agent": "namoobi research namoobi@gmail.com"}
+                def _con(tags):
+                    out = {}
+                    for tg in tags:
+                        try:
+                            jj = json.loads(urllib.request.urlopen(urllib.request.Request(
+                                f"https://data.sec.gov/api/xbrl/companyconcept/CIK{int(cik):010d}/us-gaap/{tg}.json",
+                                headers=H2), timeout=25).read())
+                        except Exception:
+                            continue
+                        for unit in ("USD", "USD/shares"):
+                            for x in (jj.get("units", {}).get(unit) or []):
+                                st_, en_ = x.get("start"), x.get("end")
+                                if not st_ or not en_ or x.get("form") not in ("10-Q", "10-K"):
+                                    continue
+                                try:
+                                    dur = (datetime.fromisoformat(en_) - datetime.fromisoformat(st_)).days
+                                except Exception:
+                                    continue
+                                if 60 <= dur <= 100:            # 분기 구간만(누적 제외)
+                                    out[en_] = x["val"]
+                        if out:
+                            break
+                    return out
+                rev = _con(["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
+                            "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"])
+                opi = _con(["OperatingIncomeLoss"])
+                nis = _con(["NetIncomeLoss"])
+                eps = _con(["EarningsPerShareDiluted", "IncomeLossFromContinuingOperationsPerDilutedShare"])
+                if rev:
+                    merged = {}
+                    for d0 in sorted(set(rev) | set(opi) | set(nis) | set(eps)):
+                        merged[d0[:7].replace("-", "/")] = {
+                            "p": d0[:7].replace("-", "/"),
+                            "s": (rev.get(d0) or 0) / 1e6 or None,
+                            "o": (opi[d0] / 1e6) if d0 in opi else None,
+                            "n": (nis[d0] / 1e6) if d0 in nis else None,
+                            "eps": eps.get(d0)}
+                    for r0 in q:                                # Yahoo 값으로 빈칸 보완
+                        m0 = merged.setdefault(r0["p"], {"p": r0["p"]})
+                        for k0 in ("s", "o", "n", "eps"):
+                            if m0.get(k0) is None and r0.get(k0) is not None:
+                                m0[k0] = r0[k0]
+                    q = [merged[k0] for k0 in sorted(merged)]
+        except Exception:
+            pass
         # ② 컨센 추정 + 리비전 곡선 (quoteSummary — crumb 필요)
         est, rev = [], []
         try:
@@ -634,7 +702,6 @@ def kr_seg(code: str):
 
 
 _earn_cache = {}
-_cikmap_cache = {"at": 0, "m": {}}
 
 @app.get("/api/earn_dates/us/{sym}")
 def earn_dates_us(sym: str, days: int = 400):

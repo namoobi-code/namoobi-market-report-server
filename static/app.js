@@ -5495,14 +5495,23 @@ await _canvasFlow(c);
     if(!J||!(J.q||[]).length){ el.innerHTML='<span class="note">분기 재무 데이터 없음</span>'; el.style.display='none'; return; }
     _USFIN=J; _paint();                   // 팝업 YoY/QoQ 즉시 반영
     const q=J.q, F=v=>v==null?'—':Math.round(v).toLocaleString();
-    const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>1)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
-    const yoy=(i,k)=>i>=4?pct(q[i][k],q[i-4][k]):null;
-    const qoq=(i,k)=>i>=1?pct(q[i][k],q[i-1][k]):null;
+    const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
+    /* (2026-08-09) YoY/QoQ 를 **인덱스가 아니라 기간 라벨로** 매칭한다.
+       SEC XBRL 은 4분기(12월)를 따로 신고하지 않는 회사가 있어 분기가 비는데,
+       인덱스로 i−4 를 쓰면 엉뚱한 분기와 비교된다(실측 ABNB: 2023/12·2024/12 결측). */
+    const QI={}; q.forEach((z,i)=>QI[z.p]=i);
+    const shift=(p,mm)=>{ let y=+p.slice(0,4), m=+p.slice(5,7)+mm;
+      while(m<=0){m+=12;y--;} while(m>12){m-=12;y++;}
+      return `${y}/${String(m).padStart(2,'0')}`; };
+    const at=(p,k)=>{ const i=QI[p]; return i==null?null:q[i][k]; };
+    const yoy=(i,k)=>pct(q[i][k], at(shift(q[i].p,-12),k));
+    const qoq=(i,k)=>pct(q[i][k], at(shift(q[i].p,-3),k));
     const P=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
     const opm=i=>(q[i].s&&q[i].o!=null)?(q[i].o/q[i].s*100):null;
-    const turn=(i,k)=>{ if(i<1||q[i][k]==null||q[i-1][k]==null) return '';
-      if(q[i-1][k]<0&&q[i][k]>0) return ' <b style="color:#1f9d55">⚡흑전</b>';
-      if(q[i-1][k]>0&&q[i][k]<0) return ' <b style="color:#c0392b">⚡적전</b>'; return ''; };
+    const turn=(i,k)=>{ const pv=at(shift(q[i].p,-3),k), cv=q[i][k];
+      if(pv==null||cv==null) return '';
+      if(pv<0&&cv>0) return ' <b style="color:#1f9d55">⚡흑전</b>';
+      if(pv>0&&cv<0) return ' <b style="color:#c0392b">⚡적전</b>'; return ''; };
     /* ① 분기 실적표 — (2026-08-09) 미국식 보는 순서: 매출 → EPS → 서프라이즈 → 영업이익률.
        영업익·순익 열은 빼고(이익률 계산에만 사용) EPS 를 전면에 — 미국 시장의 정식 지표. */
     const eF=v=>v==null?'—':(+v).toFixed(2);
@@ -5905,9 +5914,16 @@ await _canvasFlow(c);
             if(qi>=0){
               /* (2026-08-09) 미국식 보는 순서 — 매출 → EPS → 서프 판정 → 이익률 */
               const pctu=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a/Math.abs(b)-(b<0?-1:1))*(b<0?-100:100)):null;
-              const gy=k=>qi>=4?pctu(qq[qi][k],qq[qi-4][k]):null, gq=k=>qi>=1?pctu(qq[qi][k],qq[qi-1][k]):null;
-              const tn=k=>{ if(qi<1||qq[qi][k]==null||qq[qi-1][k]==null) return '';
-                if(qq[qi-1][k]<0&&qq[qi][k]>0) return ' ⚡흑전'; if(qq[qi-1][k]>0&&qq[qi][k]<0) return ' ⚡적전'; return ''; };
+              /* 분기 결측(4Q 미신고 회사)이 있어 인덱스가 아니라 기간 라벨로 매칭한다 */
+              const _sh=(p,mm)=>{ let y=+p.slice(0,4), m=+p.slice(5,7)+mm;
+                while(m<=0){m+=12;y--;} while(m>12){m-=12;y++;}
+                return `${y}/${String(m).padStart(2,'0')}`; };
+              const _at=(p,k)=>{ const z=qq.find(v=>v.p===p); return z?z[k]:null; };
+              const gy=k=>pctu(qq[qi][k], _at(_sh(qq[qi].p,-12),k));
+              const gq=k=>pctu(qq[qi][k], _at(_sh(qq[qi].p,-3),k));
+              const tn=k=>{ const pv=_at(_sh(qq[qi].p,-3),k), cv=qq[qi][k];
+                if(pv==null||cv==null) return '';
+                if(pv<0&&cv>0) return ' ⚡흑전'; if(pv>0&&cv<0) return ' ⚡적전'; return ''; };
               const l2=[]; if(gy('s')!=null) l2.push('매출 '+pc(gy('s')));
               if(gy('eps')!=null) l2.push('EPS '+pc(gy('eps')));
               if(l2.length) rows.push([`YoY`, l2.join('   ')+`  (${qq[qi].p})`]);
