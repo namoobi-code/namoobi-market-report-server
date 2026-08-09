@@ -5311,7 +5311,24 @@ await _canvasFlow(c);
         svg=`<svg width="${w}" height="${hh}" style="vertical-align:middle"><polyline points="${xy.join(' ')}" fill="none" stroke="#1f6feb" stroke-width="1.6"/></svg>`;
       }
       const up=tp.filter(z=>(z.chg||0)>0).length, dn=tp.filter(z=>(z.chg||0)<0).length;
-      t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 ~90일 · ${tp.length}건 · 상향 ${up}·하향 ${dn})</b> ${svg}
+      /* (2026-08-09) 30·90일 평균 목표가 + 현재가 대비 상승여력 — 표 위 요약줄 */
+      let avgLine='';
+      {
+        const cur=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):null;
+        const now=new Date(), cut=n=>{const d=new Date(now); d.setDate(d.getDate()-n); return d;};
+        const pdate=s=>{const m=/^(\d\d)\/(\d\d)\/(\d\d)$/.exec(s||''); return m?new Date(2000+ +m[1], +m[2]-1, +m[3]):null;};
+        const avg=n=>{const a=pts.filter(z=>{const d=pdate(z.d); return d&&d>=cut(n);}).map(z=>z.tp);
+          return a.length?{v:a.reduce((x,y)=>x+y,0)/a.length,n:a.length}:null;};
+        const fmt=o=>{ if(!o) return null;
+          const gp=(cur&&cur>0)?((o.v/cur-1)*100):null;
+          return `<b>${Math.round(o.v).toLocaleString()}</b><span class="note">(${o.n}건)</span>`+
+            (gp==null?'':` <span class="${gp>0?'up':(gp<0?'dn':'note')}">${gp>0?'+':''}${gp.toFixed(1)}%</span>`); };
+        const a30=fmt(avg(30)), a90=fmt(avg(90));
+        if(a30||a90) avgLine=`<div style="font-size:11.5px;margin:4px 0 2px">`+
+          (a30?`30일 평균 ${a30}`:'')+(a30&&a90?' · ':'')+(a90?`90일 평균 ${a90}`:'')+
+          ` <span class="note">— % 는 현재가 대비 상승여력</span></div>`;
+      }
+      t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 ~90일 · ${tp.length}건 · 상향 ${up}·하향 ${dn})</b> ${svg}${avgLine}
         <div style="max-height:150px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">일자</th><th style="text-align:left">증권사</th><th>목표가</th><th>직전</th><th>변동</th><th>의견</th></tr>`+
         tp.slice().reverse().map(z=>`<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px">${z.d}</td><td>${E(z.b)}</td>
