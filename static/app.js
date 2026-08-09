@@ -5537,10 +5537,14 @@ await _canvasFlow(c);
     const isADR=J.cur&&J.cur!=='USD';
     const hasSE=q.some(r=>r.sE!=null);
     const showSE=!isADR||hasSE;
+    /* (2026-08-10) ADR 은 EPS 실적 열도 Zacks 조정 EPS(US$ ADR)로 표시 — EPS·EPS컨센·
+       판정이 전부 같은 소스(Zacks)·같은 통화(US$ ADR)가 된다 (실측 MUFG: ¥ EPS 와
+       $ 컨센이 나란히 있어 혼란). YoY/QoQ/흑전 도 같은 시리즈로 계산. */
+    const epsK=isADR?'epsA':'eps';
     let t1=`<table style="width:100%;font-size:11.5px;border-collapse:collapse">
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
       <th>매출<span class="note">(백만${isADR?' '+J.cur:'$'})</span></th><th>YoY</th><th>QoQ</th>
-      <th>EPS<span class="note">(${isADR?J.cur:'$'})</span></th><th>YoY</th><th>QoQ</th>
+      <th>EPS<span class="note">(${isADR?'US$ ADR·조정':'$'})</span></th><th>YoY</th><th>QoQ</th>
       ${showSE?`<th>매출컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>`:''}<th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
@@ -5553,12 +5557,12 @@ await _canvasFlow(c);
       const ssp=r.sSpr!=null?r.sSpr:((!isADR&&r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
-        <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
+        <td style="text-align:right"><b>${eF(r[epsK])}</b></td><td style="text-align:right">${P(yoy(i,epsK))}</td><td style="text-align:right">${P(qoq(i,epsK))}${turn(i,epsK)}</td>
         ${showSE?`<td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 없음 — Zacks 발표 이력에 이 분기 없음':''}">${cCell(r.sE,ssp,false)}</td>`:''}
-        <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'} (왼쪽 EPS 열은 GAAP 희석EPS)`:''}">${cCell(r.epsE,r.sprE,true)}</td>
+        <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}${isADR?'':' (왼쪽 EPS 열은 GAAP 희석EPS)'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · '
-      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — 매출·EPS 컨센(발표시점)·판정은 Zacks <b>US$ ADR 기준</b>(왼쪽 실적 열은 ${J.cur} 라 값 규모가 다름 — 판정은 Zacks 의 컨센·실제 쌍끼리 비교라 유효)`
+      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — EPS·EPS컨센·판정은 전부 Zacks <b>US$ ADR·조정 EPS 기준으로 통일</b>(매출·영업이익률만 ${J.cur})${hasSE?' · 매출컨센도 Zacks US$ ADR':' · 매출컨센은 Zacks 에 추정치 없음(실제만 제공 — 열 숨김)'}`
              :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')
       +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
@@ -6050,11 +6054,13 @@ await _canvasFlow(c);
               const tn=k=>{ const b=_bs(3), pv=b?b[k]:null, cv=qq[qi][k];
                 if(pv==null||cv==null) return '';
                 if(pv<0&&cv>0) return ' ⚡흑전'; if(pv>0&&cv<0) return ' ⚡적전'; return ''; };
+              /* ADR 은 표와 동일하게 EPS 를 Zacks 조정 EPS(US$ ADR) 시리즈로 */
+              const epsK2=(_USFIN&&_USFIN.cur&&_USFIN.cur!=='USD')?'epsA':'eps';
               const l2=[]; if(gy('s')!=null) l2.push('매출 '+pc(gy('s')));
-              if(gy('eps')!=null) l2.push('EPS '+pc(gy('eps')));
+              if(gy(epsK2)!=null) l2.push('EPS '+pc(gy(epsK2)));
               if(l2.length) rows.push([`YoY`, l2.join('   ')+`  (${qq[qi].p})`]);
               const l3=[]; if(gq('s')!=null) l3.push('매출 '+pc(gq('s')));
-              if(gq('eps')!=null) l3.push('EPS '+pc(gq('eps'))+tn('eps'));
+              if(gq(epsK2)!=null) l3.push('EPS '+pc(gq(epsK2))+tn(epsK2));
               if(l3.length) rows.push(['QoQ', l3.join('   ')]);
               /* 서프 — 매출·EPS 각각. 매출 판정은 서버가 Zacks 쌍으로 계산한 sSpr 우선
                  (ADR 은 실적 열과 통화가 달라 직접 비교 금지 — 표와 동일 규칙) */

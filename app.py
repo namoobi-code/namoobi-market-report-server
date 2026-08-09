@@ -635,13 +635,18 @@ def us_fin(sym: str):
                 if len(row) < 4:
                     continue
                 r2, vE, vA = _zq(_zc(row[1])), _zv(row[2]), _zv(row[3])
-                if r2 is None or vE is None or r2["p"] in ze:
+                if r2 is None or r2["p"] in ze:
                     continue
-                r2["epsE"] = vE
                 ze.add(r2["p"])
+                # (2026-08-10) 실제(조정 EPS)는 컨센 유무와 무관하게 저장 — 현지통화 ADR 은
+                # 프론트가 EPS 실적 열 자체를 이 값(US$ ADR)으로 표시해 컨센 열과 통화를 통일한다
+                # (실측 MUFG: 실적 ¥ vs 컨센 $ 로 열끼리 통화가 달랐다. Zacks 만 사용 — 소스 단일).
                 if vA is not None:
                     r2["epsA"] = vA
-                    r2["sprE"] = round((vA - vE) / abs(vE) * 100, 1)
+                if vE is not None:
+                    r2["epsE"] = vE
+                    if vA is not None:
+                        r2["sprE"] = round((vA - vE) / abs(vE) * 100, 1)
         except Exception:
             pass
         # ③-3 (2026-08-10) Zacks 에 없는 분기만 자체 스냅샷(야후 rq0 · 매일 08:00)으로 폴백.
