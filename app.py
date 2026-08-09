@@ -420,7 +420,10 @@ def us_fin(sym: str):
             if cik:
                 H2 = {"User-Agent": "namoobi research namoobi@gmail.com"}
                 def _con(tags):
-                    out = {}
+                    """분기값 {end: val}. 4분기를 따로 신고하지 않는 회사가 많아
+                    (10-K 에 연간만 실림 — 실측 ABNB 2023/12·2024/12 결측)
+                    **연간 − 그 해 분기 3개 합**으로 Q4 를 유도해 채운다."""
+                    out, ann = {}, []
                     for tg in tags:
                         try:
                             jj = json.loads(urllib.request.urlopen(urllib.request.Request(
@@ -437,16 +440,28 @@ def us_fin(sym: str):
                                     dur = (datetime.fromisoformat(en_) - datetime.fromisoformat(st_)).days
                                 except Exception:
                                     continue
-                                if 60 <= dur <= 100:            # 분기 구간만(누적 제외)
+                                if 60 <= dur <= 100:            # 분기 구간
                                     out[en_] = x["val"]
+                                elif 340 <= dur <= 380:         # 연간 구간(Q4 유도용)
+                                    ann.append((st_, en_, x["val"]))
                         if out:
                             break
-                    return out
-                rev = _con(["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
-                            "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"])
-                opi = _con(["OperatingIncomeLoss"])
-                nis = _con(["NetIncomeLoss"])
-                eps = _con(["EarningsPerShareDiluted", "IncomeLossFromContinuingOperationsPerDilutedShare"])
+                    drv = set()
+                    for st_, en_, tot in sorted(set(ann)):
+                        if en_ in out:
+                            continue
+                        qs = [v for e2, v in out.items() if st_ < e2 < en_]
+                        if len(qs) == 3:                        # 정확히 3개일 때만(중복·누락 방어)
+                            out[en_] = tot - sum(qs); drv.add(en_)
+                    return out, drv
+                rev, _ = _con(["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
+                               "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"])
+                opi, _ = _con(["OperatingIncomeLoss"])
+                nis, _ = _con(["NetIncomeLoss"])
+                # EPS 는 분기 합이 연간과 정확히 일치하지 않는다(주식수가 분기마다 달라짐)
+                # → 유도값(drv)보다 야후 보고치를 우선한다.
+                eps, eps_drv = _con(["EarningsPerShareDiluted",
+                                     "IncomeLossFromContinuingOperationsPerDilutedShare"])
                 if rev:
                     merged = {}
                     for d0 in sorted(set(rev) | set(opi) | set(nis) | set(eps)):
@@ -455,12 +470,18 @@ def us_fin(sym: str):
                             "s": (rev.get(d0) or 0) / 1e6 or None,
                             "o": (opi[d0] / 1e6) if d0 in opi else None,
                             "n": (nis[d0] / 1e6) if d0 in nis else None,
-                            "eps": eps.get(d0)}
+                            "eps": eps.get(d0),
+                            "_epsdrv": d0 in eps_drv}
                     for r0 in q:                                # Yahoo 값으로 빈칸 보완
                         m0 = merged.setdefault(r0["p"], {"p": r0["p"]})
                         for k0 in ("s", "o", "n", "eps"):
                             if m0.get(k0) is None and r0.get(k0) is not None:
                                 m0[k0] = r0[k0]
+                        # 유도 EPS 는 야후 보고치가 있으면 그쪽으로 교체(주식수 변동 오차 제거)
+                        if m0.pop("_epsdrv", False) and r0.get("eps") is not None:
+                            m0["eps"] = r0["eps"]
+                    for m0 in merged.values():
+                        m0.pop("_epsdrv", None)
                     q = [merged[k0] for k0 in sorted(merged)]
         except Exception:
             pass
