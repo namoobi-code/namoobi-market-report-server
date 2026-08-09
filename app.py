@@ -764,7 +764,7 @@ def earn_dates_us(sym: str, days: int = 400):
         forms = r.get("form", []); items = r.get("items", [])
         dates = r.get("filingDate", []); accs = r.get("accessionNumber", [])
         cut = (datetime.now() - timedelta(days=max(30, min(days, 1200)))).strftime("%Y-%m-%d")
-        out, seen_q = [], set()
+        out, seen_q, out10 = [], set(), []
         for i in range(len(accs)):
             d = dates[i] if i < len(dates) else ""
             if not d or d < cut:
@@ -773,6 +773,8 @@ def earn_dates_us(sym: str, days: int = 400):
             it = (items[i] if i < len(items) else "") or ""
             if f == "8-K" and "2.02" in it:
                 out.append({"d": d.replace("-", ""), "acc": accs[i], "f": "8-K"})
+            elif f in ("10-Q", "10-K"):                     # (2026-08-09) 정기보고서 링크용
+                out10.append({"d": d.replace("-", ""), "acc": accs[i], "f": f})
             elif f == "6-K":                                # (아래 6-K 는 원래 분기당 1건)
                 q = d[:4] + str((int(d[5:7]) - 1) // 3)      # 분기당 1건만
                 if q in seen_q:
@@ -800,7 +802,7 @@ def earn_dates_us(sym: str, days: int = 400):
             else:
                 keep[z["d"]] = z
         out = sorted(keep.values(), key=lambda x: x["d"])
-        res = {"items": out, "cik": cik}
+        res = {"items": out, "cik": cik, "tq": sorted(out10, key=lambda x: x["d"])}
         _earn_cache[sym] = (now, res)
         if len(_earn_cache) > 400:
             _earn_cache.clear()

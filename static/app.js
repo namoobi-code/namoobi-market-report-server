@@ -5675,8 +5675,36 @@ await _canvasFlow(c);
         (sn.length?`<div class="note">일별 스냅샷 ${sn.length}일치 적립 중(08-09 시작) — 30일 리비전은 9/8·90일은 11/7부터 필터에도 반영</div>`:
                    '<div class="note">일별 스냅샷 적립 시작(매일 08:00) — 30일 리비전 9/8·90일 11/7부터</div>')+'</div>';
     }
+    /* (2026-08-09) 분기별 발표·공시 자료 링크(1년) — 전부 SEC 공식 접수 인덱스.
+       8-K 인덱스에는 Earnings Release + 프레젠테이션·보충자료가 Exhibit 99.x 로 함께 있고,
+       10-Q(분기)/10-K(4분기·연간)는 정기보고서 원문. 콘퍼런스콜 음성·원고는 SEC 에
+       접수되지 않아 회사 IR 페이지에서만 제공(구조화 무료 소스 없음 — 정직하게 미지원). */
+    let t5='';
+    try{
+      const ED=await (await fetch('/api/earn_dates/us/'+encodeURIComponent(c))).json();
+      const cik=ED.cik;
+      if(cik&&(ED.items||[]).length){
+        const idxU=a=>`https://www.sec.gov/Archives/edgar/data/${parseInt(cik,10)}/${String(a).replace(/-/g,'')}/${a}-index.htm`;
+        const dl=d=>`${d.slice(0,4)}.${d.slice(4,6)}.${d.slice(6,8)}`;
+        const ers=(ED.items||[]).filter(z=>z.f!=='6-K').slice(-5).reverse();
+        const tq=ED.tq||[];
+        t5=`<div style="margin-top:10px"><b style="font-size:12px">분기별 발표·공시 자료 (1년)</b> <span class="note">— SEC 공식 접수분</span>
+          <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:3px">
+          <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">발표일</th>
+          <th style="text-align:left">실적발표 자료<span class="note"> (Earnings Release·프레젠테이션·보충자료)</span></th>
+          <th style="text-align:left">정기보고서</th></tr>`+
+          ers.map(er=>{
+            /* 발표 후 0~50일 내 접수된 첫 10-Q/10-K 를 그 분기 보고서로 매칭 */
+            const D8=s=>new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`);
+            const m10=tq.find(z=>z.d>=er.d && (D8(z.d)-D8(er.d))/864e5<=50);
+            return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${dl(er.d)}</b></td>
+              <td><a href="${idxU(er.acc)}" target="_blank" rel="noopener">📄 8-K 접수 인덱스↗</a></td>
+              <td>${m10?`<a href="${idxU(m10.acc)}" target="_blank" rel="noopener">${m10.f==='10-K'?'📕 10-K (4분기·연간)':'📘 10-Q (분기)'}↗</a> <span class="note">${dl(m10.d)}</span>`:'<span class="note">제출 전 또는 45일 초과</span>'}</td></tr>`; }).join('')+
+          `</table><div class="note" style="margin-top:2px">8-K 인덱스의 Exhibit 99.1 = 보도자료 · 99.2 = 프레젠테이션(첨부한 회사만) · 콘퍼런스콜 음성·원고는 SEC 미접수 — 회사 IR 페이지에서 확인</div></div>`;
+      }
+    }catch(e){}
     el.innerHTML=`<div class="box" style="padding:10px 12px"><b style="font-size:12.5px">📊 실적·전망</b> <span class="note">(${E(J.src||'')} · ${E(J.unit||'')})</span>
-      <div style="overflow:auto;margin-top:6px">${t1}</div>${t3}${t2}</div>`;
+      <div style="overflow:auto;margin-top:6px">${t1}</div>${t3}${t2}${t5}</div>`;
   }
   /* ── (2026-08-09) 매출 구성·제품 정보 — 우측 열 하단. 소스 3종을 출처와 함께 비교.
      ① DART 정기보고서(사업/반기/분기) 「매출실적」 표 원문 그대로 — 기업마다 상세도가 다르다
