@@ -1126,9 +1126,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             res=` <span class="note">— ${esc(t8p.replace('📄 ',''))} · <b>수치 대기</b>${secU?` · <a href="${secU}" target="_blank" rel="noopener">SEC 원문</a>`:''}</span>`;
           }else if(lv){
             const bits=[];
-            // ① 실적 — 컨센서스 대비(영업익·매출) 우선, 없으면 YoY
+            /* ① 실적 — 컨센서스 대비. (2026-08-09) US 는 미국식 순서에 맞춰
+               'EPS서프 + (실제 vs 컨센)' 을 한 덩어리로 보여 차트 팝업과 구조를 통일한다. */
             const sLab = mk==='us' ? 'EPS서프' : (lv.spr!=null?'영업익 컨센比':'영업익YoY');
-            bits.push(`${sLab} ${pct(rv)||'—'}`);
+            bits.push(`${sLab} ${pct(rv)||'—'}`
+              + ((mk==='us'&&lv.eps!=null&&lv.est!=null)
+                  ? ` <span class="note">(실제 ${(+lv.eps).toFixed(2)} vs 컨센 ${(+lv.est).toFixed(2)})</span>` : ''));
             if(mk==='kr'&&lv.spr_s!=null) bits.push(`매출 컨센比 ${pct(lv.spr_s)}`);
             if(mk==='kr'){
               const yy=[]; if(lv.sales_yoy!=null) yy.push('매출'+pct(lv.sales_yoy));
@@ -5550,16 +5553,7 @@ await _canvasFlow(c);
       /* (2026-08-09) 매출·EPS·애널수 3열. 영업이익률은 야후가 영업익 추정 자체를 안 줘서
          컨센 산출 불가 — 모든 행에 같은 TTM 값이 반복돼 오해만 주므로 열을 뺐다
          (실적 기준 영업이익률은 위 분기 실적표에 이미 있다). */
-      t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
-        <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
-        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
-        <th>매출(E)</th><th>EPS(E)</th><th>애널수</th></tr>`+
-        J.est.map(e2=>`<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
-            <td style="padding:3px 4px"><b>${LBL[e2.per]||e2.per}</b></td><td style="text-align:center">${E(e2.end||'')}</td>
-            <td style="text-align:right">${F(e2.rev)}</td>
-            <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td>
-            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+'</table></div>';
-      /* 직전 실적발표 가이던스 — 회사가 제시한 기간별 전망 vs 발표시점 컨센 + 서프 판정 */
+      /* (2026-08-09) 순서: 가이던스(회사 전망) → 컨센서스 추정(애널) — 실전 우선순위대로 */
       const gd2=J.gd;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">직전 실적발표 가이던스</b> <span class="note">${gd2?`(발표일 ${E(gd2.d)} · 8-K 보도자료 파싱)`:'(파싱된 값 없음)'}</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
@@ -5578,6 +5572,15 @@ await _canvasFlow(c);
             <td style="text-align:right">${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'}</td>
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td></tr>`; }).join('')+
         `</table><div class="note">판정 = 가이던스 중간값 ÷ 발표시점 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · 연간(FY) 가이던스는 분기 컨센과 혼동 위험이 커 자동 파싱 제외</div></div>`;
+      t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
+        <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
+        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
+        <th>매출(E)</th><th>EPS(E)</th><th>애널수</th></tr>`+
+        J.est.map(e2=>`<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
+            <td style="padding:3px 4px"><b>${LBL[e2.per]||e2.per}</b></td><td style="text-align:center">${E(e2.end||'')}</td>
+            <td style="text-align:right">${F(e2.rev)}</td>
+            <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td>
+            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+'</table></div>';
     }
     /* ② EPS 추정 리비전 — 표 + 4점 곡선 (즉시) */
     let t3='';
@@ -5909,13 +5912,6 @@ await _canvasFlow(c);
             if(rw.opmn!=null) rows.push(['마진', `영업이익률 ${rw.opmn}%`+(rw.opmy!=null?`  (YoY ${rw.opmy>0?'+':''}${rw.opmy}%p)`:'')]);
             const cv = rw.tprv!=null?pc(rw.tprv):null;
             if(cv) rows.push(['전망', `목표가 30일 ${cv}`+(rw.tprv90!=null?`   90일 ${pc(rw.tprv90)}`:'')]);
-          } else if(latest){
-            rows.push(['실적', 'EPS 서프 '+(pc(rw.spr)||'—')
-              + (rw.sprb!=null?`  (4분기 중 ${rw.sprb}회 상회)`:'')]);
-            const gp = rw.gap!=null?pc(rw.gap):null;
-            const cv = rw.cr30!=null?pc(rw.cr30*100):null;
-            rows.push(['전망', (gp?`가이던스 ${gp} vs 컨센`:'가이던스 —')
-              + '   ' + (cv?`컨센 30일 ${cv}`:'')]);
           }
           /* (2026-08-09) US — 분기 실적 YoY/QoQ (컨센과 무관한 실적치라 과거 마커 전부 계산).
              발표일로부터 1~4개월 앞선 분기말을 해당 분기로 매칭한다. */
@@ -5936,11 +5932,24 @@ await _canvasFlow(c);
               const l3=[]; if(gq('s')!=null) l3.push('매출 '+pc(gq('s')));
               if(gq('eps')!=null) l3.push('EPS '+pc(gq('eps'))+tn('eps'));
               if(l3.length) rows.push(['QoQ', l3.join('   ')]);
-              if(qq[qi].sprE!=null) rows.push(['서프', `EPS ${qq[qi].sprE>0?'비트':'미스'} ${pc(qq[qi].sprE)}`
-                +(qq[qi].epsE!=null?`  (실제 ${(+qq[qi].eps).toFixed(2)} vs 컨센 ${(+qq[qi].epsE).toFixed(2)})`:'')]);
+              /* 서프 — 매출·EPS 각각 (매출 컨센은 스냅샷 적립 후 채워짐) */
+              const sl2=[];
+              if(qq[qi].sE&&qq[qi].s!=null){ const sv=(qq[qi].s/qq[qi].sE-1)*100;
+                sl2.push(`매출 ${sv>0?'비트':'미스'} ${pc(sv)}`); }
+              if(qq[qi].sprE!=null) sl2.push(`EPS ${qq[qi].sprE>0?'비트':'미스'} ${pc(qq[qi].sprE)}`
+                +(qq[qi].epsE!=null?` (실제 ${(+qq[qi].eps).toFixed(2)} vs 컨센 ${(+qq[qi].epsE).toFixed(2)})`:''));
+              if(sl2.length) rows.push(['서프', sl2.join('   ')]);
               const om=(qq[qi].s&&qq[qi].o!=null)?(qq[qi].o/qq[qi].s*100):null;
               const omY=(qi>=4&&qq[qi-4].s&&qq[qi-4].o!=null)?(qq[qi-4].o/qq[qi-4].s*100):null;
               if(om!=null) rows.push(['마진', `영업이익률 ${om.toFixed(1)}%`+(omY!=null?`  (YoY ${om-omY>0?'+':''}${(om-omY).toFixed(1)}%p)`:'')]);
+            }
+            /* 가이던스 → 컨센 리비전 (미국식 순서의 마지막 축) — 최근 발표분에만 값이 있다 */
+            if(latest){
+              const gl=[];
+              if(rw.gap!=null) gl.push(`가이던스 ${pc(rw.gap)} vs 컨센`);
+              if(rw.sprb!=null) gl.push(`4분기 중 ${rw.sprb}회 상회`);
+              if(rw.cr30!=null) gl.push(`컨센 30일 ${pc(rw.cr30*100)}`);
+              if(gl.length) rows.push(['전망', gl.join('   ')]);
             }
           }
           const rc = latest ? {r1:rw.r1, r5:rw.r5, r20:rw.r20} : reactAt(sm.i);
