@@ -3759,6 +3759,19 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
     payout:{l:'배당성향',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'}
   };
+  /* (2026-08-10) 컬럼명 = 필터명 **자동 동기화** — 이름이 어긋나면 같은 값인지 알 수 없다
+     (사용자 지시). 컬럼 라벨을 하드코딩하지 않고 현재 시장의 필터 정의(DEF[mkt].label)에서
+     그대로 가져온다 → 필터명을 바꾸면 컬럼명이 저절로 따라오고, 시장 전환 시에도 맞는다.
+     필터 키와 컬럼 키가 다른 4쌍은 명시 매핑. 필터가 없는 컬럼(목표주가 등)·fixed(미제공)
+     필터는 기존 컬럼 라벨을 유지한다. */
+  {const F2C={recn:'rec',revg:'mgrw',opg:'ogrw',oploss:'opLoss'};
+   Object.keys(CDEF).forEach(k=>{
+     const od=Object.getOwnPropertyDescriptor(CDEF[k],'l');
+     const orig=()=>od&&(od.get?od.get.call(CDEF[k]):od.value);
+     Object.defineProperty(CDEF[k],'l',{configurable:true,get(){
+       const d=DEF[mkt]&&DEF[mkt][F2C[k]||k];
+       return (d&&d.label&&d.fixed===undefined)?d.label:orig(); }});
+   });}
   const cl =k=>_MALBL[k]?_MALBL[k][mkt]:CDEF[k].l;   // 표 헤더 = 패널 = 필터 (이평선은 시장별 라벨)
   const cpl=cl;
   const CALL=Object.keys(CDEF);
