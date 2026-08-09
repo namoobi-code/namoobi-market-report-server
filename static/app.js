@@ -5501,22 +5501,22 @@ await _canvasFlow(c);
     /* (2026-08-09 수정) 변화율 = (현재−기저)÷|기저| — 적자 기저 부호 뒤집힘 수정
        (실측 ABNB 2024/03: EPS −0.55→0.41 이 −174.5% 로 나오던 것을 +174.5% 로) */
     const pct=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a-b)/Math.abs(b)*100):null;
-    /* (2026-08-09) YoY/QoQ 를 **인덱스가 아니라 기간 라벨로** 매칭한다.
-       SEC XBRL 은 4분기(12월)를 따로 신고하지 않는 회사가 있어 분기가 비는데,
-       인덱스로 i−4 를 쓰면 엉뚱한 분기와 비교된다(실측 ABNB: 2023/12·2024/12 결측). */
-    const QI={}; q.forEach((z,i)=>QI[z.p]=i);
-    const shift=(p,mm)=>{ let y=+p.slice(0,4), m=+p.slice(5,7)+mm;
-      while(m<=0){m+=12;y--;} while(m>12){m-=12;y++;}
-      return `${y}/${String(m).padStart(2,'0')}`; };
-    const at=(p,k)=>{ const i=QI[p]; return i==null?null:q[i][k]; };
-    const yoy=(i,k)=>pct(q[i][k], at(shift(q[i].p,-12),k));
-    const qoq=(i,k)=>pct(q[i][k], at(shift(q[i].p,-3),k));
+    /* (2026-08-09 수정) YoY/QoQ 매칭 — 정확한 라벨(−12/−3개월)이 아니라 **±1개월 허용**.
+       4-4-5 회계 달력 회사는 분기말이 다음 달로 밀린다(실측 AAPL: 2023 분기가
+       2023/04·2023/07 로 기록 → 2024/03 의 1년 전을 2023/03 으로 찾으면 없어서
+       YoY 가 통째로 '—'). 목표 시점에서 가장 가까운 분기(차이 ≤1개월)를 기저로 쓴다. */
+    const mnum=p=>+p.slice(0,4)*12 + +p.slice(5,7);
+    const base=(i,mm)=>{ const t=mnum(q[i].p)-mm; let best=null,bd=99;
+      for(const z of q){ const d=Math.abs(mnum(z.p)-t); if(d<bd){bd=d;best=z;} }
+      return bd<=1?best:null; };
+    const yoy=(i,k)=>{ const b=base(i,12); return b?pct(q[i][k],b[k]):null; };
+    const qoq=(i,k)=>{ const b=base(i,3);  return b?pct(q[i][k],b[k]):null; };
     const P=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
     const opm=i=>(q[i].s&&q[i].o!=null)?(q[i].o/q[i].s*100):null;
     /* 전환 배지 — QoQ 칸에 붙으며 **부호가 바뀐 그 분기에만** 표시한다.
        ⚡흑전 = 직전 분기 적자(−) → 이번 분기 흑자(+) · ⚡적전 = 흑자(+) → 적자(−)
        흑자를 계속 유지 중인 분기에는 붙지 않는다(전환이 아니라 유지이므로). */
-    const turn=(i,k)=>{ const pv=at(shift(q[i].p,-3),k), cv=q[i][k];
+    const turn=(i,k)=>{ const b=base(i,3), pv=b?b[k]:null, cv=q[i][k];
       if(pv==null||cv==null) return '';
       if(pv<0&&cv>0) return ` <b style="color:#1f9d55" title="직전 분기 ${pv.toFixed(2)} 적자 → 이번 분기 ${cv.toFixed(2)} 흑자">⚡흑전</b>`;
       if(pv>0&&cv<0) return ` <b style="color:#c0392b" title="직전 분기 ${pv.toFixed(2)} 흑자 → 이번 분기 ${cv.toFixed(2)} 적자">⚡적전</b>`; return ''; };
@@ -6024,14 +6024,14 @@ await _canvasFlow(c);
             if(qi>=0){
               /* (2026-08-09) 미국식 보는 순서 — 매출 → EPS → 서프 판정 → 이익률 */
               const pctu=(a,b)=>(a!=null&&b!=null&&Math.abs(b)>0.005)?((a-b)/Math.abs(b)*100):null;
-              /* 분기 결측(4Q 미신고 회사)이 있어 인덱스가 아니라 기간 라벨로 매칭한다 */
-              const _sh=(p,mm)=>{ let y=+p.slice(0,4), m=+p.slice(5,7)+mm;
-                while(m<=0){m+=12;y--;} while(m>12){m-=12;y++;}
-                return `${y}/${String(m).padStart(2,'0')}`; };
-              const _at=(p,k)=>{ const z=qq.find(v=>v.p===p); return z?z[k]:null; };
-              const gy=k=>pctu(qq[qi][k], _at(_sh(qq[qi].p,-12),k));
-              const gq=k=>pctu(qq[qi][k], _at(_sh(qq[qi].p,-3),k));
-              const tn=k=>{ const pv=_at(_sh(qq[qi].p,-3),k), cv=qq[qi][k];
+              /* ±1개월 허용 매칭 — 4-4-5 회계(AAPL 등)는 분기말이 다음 달로 밀린다 */
+              const _mn=p=>+p.slice(0,4)*12 + +p.slice(5,7);
+              const _bs=(mm)=>{ const t=_mn(qq[qi].p)-mm; let best=null,bd=99;
+                for(const z of qq){ const d=Math.abs(_mn(z.p)-t); if(d<bd){bd=d;best=z;} }
+                return bd<=1?best:null; };
+              const gy=k=>{ const b=_bs(12); return b?pctu(qq[qi][k],b[k]):null; };
+              const gq=k=>{ const b=_bs(3);  return b?pctu(qq[qi][k],b[k]):null; };
+              const tn=k=>{ const b=_bs(3), pv=b?b[k]:null, cv=qq[qi][k];
                 if(pv==null||cv==null) return '';
                 if(pv<0&&cv>0) return ' ⚡흑전'; if(pv>0&&cv<0) return ' ⚡적전'; return ''; };
               const l2=[]; if(gy('s')!=null) l2.push('매출 '+pc(gy('s')));
