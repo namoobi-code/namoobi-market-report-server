@@ -5284,7 +5284,9 @@ await _canvasFlow(c);
     if(Y.length){
       const ypct=(i,k)=>i>=1?pct(Y[i][k],Y[i-1][k]):null;
       const yopm=i=>(Y[i].s&&Y[i].o!=null)?(Y[i].o/Y[i].s*100):null;
-      let ty=`<div style="margin-top:8px"><b style="font-size:12px">연간</b> <span class="note">(확정 + 컨센 추정 — 최장 2년 뒤까지)</span>
+      /* 라벨은 고정 문구가 아니라 실제 제공분 기준 — FY2029 를 주는 종목이면 그대로 표시된다 */
+      const lastE=[...Y].reverse().find(r=>r.e);
+      let ty=`<div style="margin-top:8px"><b style="font-size:12px">연간</b> <span class="note">(확정 + 컨센 추정${lastE?` — ${lastE.p.slice(0,4)}년까지 제공분 전부`:''})</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">연도</th>
         <th>매출<span class="note">(억)</span></th><th>YoY</th><th>영업익<span class="note">(억)</span></th><th>YoY</th>
@@ -5329,7 +5331,12 @@ await _canvasFlow(c);
           (a30?`30일 평균 ${a30}`:'')+(a30&&a90?' · ':'')+(a90?`90일 평균 ${a90}`:'')+
           ` <span class="note">— % 는 현재가 대비 상승여력</span></div>`;
       }
-      t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 90일)</b> ${svg}${avgLine}
+      /* (2026-08-09 실측) cTB24 는 기간이 아니라 **최근 ~24건**만 보관한다
+         (삼성전자 24건 6/1~7/31 · SK하이닉스 24건 · 현대차 25건). 커버리지 많은 종목은
+         90일 전체가 안 담기므로 '90일'이라 쓰면 거짓말 — 보유분 기준으로 표기한다. */
+      const span=tp.length?`${tp[0].d}~${tp[tp.length-1].d}`:'';
+      t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 최근 ${tp.length}건 · ${span})</b>
+        <span class="note">소스가 최근 ~24건만 보관 — 리포트 많은 종목은 90일 전체가 아닐 수 있음</span> ${svg}${avgLine}
         <div style="max-height:230px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">일자</th><th style="text-align:left">증권사</th><th>목표가</th><th>직전</th><th>변동</th><th>의견</th></tr>`+
         tp.slice().reverse().map(z=>`<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px">${z.d}</td><td>${E(z.b)}</td>
@@ -5346,18 +5353,30 @@ await _canvasFlow(c);
       const ps=Object.keys(byP).sort();
       const days=[...new Set(sn.map(z=>z.d))].sort();
       const d90=days.slice(-90);                       // 표·그래프 모두 최근 90일치
+      /* 그래프(표 아래): 절대값(억원)은 분기 60만억 vs 연간 400만억이라 한 차트에 못 섞는다
+         → 각 추정치의 **첫 스냅샷 대비 누적 변화율(%)**로 정규화해 항목별 한 차트에.
+         점을 항상 찍으므로 1일차에도 차트가 보인다(전부 0% 기준선 위). */
       let svg='';
-      if(d90.length>=2){
-        const w=560,hh=90;
-        const all=sn.filter(z=>d90.includes(z.d)).map(z=>z.o),
-              lo=Math.min(...all), hi=Math.max(...all), rg=(hi-lo)||1;
+      {
+        const w=560,hh=110;
         const COLS=['#1f6feb','#e08e3c','#27ae60','#8e44ad','#c0392b','#16a085'];
-        const lines=ps.map((pp,k)=>{
-          const xy=d90.filter(d=>byP[pp][d]!=null)
-            .map(d=>`${(d90.indexOf(d)/(d90.length-1)*(w-8)+4).toFixed(1)},${(hh-8-(byP[pp][d]-lo)/rg*(hh-18)).toFixed(1)}`);
-          return xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="${COLS[k%COLS.length]}" stroke-width="1.6"/>`:''; }).join('');
-        const leg=ps.map((pp,k)=>`<span style="color:${COLS[k%COLS.length]}">● ${pp}(E)</span>`).join(' ');
-        svg=`<svg width="${w}" height="${hh}" style="max-width:100%">${lines}</svg><div class="note">${leg}</div>`;
+        const base={}; ps.forEach(pp=>{ const f=d90.find(d=>byP[pp][d]!=null); base[pp]=(f!=null)?byP[pp][f]:null; });
+        const pcv=(pp,d)=>{ const v=byP[pp][d]; return (v!=null&&base[pp])?((v/base[pp]-1)*100):null; };
+        let lo=0,hi=0;
+        ps.forEach(pp=>d90.forEach(d=>{ const p=pcv(pp,d); if(p!=null){ if(p<lo)lo=p; if(p>hi)hi=p; } }));
+        if(hi-lo<0.5){ hi+=0.5; lo-=0.5; }
+        const rg=hi-lo, X=i=>((d90.length>1?i/(d90.length-1):0.5)*(w-64)+8), Yc=p=>(hh-16-(p-lo)/rg*(hh-30));
+        const zero=`<line x1="8" y1="${Yc(0).toFixed(1)}" x2="${w-56}" y2="${Yc(0).toFixed(1)}" stroke="#d7dce3" stroke-dasharray="3,3"/>`
+          +`<text x="${w-52}" y="${(Yc(0)+3).toFixed(1)}" font-size="9" fill="#8a94a3">0%</text>`;
+        const parts=ps.map((pp,k)=>{ const col=COLS[k%COLS.length];
+          const pt=d90.map((d,i)=>({i,p:pcv(pp,d)})).filter(z=>z.p!=null);
+          const xy=pt.map(z=>`${X(z.i).toFixed(1)},${Yc(z.p).toFixed(1)}`);
+          const dots=pt.map(z=>`<circle cx="${X(z.i).toFixed(1)}" cy="${Yc(z.p).toFixed(1)}" r="2.2" fill="${col}"/>`).join('');
+          return (xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="${col}" stroke-width="1.6"/>`:'')+dots; }).join('');
+        const leg=ps.map((pp,k)=>{ const last=[...d90].reverse().map(d=>pcv(pp,d)).find(p=>p!=null);
+          return `<span style="color:${COLS[k%COLS.length]}">● ${pp}(E)${last!=null?` ${last>0?'+':''}${last.toFixed(1)}%`:''}</span>`; }).join(' ');
+        svg=`<div style="margin-top:6px"><svg width="${w}" height="${hh}" style="max-width:100%">${zero}${parts}</svg>
+          <div class="note">${leg} — 첫 스냅샷(${d90[0]||''}) 대비 누적 변화율</div></div>`;
       }
       /* 표: 최신이 위 — 분기별 추정치 + 직전 스냅샷 대비 % */
       const rows=d90.slice().reverse().map(d=>{
@@ -5370,8 +5389,8 @@ await _canvasFlow(c);
         }).join('')+'</tr>'; }).join('');
       const tbl=`<div style="max-height:230px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">일자</th>${ps.map(pp=>`<th style="text-align:right">${pp}(E) 영업익</th>`).join('')}</tr>${rows}</table></div>`;
-      t3=`<div style="margin-top:10px"><b style="font-size:12px">영업이익 컨센서스 리비전 (90일)</b> <span class="note">(일별 스냅샷 · 억원 · %는 직전 스냅샷 대비)</span><br>
-        ${svg}${tbl}<div class="note" style="margin-top:2px">매일 07:20 적립(2026-08-09 시작)${d90.length<2?' · 아직 1일치 — 그래프는 2일차부터 자동 표시':''} · 30/90일 리비전 필터는 스냅샷이 그만큼 쌓인 뒤 유효</div></div>`;
+      t3=`<div style="margin-top:10px"><b style="font-size:12px">영업이익 컨센서스 리비전 (90일)</b> <span class="note">(일별 스냅샷 · 억원 · %는 직전 스냅샷 대비)</span>
+        ${tbl}${svg}<div class="note" style="margin-top:2px">매일 07:20 적립(2026-08-09 시작)${d90.length<2?' · 아직 1일치 — 점만 표시, 내일부터 선이 이어집니다':''} · 30/90일 리비전 필터는 스냅샷이 그만큼 쌓인 뒤 유효</div></div>`;
     }
     el.innerHTML=`<div class="box" style="padding:10px 12px"><b style="font-size:12.5px">📊 실적·전망</b> <span class="note">(${E(J.src||'')} · 단위 억원)</span>
       <div style="overflow:auto;margin-top:6px">${t1}</div>${t2}${t3}</div>`;
