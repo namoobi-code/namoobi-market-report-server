@@ -1408,9 +1408,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         for(let i=0;i<K.length;i++) if(c.includes(K[i])) return i; return 9; };
       const cats=[...new Set(_hbEv.map(e=>mapC(e.cat)))].sort((a,b)=>ord(a)-ord(b));
       const isFg=c=>/해외|메이저/.test(c);
-      // (2026-08-09) 접수 상태 자동 판별 — 접수완료(내 신청)/마감/접수중/예정
-      const regStat=r=>/✅/.test(r)?['접수완료','#2f6fed']
-        :/(접수 마감|\(마감|마감\)|SOLD OUT|접수는 종료|추첨 종료)/i.test(r)?['마감','#94a3b8']
+      // (2026-08-09) 접수 상태 자동 판별 — 마감/접수중/예정
+      const regStat=r=>/(접수 마감|\(마감|마감\)|SOLD OUT|접수는 종료|추첨 종료)/i.test(r)?['마감','#94a3b8']
         :/(접수 중|접수중|진행 중|진행중|현재 접수|판매 중|접수 진행)/.test(r)?['접수중','#1a9850']
         :['예정','#f2a72e'];
       const stChip=r=>{const s=regStat(r);
@@ -1428,7 +1427,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           }).join('')}</table></div>`;
       };
       document.getElementById('hb_list').innerHTML=
-        `<div class="note" style="margin:4px 0 8px">접수 상태: ${stChip('✅')}내가 신청한 대회 &nbsp;${stChip('접수 중')}지금 신청 가능 &nbsp;${stChip('예정')}접수 전(오픈 대기) &nbsp;${stChip('(마감)')}접수 종료</div>
+        `<div class="note" style="margin:4px 0 8px">접수 상태: ${stChip('접수 중')}지금 신청 가능 &nbsp;${stChip('예정')}접수 전(오픈 대기) &nbsp;${stChip('(마감)')}접수 종료</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:0 12px;align-items:start">
           <div><div class="note" style="margin:2px 0 6px"><b>🇰🇷 한국 대회</b></div>${cats.filter(c=>!isFg(c)).map(catBox).join('')}</div>
           <div><div class="note" style="margin:2px 0 6px"><b>🌍 외국 대회</b></div>${cats.filter(isFg).map(catBox).join('')}</div>
