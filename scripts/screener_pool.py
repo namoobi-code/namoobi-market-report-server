@@ -756,3 +756,17 @@ if __name__=="__main__":
         fetch_us_krname.patch_pool()
     except Exception as e:
         print("[pool] us_krname 패치 실패:", repr(e)[:80])
+
+
+# ── (2026-08-09) 풀 재빌드 직후 실적·전망 재병합 ────────────────────────────
+#  풀을 처음부터 다시 만들면 earnings_join 이 붙여둔 필드(spr·cr30·tprv·edl·r1·gap)가
+#  통째로 사라진다. 실측: 06:52 재빌드 후 KR 실적 서프라이즈 필터가 0종이 됐다.
+#  → 빌드 끝에서 스스로 병합을 호출한다. cron 순서에 의존하지 않게 하는 게 안전하다.
+try:
+    import subprocess, sys as _sys
+    from pathlib import Path as _P
+    _j = _P(__file__).resolve().parent / "earnings_join.py"
+    if _j.exists():
+        subprocess.run([_sys.executable, str(_j)], timeout=300)
+except Exception as _e:
+    print("[pool] earnings_join 재병합 실패:", repr(_e)[:80])
