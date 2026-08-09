@@ -5525,28 +5525,8 @@ await _canvasFlow(c);
        자동 파싱 가능한 두 항목만 숫자로, 마진·EBITDA·FCF·CAPEX·가입자 등은 보도자료·어닝콜
        원문에만 있어(형식 자유) 링크로 안내한다. 비교 대상은 '회사 가이던스 vs 애널 컨센'
        — 회사가 EPS 가이던스를 안 주면 매출 가이던스+마진 전망으로 이익 방향을 추정할 것. */
-    { const rw0=(POOL.us||[]).find(z=>z.c===c)||{};
-      const gd=J.gd, rows2=[];
-      if(gd&&gd.rev!=null) rows2.push(['다음 분기 매출(백만$)', gd.rev, (rw0.rq1!=null?rw0.rq1/1e6:null), gd.revGap]);
-      if(gd&&gd.eps!=null) rows2.push(['다음 분기 EPS($)', gd.eps, rw0.eq1??null, gd.epsGap]);
-      if(rows2.length){
-        const fmt2=(v,isEps)=>v==null?'—':(isEps?(+v).toFixed(2):Math.round(v).toLocaleString());
-        t1+=`<div style="margin-top:8px"><b style="font-size:12px">가이던스 vs 컨센서스</b>
-          <span class="note">(회사 8-K 보도자료 파싱 · 발표일 ${E(gd.d||'')} · 갭 = 가이던스 중간값 ÷ 컨센 − 1)</span>
-          <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
-          <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">항목</th>
-          <th>회사 가이던스</th><th>컨센서스</th><th>갭</th><th style="width:40%"></th></tr>`+
-          rows2.map(([nm,g,cn,gp])=>{ const isE=nm.includes('EPS');
-            const mx=Math.max(g||0,cn||0)||1, bw=v=>Math.max(2,(v||0)/mx*100);
-            return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px">${nm}</td>
-              <td style="text-align:right"><b>${fmt2(g,isE)}</b></td><td style="text-align:right">${fmt2(cn,isE)}</td>
-              <td style="text-align:right">${gp==null?'—':`<span class="${gp>0?'up':'dn'}"><b>${gp>0?'+':''}${(+gp).toFixed(1)}%</b></span>`}</td>
-              <td style="padding:2px 6px"><div style="background:#1f6feb;height:7px;width:${bw(g)}%;border-radius:2px"></div>
-                <div style="background:#c3ccd8;height:7px;width:${bw(cn)}%;border-radius:2px;margin-top:2px"></div></td></tr>`; }).join('')+
-          `</table><div class="note"><span style="color:#1f6feb">■</span> 가이던스 · <span style="color:#9aa4b0">■</span> 컨센서스
-           — 마진·EBITDA·FCF·CAPEX·가입자 등 그 외 가이던스 항목은 형식이 자유로워 자동 파싱 미지원(보도자료·어닝콜 원문 확인)</div></div>`;
-      } else t1+=`<div class="note" style="margin-top:4px">다음 분기 가이던스: 파싱된 값 없음 — 숫자 가이던스를 안 주는 회사(애플형)이거나 최근 발표가 없음. 마진·CAPEX 등은 어닝콜 원문 확인</div>`;
-    }
+    /* (2026-08-09) 위쪽 '가이던스 vs 컨센서스' 막대표는 아래 '직전 실적발표 가이던스' 표와
+       내용이 겹쳐(같은 8-K 값·같은 갭) 제거했다 — 아래 표가 기간 4종을 모두 담는 상위 호환. */
     /* ①-b 컨센 추정 — 분기·연간 (회사가 공식으로 주는 미래치는 가이던스(매출·EPS), 여긴 애널 컨센) */
     const LBL={'0q':'진행분기','+1q':'다음분기','0y':'올해(FY)','+1y':'내년(FY)'};
     if((J.est||[]).length){

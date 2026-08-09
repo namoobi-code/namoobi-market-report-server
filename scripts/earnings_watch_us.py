@@ -78,9 +78,14 @@ def main():
         if not best:
             continue
         q, x = best
-        # 이 분기 실제치가 '이번 어닝'인지 — 분기말이 어닝일 기준 5개월 이내면 이번 발표로 본다
+        # (2026-08-09 수정) 이 분기 실제치가 '이번 어닝'인지 판정 — 예전엔 150일까지 허용해
+        # **직전 분기 값을 이번 발표로 오인**했다(실측 ABNB 8/6 발표에 Q1 0.26/0.30 이 붙어
+        # 캘린더 −14.1%, 차트 팝업은 Q2 1.37/1.25 +9.5% 로 불일치).
+        # 분기말→발표는 통상 20~60일. 100일을 넘으면 야후가 아직 이번 분기를 안 올린 것이므로
+        # 채우지 말고 건너뛴다(다음 폴링에서 다시 시도 — seen 집합은 eps 채워진 것만 센다).
         try:
-            if (datetime.fromisoformat(r["ed"]).date() - datetime.fromisoformat(q).date()).days > 150:
+            gap = (datetime.fromisoformat(r["ed"]).date() - datetime.fromisoformat(q).date()).days
+            if not (0 <= gap <= 100):
                 continue
         except Exception:
             pass
