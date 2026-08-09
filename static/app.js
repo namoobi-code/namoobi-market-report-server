@@ -5334,7 +5334,8 @@ await _canvasFlow(c);
       {
         const P2=pts.map(z=>({t:pdate(z.d),v:z.tp,d:z.d})).filter(z=>z.t).sort((a,b)=>a.t-b.t);
         if(P2.length){
-          const w=560,hh=120,L=52,R=10,T=8,B=18;
+          /* (2026-08-09) 차트 폭 = 표 폭(패널 실측), 높이 2배 */
+          const w=Math.max(560,(el.clientWidth||620)-26),hh=240,L=64,R=10,T=8,B=18;
           let lo=Math.min(...P2.map(z=>z.v)), hi=Math.max(...P2.map(z=>z.v));
           if(cur&&cur>0){ lo=Math.min(lo,cur); hi=Math.max(hi,cur); }
           const pad=(hi-lo)*0.06||hi*0.02||1; lo-=pad; hi+=pad;
@@ -5382,7 +5383,7 @@ await _canvasFlow(c);
          점을 항상 찍으므로 1일차에도 차트가 보인다(전부 0% 기준선 위). */
       let svg='';
       {
-        const w=560,hh=110;
+        const w=Math.max(560,(el.clientWidth||620)-26),hh=220;   // 폭=표 폭 · 높이 2배
         const COLS=['#1f6feb','#e08e3c','#27ae60','#8e44ad','#c0392b','#16a085'];
         const base={}; ps.forEach(pp=>{ const f=d90.find(d=>byP[pp][d]!=null); base[pp]=(f!=null)?byP[pp][f]:null; });
         const pcv=(pp,d)=>{ const v=byP[pp][d]; return (v!=null&&base[pp])?((v/base[pp]-1)*100):null; };
