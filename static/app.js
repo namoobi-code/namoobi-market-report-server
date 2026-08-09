@@ -5306,19 +5306,12 @@ await _canvasFlow(c);
     const tp=(J.tp||[]).slice().sort((a,b)=>a.d<b.d?-1:1);
     if(tp.length){
       const pts=tp.filter(z=>z.tp!=null);
-      let svg='';
-      if(pts.length>=2){
-        const w=280,hh=54,lo=Math.min(...pts.map(z=>z.tp)),hi=Math.max(...pts.map(z=>z.tp)),rg=(hi-lo)||1;
-        const xy=pts.map((z,i)=>`${(i/(pts.length-1)*(w-8)+4).toFixed(1)},${(hh-6-(z.tp-lo)/rg*(hh-14)).toFixed(1)}`);
-        svg=`<svg width="${w}" height="${hh}" style="vertical-align:middle"><polyline points="${xy.join(' ')}" fill="none" stroke="#1f6feb" stroke-width="1.6"/></svg>`;
-      }
-      const up=tp.filter(z=>(z.chg||0)>0).length, dn=tp.filter(z=>(z.chg||0)<0).length;
+      const cur=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):null;
+      const pdate=s=>{const m=/^(\d\d)\/(\d\d)\/(\d\d)$/.exec(s||''); return m?new Date(2000+ +m[1], +m[2]-1, +m[3]):null;};
       /* (2026-08-09) 30·90일 평균 목표가 + 현재가 대비 상승여력 — 표 위 요약줄 */
       let avgLine='';
       {
-        const cur=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):null;
         const now=new Date(), cut=n=>{const d=new Date(now); d.setDate(d.getDate()-n); return d;};
-        const pdate=s=>{const m=/^(\d\d)\/(\d\d)\/(\d\d)$/.exec(s||''); return m?new Date(2000+ +m[1], +m[2]-1, +m[3]):null;};
         const avg=n=>{const a=pts.filter(z=>{const d=pdate(z.d); return d&&d>=cut(n);});
           return a.length?{v:a.reduce((x,z)=>x+z.tp,0)/a.length,n:a.length,
             u:a.filter(z=>(z.chg||0)>0).length,d:a.filter(z=>(z.chg||0)<0).length}:null;};
@@ -5331,17 +5324,44 @@ await _canvasFlow(c);
           (a30?`30일 평균 ${a30}`:'')+(a30&&a90?' · ':'')+(a90?`90일 평균 ${a90}`:'')+
           ` <span class="note">— % 는 현재가 대비 상승여력</span></div>`;
       }
+      /* 차트(표 아래) — x=실제 발간일, 점=리포트 1건, 선=시간순 연결, 현재가는 점선 기준선.
+         상승여력이 한눈에 보이도록 y 범위에 현재가를 포함한다. */
+      let svg='';
+      {
+        const P2=pts.map(z=>({t:pdate(z.d),v:z.tp,d:z.d})).filter(z=>z.t).sort((a,b)=>a.t-b.t);
+        if(P2.length){
+          const w=560,hh=120,L=52,R=10,T=8,B=18;
+          let lo=Math.min(...P2.map(z=>z.v)), hi=Math.max(...P2.map(z=>z.v));
+          if(cur&&cur>0){ lo=Math.min(lo,cur); hi=Math.max(hi,cur); }
+          const pad=(hi-lo)*0.06||hi*0.02||1; lo-=pad; hi+=pad;
+          const t0=P2[0].t.getTime(), t1=Math.max(P2[P2.length-1].t.getTime(), t0+864e5);
+          const X=t=>L+(t-t0)/(t1-t0)*(w-L-R), Yc=v=>T+(1-(v-lo)/(hi-lo))*(hh-T-B);
+          const fm=v=>Math.round(v).toLocaleString();
+          const gridY=[hi-pad,(hi+lo)/2,lo+pad].map(v=>
+            `<line x1="${L}" y1="${Yc(v).toFixed(1)}" x2="${w-R}" y2="${Yc(v).toFixed(1)}" stroke="#eef1f5"/>`+
+            `<text x="${L-4}" y="${(Yc(v)+3).toFixed(1)}" font-size="9" fill="#8a94a3" text-anchor="end">${fm(v)}</text>`).join('');
+          const curLn=(cur&&cur>0)?`<line x1="${L}" y1="${Yc(cur).toFixed(1)}" x2="${w-R}" y2="${Yc(cur).toFixed(1)}" stroke="#e05252" stroke-dasharray="4,3" stroke-width="1.2"/>`+
+            `<text x="${w-R}" y="${(Yc(cur)-3).toFixed(1)}" font-size="9" fill="#e05252" text-anchor="end">현재가 ${fm(cur)}</text>`:'';
+          const xy=P2.map(z=>`${X(z.t.getTime()).toFixed(1)},${Yc(z.v).toFixed(1)}`);
+          const dots=P2.map(z=>`<circle cx="${X(z.t.getTime()).toFixed(1)}" cy="${Yc(z.v).toFixed(1)}" r="2.4" fill="#1f6feb"><title>${z.d} · ${fm(z.v)}</title></circle>`).join('');
+          const xlab=`<text x="${L}" y="${hh-4}" font-size="9" fill="#8a94a3">${P2[0].d}</text>`+
+            `<text x="${w-R}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="end">${P2[P2.length-1].d}</text>`;
+          svg=`<div style="margin-top:6px"><svg width="${w}" height="${hh}" style="max-width:100%">${gridY}${curLn}`+
+            (xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="#1f6feb" stroke-width="1.4"/>`:'')+
+            `${dots}${xlab}</svg><div class="note"><span style="color:#1f6feb">●</span> 리포트 목표가(발간일 기준) · <span style="color:#e05252">- - 현재가</span></div></div>`;
+        }
+      }
       /* (2026-08-09 실측) cTB24 는 기간이 아니라 **최근 ~24건**만 보관한다
          (삼성전자 24건 6/1~7/31 · SK하이닉스 24건 · 현대차 25건). 커버리지 많은 종목은
          90일 전체가 안 담기므로 '90일'이라 쓰면 거짓말 — 보유분 기준으로 표기한다. */
       const span=tp.length?`${tp[0].d}~${tp[tp.length-1].d}`:'';
       t2=`<div style="margin-top:10px"><b style="font-size:12px">목표주가 변동 (증권사 리포트 최근 ${tp.length}건 · ${span})</b>
-        <span class="note">소스가 최근 ~24건만 보관 — 리포트 많은 종목은 90일 전체가 아닐 수 있음</span> ${svg}${avgLine}
+        <span class="note">소스가 최근 ~24건만 보관 — 리포트 많은 종목은 90일 전체가 아닐 수 있음</span> ${avgLine}
         <div style="max-height:230px;overflow:auto;margin-top:4px"><table style="width:100%;font-size:11px;border-collapse:collapse">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">일자</th><th style="text-align:left">증권사</th><th>목표가</th><th>직전</th><th>변동</th><th>의견</th></tr>`+
         tp.slice().reverse().map(z=>`<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px">${z.d}</td><td>${E(z.b)}</td>
           <td style="text-align:right">${F(z.tp)}</td><td style="text-align:right;color:var(--tx2)">${F(z.prev)}</td>
-          <td style="text-align:right">${P(z.chg)}</td><td style="text-align:center;font-size:10px">${E(z.op||'')}</td></tr>`).join('')+'</table></div></div>';
+          <td style="text-align:right">${P(z.chg)}</td><td style="text-align:center;font-size:10px">${E(z.op||'')}</td></tr>`).join('')+'</table></div>'+svg+'</div>';
     }
     /* ③ 컨센 영업이익 추정 — 90일 스냅샷 표 + 추이 그래프
        (2026-08-09 수정) 표는 스냅샷 1일치부터 바로 보인다. 이전엔 2일 이상일 때만
