@@ -506,6 +506,42 @@ def us_fin(sym: str):
                         # (실측 ESE: 실제 1.26(GAAP) vs 컨센 2.12(조정) 인데 비트 +3.9%).
                         if raw(h0.get("epsActual")) is not None:
                             r2["epsA"] = raw(h0.get("epsActual"))
+            # (2026-08-09) 과거 분기 EPS 컨센(발표시점) — 야후 어닝 캘린더 이력 API.
+            # earningsHistory 는 최근 4분기뿐이라 그 이전 행이 전부 '—' 였다.
+            # 이 API 는 수년치(발표일·컨센·조정EPS 실제·서프%)를 주지만 최신 분기가
+            # 1년쯤 비어 있기도 하다(실측 NVDA — 검증: 2024-11 발표 est 0.75/실제 0.81
+            # = 공지된 FY25Q3 조정 EPS 와 일치). → **비어 있는 행만** 이걸로 채운다.
+            try:
+                body = json.dumps({"sortField": "startdatetime", "sortType": "DESC",
+                                   "entityIdType": "earnings",
+                                   "includeFields": ["ticker", "startdatetime", "epsestimate",
+                                                     "epsactual", "epssurprisepct"],
+                                   "query": {"operator": "eq", "operands": ["ticker", sym]},
+                                   "size": 40, "offset": 0}).encode()
+                req2 = urllib.request.Request(
+                    f"https://query1.finance.yahoo.com/v1/finance/visualization?crumb={urllib.parse.quote(crumb)}",
+                    data=body, headers={"User-Agent": "Mozilla/5.0", "Content-Type": "application/json"})
+                vrows = (json.loads(op.open(req2, timeout=15).read())
+                         ["finance"]["result"][0]["documents"][0]["rows"])
+                mn = lambda p: int(p[:4]) * 12 + int(p[5:7])
+                for vr in vrows:
+                    if len(vr) < 5:
+                        continue
+                    sdt, ee2, ea2, sp2 = vr[1], vr[2], vr[3], vr[4]
+                    if ea2 is None or ee2 is None:
+                        continue                              # 미래 일정·예정 행 제외
+                    am2 = int(sdt[:4]) * 12 + int(sdt[5:7])
+                    cand = [r2 for r2 in q if 0 <= am2 - mn(r2["p"]) <= 3]
+                    if not cand:
+                        continue
+                    r2 = max(cand, key=lambda z: mn(z["p"]))  # 발표일 직전 분기
+                    if r2.get("epsE") is None:                # 최근 4분기(earningsHistory) 우선
+                        r2["epsE"] = ee2
+                        r2["epsA"] = ea2
+                        r2["sprE"] = round(sp2, 1) if sp2 is not None else (
+                            round((ea2 / ee2 - 1) * 100, 1) if ee2 else None)
+            except Exception:
+                pass
             for t0 in et:
                 per = t0.get("period")
                 if per in ("0q", "+1q", "0y", "+1y"):
