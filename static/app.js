@@ -5676,10 +5676,40 @@ await _canvasFlow(c);
       _HIST.map(z=>`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:2px 4px;white-space:nowrap;color:var(--tx2)">${E(z.d)}</td><td style="padding:2px 4px">${E(z.t)}</td></tr>`).join('')+'</table>';
     ov.appendChild(d); ov.style.display='';
   }
+  /* (2026-08-09) US 매출 구성 — KR 패널과 같은 자리·같은 느낌.
+     소스는 실적표와 동일한 stockanalysis 한 곳(회사별 사업부/제품/지역 *_revenue 블록).
+     실측: AAPL iPhone/Mac/iPad/웨어러블/서비스 · MSFT 3사업부 · ABNB 지역별. */
+  async function loadUsSeg(c){
+    const el=$('sd_seg'); if(!el) return;
+    el.style.display=''; el.innerHTML='<span class="note">매출 구성 로드 중…</span>';
+    let J=null;
+    try{ J=await (await fetch('/api/us_fin/'+encodeURIComponent(c))).json(); }catch(e){}
+    if(dcode!==c) return;
+    const SEG=(J&&J.seg)||[];
+    if(!SEG.length){ el.innerHTML='<span class="note">세그먼트 매출 미공시 종목 (단일 사업 또는 소스 미제공)</span>'; return; }
+    const F=v=>v==null?'—':Math.round(v).toLocaleString();
+    const srcU=`https://stockanalysis.com/stocks/${encodeURIComponent(c.toLowerCase())}/financials/?p=quarterly`;
+    let hh=`<b style="font-size:12.5px">📦 매출 구성·제품 정보</b> <span class="note">(백만$ · 분기)</span>
+      <a href="${srcU}" target="_blank" rel="noopener" style="font-size:11px">출처↗</a>`;
+    SEG.forEach((sg,si)=>{
+      /* 요약: 최신 분기 비중% — KR 의 FnGuide 요약과 같은 역할 */
+      const r0=(sg.rows||[]).find(r=>(r.v||[]).some(v=>v!=null));
+      if(r0){ const tot=r0.v.reduce((s,v)=>s+(v||0),0)||1;
+        hh+=`<div style="font-size:12px;margin-top:${si?8:6}px"><b>${E(r0.p)}</b> `+
+          sg.cols.map((cn,i)=>({cn,p:(r0.v[i]||0)/tot*100})).sort((a,b)=>b.p-a.p)
+            .map(z=>`${E(z.cn)} <b>${z.p.toFixed(1)}%</b>`).join(' · ')+'</div>'; }
+      hh+=`<div style="overflow:auto"><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">
+        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">분기</th>`+
+        sg.cols.map(cn=>`<th style="text-align:right;padding:2px 4px">${E(cn)}</th>`).join('')+'</tr>'+
+        (sg.rows||[]).map(r=>`<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px"><b>${E(r.p)}</b></td>`+
+          r.v.map(v=>`<td style="text-align:right;padding:2px 4px">${F(v)}</td>`).join('')+'</tr>').join('')+'</table></div>'; });
+    hh+=`<div class="note" style="margin-top:4px">회사가 10-Q/K 에 신고한 세그먼트 구분 그대로(사업부·제품·지역 등 회사마다 다름) · 12월 분기는 연간 신고에서 분리돼 지연될 수 있음</div>`;
+    el.innerHTML=hh;
+  }
   async function loadKrSeg(c){
     const el=$('sd_seg'); if(!el) return;
     _HISTC=c; _HIST=null;
-    if(mkt!=='kr'){ el.style.display='none'; el.innerHTML=''; return; }
+    if(mkt!=='kr'){ if(mkt==='us') return loadUsSeg(c); el.style.display='none'; el.innerHTML=''; return; }
     el.style.display=''; el.innerHTML='<span class="note">매출 구성 로드 중… (첫 조회는 DART 보고서 3건 파싱 — 수십 초)</span>';
     let J=null;
     try{ J=await (await fetch('/api/kr_seg/'+encodeURIComponent(c))).json(); }catch(e){}

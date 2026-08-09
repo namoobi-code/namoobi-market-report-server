@@ -416,6 +416,7 @@ def us_fin(sym: str):
         # 실측 ABNB 2024/12: 이 소스 매출 2,480 · EPS 0.73 (= 회사 발표치. 유도값 0.71 과 다름)
         # 12분기 제공 · 마진 계산용 영업익·순익 포함.
         sa_ok = False
+        sa_seg = []
         try:
             sa = json.loads(urllib.request.urlopen(urllib.request.Request(
                 f"https://stockanalysis.com/stocks/{sym.lower()}/financials/__data.json?p=quarterly",
@@ -447,6 +448,25 @@ def us_fin(sym: str):
                     # (t−4)이 잘려 '—' 가 됐다. 전량 보관하고, 표시 개수는 프론트가 정한다.
                     q = sorted(qsa, key=lambda z: z["p"])
                     sa_ok = True
+            # (2026-08-09) 세그먼트 매출 — 같은 응답에 회사별 사업부/제품/지역 블록이 있다
+            # (실측 AAPL iphone/mac/ipad/wearables/services · MSFT 3사업부 · ABNB 지역별).
+            # 키는 '*_revenue' 로 끝나고 revenue_total 은 합계라 제외. 한 소스 원칙 유지.
+            for i0, v0 in enumerate(arr):
+                if isinstance(v0, dict) and "datekey" in v0 and any(str(k).endswith("_revenue") for k in v0):
+                    b2 = _dr(i0)
+                    cols = [k for k in b2 if str(k).endswith("_revenue")]
+                    if not cols or not b2.get("datekey"):
+                        continue
+                    def _lab(k):
+                        return (k[:-8].replace("_post_fy2024", "").replace("_", " ").strip().title())
+                    rows2 = []
+                    for k2, d2 in enumerate(b2["datekey"][:6]):     # 최신순 6분기
+                        vals = []
+                        for ck in cols:
+                            v2 = (b2.get(ck) or [None] * 99)[k2]
+                            vals.append(round(v2 / 1e6, 1) if isinstance(v2, (int, float)) else None)
+                        rows2.append({"p": str(d2)[:7].replace("-", "/"), "v": vals})
+                    sa_seg.append({"cols": [_lab(c) for c in cols], "rows": rows2})
         except Exception:
             pass
         # (2026-08-09) **실적 표는 한 소스만 쓴다** — 소스를 섞으면 같은 분기의 값이
@@ -550,7 +570,7 @@ def us_fin(sym: str):
             pass
         # (2026-08-09) 예전엔 여기서 10분기로 잘라 앞쪽 행의 YoY 기준(t−4)이 사라졌다.
         # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
-        res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd,
+        res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg,
                "unit": "백만$ · EPS=$",
                "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
