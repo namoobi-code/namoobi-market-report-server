@@ -141,6 +141,12 @@ def main(force=False):
     if force:
         kr_on = us_run = True
     if not (kr_on or us_run):
+        # (2026-08-09) 장마감 후 live_at 잔존 방지 — 스크리너 풀과 동일한 문제
+        if now.minute % 10 == 0:
+            pool = T.load_db("etf_pool") or {}
+            if pool.get("live_at"):
+                pool.pop("live_at", None); T.save_db("etf_pool", pool)
+                print("장외 — live_at 제거")
         print("장외/스킵"); return
     pool = T.load_db("etf_pool")
     if not pool or not pool.get("kr"):

@@ -4785,6 +4785,7 @@ await _canvasFlow(c);
      같은 급등락이라도 실적 발표 직후냐 아니냐에 따라 해석이 완전히 달라지므로
      캔들 위에 '실' 배지를 찍고, 누르면 캘린더 팝업과 같은 한 줄 요약을 띄운다. */
   let _ESEL=null, _EHIT=[];
+  let _PLK=[], _ECIK=null;   // 팝업 안 '원본 열기' 링크 히트박스 · US 종목 CIK(SEC 링크용)
   /* (2026-08-09) 미국은 과거 1년치 발표일을 SEC 8-K(Item 2.02) 접수일로 받는다.
      Yahoo 는 '다음 예정일' 하나와 분기 말일만 줘서 과거 발표일을 알 수 없다. */
   let _EDATES=null;
@@ -5198,9 +5199,12 @@ await _canvasFlow(c);
 
         e.addEventListener('click',ev=>{
           if(_DMOVE>4) return;                        // 드래그였으면 클릭으로 치지 않는다
-          if(!_DHIT.length && !_EHIT.length) return;
+          if(!_DHIT.length && !_EHIT.length && !_PLK.length) return;
           const r=e.getBoundingClientRect();
           const px=(ev.clientX-r.left)*(e.width/r.width), py=(ev.clientY-r.top)*(e.height/r.height);
+          // 팝업 안 '원본 열기' 링크가 최우선 — 팝업은 마커 위에 그려지므로
+          for(const L of _PLK){ if(px>=L.x&&px<=L.x+L.w&&py>=L.y&&py<=L.y+L.h){
+            window.open(L.u,'_blank'); return; } }
           // 실적 마커를 먼저 본다 — 공시 배지와 겹치는 날이면 실적 쪽이 정보량이 크다
           let eh=null;
           for(const m of _EHIT){ if((px-m.x)**2+(py-m.y)**2 <= (m.r+3)**2){ eh=m.d; break; } }
@@ -5423,7 +5427,7 @@ await _canvasFlow(c);
     _EDATES=null;
     try{ const J=await (await fetch(`/api/earn_dates/${mkt}/`+encodeURIComponent(c))).json();
       if(dcode!==c) return;
-      _EDATES=(J.items||[]); _paint();
+      _EDATES=(J.items||[]); _ECIK=J.cik||null; _paint();
     }catch(e){ _EDATES=null; }
   }
   async function loadDisc(c){
@@ -5585,7 +5589,7 @@ await _canvasFlow(c);
         🟩 '실' = 실제 발표를 감지한 날(edl · DART 잠정공시 / SEC 8-K Item 2.02)
         ⬜ '예' = IR 예정일(ed · Yahoo·네이버 IR) — 아직 발표 전이거나 감지 못한 경우
         클릭하면 캘린더 팝업과 같은 한 줄 요약(실적 → 전망 → 주가)이 뜬다. */
-     _EHIT=[];
+     _EHIT=[]; _PLK=[];        // _PLK: 팝업 안 클릭 가능한 링크(원본 열기) — 매 프레임 재계산
      {const rw=(POOL[mkt]||[]).find(z=>z.c===dcode)||{};
       const idx2={}; for(let i=0;i<N;i++) idx2[String(t[i]||'').replace(/-/g,'').slice(0,8)]=i;
       const ed8=String(rw.ed||'').replace(/-/g,'').slice(0,8);
@@ -5593,7 +5597,7 @@ await _canvasFlow(c);
       /* (2026-08-09) 미국은 SEC 8-K(Item 2.02) 접수일로 **과거 1년치**를 전부 찍는다.
          한 종목의 급등락이 실적 때문인지 아닌지를 1년 흐름에서 한눈에 보기 위함이다.
          한국은 DART 잠정공시 최근 45일치(edl)만 있어 1건이다. */
-      (_EDATES||[]).forEach(e=>{ if(idx2[e.d]!=null) marks.push({d:e.d, i:idx2[e.d], t:'실', col:'#1f9d55', acc:e.acc}); });
+      (_EDATES||[]).forEach(e=>{ if(idx2[e.d]!=null) marks.push({d:e.d, i:idx2[e.d], t:'실', col:'#1f9d55', acc:e.acc, rno:e.rno}); });
       if(rw.edl && idx2[rw.edl]!=null && !marks.some(m=>m.d===rw.edl))
         marks.push({d:rw.edl, i:idx2[rw.edl], t:'실', col:'#1f9d55'});
       if(ed8 && idx2[ed8]!=null && !marks.some(m=>m.d===ed8))
@@ -5657,11 +5661,15 @@ await _canvasFlow(c);
           rows.push(['주가', rr.length?rr.join('   '):'집계 전']);
           if(!latest) rows.push(['비고','과거 분기 — 서프라이즈·전망 수치는 최근 발표분만 보관']);
         }
+        /* (2026-08-09) 공시 원본 링크 — KR: DART 뷰어(rcpNo) · US: SEC EDGAR 접수 인덱스 */
+        const url = (mkt==='kr'&&sm.rno) ? `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${sm.rno}`
+                  : (mkt==='us'&&sm.acc&&_ECIK) ? `https://www.sec.gov/Archives/edgar/data/${parseInt(_ECIK,10)}/${String(sm.acc).replace(/-/g,'')}/${sm.acc}-index.htm`
+                  : null;
         x.font='11px sans-serif';
         const head=`${sm.d.slice(0,4)}.${sm.d.slice(4,6)}.${sm.d.slice(6,8)} ${sm.t==='예'?'실적발표 예정':'실적발표'}`;
         const lines=rows.map(z=>z[0]+'  '+z[1]);
         const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+18, 430);
-        const bh=22+lines.length*15;
+        const bh=22+lines.length*15+(url?17:0);
         let bx=Math.min(Math.max(X(sm.i)-wmax/2, P.l), W-P.r-wmax);
         let by=Math.min(Y(hh[sm.i])+16, H-P.b-bh-4); if(by<P.t+18) by=P.t+18;
         x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
@@ -5671,6 +5679,11 @@ await _canvasFlow(c);
         rows.forEach((z,k)=>{ const yy=by+31+k*15;
           x.fillStyle='#98a2ad'; x.font='10px sans-serif'; x.fillText(z[0], bx+9, yy);
           x.fillStyle='#3d454f'; x.font='11px sans-serif'; x.fillText(z[1], bx+40, yy); });
+        if(url){ const ly=by+31+rows.length*15;
+          const lt=(mkt==='kr'?'📄 DART 공시 원본 열기 ↗':'📄 SEC 8-K 원본 열기 ↗');
+          x.fillStyle='#1f6feb'; x.font='bold 11px sans-serif'; x.fillText(lt, bx+9, ly);
+          _PLK.push({x:bx+6, y:ly-12, w:x.measureText(lt).width+10, h:16, u:url});
+        }
       }
      }
      /* 공시 마커 — 날짜별로 묶어 최신부터 A·B·C… 를 부여하고 캔들 고가 위에 원형 배지로 찍는다.
@@ -5701,7 +5714,7 @@ await _canvasFlow(c);
          const lines=its.map(z=>'· '+z.t);
          const head=`${_DSEL.slice(0,4)}.${_DSEL.slice(4,6)}.${_DSEL.slice(6,8)} 공시 ${byD[_DSEL].length}건`;
          const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+16, 420);
-         const bh=20+lines.length*14+(byD[_DSEL].length>6?14:0);
+         const bh=20+lines.length*14+(byD[_DSEL].length>6?14:0)+15;   // +15: 원본 안내줄
          let bx=Math.min(Math.max(X(i)-wmax/2, P.l), W-P.r-wmax), by=Math.min(Y(hh[i])+14, H-P.b-bh-4);
          if(by<P.t+18) by=P.t+18;
          x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
@@ -5713,8 +5726,13 @@ await _canvasFlow(c);
            while(x.measureText(tx).width>wmax-16 && tx.length>4) tx=tx.slice(0,-2);
            if(tx!==z) tx=tx.slice(0,-1)+'…';
            x.fillText(tx, bx+8, by+29+q*14); });
+         /* (2026-08-09) 각 행 클릭 → 공시 원본 뷰어(/dv — 네이버 공시 상세 프록시) */
+         its.forEach((z,q)=>{ if(z.id!=null)
+           _PLK.push({x:bx+6, y:by+29+q*14-11, w:wmax-12, h:14, u:'/dv/'+dcode+'/'+z.id}); });
          if(byD[_DSEL].length>6){ x.fillStyle='#98a2ad';
            x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+8, by+29+lines.length*14); }
+         x.fillStyle='#1f6feb'; x.font='bold 10px sans-serif';
+         x.fillText('📄 행 클릭 → 공시 원본 열기 ↗', bx+8, by+bh-6);
        }
      }
      // 십자선 — 호버 중인 봉 위치
@@ -6218,9 +6236,27 @@ await _canvasFlow(c);
      (수집 시각만 덩그러니 있으면 갱신이 고장 난 것처럼 보인다) */
   function poolMeta(d){
     const E2=s=>E(s==null?'':s);
-    let tail;
+    /* (2026-08-09) live_at 신선도 검사 — 장마감 후 서버가 못 지운 값이 남으면
+       주말에도 'LIVE' 로 보인다(실측: 금 장마감값이 일요일까지 표시). 15분 넘으면 장마감 취급. */
+    let liveFresh=false;
     if(d.live_at){
+      const m=/(\d\d)-(\d\d) (\d\d):(\d\d)( ET)?/.exec(d.live_at);
+      if(m){
+        try{
+          const tz=m[5]?'America/New_York':'Asia/Seoul';
+          const nowTz=new Date(new Date().toLocaleString('en-US',{timeZone:tz}));
+          const tt=new Date(nowTz); tt.setMonth(+m[1]-1,+m[2]); tt.setHours(+m[3],+m[4],0,0);
+          if(tt-nowTz>36e5) tt.setFullYear(tt.getFullYear()-1);   // 연초 경계
+          const age=nowTz-tt;
+          liveFresh=(age>-36e5 && age<15*60000);
+        }catch(e){ liveFresh=true; }
+      } else liveFresh=true;
+    }
+    let tail;
+    if(d.live_at&&liveFresh){
       tail = ` · <b style="color:#1f6feb">⚡LIVE ${E2(d.live_at)}</b> <span class="note">· 장중 자동갱신 KR 1분·US 3분(시간외 포함)</span>`;
+    }else if(d.live_at){
+      tail = ` · <span style="color:var(--tx2)">장마감 (마지막 장중 갱신 ${E2(d.live_at)} · 장중에만 자동갱신)</span>`;
     }else{
       // 브라우저 시간대와 무관하게 KST 로 환산해 판단
       const k=new Date(Date.now()+(9*60+new Date().getTimezoneOffset())*60000);

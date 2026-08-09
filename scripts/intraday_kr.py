@@ -47,6 +47,13 @@ def bulk_vol():
 def main(force=False):
     now = datetime.now(KST)
     if not force and not in_session(now):
+        # (2026-08-09) 장마감 후 live_at 잔존 → 주말 내내 'LIVE' 로 표시되던 문제.
+        # 10분에 한 번만 확인해 대용량 풀 로드 비용을 줄인다.
+        if now.minute % 10 == 0:
+            pool = T.load_db("screener_pool") or {}
+            if pool.get("live_at"):
+                pool.pop("live_at", None); T.save_db("screener_pool", pool)
+                print("장외 — live_at 제거")
         print("장외 — skip"); return
     pool = T.load_db("screener_pool") or {}
     stdb = (T.load_db("ta_state") or {}).get("st") or {}

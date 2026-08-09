@@ -2,7 +2,7 @@ import json, time, urllib.request, os, re, sqlite3, zlib, sys
 from pathlib import Path
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 BASE = Path(__file__).parent
@@ -321,6 +321,38 @@ def disclosure_api(code: str):
         return out
     except Exception as e:
         return {"items": [], "err": repr(e)[:80]}
+
+
+@app.get("/dv/{code}/{disc_id}")
+def disclosure_doc(code: str, disc_id: int):
+    """공시 원본 뷰어 (2026-08-09) — 차트 공시 팝업의 행을 클릭하면 새 탭으로 연다.
+
+    네이버 m.stock 공시 상세 API 의 contents 에 KOSCOM/KIND 원문 HTML 이 통째로
+    들어 있어(실측: 표 포함 전문) 별도 파싱 없이 페이지로 감싸기만 한다.
+    DART 접수번호는 이 소스에 없으므로 rcpNo 링크는 실적발표(earn_dates) 쪽만 가능.
+    """
+    if not re.fullmatch(r"[0-9A-Za-z]{6}", code):
+        raise HTTPException(400, "bad code")
+    try:
+        req = urllib.request.Request(
+            f"https://m.stock.naver.com/api/stock/{code}/disclosure/{disc_id}",
+            headers={"User-Agent": "Mozilla/5.0", "Referer": "https://m.stock.naver.com/"})
+        j = json.loads(urllib.request.urlopen(req, timeout=10).read())
+        d = j.get("disclosure") or {}
+        title = d.get("title") or "공시"
+        dt = d.get("datetime") or ""
+        body = d.get("contents") or "<p>본문이 제공되지 않는 공시입니다.</p>"
+        html = ("<!doctype html><html lang=ko><head><meta charset=utf-8>"
+                "<meta name=viewport content='width=device-width,initial-scale=1'>"
+                f"<title>{title}</title>"
+                "<style>body{font-family:'Malgun Gothic',sans-serif;max-width:880px;margin:20px auto;"
+                "padding:0 14px;color:#222;font-size:14px}table{border-collapse:collapse;max-width:100%}"
+                "td,th{border:1px solid #ccc;padding:3px 6px;font-size:13px}</style></head><body>"
+                f"<h3>{title}</h3><div style='color:#777;font-size:13px'>{dt} · 출처 KOSCOM (네이버 증권 경유)</div><hr>"
+                f"{body}</body></html>")
+        return HTMLResponse(html)
+    except Exception as e:
+        raise HTTPException(502, f"공시 원문 조회 실패: {repr(e)[:60]}")
 
 
 _earn_cache = {}
