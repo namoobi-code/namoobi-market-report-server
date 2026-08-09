@@ -5551,7 +5551,7 @@ await _canvasFlow(c);
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
       <th>매출<span class="note">(백만${isADR?(sK==='sUS'?' US$ ADR':' '+J.cur):'$'})</span></th><th>YoY</th><th>QoQ</th>
       <th>EPS<span class="note">(${isADR?'US$ ADR·조정':'$'})</span></th><th>YoY</th><th>QoQ</th>
-      <th>매출컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th><th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
+      <th>매출컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th><th>EPS컨센<span class="note">(발표시점${isADR?' · US$ ADR':''})</span></th><th>영업이익률</th></tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
        (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
@@ -5570,7 +5570,10 @@ await _canvasFlow(c);
              사유를 열 안에 직접 표시 (사용자 지시: 표 밑 각주 말고 표 안에) */
           :(i===VIS?`<td rowspan="${q.length-VIS}" style="text-align:center;vertical-align:middle;color:#98a2b3;font-size:10.5px;line-height:1.5">추정치 미제공<br>(Zacks — 이 종목 매출<br>추정 애널 없음 · 실제만 제공)</td>`:'')}
         <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}${isADR?'':' (왼쪽 EPS 열은 GAAP 희석EPS)'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
-        ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
+        ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`
+          /* 전 분기 영업이익 미제공(실측 BAC·MUFG — 은행·금융은 공시 손익에 영업이익
+             항목이 없음) → 숨기지 않고 사유를 열 안에 직접 표시 */
+          :(i===VIS?`<td rowspan="${q.length-VIS}" style="text-align:center;vertical-align:middle;color:#98a2b3;font-size:10.5px;line-height:1.5">미제공<br>(은행·금융 — 공시 손익에<br>영업이익 항목 없음)</td>`:'')}</tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · '
       +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — ${sK==='sUS'?`매출·EPS·컨센·판정 전부 Zacks <b>US$ ADR 기준으로 통일</b>(영업이익률만 현지 공시 재무의 비율 — 통화 무관)`:`EPS·EPS컨센·판정은 Zacks <b>US$ ADR·조정 EPS 통일</b> · 매출은 ${J.cur} 유지(Zacks 매출 실제가 공시 매출과 규모 불일치 — 정의가 달라 US$ 통일 시 틀린 값이 됨)`}`
              :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')
