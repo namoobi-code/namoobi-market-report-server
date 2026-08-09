@@ -410,13 +410,50 @@ def us_fin(sym: str):
               "s": v.get("quarterlyTotalRevenue"), "o": v.get("quarterlyOperatingIncome"),
               "n": v.get("quarterlyNetIncome"), "eps": v.get("quarterlyDilutedEPS")}
              for d, v in sorted(acc.items())]
+        # ── (2026-08-09) 1순위 소스: stockanalysis.com 분기 손익 ─────────────────
+        # SEC 는 4분기(12월)를 **따로 신고하지 않는다**(10-K 에 연간만) → 그 분기가 통째로 빈다.
+        # 임의 계산(연간−3분기) 대신, Q4 를 실제로 제공하는 곳을 쓴다.
+        # 실측 ABNB 2024/12: 이 소스 매출 2,480 · EPS 0.73 (= 회사 발표치. 유도값 0.71 과 다름)
+        # 12분기 제공 · 마진 계산용 영업익·순익 포함.
+        sa_ok = False
+        try:
+            sa = json.loads(urllib.request.urlopen(urllib.request.Request(
+                f"https://stockanalysis.com/stocks/{sym.lower()}/financials/__data.json?p=quarterly",
+                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}), timeout=25).read())
+            arr = [n for n in sa.get("nodes", []) if n.get("type") == "data"][-1]["data"]
+            def _dr(i):
+                v = arr[i]
+                if isinstance(v, list):  return [_dr(x) for x in v]
+                if isinstance(v, dict):  return {k: _dr(x) for k, x in v.items()}
+                return v
+            blk = None
+            for i0, v0 in enumerate(arr):
+                if isinstance(v0, dict) and {"datekey", "revenue", "epsdil"} <= set(v0):
+                    blk = _dr(i0); break
+            if blk and blk.get("datekey"):
+                num = lambda x: None if x in (None, "", "-") else float(x)
+                qsa = []
+                for k2, d2 in enumerate(blk["datekey"]):
+                    g = lambda key, dv=1: (num((blk.get(key) or [None] * 99)[k2]) or None)
+                    rv2, op2 = g("revenue"), g("opinc")
+                    ni2, ep2 = g("netinccmn"), g("epsdil")
+                    qsa.append({"p": str(d2)[:7].replace("-", "/"),
+                                "s": rv2 / 1e6 if rv2 is not None else None,
+                                "o": op2 / 1e6 if op2 is not None else None,
+                                "n": ni2 / 1e6 if ni2 is not None else None,
+                                "eps": ep2})
+                if len(qsa) >= 6:
+                    q = sorted(qsa, key=lambda z: z["p"])[-12:]
+                    sa_ok = True
+        except Exception:
+            pass
         # (2026-08-09) Yahoo 무료 timeseries 는 **분기 5개**만 준다(실측 — 기간을 8년으로 늘려도 동일).
         # 그래서 YoY(t−4) 가 마지막 행에서만 계산돼 앞 행이 전부 '—' 로 보였다.
         # SEC XBRL companyconcept 는 같은 값을 5년+ 로 주므로(실측 ABNB 23분기) 이걸 우선 쓰고
         # 부족한 항목만 Yahoo 로 메운다. EPS 는 태그가 회사마다 달라 후보를 순회한다.
         try:
             cikm = _cik_map()
-            cik = cikm.get(sym.upper())
+            cik = None if sa_ok else cikm.get(sym.upper())    # 1순위 소스가 되면 SEC 생략
             if cik:
                 H2 = {"User-Agent": "namoobi research namoobi@gmail.com"}
                 def _con(tags):
@@ -446,14 +483,7 @@ def us_fin(sym: str):
                                     ann.append((st_, en_, x["val"]))
                         if out:
                             break
-                    drv = set()
-                    for st_, en_, tot in sorted(set(ann)):
-                        if en_ in out:
-                            continue
-                        qs = [v for e2, v in out.items() if st_ < e2 < en_]
-                        if len(qs) == 3:                        # 정확히 3개일 때만(중복·누락 방어)
-                            out[en_] = tot - sum(qs); drv.add(en_)
-                    return out, drv
+                    return out, set()
                 rev, _ = _con(["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
                                "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"])
                 opi, _ = _con(["OperatingIncomeLoss"])
