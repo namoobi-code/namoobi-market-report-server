@@ -5564,11 +5564,15 @@ await _canvasFlow(c);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r[sK])}</td><td style="text-align:right">${P(yoy(i,sK))}</td><td style="text-align:right">${P(qoq(i,sK))}</td>
         <td style="text-align:right"><b>${eF(r[epsK])}</b></td><td style="text-align:right">${P(yoy(i,epsK))}</td><td style="text-align:right">${P(qoq(i,epsK))}${turn(i,epsK)}</td>
-        <td style="text-align:right" title="${r.sE==null?(hasSE?'발표시점 매출컨센 없음 — Zacks 발표 이력에 이 분기 추정치 없음':'발표시점 매출컨센 없음 — Zacks 에 이 종목 매출 추정치가 없음(실제만 제공 · 매출 추정 애널 미커버)'):''}">${cCell(r.sE,ssp,false)}</td>
+        ${hasSE
+          ?`<td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 없음 — Zacks 발표 이력에 이 분기 추정치 없음':''}">${cCell(r.sE,ssp,false)}</td>`
+          /* 전 분기 컨센 부재(실측 MUFG — Zacks 에 매출 추정 애널 없음) → '—' 반복 대신
+             사유를 열 안에 직접 표시 (사용자 지시: 표 밑 각주 말고 표 안에) */
+          :(i===VIS?`<td rowspan="${q.length-VIS}" style="text-align:center;vertical-align:middle;color:#98a2b3;font-size:10.5px;line-height:1.5">추정치 미제공<br>(Zacks — 이 종목 매출<br>추정 애널 없음 · 실제만 제공)</td>`:'')}
         <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}${isADR?'':' (왼쪽 EPS 열은 GAAP 희석EPS)'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · '
-      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — ${sK==='sUS'?`매출·EPS·컨센·판정 전부 Zacks <b>US$ ADR 기준으로 통일</b>(영업이익률만 현지 공시 재무의 비율 — 통화 무관)`:`EPS·EPS컨센·판정은 Zacks <b>US$ ADR·조정 EPS 통일</b> · 매출은 ${J.cur} 유지(Zacks 매출 실제가 공시 매출과 규모 불일치 — 정의가 달라 US$ 통일 시 틀린 값이 됨)`}${hasSE?'':` · 매출컨센 «—» = Zacks 에 매출 추정치 없음(실제만 제공 · 추정 애널 미커버)`}`
+      +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — ${sK==='sUS'?`매출·EPS·컨센·판정 전부 Zacks <b>US$ ADR 기준으로 통일</b>(영업이익률만 현지 공시 재무의 비율 — 통화 무관)`:`EPS·EPS컨센·판정은 Zacks <b>US$ ADR·조정 EPS 통일</b> · 매출은 ${J.cur} 유지(Zacks 매출 실제가 공시 매출과 규모 불일치 — 정의가 달라 US$ 통일 시 틀린 값이 됨)`}`
              :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')
       +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
