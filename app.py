@@ -387,6 +387,60 @@ def earn_dates_us(sym: str, days: int = 400):
         return {"items": [], "err": repr(e)[:80]}
 
 
+@app.get("/api/earn_dates/kr/{code}")
+def earn_dates_kr(code: str, days: int = 400):
+    """한국 종목의 **과거 실적발표일** — DART 영업(잠정)실적 공정공시 접수일.
+
+    (2026-08-09) 미국(SEC 8-K Item 2.02)과 같은 목적. 한국의 실적 최초 발표처는
+    DART '영업(잠정)실적(공정공시)' 이고, 그 접수일이 곧 발표일이다.
+    잠정실적을 안 내는 회사도 있어 '매출액또는손익구조 30% 이상 변경' 공시도 함께 잡는다.
+
+    같은 날 원공시 + [기재정정] 이 함께 오면 하루로 합친다(마커가 겹쳐 보이는 걸 방지).
+    캐시 12시간 — 과거 발표일은 바뀌지 않는다.
+    """
+    if not re.fullmatch(r"\d{6}", code or ""):
+        raise HTTPException(400, "bad code")
+    now = time.time()
+    hit = _earn_cache.get("kr:" + code)
+    if hit and now - hit[0] < 43200:
+        return hit[1]
+    try:
+        key = (BASE / "keys" / "opendart.txt").read_text().strip()
+        mp = json.loads((BASE / "data" / "watch" / "dart_corp_map.json").read_text())["map"]
+        cc = mp.get(code)
+        if not cc:
+            return {"items": [], "note": "DART 고유번호 미매핑"}
+        b = (datetime.now() - timedelta(days=max(30, min(days, 1200)))).strftime("%Y%m%d")
+        e = datetime.now().strftime("%Y%m%d")
+        seen, out = set(), []
+        for page in (1, 2):            # 거래소공시는 1년에 60~80건이라 2페이지면 충분
+            u = (f"https://opendart.fss.or.kr/api/list.json?crtfc_key={key}&corp_code={cc}"
+                 f"&bgn_de={b}&end_de={e}&pblntf_ty=I&page_count=100&page_no={page}")
+            j = json.loads(urllib.request.urlopen(u, timeout=25).read())
+            if j.get("status") != "000":
+                break
+            lst = j.get("list") or []
+            for r in lst:
+                nm = r.get("report_nm") or ""
+                if "잠정" not in nm and "손익구조" not in nm:
+                    continue
+                d = (r.get("rcept_dt") or "")
+                if not d or d in seen:
+                    continue
+                seen.add(d)
+                out.append({"d": d, "rno": r.get("rcept_no"), "t": nm.strip()})
+            if len(lst) < 100:
+                break
+        out.sort(key=lambda x: x["d"])
+        res = {"items": out, "corp": cc}
+        _earn_cache["kr:" + code] = (now, res)
+        if len(_earn_cache) > 400:
+            _earn_cache.clear()
+        return res
+    except Exception as ex:
+        return {"items": [], "err": repr(ex)[:80]}
+
+
 def _logged_in(request) -> bool:
     """namoobi 로그인 세션 여부. KIS 를 쓰는 엔드포인트는 이걸로 막는다.
 

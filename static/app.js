@@ -5216,9 +5216,12 @@ await _canvasFlow(c);
     _CZ=CZ0; _COFF=0;                    // 종목이 바뀌면 기본 구간으로
     _bindChart(); _paint(); }
   async function loadEarn(c){
+    /* (2026-08-09) 미국·한국 모두 과거 1년치 발표일을 받는다.
+         미국 = SEC 8-K Item 2.02 접수일
+         한국 = DART 영업(잠정)실적 공정공시 접수일
+       둘 다 '실적이 세상에 처음 나온 날'이라 성격이 같다. */
     _EDATES=null;
-    if(mkt!=='us') return;                  // 한국은 DART 잠정공시(최근 45일)를 이미 쓰고 있다
-    try{ const J=await (await fetch('/api/earn_dates/us/'+encodeURIComponent(c))).json();
+    try{ const J=await (await fetch(`/api/earn_dates/${mkt}/`+encodeURIComponent(c))).json();
       if(dcode!==c) return;
       _EDATES=(J.items||[]); _paint();
     }catch(e){ _EDATES=null; }
