@@ -591,6 +591,13 @@ def us_fin(sym: str):
                 if not m2:
                     return None
                 return float(m2.group(1).replace(",", "")) * {"B": 1e3, "M": 1.0, "K": 1e-3}.get(m2.group(2), 1e-6)
+
+            def _mbd(s):                       # "$1.76" · "($0.12)" · "-$0.12" → float
+                m2 = re.search(r"\$([\d,.]+)", s or "")
+                if not m2:
+                    return None
+                v2 = float(m2.group(1).replace(",", ""))
+                return -v2 if ("(" in s or s.strip().startswith("-")) else v2
             if i0 > 0:
                 for tr0 in re.findall(r"<tr[^>]*>(.*?)</tr>", hmb[i0:i0 + 60000], re.S):
                     cs = [re.sub(r"<[^>]+>", "", c).strip()
@@ -599,13 +606,29 @@ def us_fin(sym: str):
                     if len(cs) < 8 or "Estimated" in cs[0]:
                         continue                # 미래 예정 행
                     m3 = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", cs[0])
-                    revE = _mbv(cs[6])
-                    if not m3 or revE is None:
+                    if not m3:
                         continue
                     am3 = int(m3.group(3)) * 12 + int(m3.group(1))
                     cand3 = [r2 for r2 in q if 0 <= am3 - mnq(r2["p"]) <= 3]  # 발표일 직전 분기
-                    if cand3:
-                        max(cand3, key=lambda z: mnq(z["p"]))["sE"] = round(revE, 1)
+                    if not cand3:
+                        continue
+                    r2 = max(cand3, key=lambda z: mnq(z["p"]))
+                    revE = _mbv(cs[6])
+                    if revE is not None:
+                        r2["sE"] = round(revE, 1)
+                    # (2026-08-10) EPS 컨센(발표시점)도 이 표를 1순위로 쓴다 — 야후는
+                    # earningsHistory(최근 4분기) 와 캘린더 이력(최근 1년 누락 — 실측
+                    # AAPL 2025-07-31 행 부재) 사이에 사각지대가 있어 그 분기만 '—' 였다.
+                    # MarketBeat 는 표시 범위(2년=8분기)를 빈틈없이 주고, 컨센·보고 EPS 를
+                    # 같은 행에서 주므로 서프% 도 같은 소스 안에서 계산된다(조정 EPS 기준).
+                    # 야후 값은 이 표 범위 밖(2년 이전 — 차트 팝업용)의 폴백으로만 남는다.
+                    ee3, ea3 = _mbd(cs[2]), _mbd(cs[3])
+                    if ee3 is not None:
+                        r2["epsE"] = ee3
+                    if ea3 is not None:
+                        r2["epsA"] = ea3
+                    if ee3 and ea3 is not None:
+                        r2["sprE"] = round((ea3 - ee3) / abs(ee3) * 100, 1)
         except Exception:
             pass
         # ④ 최근 가이던스 (8-K 보도자료 파싱 · earnings_live_us) — 매출·EPS 중간값 + 컨센 갭
@@ -625,7 +648,7 @@ def us_fin(sym: str):
         # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
         res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg,
                "unit": "백만$ · EPS=$",
-               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + MarketBeat(발표시점 매출컨센) + 일별 스냅샷"}
+               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + MarketBeat(발표시점 매출·EPS컨센) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
         if len(_usfin_cache) > 300:
             _usfin_cache.clear()

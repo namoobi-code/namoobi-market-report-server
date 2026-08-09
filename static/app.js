@@ -5527,11 +5527,14 @@ await _canvasFlow(c);
     const cCell=(val,spr,isEps)=>{ if(val==null&&spr==null) return '<span class="note">—</span>';
       return (val==null?'—':(isEps?(+val).toFixed(2):Math.round(val).toLocaleString()))
         +(spr==null?'':`<br><span class="${spr>0?'up':'dn'}" style="font-size:10.5px"><b>${spr>0?'비트':'미스'}</b> ${spr>0?'+':''}${spr.toFixed(1)}%</span>`); };
+    /* (2026-08-10) 영업이익률 미제공이면 열 자체를 뺀다 — 은행 등 금융주는
+       stockanalysis 손익에 영업이익 항목이 없어(실측 BAC 전분기 null) 전부 '—' 였다. */
+    const hasOPM=q.some((_,i)=>opm(i)!=null);
     let t1=`<table style="width:100%;font-size:11.5px;border-collapse:collapse">
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
       <th>매출<span class="note">(백만$)</span></th><th>YoY</th><th>QoQ</th>
       <th>EPS<span class="note">($)</span></th><th>YoY</th><th>QoQ</th>
-      <th>매출컨센<span class="note">(발표시점)</span></th><th>EPS컨센<span class="note">(발표시점)</span></th><th>영업이익률</th></tr>`;
+      <th>매출컨센<span class="note">(발표시점)</span></th><th>EPS컨센<span class="note">(발표시점)</span></th>${hasOPM?'<th>영업이익률</th>':''}</tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
        (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
@@ -5544,8 +5547,8 @@ await _canvasFlow(c);
         <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
         <td style="text-align:right">${cCell(r.sE,ssp,false)}</td>
         <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'} (왼쪽 EPS 열은 GAAP 희석EPS)`:''}">${cCell(r.epsE,r.sprE,true)}</td>
-        <td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td></tr>`; });
-    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b>'
+        ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
+    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · 매출·EPS 컨센(발표시점)·판정은 MarketBeat 어닝 이력(2년 · 조정 EPS 기준)'
       +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
        자동 파싱 가능한 두 항목만 숫자로, 마진·EBITDA·FCF·CAPEX·가입자 등은 보도자료·어닝콜
