@@ -5545,7 +5545,7 @@ await _canvasFlow(c);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
         <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
-        <td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 소스 없음 — MarketBeat 이력에 이 발표 행이 누락됐고, 자체 일별 스냅샷(2026-08-09 시작) 이전 발표라 폴백도 불가':''}">${cCell(r.sE,ssp,false)}</td>
+        <td style="text-align:right" title="${r.sE==null?'발표시점 매출컨센 없음 — MarketBeat 이력 누락 또는 통화 불일치(해외 ADR — 실적과 0.5~2배 밖이면 오판정 방지 위해 제외), 자체 스냅샷(2026-08-09 시작) 이전 발표라 폴백도 불가':''}">${cCell(r.sE,ssp,false)}</td>
         <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'} (왼쪽 EPS 열은 GAAP 희석EPS)`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         ${hasOPM?`<td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td>`:''}</tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · 매출·EPS 컨센(발표시점)·판정은 MarketBeat 어닝 이력(2년 · 조정 EPS 기준)'

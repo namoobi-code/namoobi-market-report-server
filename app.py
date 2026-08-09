@@ -599,6 +599,7 @@ def us_fin(sym: str):
                 v2 = float(m2.group(1).replace(",", ""))
                 return -v2 if ("(" in s or s.strip().startswith("-")) else v2
             if i0 > 0:
+                mb_rev, mb_eps = set(), set()   # 분기당 1회만 — MB 는 같은 분기에 중복 행이 있다
                 for tr0 in re.findall(r"<tr[^>]*>(.*?)</tr>", hmb[i0:i0 + 60000], re.S):
                     cs = [re.sub(r"<[^>]+>", "", c).strip()
                           for c in re.findall(r"<td[^>]*>(.*?)</td>", tr0, re.S)]
@@ -613,22 +614,29 @@ def us_fin(sym: str):
                     if not cand3:
                         continue
                     r2 = max(cand3, key=lambda z: mnq(z["p"]))
+                    # (2026-08-10) 타당성 검사 — 해외 ADR 은 MB 매출컨센의 통화가 뒤섞여 있다
+                    # (실측 TSM: $22.72B(US$)와 $834.10B(NT$ 를 $ 로 오표기)가 한 열에 공존).
+                    # 실적(stockanalysis · 현지통화) 대비 0.5~2배 밖이면 통화가 다른 값
+                    # → 버린다(비트 +3243% 같은 오판정보다 빈칸). 정상 종목은 비율 ≈1.
                     revE = _mbv(cs[6])
-                    if revE is not None:
+                    if (revE is not None and r2["p"] not in mb_rev and r2.get("s")
+                            and 0.5 <= revE / r2["s"] <= 2.0):
                         r2["sE"] = round(revE, 1)
+                        mb_rev.add(r2["p"])
                     # (2026-08-10) EPS 컨센(발표시점)도 이 표를 1순위로 쓴다 — 야후는
-                    # earningsHistory(최근 4분기) 와 캘린더 이력(최근 1년 누락 — 실측
+                    # earningsHistory(최근 4분기) 와 캘린더 이력(최신 1년 누락 — 실측
                     # AAPL 2025-07-31 행 부재) 사이에 사각지대가 있어 그 분기만 '—' 였다.
-                    # MarketBeat 는 표시 범위(2년=8분기)를 빈틈없이 주고, 컨센·보고 EPS 를
-                    # 같은 행에서 주므로 서프% 도 같은 소스 안에서 계산된다(조정 EPS 기준).
-                    # 야후 값은 이 표 범위 밖(2년 이전 — 차트 팝업용)의 폴백으로만 남는다.
+                    # 컨센·보고 EPS 를 같은 행에서 주므로 서프% 도 한 소스 안에서 계산된다
+                    # (조정 EPS 기준). 야후 값은 이 표 범위 밖(2년 이전)의 폴백으로만 남는다.
+                    # 컨센 없는 행(정정·재공시 — 실측 TSM 11/14 행 epsA $14.3160 쓰레기)은
+                    # 발표 행이 아니므로 통째로 무시한다.
                     ee3, ea3 = _mbd(cs[2]), _mbd(cs[3])
-                    if ee3 is not None:
+                    if ee3 is not None and r2["p"] not in mb_eps:
                         r2["epsE"] = ee3
-                    if ea3 is not None:
-                        r2["epsA"] = ea3
-                    if ee3 and ea3 is not None:
-                        r2["sprE"] = round((ea3 - ee3) / abs(ee3) * 100, 1)
+                        mb_eps.add(r2["p"])
+                        if ea3 is not None:
+                            r2["epsA"] = ea3
+                            r2["sprE"] = round((ea3 - ee3) / abs(ee3) * 100, 1)
         except Exception:
             pass
         # ③-3 (2026-08-10) MarketBeat 이력에 구멍이 난 분기만 자체 스냅샷으로 폴백.
