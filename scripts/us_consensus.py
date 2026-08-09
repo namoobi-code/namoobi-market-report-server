@@ -96,6 +96,14 @@ def parse(fd):
         for k, v in (("eq0", _raw(ee0.get("avg"))), ("rq0", _raw(re0.get("avg")))):
             if v is not None:
                 out[k] = v
+    # (2026-08-09) 연간 FY 추정 2종 — 일별로 쌓아 리비전 '90일 일별 곡선' 재료
+    # (야후는 90/60/30/7일 전 4개 시점만 주므로 진짜 일별 곡선은 자체 적립뿐이다)
+    for lab, per in (("ey0", "0y"), ("ey1", "+1y")):
+        t_ = next((x for x in et if x.get("period") == per), None)
+        if t_:
+            v = _raw((t_.get("earningsEstimate") or {}).get("avg"))
+            if v is not None:
+                out[lab] = v
 
     hs = (fd.get("earningsHistory") or {}).get("history", []) or []
     vs = sorted([((h.get("quarter") or {}).get("fmt") or "", _raw(h.get("surprisePercent")))
@@ -154,14 +162,20 @@ def main():
     cx = sqlite3.connect(db, timeout=60)
     cx.executescript("CREATE TABLE IF NOT EXISTS snap(sym TEXT,d TEXT,eq0 REAL,rq0 REAL,eq1 REAL,rq1 REAL,tp REAL,"
                      "PRIMARY KEY(sym,d));")
+    for col in ("ey0", "ey1"):                      # (2026-08-09) FY 추정 2종 열 추가(기존 DB 호환)
+        try:
+            cx.execute(f"ALTER TABLE snap ADD COLUMN {col} REAL")
+        except Exception:
+            pass
     today = datetime.now().strftime("%Y-%m-%d")
     ns = 0
     for r in us:
         sym, d = r.get("c"), got.get(r.get("c")) or {}
         if not sym or (d.get("eq0") is None and d.get("eq1") is None and r.get("tp") is None):
             continue
-        cx.execute("INSERT OR REPLACE INTO snap(sym,d,eq0,rq0,eq1,rq1,tp) VALUES(?,?,?,?,?,?,?)",
-                   (sym, today, d.get("eq0"), d.get("rq0"), d.get("eq1"), d.get("rq1"), r.get("tp")))
+        cx.execute("INSERT OR REPLACE INTO snap(sym,d,eq0,rq0,eq1,rq1,tp,ey0,ey1) VALUES(?,?,?,?,?,?,?,?,?)",
+                   (sym, today, d.get("eq0"), d.get("rq0"), d.get("eq1"), d.get("rq1"), r.get("tp"),
+                    d.get("ey0"), d.get("ey1")))
         ns += 1
     cx.commit()
     def tprev(sym, days):

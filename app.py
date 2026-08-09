@@ -526,8 +526,13 @@ def us_fin(sym: str):
             db = DB / "us_consensus.sqlite"
             if db.exists():
                 cx = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=10)
-                snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4], "tp": r0[5]}
-                        for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp FROM snap WHERE sym=? ORDER BY d", (sym,))]
+                try:      # ey0/ey1 은 2026-08-09 추가 열 — 구버전 DB 호환
+                    snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4],
+                             "tp": r0[5], "ey0": r0[6], "ey1": r0[7]}
+                            for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp,ey0,ey1 FROM snap WHERE sym=? ORDER BY d", (sym,))]
+                except Exception:
+                    snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4], "tp": r0[5]}
+                            for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp FROM snap WHERE sym=? ORDER BY d", (sym,))]
                 cx.close()
                 # (2026-08-09 재수정) 매출 컨센(발표 시점) — 조건은 하나뿐이다:
                 #   "그 분기가 끝난 뒤 ~ **그 분기 실적을 발표하기 전**" 사이의 스냅샷 rq0.
