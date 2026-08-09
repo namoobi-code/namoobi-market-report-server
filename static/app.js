@@ -5160,6 +5160,20 @@ await _canvasFlow(c);
     sync(); }
 
   function _bindChart(){ if(_CBOUND) return; _CBOUND=true;
+    /* (2026-08-09) 팝업 '원본 열기' 클릭 — 캔버스 위에 다른 요소가 겹쳐도 동작하도록
+       문서 캡처 단계에서 sd_main 좌표로 환산해 판정하고, 팝업 차단을 피해
+       window.open 대신 앵커 클릭으로 연다(사용자 제스처 내 링크 이동으로 취급). */
+    document.addEventListener('click',ev=>{
+      if(!_PLK.length) return;
+      const e=$('sd_main'); if(!e) return;
+      const r=e.getBoundingClientRect();
+      if(ev.clientX<r.left||ev.clientX>r.right||ev.clientY<r.top||ev.clientY>r.bottom) return;
+      const px=(ev.clientX-r.left)*(e.width/r.width), py=(ev.clientY-r.top)*(e.height/r.height);
+      for(const L of _PLK){ if(px>=L.x&&px<=L.x+L.w&&py>=L.y&&py<=L.y+L.h){
+        ev.preventDefault(); ev.stopPropagation();
+        const a=document.createElement('a'); a.href=L.u; a.target='_blank'; a.rel='noopener';
+        document.body.appendChild(a); a.click(); a.remove(); return; } }
+    }, true);
     ['sd_main','sd_vol','sd_rsi','sd_macd'].forEach(id=>{ const e=$(id); if(!e) return;
       e.addEventListener('mousemove',ev=>{ if(!_CN) return;
         const r=e.getBoundingClientRect(), PL=6, PR=52;
@@ -5276,13 +5290,14 @@ await _canvasFlow(c);
       <th>영업익<span class="note">(억)</span></th><th>YoY</th><th>QoQ</th>
       <th>순익<span class="note">(억)</span></th><th>YoY</th><th>QoQ</th><th>영업이익률</th></tr>`;
     q.forEach((r,i)=>{ const m=opm(i);
-      t1+=`<tr style="border-bottom:1px solid #f2f4f7;${r.e?'background:#fff7ea':''}">
-        <td style="padding:3px 4px"><b>${r.p}</b>${r.e?' <span style="color:#c47b1e;font-size:10px">E</span>':''}</td>
+      /* prov = DART 잠정공시로 덮은 분기 — WISEreport 가 (E) 로 두는 동안 실제(잠정)값 표시 */
+      t1+=`<tr style="border-bottom:1px solid #f2f4f7;${r.prov?'background:#eefaf1':(r.e?'background:#fff7ea':'')}">
+        <td style="padding:3px 4px"><b>${r.p}</b>${r.prov?' <span style="color:#1f9d55;font-size:10px">잠정</span>':(r.e?' <span style="color:#c47b1e;font-size:10px">E</span>':'')}</td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
         <td style="text-align:right">${F(r.o)}</td><td style="text-align:right">${P(yoy(i,'o'))}</td><td style="text-align:right">${P(qoq(i,'o'))}</td>
         <td style="text-align:right">${F(r.n)}</td><td style="text-align:right">${P(yoy(i,'n'))}</td><td style="text-align:right">${P(qoq(i,'n'))}</td>
         <td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td></tr>`; });
-    t1+='</table><div class="note" style="margin-top:3px">주황 배경 = 컨센서스 추정(E) · YoY/QoQ 는 표 안 값으로 계산 · 음수 기저 구간의 비율은 부호 왜곡 가능</div>';
+    t1+='</table><div class="note" style="margin-top:3px">주황 배경 = 컨센서스 추정(E) · <span style="color:#1f9d55">초록 배경 = DART 잠정실적 반영(확정 전)</span> · YoY/QoQ 는 표 안 값으로 계산 · 음수 기저 구간의 비율은 부호 왜곡 가능</div>';
     /* ①-b 연간 재무 — 분기 컨센이 못 미치는 2027(E)·2028(E)까지 (2029는 WISEreport 미제공) */
     const Y=J.y||[];
     if(Y.length){
@@ -5349,11 +5364,18 @@ await _canvasFlow(c);
             `<text x="${w-R}" y="${(Yc(cur)-3).toFixed(1)}" font-size="9" fill="#e05252" text-anchor="end">현재가 ${fm(cur)}</text>`:'';
           const xy=P2.map(z=>`${X(z.t.getTime()).toFixed(1)},${Yc(z.v).toFixed(1)}`);
           const dots=P2.map(z=>`<circle cx="${X(z.t.getTime()).toFixed(1)}" cy="${Yc(z.v).toFixed(1)}" r="2.4" fill="#1f6feb"><title>${z.d} · ${fm(z.v)}</title></circle>`).join('');
+          /* (2026-08-09) 30·90일 이동평균선 — 각 발간일 시점에서 직전 N일 리포트 목표가 평균.
+             개별 점의 널뜀을 걸러 '눈높이가 실제로 어디로 움직이는가'가 추이로 보인다. */
+          const roll=(days,tt)=>{const a=P2.filter(z=>z.t.getTime()<=tt&&z.t.getTime()>tt-days*864e5).map(z=>z.v);
+            return a.length?a.reduce((s,v)=>s+v,0)/a.length:null;};
+          const mline=(days,col)=>{const pt=P2.map(z=>({t:z.t.getTime(),v:roll(days,z.t.getTime())})).filter(z=>z.v!=null);
+            return pt.length>=2?`<polyline points="${pt.map(z=>`${X(z.t).toFixed(1)},${Yc(z.v).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="1.8"/>`:'';};
+          const m30=mline(30,'#e08e3c'), m90=mline(90,'#27ae60');
           const xlab=`<text x="${L}" y="${hh-4}" font-size="9" fill="#8a94a3">${P2[0].d}</text>`+
             `<text x="${w-R}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="end">${P2[P2.length-1].d}</text>`;
           svg=`<div style="margin-top:6px"><svg width="${w}" height="${hh}" style="max-width:100%">${gridY}${curLn}`+
-            (xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="#1f6feb" stroke-width="1.4"/>`:'')+
-            `${dots}${xlab}</svg><div class="note"><span style="color:#1f6feb">●</span> 리포트 목표가(발간일 기준) · <span style="color:#e05252">- - 현재가</span></div></div>`;
+            (xy.length>=2?`<polyline points="${xy.join(' ')}" fill="none" stroke="#9db8e8" stroke-width="1"/>`:'')+
+            `${m30}${m90}${dots}${xlab}</svg><div class="note"><span style="color:#1f6feb">●</span> 리포트 목표가(발간일 기준) · <span style="color:#e08e3c">— 30일 평균</span> · <span style="color:#27ae60">— 90일 평균</span> · <span style="color:#e05252">- - 현재가</span></div></div>`;
         }
       }
       /* (2026-08-09 실측) cTB24 는 기간이 아니라 **최근 ~24건**만 보관한다
@@ -5666,24 +5688,25 @@ await _canvasFlow(c);
         const url = (mkt==='kr'&&sm.rno) ? `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${sm.rno}`
                   : (mkt==='us'&&sm.acc&&_ECIK) ? `https://www.sec.gov/Archives/edgar/data/${parseInt(_ECIK,10)}/${String(sm.acc).replace(/-/g,'')}/${sm.acc}-index.htm`
                   : null;
-        x.font='11px sans-serif';
+        /* (2026-08-09) 글자 확대 — 11px 이 작다는 피드백. 13px 기준으로 전부 재계산 */
+        x.font='13px sans-serif';
         const head=`${sm.d.slice(0,4)}.${sm.d.slice(4,6)}.${sm.d.slice(6,8)} ${sm.t==='예'?'실적발표 예정':'실적발표'}`;
         const lines=rows.map(z=>z[0]+'  '+z[1]);
-        const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+18, 430);
-        const bh=22+lines.length*15+(url?17:0);
+        const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+26, 520);
+        const bh=27+lines.length*19+(url?22:0);
         let bx=Math.min(Math.max(X(sm.i)-wmax/2, P.l), W-P.r-wmax);
         let by=Math.min(Y(hh[sm.i])+16, H-P.b-bh-4); if(by<P.t+18) by=P.t+18;
         x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
         if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,7); x.fill(); x.stroke(); }
         else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
-        x.fillStyle=sm.col; x.font='bold 11px sans-serif'; x.fillText(head, bx+9, by+16);
-        rows.forEach((z,k)=>{ const yy=by+31+k*15;
-          x.fillStyle='#98a2ad'; x.font='10px sans-serif'; x.fillText(z[0], bx+9, yy);
-          x.fillStyle='#3d454f'; x.font='11px sans-serif'; x.fillText(z[1], bx+40, yy); });
-        if(url){ const ly=by+31+rows.length*15;
+        x.fillStyle=sm.col; x.font='bold 13px sans-serif'; x.fillText(head, bx+10, by+19);
+        rows.forEach((z,k)=>{ const yy=by+38+k*19;
+          x.fillStyle='#98a2ad'; x.font='12px sans-serif'; x.fillText(z[0], bx+10, yy);
+          x.fillStyle='#3d454f'; x.font='13px sans-serif'; x.fillText(z[1], bx+50, yy); });
+        if(url){ const ly=by+38+rows.length*19;
           const lt=(mkt==='kr'?'📄 DART 공시 원본 열기 ↗':'📄 SEC 8-K 원본 열기 ↗');
-          x.fillStyle='#1f6feb'; x.font='bold 11px sans-serif'; x.fillText(lt, bx+9, ly);
-          _PLK.push({x:bx+6, y:ly-12, w:x.measureText(lt).width+10, h:16, u:url});
+          x.fillStyle='#1f6feb'; x.font='bold 13px sans-serif'; x.fillText(lt, bx+10, ly);
+          _PLK.push({x:bx+6, y:ly-15, w:x.measureText(lt).width+12, h:20, u:url});
         }
       }
      }
@@ -5711,29 +5734,29 @@ await _canvasFlow(c);
        // 선택된 공시 내용 상자
        if(_DSEL&&byD[_DSEL]){
          const its=byD[_DSEL].slice(0,6), i=idx[_DSEL];
-         x.font='11px sans-serif';
+         /* (2026-08-09) 글자 확대(13px) + 행 클릭 → 공시 원본 */
+         x.font='13px sans-serif';
          const lines=its.map(z=>'· '+z.t);
          const head=`${_DSEL.slice(0,4)}.${_DSEL.slice(4,6)}.${_DSEL.slice(6,8)} 공시 ${byD[_DSEL].length}건`;
-         const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+16, 420);
-         const bh=20+lines.length*14+(byD[_DSEL].length>6?14:0)+15;   // +15: 원본 안내줄
+         const wmax=Math.min(Math.max(x.measureText(head).width, ...lines.map(z=>x.measureText(z).width))+22, 520);
+         const bh=25+lines.length*18+(byD[_DSEL].length>6?18:0)+19;   // +19: 원본 안내줄
          let bx=Math.min(Math.max(X(i)-wmax/2, P.l), W-P.r-wmax), by=Math.min(Y(hh[i])+14, H-P.b-bh-4);
          if(by<P.t+18) by=P.t+18;
          x.fillStyle='rgba(255,255,255,.97)'; x.strokeStyle='#d6dbe2';
          if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,7); x.fill(); x.stroke(); }
          else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
-         x.fillStyle='#c0392b'; x.font='bold 11px sans-serif'; x.fillText(head, bx+8, by+15);
-         x.fillStyle='#3d454f'; x.font='11px sans-serif';
+         x.fillStyle='#c0392b'; x.font='bold 13px sans-serif'; x.fillText(head, bx+9, by+18);
+         x.fillStyle='#3d454f'; x.font='13px sans-serif';
          lines.forEach((z,q)=>{ let tx=z;
-           while(x.measureText(tx).width>wmax-16 && tx.length>4) tx=tx.slice(0,-2);
+           while(x.measureText(tx).width>wmax-18 && tx.length>4) tx=tx.slice(0,-2);
            if(tx!==z) tx=tx.slice(0,-1)+'…';
-           x.fillText(tx, bx+8, by+29+q*14); });
-         /* (2026-08-09) 각 행 클릭 → 공시 원본 뷰어(/dv — 네이버 공시 상세 프록시) */
+           x.fillText(tx, bx+9, by+36+q*18); });
          its.forEach((z,q)=>{ if(z.id!=null)
-           _PLK.push({x:bx+6, y:by+29+q*14-11, w:wmax-12, h:14, u:'/dv/'+dcode+'/'+z.id}); });
+           _PLK.push({x:bx+6, y:by+36+q*18-14, w:wmax-12, h:18, u:'/dv/'+dcode+'/'+z.id}); });
          if(byD[_DSEL].length>6){ x.fillStyle='#98a2ad';
-           x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+8, by+29+lines.length*14); }
-         x.fillStyle='#1f6feb'; x.font='bold 10px sans-serif';
-         x.fillText('📄 행 클릭 → 공시 원본 열기 ↗', bx+8, by+bh-6);
+           x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+9, by+36+lines.length*18); }
+         x.fillStyle='#1f6feb'; x.font='bold 12px sans-serif';
+         x.fillText('📄 행 클릭 → 공시 원본 열기 ↗', bx+9, by+bh-7);
        }
      }
      // 십자선 — 호버 중인 봉 위치

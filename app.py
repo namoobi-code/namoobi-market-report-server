@@ -535,6 +535,29 @@ def kr_fin(code: str):
             return out
         q = _cf1001("Q")
         yr = _cf1001("Y")
+        # (2026-08-09) 잠정실적 반영 — WISEreport 는 확정 공시 전까지 해당 분기를 (E) 로
+        # 유지한다(실측: SK하이닉스 7/29 발표 후 8월에도 2026/06(E)). DART 잠정공시 값으로
+        # 그 분기를 실제값으로 덮고 prov 뱃지를 단다. 덮기 전 컨센은 cons_* 로 보존.
+        try:
+            live = json.loads((DB / "earnings_live.json").read_text(encoding="utf-8"))
+            ev = evd = None
+            for d8 in sorted(live.get("days") or {}):
+                for it in live["days"][d8]:
+                    if it.get("c") == code:
+                        ev, evd = it, d8
+            if ev:
+                y0, m0_ = int(evd[:4]), int(evd[4:6])
+                qe = (f"{y0-1}/12" if m0_ <= 3 else f"{y0}/03" if m0_ <= 6
+                      else f"{y0}/06" if m0_ <= 9 else f"{y0}/09")
+                for r0 in q:
+                    if r0["p"] == qe and r0.get("e"):
+                        r0["prov"] = evd
+                        for k, sk in (("s", "sales"), ("o", "op"), ("n", "ni")):
+                            if ev.get(sk) is not None:
+                                r0["cons_" + k] = r0[k]
+                                r0[k] = ev[sk]
+        except Exception:
+            pass
         # ② 목표주가 변동표(cTB24) — 개별 종목 페이지에서
         b = _get(f"https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd={code}")
         tp = []
