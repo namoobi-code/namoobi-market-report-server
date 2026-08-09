@@ -443,78 +443,16 @@ def us_fin(sym: str):
                                 "n": ni2 / 1e6 if ni2 is not None else None,
                                 "eps": ep2})
                 if len(qsa) >= 6:
-                    q = sorted(qsa, key=lambda z: z["p"])[-12:]
+                    # (2026-08-09) 소스는 20분기를 준다 — 12개로 자르면 앞쪽 4행의 YoY 기준
+                    # (t−4)이 잘려 '—' 가 됐다. 전량 보관하고, 표시 개수는 프론트가 정한다.
+                    q = sorted(qsa, key=lambda z: z["p"])
                     sa_ok = True
         except Exception:
             pass
-        # (2026-08-09) Yahoo 무료 timeseries 는 **분기 5개**만 준다(실측 — 기간을 8년으로 늘려도 동일).
-        # 그래서 YoY(t−4) 가 마지막 행에서만 계산돼 앞 행이 전부 '—' 로 보였다.
-        # SEC XBRL companyconcept 는 같은 값을 5년+ 로 주므로(실측 ABNB 23분기) 이걸 우선 쓰고
-        # 부족한 항목만 Yahoo 로 메운다. EPS 는 태그가 회사마다 달라 후보를 순회한다.
-        try:
-            cikm = _cik_map()
-            cik = None if sa_ok else cikm.get(sym.upper())    # 1순위 소스가 되면 SEC 생략
-            if cik:
-                H2 = {"User-Agent": "namoobi research namoobi@gmail.com"}
-                def _con(tags):
-                    """분기값 {end: val}. 4분기를 따로 신고하지 않는 회사가 많아
-                    (10-K 에 연간만 실림 — 실측 ABNB 2023/12·2024/12 결측)
-                    **연간 − 그 해 분기 3개 합**으로 Q4 를 유도해 채운다."""
-                    out, ann = {}, []
-                    for tg in tags:
-                        try:
-                            jj = json.loads(urllib.request.urlopen(urllib.request.Request(
-                                f"https://data.sec.gov/api/xbrl/companyconcept/CIK{int(cik):010d}/us-gaap/{tg}.json",
-                                headers=H2), timeout=25).read())
-                        except Exception:
-                            continue
-                        for unit in ("USD", "USD/shares"):
-                            for x in (jj.get("units", {}).get(unit) or []):
-                                st_, en_ = x.get("start"), x.get("end")
-                                if not st_ or not en_ or x.get("form") not in ("10-Q", "10-K"):
-                                    continue
-                                try:
-                                    dur = (datetime.fromisoformat(en_) - datetime.fromisoformat(st_)).days
-                                except Exception:
-                                    continue
-                                if 60 <= dur <= 100:            # 분기 구간
-                                    out[en_] = x["val"]
-                                elif 340 <= dur <= 380:         # 연간 구간(Q4 유도용)
-                                    ann.append((st_, en_, x["val"]))
-                        if out:
-                            break
-                    return out, set()
-                rev, _ = _con(["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues",
-                               "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet"])
-                opi, _ = _con(["OperatingIncomeLoss"])
-                nis, _ = _con(["NetIncomeLoss"])
-                # EPS 는 분기 합이 연간과 정확히 일치하지 않는다(주식수가 분기마다 달라짐)
-                # → 유도값(drv)보다 야후 보고치를 우선한다.
-                eps, eps_drv = _con(["EarningsPerShareDiluted",
-                                     "IncomeLossFromContinuingOperationsPerDilutedShare"])
-                if rev:
-                    merged = {}
-                    for d0 in sorted(set(rev) | set(opi) | set(nis) | set(eps)):
-                        merged[d0[:7].replace("-", "/")] = {
-                            "p": d0[:7].replace("-", "/"),
-                            "s": (rev.get(d0) or 0) / 1e6 or None,
-                            "o": (opi[d0] / 1e6) if d0 in opi else None,
-                            "n": (nis[d0] / 1e6) if d0 in nis else None,
-                            "eps": eps.get(d0),
-                            "_epsdrv": d0 in eps_drv}
-                    for r0 in q:                                # Yahoo 값으로 빈칸 보완
-                        m0 = merged.setdefault(r0["p"], {"p": r0["p"]})
-                        for k0 in ("s", "o", "n", "eps"):
-                            if m0.get(k0) is None and r0.get(k0) is not None:
-                                m0[k0] = r0[k0]
-                        # 유도 EPS 는 야후 보고치가 있으면 그쪽으로 교체(주식수 변동 오차 제거)
-                        if m0.pop("_epsdrv", False) and r0.get("eps") is not None:
-                            m0["eps"] = r0["eps"]
-                    for m0 in merged.values():
-                        m0.pop("_epsdrv", None)
-                    q = [merged[k0] for k0 in sorted(merged)]
-        except Exception:
-            pass
+        # (2026-08-09) **실적 표는 한 소스만 쓴다** — 소스를 섞으면 같은 분기의 값이
+        # 소스마다 달라(EPS 유도치 vs 보고치, 분기 개수 차이) 표 안에서 앞뒤가 안 맞는다.
+        # 위 stockanalysis 가 매출·영업익·순익·희석EPS 를 20분기 한 번에 주므로 그것만 쓴다.
+        # 실패했을 때만(sa_ok=False) 위 Yahoo timeseries 5분기가 폴백으로 남는다.
         # ② 컨센 추정 + 리비전 곡선 (quoteSummary — crumb 필요)
         est, rev = [], []
         try:
@@ -603,8 +541,11 @@ def us_fin(sym: str):
                               "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"), "acc": it.get("acc")}
         except Exception:
             pass
-        res = {"q": q[-10:], "est": est, "rev": rev, "snap": snap, "gd": gd,
-               "unit": "백만$ · EPS=$", "src": "Yahoo timeseries·earningsTrend + 일별 스냅샷"}
+        # (2026-08-09) 예전엔 여기서 10분기로 잘라 앞쪽 행의 YoY 기준(t−4)이 사라졌다.
+        # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
+        res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd,
+               "unit": "백만$ · EPS=$",
+               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
         if len(_usfin_cache) > 300:
             _usfin_cache.clear()
