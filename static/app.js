@@ -5532,9 +5532,11 @@ await _canvasFlow(c);
       <th>매출<span class="note">(백만$)</span></th><th>YoY</th><th>QoQ</th>
       <th>EPS<span class="note">($)</span></th><th>YoY</th><th>QoQ</th>
       <th>매출컨센<span class="note">(발표시점)</span></th><th>EPS컨센<span class="note">(발표시점)</span></th><th>영업이익률</th></tr>`;
-    /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 **표시는 최근 10분기**만.
-       앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다. */
-    const VIS=Math.max(0,q.length-10);
+    /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
+       앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
+       (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
+       앞의 2행이 늘 공란이었다. 컨센 있는 범위에 맞춘다. */
+    const VIS=Math.max(0,q.length-8);
     q.forEach((r,i)=>{ if(i<VIS) return; const m=opm(i);
       const ssp=(r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null;
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
