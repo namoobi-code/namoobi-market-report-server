@@ -76,18 +76,23 @@ def kr_surprise_backfill(ev):
     cx = sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=15)
     n = 0
     for c, (d8, it) in ev.items():
-        if it.get("spr") is not None or it.get("op") is None:
+        # (2026-08-09 수정) 영업익 서프가 이미 있어도 매출 서프가 비었으면 계속 진행한다.
+        # 예전엔 spr 존재 시 통째로 건너뛰어 spr_s 가 계산될 기회가 없었다(SK하이닉스 실측).
+        need_op = it.get("spr") is None and it.get("op") is not None
+        need_s  = it.get("spr_s") is None and it.get("sales") is not None
+        if not (need_op or need_s):
             continue
         r = cx.execute("SELECT op,sales FROM snap WHERE code=? AND period=? ORDER BY d DESC LIMIT 1",
                        (c, quarter_end(d8))).fetchone()
         est, sest = (r[0], r[1]) if r else (None, None)
-        if est and abs(est) > 10:                       # 컨센 10억원 미만은 비율이 무의미
+        if need_op and est and abs(est) > 10:           # 컨센 10억원 미만은 비율이 무의미
             it["spr"] = round((it["op"] / est - 1) * 100, 1)
             it["cons_op"] = est
             n += 1
-        if sest and sest > 10 and it.get("sales") is not None:
+        if need_s and sest and sest > 10:
             it["spr_s"] = round((it["sales"] / sest - 1) * 100, 1)
             it["cons_sales"] = sest
+            n += 1
     cx.close()
     return n
 
@@ -106,8 +111,10 @@ def main():
         for d8 in j.get("days") or {}:
             for it in j["days"][d8]:
                 src = kr_ev.get(it.get("c"))
-                if src and src[0] == d8 and src[1].get("spr") is not None:
-                    it["spr"] = src[1]["spr"]; it["cons_op"] = src[1].get("cons_op")
+                if src and src[0] == d8:
+                    for k in ("spr", "cons_op", "spr_s", "cons_sales"):
+                        if src[1].get(k) is not None:
+                            it[k] = src[1][k]
         ERN["kr"].write_text(json.dumps(j, ensure_ascii=False), encoding="utf-8")
     print(f"[join] KR 서프라이즈 소급 계산 {bf}건")
     for mk in ("kr", "us"):
