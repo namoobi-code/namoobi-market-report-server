@@ -5444,7 +5444,8 @@ await _canvasFlow(c);
       let svg='';
       {
         const w=Math.max(560,(el.clientWidth||620)-26),hh=220;   // 폭=표 폭 · 높이 2배
-        const COLS=['#1f6feb','#e08e3c','#27ae60','#8e44ad','#c0392b','#16a085'];
+        /* 무지개 순서(빨강→주황→노랑→초록→파랑→보라) — 기간 순서와 색 순서를 일치시킨다 */
+        const COLS=['#e03131','#f08c00','#d9a406','#2f9e44','#1c7ed6','#7048e8'];
         const base={}; ps.forEach(pp=>{ const f=d90.find(d=>byP[pp][d]!=null); base[pp]=(f!=null)?byP[pp][f]:null; });
         const pcv=(pp,d)=>{ const v=byP[pp][d]; return (v!=null&&base[pp])?((v/base[pp]-1)*100):null; };
         let lo=0,hi=0;
@@ -5588,29 +5589,33 @@ await _canvasFlow(c);
     let t3='';
     const RV=(J.rev||[]).filter(z=>z.cur!=null);
     if(RV.length){
-      /* (2026-08-09 수정) 그래프가 '90일 전 대비 %'였고 표는 '현재 대비 %'라 서로 어긋나
-         보였다. 알고 싶은 건 "90→30→7→현재로 오면서 추정치가 오르나 내리나" 이므로
-         **표에 적힌 EPS 값 그대로**를 그린다(y축 = $). 표의 숫자 = 점의 높이. */
-      const w=Math.max(560,(el.clientWidth||620)-26),hh=200;
-      const COLS={'0q':'#1f6feb','+1q':'#e08e3c','0y':'#27ae60','+1y':'#8e44ad'};
-      const Xp=t=>44+(t+90)/90*(w-104);
+      /* (2026-08-09 재수정) EPS 절대값을 그리니 0.79 와 6.16 이 한 축에 섞여 모든 선이
+         평평해 보였다(변화폭 몇 %가 눈에 안 보임). → **90일 전 = 100 으로 지수화**한다.
+         값 크기가 달라도 '몇 % 움직였나'가 같은 축에서 비교되고, 점마다 실제 EPS 를
+         라벨로 붙여 위 표의 숫자와 바로 연결된다. */
+      const w=Math.max(560,(el.clientWidth||620)-26),hh=230;
+      /* (2026-08-09) 색은 무지개 순서 — 가까운 기간(진행분기)부터 빨강→주황→초록→파랑.
+         기간 순서와 색 순서가 일치해 범례를 안 봐도 어느 선이 먼 미래인지 짐작된다. */
+      const COLS={'0q':'#e03131','+1q':'#f08c00','0y':'#2f9e44','+1y':'#1c7ed6'};
+      const Xp=t=>52+(t+90)/90*(w-118);
       const pcv=z=>[['d90',-90],['d30',-30],['d7',-7],['cur',0]]
-        .map(([k,t])=>(z[k]!=null)?[t,z[k]]:null).filter(Boolean);
-      let lo=Infinity,hi=-Infinity;
+        .map(([k,t])=>(z[k]!=null&&z.d90)?[t,(z[k]/z.d90)*100,z[k]]:null).filter(Boolean);
+      let lo=100,hi=100;
       RV.forEach(z=>pcv(z).forEach(([t,v])=>{ if(v<lo)lo=v; if(v>hi)hi=v; }));
-      if(!isFinite(lo)){lo=0;hi=1;}
-      const pad=(hi-lo)*0.12||Math.abs(hi)*0.1||0.5; lo-=pad; hi+=pad;
-      const Yc=p=>(hh-18-(p-lo)/((hi-lo)||1)*(hh-32));
-      const zero=[hi-pad,(hi+lo)/2,lo+pad].map(v=>
-        `<line x1="44" y1="${Yc(v).toFixed(1)}" x2="${w-8}" y2="${Yc(v).toFixed(1)}" stroke="#eef1f5"/>`+
-        `<text x="40" y="${(Yc(v)+3).toFixed(1)}" font-size="9" fill="#8a94a3" text-anchor="end">${v.toFixed(2)}</text>`).join('');
+      const sp=Math.max(hi-100,100-lo,0.6);                 // 100 을 가운데 두고 대칭 여백
+      lo=100-sp*1.35; hi=100+sp*1.35;
+      const Yc=p=>(hh-20-(p-lo)/((hi-lo)||1)*(hh-40));
+      const ticks=[100+sp,100,100-sp].map(v=>
+        `<line x1="52" y1="${Yc(v).toFixed(1)}" x2="${w-8}" y2="${Yc(v).toFixed(1)}" stroke="${Math.abs(v-100)<.01?'#c9d2dd':'#eef1f5'}" ${Math.abs(v-100)<.01?'stroke-dasharray="4,3"':''}/>`+
+        `<text x="48" y="${(Yc(v)+3).toFixed(1)}" font-size="9" fill="#8a94a3" text-anchor="end">${v>100?'+':''}${(v-100).toFixed(1)}%</text>`).join('');
       const parts=RV.map(z=>{ const col=COLS[z.per]||'#888', pt=pcv(z);
-        return (pt.length>=2?`<polyline points="${pt.map(([t,p])=>`${Xp(t).toFixed(1)},${Yc(p).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="1.8"/>`:'')+
-          pt.map(([t,p])=>`<circle cx="${Xp(t).toFixed(1)}" cy="${Yc(p).toFixed(1)}" r="2.6" fill="${col}"><title>${LBL[z.per]||z.per} ${t===0?'현재':(-t)+'일 전'} ${p.toFixed(2)}</title></circle>`).join(''); }).join('');
+        return (pt.length>=2?`<polyline points="${pt.map(([t,p])=>`${Xp(t).toFixed(1)},${Yc(p).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="2"/>`:'')+
+          pt.map(([t,p,raw2])=>`<circle cx="${Xp(t).toFixed(1)}" cy="${Yc(p).toFixed(1)}" r="3" fill="${col}"><title>${LBL[z.per]||z.per} ${t===0?'현재':(-t)+'일 전'} EPS ${raw2.toFixed(2)} (90일 전 대비 ${p-100>0?'+':''}${(p-100).toFixed(1)}%)</title></circle>`
+            +`<text x="${Xp(t).toFixed(1)}" y="${(Yc(p)-6).toFixed(1)}" font-size="9" fill="${col}" text-anchor="middle">${raw2.toFixed(2)}</text>`).join(''); }).join('');
       /* 범례 = 90일 전 → 현재 총 변화(추정치가 오르는 중인지 내리는 중인지) */
       const leg=RV.map(z=>{ const ch=(z.d90&&z.cur!=null)?((z.cur-z.d90)/Math.abs(z.d90)*100):null;
         return `<span style="color:${COLS[z.per]||'#888'}">● ${LBL[z.per]||z.per}${ch!=null?` ${ch>0?'▲ +':'▼ '}${ch.toFixed(1)}%`:''}</span>`; }).join(' ');
-      const xl=`<text x="44" y="${hh-3}" font-size="9" fill="#8a94a3">90일 전</text><text x="${Xp(-30).toFixed(1)}" y="${hh-3}" font-size="9" fill="#8a94a3">30일 전</text><text x="${Xp(-7).toFixed(1)}" y="${hh-3}" font-size="9" fill="#8a94a3">7일 전</text><text x="${(w-8).toFixed(1)}" y="${hh-3}" font-size="9" fill="#8a94a3" text-anchor="end">현재</text>`;
+      const xl=`<text x="52" y="${hh-4}" font-size="9" fill="#8a94a3">90일 전</text><text x="${Xp(-30).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">30일 전</text><text x="${Xp(-7).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">7일 전</text><text x="${(w-8).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="end">현재</text>`;
       /* (2026-08-09) '90일 변화' 열 제거 — 각 시점 값 옆에 (현재 대비 %) 를 붙여
          "그때 대비 지금 얼마나 올라왔나"를 한 줄에서 바로 읽게 한다. */
       const f2=v=>v==null?'—':v.toFixed(2);
@@ -5625,8 +5630,8 @@ await _canvasFlow(c);
           `<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px"><b style="color:${COLS[z.per]||'#888'}">${LBL[z.per]||z.per}</b></td>
             <td style="text-align:right">${f2(z.d90)}${vsNow(z.d90,z.cur)}</td><td style="text-align:right">${f2(z.d30)}${vsNow(z.d30,z.cur)}</td>
             <td style="text-align:right">${f2(z.d7)}${vsNow(z.d7,z.cur)}</td><td style="text-align:right"><b>${f2(z.cur)}</b></td></tr>`).join('')+'</table>'+
-        `<div style="margin-top:4px"><svg width="${w}" height="${hh}" style="max-width:100%">${zero}${parts}${xl}</svg>
-          <div class="note">${leg} <span style="color:#8a94a3">— y축 = EPS 추정치($) · 위 표의 숫자와 동일 · ▲ 상향 / ▼ 하향(90일 전 대비)</span></div></div></div>`;
+        `<div style="margin-top:4px"><svg width="${w}" height="${hh}" style="max-width:100%">${ticks}${parts}${xl}</svg>
+          <div class="note">${leg} <span style="color:#8a94a3">— y축 = <b>90일 전 대비 변화율</b>(각 항목을 90일 전=0%로 맞춰 비교 · 점선이 0%) · 점 위 숫자는 실제 EPS($) · ▲ 상향 / ▼ 하향</span></div></div></div>`;
     }
     /* ③ 목표주가 — 현재 유효 평균 + 스냅샷 리비전 (누적 중) */
     let t2='';
