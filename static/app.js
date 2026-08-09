@@ -4332,6 +4332,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         loadDisc(c);                              // 공시 마커도 별도 로드
         loadEarn(c);                              // 실적발표일 1년치(US=SEC 8-K · KR=DART)
         loadKrFin(c);                             // KR 분기 재무표·목표주가 변동·컨센 추이
+        loadKrSeg(c);                             // KR 매출 구성·제품 정보 (DART·WISE·IR 비교)
         loadBottom(c);                            // 차트 하단 패널(호가/체결 또는 순매매 표)
       }catch(e){ $('sd_src').textContent='차트 로드 실패: '+e; }
   }
@@ -5457,6 +5458,39 @@ await _canvasFlow(c);
     }
     el.innerHTML=`<div class="box" style="padding:10px 12px"><b style="font-size:12.5px">📊 실적·전망</b> <span class="note">(${E(J.src||'')} · 단위 억원)</span>
       <div style="overflow:auto;margin-top:6px">${t1}</div>${t2}${t3}</div>`;
+  }
+  /* ── (2026-08-09) 매출 구성·제품 정보 — 우측 열 하단. 소스 3종을 출처와 함께 비교.
+     ① DART 정기보고서(사업/반기/분기) 「매출실적」 표 원문 그대로 — 기업마다 상세도가 다르다
+        (실측: SK하이닉스는 'DRAM, NAND Flash 등' 단일 항목 + 부문별 기재 생략)
+     ② WISEreport(FnGuide 계열) 주요제품 매출구성% 요약
+     ③ 회사 IR 실적발표 — 분기 제품·응용처 비중의 유일한 정본(PDF·링크 제공) */
+  async function loadKrSeg(c){
+    const el=$('sd_seg'); if(!el) return;
+    if(mkt!=='kr'){ el.style.display='none'; el.innerHTML=''; return; }
+    el.style.display=''; el.innerHTML='<span class="note">매출 구성 로드 중… (첫 조회는 DART 보고서 3건 파싱 — 수십 초)</span>';
+    let J=null;
+    try{ J=await (await fetch('/api/kr_seg/'+encodeURIComponent(c))).json(); }catch(e){}
+    if(dcode!==c) return;
+    if(!J||(!((J.reports||[]).length)&&!J.wise)){ el.innerHTML='<span class="note">매출 구성 정보 없음</span>'; return; }
+    let hh='<b style="font-size:12.5px">📦 매출 구성·제품 정보</b> <span class="note">(소스 비교 · 24h 캐시 자동 갱신)</span>';
+    (J.reports||[]).forEach(r=>{
+      hh+=`<div style="margin-top:8px"><b style="font-size:12px">${E(r.nm)}</b> <span class="note">${E(r.dt)}</span>
+        <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${E(r.rno)}" target="_blank" rel="noopener" style="font-size:11px">원본↗</a>`;
+      if((r.rows||[]).length){
+        hh+=`<div style="overflow:auto"><table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">`+
+          r.rows.map((cs,i)=>`<tr style="border-bottom:1px solid #f2f4f7;${i===0?'background:#f7f9fb;font-weight:600':''}">`+
+            cs.map(cell=>`<td style="padding:2px 4px;white-space:nowrap;text-align:${/^[\d,.\-]+$/.test(cell)?'right':'left'}">${E(cell)}</td>`).join('')+'</tr>').join('')+
+          '</table></div>'+(r.unit?`<div class="note">단위: ${E(r.unit)}</div>`:'');
+      } else hh+='<div class="note">매출실적 표 없음(보고서 양식 상이)</div>';
+      if(r.seg_skip) hh+=`<div class="note" style="color:#b7791f">※ 부문별 재무정보 기재 생략(지배적 단일 사업부문) — 제품별 분리는 회사 IR 자료에만 있음</div>`;
+      hh+='</div>'; });
+    if(J.wise) hh+=`<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px"><b style="font-size:12px">FnGuide·WISEreport 요약</b>
+      <span class="note">매출구성 ${E(J.wise.asof||'')}</span> <a href="${E(J.wise.url)}" target="_blank" rel="noopener" style="font-size:11px">출처↗</a>
+      <div style="font-size:12px;margin-top:2px">`+J.wise.items.map(z=>`${E(z.n)} <b>${E(z.p)}%</b>`).join(' · ')+'</div></div>';
+    if(J.ir) hh+=`<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px"><b style="font-size:12px">IR 실적발표 자료</b>
+      <a href="${E(J.ir)}" target="_blank" rel="noopener" style="font-size:11px">바로가기↗</a>
+      <div class="note">분기별 제품(DRAM/NAND 등)·응용처별 비중은 <b>IR 자료가 유일한 정본</b> — PDF 형태라 표 자동 표시는 미지원, 원문 링크로 확인</div></div>`;
+    el.innerHTML=hh;
   }
   async function loadEarn(c){
     /* (2026-08-09) 미국·한국 모두 과거 1년치 발표일을 받는다.

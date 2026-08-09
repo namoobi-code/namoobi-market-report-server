@@ -355,6 +355,96 @@ def disclosure_doc(code: str, disc_id: int):
         raise HTTPException(502, f"공시 원문 조회 실패: {repr(e)[:60]}")
 
 
+_seg_cache = {}
+
+@app.get("/api/kr_seg/{code}")
+def kr_seg(code: str):
+    """매출 구성(제품·부문) 소스 비교 — 자동 (2026-08-09).
+
+    ① DART 정기보고서 3종(사업/반기/분기 최신 각 1건)의 「매출실적」 표를 원문에서 그대로 추출
+       + '지배적 단일 사업부문 기재 생략' 여부 감지 (실측 SK하이닉스: 제품별 분리 없음)
+    ② WISEreport 기업현황(c1020001)의 주요제품 매출구성(%) — FnGuide 계열 요약
+    ③ 기업 IR 링크 — 분기 제품별(예: DRAM/NAND·응용처) 비중은 IR 자료가 유일한 정본
+    온디맨드 · 24시간 캐시(보고서는 분기에 한 번 바뀜). 어떤 종목이든 동작한다.
+    """
+    if not re.fullmatch(r"\d{6}", code or ""):
+        raise HTTPException(400, "bad code")
+    now = time.time()
+    hit = _seg_cache.get(code)
+    if hit and now - hit[0] < 86400:
+        return hit[1]
+    import io, zipfile
+    CL = lambda x: re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", x)).strip()
+    res = {"reports": [], "wise": None, "ir": None}
+    try:
+        key = (BASE / "keys" / "opendart.txt").read_text().strip()
+        cc = (json.loads((BASE / "data" / "watch" / "dart_corp_map.json").read_text(encoding="utf-8"))
+              .get("map") or {}).get(code)
+        if key and cc:
+            bgn = (datetime.now() - timedelta(days=400)).strftime("%Y%m%d")
+            j = json.loads(urllib.request.urlopen(
+                f"https://opendart.fss.or.kr/api/list.json?crtfc_key={key}&corp_code={cc}"
+                f"&bgn_de={bgn}&end_de={datetime.now().strftime('%Y%m%d')}&pblntf_ty=A&page_count=30",
+                timeout=20).read())
+            picked, seen = [], set()
+            for r0 in j.get("list") or []:                      # 최신순 — 유형별 첫 건만
+                for ty in ("사업보고서", "반기보고서", "분기보고서"):
+                    if ty in (r0.get("report_nm") or "") and ty not in seen:
+                        seen.add(ty); picked.append((ty, r0))
+            for ty, r0 in picked[:3]:
+                try:
+                    b = urllib.request.urlopen(
+                        f"https://opendart.fss.or.kr/api/document.xml?crtfc_key={key}"
+                        f"&rcept_no={r0['rcept_no']}", timeout=60).read()
+                    z = zipfile.ZipFile(io.BytesIO(b))
+                    n = max(z.namelist(), key=lambda x: z.getinfo(x).file_size)
+                    h = z.read(n).decode("utf-8", "ignore")
+                    i = h.find("매출실적")
+                    rows = []
+                    if i > 0:
+                        j2 = h.find("수주상황", i)
+                        win = h[i:(j2 if 0 < j2 < i + 40000 else i + 15000)]
+                        for tr in re.findall(r"<TR[^>]*>(.*?)</TR>", win, re.S | re.I):
+                            cs = [CL(x2) for x2 in re.findall(r"<T[DHEU][^>]*>(.*?)</T[DHEU]>", tr, re.S | re.I)]
+                            cs = [c2 for c2 in cs if c2 != ""]
+                            if cs:
+                                rows.append(cs[:8])
+                    unit = "백만원" if "단위: 백만원" in h[i:i + 400] else ""
+                    res["reports"].append({
+                        "nm": r0["report_nm"], "dt": r0["rcept_dt"], "rno": r0["rcept_no"],
+                        "unit": unit, "rows": rows[:14],
+                        "seg_skip": ("부문별 기재를 생략" in h)})
+                except Exception:
+                    continue
+    except Exception:
+        pass
+    try:  # WISEreport 주요제품 매출구성
+        h = urllib.request.urlopen(urllib.request.Request(
+            f"https://navercomp.wisereport.co.kr/v2/company/c1020001.aspx?cmp_cd={code}",
+            headers={"User-Agent": "Mozilla/5.0"}), timeout=20).read().decode("utf-8", "replace")
+        m = re.search(r"매출구성\((\d{4}\s*/\s*\d{2})\)", h)
+        asof = m.group(1).replace(" ", "") if m else ""
+        items = []
+        mt = re.search(r'id="cTB203".*?</table>', h, re.S)
+        if mt:
+            for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", mt.group(0), re.S):
+                cs = [CL(x2) for x2 in re.findall(r"<t[hd][^>]*>(.*?)</t[hd]>", tr, re.S)]
+                if len(cs) >= 2 and cs[0] not in ("제품명", "") and re.search(r"[\d.]", cs[1]):
+                    items.append({"n": cs[0], "p": cs[1]})
+        if items:
+            res["wise"] = {"asof": asof, "items": items[:8],
+                           "url": f"https://navercomp.wisereport.co.kr/v2/company/c1020001.aspx?cmp_cd={code}"}
+    except Exception:
+        pass
+    IRS = {"000660": "https://www.skhynix.com/kor/ir/financialInfo/earningsCall.do",
+           "005930": "https://www.samsung.com/global/ir/reports-disclosures/earnings-release/"}
+    res["ir"] = IRS.get(code)
+    _seg_cache[code] = (now, res)
+    if len(_seg_cache) > 100:
+        _seg_cache.clear()
+    return res
+
+
 _earn_cache = {}
 _cikmap_cache = {"at": 0, "m": {}}
 
