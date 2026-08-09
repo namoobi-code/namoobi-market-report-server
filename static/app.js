@@ -5606,9 +5606,10 @@ await _canvasFlow(c);
       /* (2026-08-09) '90일 변화' 열 제거 — 각 시점 값 옆에 (현재 대비 %) 를 붙여
          "그때 대비 지금 얼마나 올라왔나"를 한 줄에서 바로 읽게 한다. */
       const f2=v=>v==null?'—':v.toFixed(2);
+      /* 반올림해서 0.0% 이면 변화 없음 — 부호 없이 검은색(±0.05% 미만은 방향이 무의미) */
       const vsNow=(v,cur)=>{ if(v==null||cur==null||Math.abs(v)<1e-9) return '';
-        const p=(cur/v-1)*100;
-        return ` <span class="${p>0?'up':(p<0?'dn':'note')}" style="font-size:10.5px">(${p>0?'+':''}${p.toFixed(1)}%)</span>`; };
+        const p=(cur/v-1)*100, z=Math.abs(p)<0.05;
+        return ` <span class="${z?'':(p>0?'up':'dn')}" style="font-size:10.5px${z?';color:#3d454f':''}">(${z?'0.0':(p>0?'+':'')+p.toFixed(1)}%)</span>`; };
       t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(Yahoo 가 90/30/7일 전 추정치를 직접 제공 — 즉시 곡선 · 괄호 = 현재 대비 변화율)</span>
         <table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전<span class="note">(현재대비)</span></th><th>30일 전<span class="note">(현재대비)</span></th><th>7일 전<span class="note">(현재대비)</span></th><th>현재</th></tr>`+
