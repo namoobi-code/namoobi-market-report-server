@@ -446,6 +446,14 @@ def us_fin(sym: str):
                 snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4], "tp": r0[5]}
                         for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp FROM snap WHERE sym=? ORDER BY d", (sym,))]
                 cx.close()
+                # (2026-08-09) 매출 컨센(발표 시점) — 분기말 이후 첫 스냅샷의 rq0(진행분기 매출 추정)
+                # 이 그 분기의 '발표 전 컨센'이다. 스냅샷 적립 시작(08-09) 이후 분기부터 채워진다.
+                for r2 in q:
+                    y0, m0 = int(r2["p"][:4]), int(r2["p"][5:7])
+                    qe = f"{y0:04d}-{m0:02d}-"
+                    cand = [s for s in snap if s.get("rq0") and s["d"] > qe]
+                    if cand:
+                        r2["sE"] = round(cand[0]["rq0"] / 1e6, 1)
         except Exception:
             pass
         # ④ 최근 가이던스 (8-K 보도자료 파싱 · earnings_live_us) — 매출·EPS 중간값 + 컨센 갭

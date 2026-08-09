@@ -5501,20 +5501,23 @@ await _canvasFlow(c);
     /* ① 분기 실적표 — (2026-08-09) 미국식 보는 순서: 매출 → EPS → 서프라이즈 → 영업이익률.
        영업익·순익 열은 빼고(이익률 계산에만 사용) EPS 를 전면에 — 미국 시장의 정식 지표. */
     const eF=v=>v==null?'—':(+v).toFixed(2);
-    const sprB=v=>v==null?'<span class="note">—</span>':
-      `<span class="${v>0?'up':'dn'}"><b>${v>0?'비트':'미스'}</b> ${v>0?'+':''}${v.toFixed(1)}%</span>`;
+    /* 컨센 셀 = 발표시점 컨센값 + 실제 대비 서프(비트/미스) 한 칸에 */
+    const cCell=(val,spr,isEps)=>{ if(val==null&&spr==null) return '<span class="note">—</span>';
+      return (val==null?'—':(isEps?(+val).toFixed(2):Math.round(val).toLocaleString()))
+        +(spr==null?'':`<br><span class="${spr>0?'up':'dn'}" style="font-size:10.5px"><b>${spr>0?'비트':'미스'}</b> ${spr>0?'+':''}${spr.toFixed(1)}%</span>`); };
     let t1=`<table style="width:100%;font-size:11.5px;border-collapse:collapse">
       <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">분기</th>
       <th>매출<span class="note">(백만$)</span></th><th>YoY</th><th>QoQ</th>
       <th>EPS<span class="note">($)</span></th><th>YoY</th><th>QoQ</th>
-      <th>EPS컨센<span class="note">(발표시점)</span></th><th>EPS서프</th><th>영업이익률</th></tr>`;
+      <th>매출컨센<span class="note">(발표시점)</span></th><th>EPS컨센<span class="note">(발표시점)</span></th><th>영업이익률</th></tr>`;
     q.forEach((r,i)=>{ const m=opm(i);
+      const ssp=(r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null;
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
         <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
-        <td style="text-align:right">${eF(r.epsE)}</td><td style="text-align:right">${sprB(r.sprE)}</td>
+        <td style="text-align:right">${cCell(r.sE,ssp,false)}</td><td style="text-align:right">${cCell(r.epsE,r.sprE,true)}</td>
         <td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td></tr>`; });
-    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)·매출 서프 판정은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b> · 음수 기저 비율은 부호 왜곡 가능</div>';
+    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b> · 음수 기저 비율은 부호 왜곡 가능</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
        자동 파싱 가능한 두 항목만 숫자로, 마진·EBITDA·FCF·CAPEX·가입자 등은 보도자료·어닝콜
        원문에만 있어(형식 자유) 링크로 안내한다. 비교 대상은 '회사 가이던스 vs 애널 컨센'
@@ -5544,16 +5547,41 @@ await _canvasFlow(c);
     /* ①-b 컨센 추정 — 분기·연간 (회사가 공식으로 주는 미래치는 가이던스(매출·EPS), 여긴 애널 컨센) */
     const LBL={'0q':'진행분기','+1q':'다음분기','0y':'올해(FY)','+1y':'내년(FY)'};
     if((J.est||[]).length){
+      /* (2026-08-09) 매출·EPS·영업이익률·애널수 4열. 영업이익률 컨센은 야후 미제공이라
+         **최근 4분기 실적 영업이익률(TTM)** 을 참고치로 같은 칸에 표시한다(추정 아님을 명시). */
+      const ttm=(()=>{ const a=q.slice(-4).filter(z=>z.s&&z.o!=null);
+        if(!a.length) return null; const s=a.reduce((x,z)=>x+z.s,0), o=a.reduce((x,z)=>x+z.o,0);
+        return s?o/s*100:null; })();
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
-        <th>매출(E)</th><th>YoY</th><th>EPS(E)</th><th>YoY</th><th>애널</th></tr>`+
-        J.est.map(e2=>{ const ry=pct(e2.rev,e2.revY), ey=pct(e2.eps,e2.epsY);
-          return `<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
+        <th>매출(E)</th><th>EPS(E)</th><th>영업이익률</th><th>애널수</th></tr>`+
+        J.est.map(e2=>`<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
             <td style="padding:3px 4px"><b>${LBL[e2.per]||e2.per}</b></td><td style="text-align:center">${E(e2.end||'')}</td>
-            <td style="text-align:right">${F(e2.rev)}</td><td style="text-align:right">${P(ry)}</td>
-            <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td><td style="text-align:right">${P(ey)}</td>
-            <td style="text-align:right">${e2.nan??'—'}</td></tr>`; }).join('')+'</table></div>';
+            <td style="text-align:right">${F(e2.rev)}</td>
+            <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td>
+            <td style="text-align:right">${ttm==null?'—':`<span class="note">${ttm.toFixed(1)}%</span>`}</td>
+            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+
+        `</table><div class="note">영업이익률은 <b>컨센 미제공</b> — 최근 4분기 실적 기준 TTM 마진을 참고치로 표시</div></div>`;
+      /* 직전 실적발표 가이던스 — 회사가 제시한 기간별 전망 vs 발표시점 컨센 + 서프 판정 */
+      const gd2=J.gd;
+      t1+=`<div style="margin-top:8px"><b style="font-size:12px">직전 실적발표 가이던스</b> <span class="note">${gd2?`(발표일 ${E(gd2.d)} · 8-K 보도자료 파싱)`:'(파싱된 값 없음)'}</span>
+        <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
+        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th>
+        <th>매출 가이던스</th><th>매출 컨센</th><th>판정</th><th>EPS 가이던스</th><th>EPS 컨센</th><th>판정</th></tr>`+
+        ['0q','+1q','0y','+1y'].map(per=>{
+          const e3=(J.est||[]).find(z=>z.per===per)||{};
+          /* 8-K 파서는 '다음 분기(+1q)' 가이던스만 신뢰 가능하게 뽑는다(연간은 분기 컨센과
+             섞이는 오류가 잦아 제외 — 실측 DELL $27~60B). 나머지 기간은 회사 미제시/미지원. */
+          const gr=(per==='+1q'&&gd2)?gd2.rev:null, ge=(per==='+1q'&&gd2)?gd2.eps:null;
+          const jr=(per==='+1q'&&gd2)?gd2.revGap:null, je=(per==='+1q'&&gd2)?gd2.epsGap:null;
+          const J2=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':'dn'}"><b>${v>0?'상회':'하회'}</b> ${v>0?'+':''}${(+v).toFixed(1)}%</span>`;
+          return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b> <span class="note">${E(e3.end||'')}</span></td>
+            <td style="text-align:right">${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'}</td>
+            <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
+            <td style="text-align:right">${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'}</td>
+            <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td></tr>`; }).join('')+
+        `</table><div class="note">판정 = 가이던스 중간값 ÷ 발표시점 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · 연간(FY) 가이던스는 분기 컨센과 혼동 위험이 커 자동 파싱 제외</div></div>`;
     }
     /* ② EPS 추정 리비전 — 표 + 4점 곡선 (즉시) */
     let t3='';
@@ -5575,14 +5603,19 @@ await _canvasFlow(c);
       const leg=RV.map(z=>{ const p=pcv(z), last=p.length?p[p.length-1][1]:null;
         return `<span style="color:${COLS[z.per]||'#888'}">● ${LBL[z.per]||z.per}${last!=null?` ${last>0?'+':''}${last.toFixed(1)}%`:''}</span>`; }).join(' ');
       const xl=`<text x="8" y="${hh-3}" font-size="9" fill="#8a94a3">90일 전</text><text x="${Xp(-30).toFixed(1)}" y="${hh-3}" font-size="9" fill="#8a94a3">30일 전</text><text x="${Xp(0).toFixed(1)}" y="${hh-3}" font-size="9" fill="#8a94a3" text-anchor="end">현재</text>`;
-      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(Yahoo 가 90/30/7일 전 추정치를 직접 제공 — 즉시 곡선 · %는 90일 전 대비)</span>
+      /* (2026-08-09) '90일 변화' 열 제거 — 각 시점 값 옆에 (현재 대비 %) 를 붙여
+         "그때 대비 지금 얼마나 올라왔나"를 한 줄에서 바로 읽게 한다. */
+      const f2=v=>v==null?'—':v.toFixed(2);
+      const vsNow=(v,cur)=>{ if(v==null||cur==null||Math.abs(v)<1e-9) return '';
+        const p=(cur/v-1)*100;
+        return ` <span class="${p>0?'up':(p<0?'dn':'note')}" style="font-size:10.5px">(${p>0?'+':''}${p.toFixed(1)}%)</span>`; };
+      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(Yahoo 가 90/30/7일 전 추정치를 직접 제공 — 즉시 곡선 · 괄호 = 현재 대비 변화율)</span>
         <table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">
-        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전</th><th>30일 전</th><th>7일 전</th><th>현재</th><th>90일 변화</th></tr>`+
-        RV.map(z=>{ const ch=(z.d90&&z.cur!=null)?((z.cur/z.d90-1)*100):null;
-          const f2=v=>v==null?'—':v.toFixed(2);
-          return `<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px"><b style="color:${COLS[z.per]||'#888'}">${LBL[z.per]||z.per}</b></td>
-            <td style="text-align:right">${f2(z.d90)}</td><td style="text-align:right">${f2(z.d30)}</td><td style="text-align:right">${f2(z.d7)}</td><td style="text-align:right"><b>${f2(z.cur)}</b></td>
-            <td style="text-align:right">${P(ch)}</td></tr>`; }).join('')+'</table>'+
+        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전<span class="note">(현재대비)</span></th><th>30일 전<span class="note">(현재대비)</span></th><th>7일 전<span class="note">(현재대비)</span></th><th>현재</th></tr>`+
+        RV.map(z=>
+          `<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px"><b style="color:${COLS[z.per]||'#888'}">${LBL[z.per]||z.per}</b></td>
+            <td style="text-align:right">${f2(z.d90)}${vsNow(z.d90,z.cur)}</td><td style="text-align:right">${f2(z.d30)}${vsNow(z.d30,z.cur)}</td>
+            <td style="text-align:right">${f2(z.d7)}${vsNow(z.d7,z.cur)}</td><td style="text-align:right"><b>${f2(z.cur)}</b></td></tr>`).join('')+'</table>'+
         `<div style="margin-top:4px"><svg width="${w}" height="${hh}" style="max-width:100%">${zero}${parts}${xl}</svg><div class="note">${leg}</div></div></div>`;
     }
     /* ③ 목표주가 — 현재 유효 평균 + 스냅샷 리비전 (누적 중) */
