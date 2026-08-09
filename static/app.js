@@ -6642,11 +6642,20 @@ await _canvasFlow(c);
       POOL={kr:d.kr||[],us:d.us||[]}; mergeSec(); if(s2loaded) S2=POOL;
       $('scr_asof').innerHTML=poolMeta(d);
       /* (2026-07-24) 자동 갱신이 표·칩을 다시 그리며 스크롤이 최상단으로 튀는 문제 —
-         갱신 전 위치(페이지 + 표 내부)를 저장했다가 재렌더 직후와 다음 프레임에 복원 */
+         갱신 전 위치(페이지 + 표 내부)를 저장했다가 복원.
+         (2026-08-09 보강) 2프레임 복원으로는 부족했다 — 종목 상세가 열려 있으면 기업개요·
+         실적표·매출구성 등이 **비동기로 도착해 나중에 높이를 바꾸므로** 그 뒤에 다시 튄다.
+         → 1.2초 동안 매 프레임 복원하되, 사용자가 직접 스크롤하면 즉시 중단한다. */
       const sy=window.scrollY, sx=window.scrollX, tw=$('scr_tblwrap'), ts=tw?tw.scrollTop:0;
       refresh();
-      const back=()=>{ window.scrollTo(sx,sy); if(tw) tw.scrollTop=ts; };
-      back(); requestAnimationFrame(back);
+      let last=sy, t0=performance.now(), stop=false;
+      const onUser=()=>{ if(Math.abs(window.scrollY-last)>2) stop=true; };
+      ['wheel','touchmove','keydown','mousedown'].forEach(ev=>window.addEventListener(ev,()=>{stop=true;},{once:true,passive:true}));
+      const back=()=>{ if(stop) return;
+        if(window.scrollY!==sy){ window.scrollTo(sx,sy); last=window.scrollY; }
+        if(tw&&tw.scrollTop!==ts) tw.scrollTop=ts;
+        if(performance.now()-t0<1200) requestAnimationFrame(back); };
+      back(); onUser();
     }).catch(()=>{});
   }, 60000);
   document.addEventListener('click',e=>{ if(!e.target.closest('.fchip')) document.querySelectorAll('.fpop').forEach(x=>x.classList.remove('open')); });
