@@ -5317,11 +5317,12 @@ await _canvasFlow(c);
         const cur=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):null;
         const now=new Date(), cut=n=>{const d=new Date(now); d.setDate(d.getDate()-n); return d;};
         const pdate=s=>{const m=/^(\d\d)\/(\d\d)\/(\d\d)$/.exec(s||''); return m?new Date(2000+ +m[1], +m[2]-1, +m[3]):null;};
-        const avg=n=>{const a=pts.filter(z=>{const d=pdate(z.d); return d&&d>=cut(n);}).map(z=>z.tp);
-          return a.length?{v:a.reduce((x,y)=>x+y,0)/a.length,n:a.length}:null;};
+        const avg=n=>{const a=pts.filter(z=>{const d=pdate(z.d); return d&&d>=cut(n);});
+          return a.length?{v:a.reduce((x,z)=>x+z.tp,0)/a.length,n:a.length,
+            u:a.filter(z=>(z.chg||0)>0).length,d:a.filter(z=>(z.chg||0)<0).length}:null;};
         const fmt=o=>{ if(!o) return null;
           const gp=(cur&&cur>0)?((o.v/cur-1)*100):null;
-          return `<b>${Math.round(o.v).toLocaleString()}</b><span class="note">(${o.n}건)</span>`+
+          return `<b>${Math.round(o.v).toLocaleString()}</b><span class="note">(${o.n}건 · <span class="up">상향 ${o.u}</span>·<span class="dn">하향 ${o.d}</span>)</span>`+
             (gp==null?'':` <span class="${gp>0?'up':(gp<0?'dn':'note')}">${gp>0?'+':''}${gp.toFixed(1)}%</span>`); };
         const a30=fmt(avg(30)), a90=fmt(avg(90));
         if(a30||a90) avgLine=`<div style="font-size:11.5px;margin:4px 0 2px">`+
