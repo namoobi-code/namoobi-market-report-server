@@ -13,7 +13,9 @@ localhost 엔드포인트를 그대로 호출한다(파싱 로직 이원화 방�
 엔드포인트가 디스크(kr_seg_db.json)에 영구 저장하므로:
   · 이미 있고 보고서가 안 바뀐 종목 → 목록 1콜만 (몇백 ms)
   · 새 보고서가 나온 종목만 재파싱 (분기보고서 시즌에만 몰림)
-대상: 시총 상위 N(기본 300) + 이미 캐시에 있는 종목(사용자가 한 번이라도 본 것).
+대상: 기본 **전종목** (--top N 으로 제한 가능). 콜 수 검산(2026-08-09):
+  최초 1회 = 종목당 목록1+문서3 ≈ 1만 콜 (DART 일일 한도 2만 이내 · 3~4시간)
+  이후 매일 = 목록 1콜×전종목 ≈ 2,500콜 (~25분) — 새 보고서 나온 종목만 재파싱
 
 사용: kr_seg_warm.py [--top N]
 """
@@ -23,7 +25,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
 SEGDB = BASE / "data" / "db" / "kr_seg_db.json"
-TOP = int(sys.argv[sys.argv.index("--top") + 1]) if "--top" in sys.argv else 300
+TOP = int(sys.argv[sys.argv.index("--top") + 1]) if "--top" in sys.argv else 0   # 0 = 전종목
 
 
 def main():
@@ -31,7 +33,8 @@ def main():
         kr = json.loads(POOL.read_text(encoding="utf-8")).get("kr") or []
     except Exception:
         kr = []
-    top = [r["c"] for r in sorted(kr, key=lambda r: -(r.get("cap") or 0))[:TOP] if r.get("c")]
+    srt = sorted(kr, key=lambda r: -(r.get("cap") or 0))     # 시총 큰 순으로 먼저 워밍
+    top = [r["c"] for r in (srt[:TOP] if TOP else srt) if r.get("c")]
     try:
         cached = list(json.loads(SEGDB.read_text(encoding="utf-8")))
     except Exception:

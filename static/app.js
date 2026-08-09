@@ -5488,6 +5488,10 @@ await _canvasFlow(c);
     if(J&&(J.hist||[]).length){ _HIST=J.hist; _ovHist(); }   // 최근연혁 → 기업개요 아래
     if(!J||(!((J.reports||[]).length)&&!J.wise)){ el.innerHTML='<span class="note">매출 구성 정보 없음</span>'; return; }
     let hh='<b style="font-size:12.5px">📦 매출 구성·제품 정보</b> <span class="note">(소스 비교 · 24h 캐시 자동 갱신)</span>';
+    /* (2026-08-09) 요약(구성비%)을 맨 위로 — 한눈 요약 먼저, 상세 표는 아래 */
+    if(J.wise) hh+=`<div style="margin-top:6px"><b style="font-size:12px">FnGuide·WISEreport 요약</b>
+      <span class="note">매출구성 ${E(J.wise.asof||'')}</span> <a href="${E(J.wise.url)}" target="_blank" rel="noopener" style="font-size:11px">출처↗</a>
+      <div style="font-size:12px;margin-top:2px">`+J.wise.items.map(z=>`${E(z.n)} <b>${E(z.p)}%</b>`).join(' · ')+'</div></div>';
     (J.reports||[]).forEach(r=>{
       hh+=`<div style="margin-top:8px"><b style="font-size:12px">${E(r.nm)}</b> <span class="note">${E(r.dt)}</span>
         <a href="https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${E(r.rno)}" target="_blank" rel="noopener" style="font-size:11px">원본↗</a>`;
@@ -5499,9 +5503,6 @@ await _canvasFlow(c);
       } else hh+='<div class="note">매출실적 표 없음(보고서 양식 상이)</div>';
       if(r.seg_skip) hh+=`<div class="note" style="color:#b7791f">※ 부문별 재무정보 기재 생략(지배적 단일 사업부문) — 제품별 분리는 회사 IR 자료에만 있음</div>`;
       hh+='</div>'; });
-    if(J.wise) hh+=`<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px"><b style="font-size:12px">FnGuide·WISEreport 요약</b>
-      <span class="note">매출구성 ${E(J.wise.asof||'')}</span> <a href="${E(J.wise.url)}" target="_blank" rel="noopener" style="font-size:11px">출처↗</a>
-      <div style="font-size:12px;margin-top:2px">`+J.wise.items.map(z=>`${E(z.n)} <b>${E(z.p)}%</b>`).join(' · ')+'</div></div>';
     if(J.ir) hh+=`<div style="margin-top:8px;border-top:1px solid var(--line);padding-top:6px"><b style="font-size:12px">IR 실적발표 자료</b>
       <a href="${E(J.ir)}" target="_blank" rel="noopener" style="font-size:11px">바로가기↗</a>
       <div class="note">분기별 제품(DRAM/NAND 등)·응용처별 비중은 <b>IR 자료가 유일한 정본</b> — PDF 형태라 표 자동 표시는 미지원, 원문 링크로 확인</div></div>`;
