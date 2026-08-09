@@ -481,6 +481,11 @@ def us_fin(sym: str):
                             r2["epsE"] = raw(h0.get("epsEstimate"))
                         if raw(h0.get("surprisePercent")) is not None:
                             r2["sprE"] = round(raw(h0.get("surprisePercent")) * 100, 1)
+                        # (2026-08-09) 서프라이즈의 '실제'는 **조정 EPS**다. 표의 eps 는
+                        # GAAP 희석 EPS(stockanalysis) 라 둘을 섞으면 모순된 문장이 된다
+                        # (실측 ESE: 실제 1.26(GAAP) vs 컨센 2.12(조정) 인데 비트 +3.9%).
+                        if raw(h0.get("epsActual")) is not None:
+                            r2["epsA"] = raw(h0.get("epsActual"))
             for t0 in et:
                 per = t0.get("period")
                 if per in ("0q", "+1q", "0y", "+1y"):

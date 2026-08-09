@@ -5540,7 +5540,8 @@ await _canvasFlow(c);
       t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${r.p}</b></td>
         <td style="text-align:right">${F(r.s)}</td><td style="text-align:right">${P(yoy(i,'s'))}</td><td style="text-align:right">${P(qoq(i,'s'))}</td>
         <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
-        <td style="text-align:right">${cCell(r.sE,ssp,false)}</td><td style="text-align:right">${cCell(r.epsE,r.sprE,true)}</td>
+        <td style="text-align:right">${cCell(r.sE,ssp,false)}</td>
+        <td style="text-align:right" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'} (왼쪽 EPS 열은 GAAP 희석EPS)`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         <td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td></tr>`; });
     t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b>'
       +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
@@ -5958,8 +5959,12 @@ await _canvasFlow(c);
               const sl2=[];
               if(qq[qi].sE&&qq[qi].s!=null){ const sv=(qq[qi].s/qq[qi].sE-1)*100;
                 sl2.push(`매출 ${sv>0?'비트':'미스'} ${pc(sv)}`); }
-              if(qq[qi].sprE!=null) sl2.push(`EPS ${qq[qi].sprE>0?'비트':'미스'} ${pc(qq[qi].sprE)}`
-                +(qq[qi].epsE!=null?` (실제 ${(+qq[qi].eps).toFixed(2)} vs 컨센 ${(+qq[qi].epsE).toFixed(2)})`:''));
+              /* (2026-08-09) '실제'는 서프라이즈와 같은 기준인 **조정 EPS**(epsA)를 쓴다.
+                 위 YoY/QoQ 의 eps 는 GAAP 희석 EPS 라 섞으면 문장이 모순된다
+                 (실측 ESE: 실제 1.26(GAAP) vs 컨센 2.12(조정) 인데 비트 +3.9%). */
+              if(qq[qi].sprE!=null){ const ea=qq[qi].epsA;
+                sl2.push(`EPS ${qq[qi].sprE>0?'비트':'미스'} ${pc(qq[qi].sprE)}`
+                  +((ea!=null&&qq[qi].epsE!=null)?` (조정EPS 실제 ${(+ea).toFixed(2)} vs 컨센 ${(+qq[qi].epsE).toFixed(2)})`:'')); }
               if(sl2.length) rows.push(['서프', sl2.join('   ')]);
               const om=(qq[qi].s&&qq[qi].o!=null)?(qq[qi].o/qq[qi].s*100):null;
               const omY=(qi>=4&&qq[qi-4].s&&qq[qi-4].o!=null)?(qq[qi-4].o/qq[qi-4].s*100):null;
