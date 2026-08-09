@@ -5547,22 +5547,18 @@ await _canvasFlow(c);
     /* ①-b 컨센 추정 — 분기·연간 (회사가 공식으로 주는 미래치는 가이던스(매출·EPS), 여긴 애널 컨센) */
     const LBL={'0q':'진행분기','+1q':'다음분기','0y':'올해(FY)','+1y':'내년(FY)'};
     if((J.est||[]).length){
-      /* (2026-08-09) 매출·EPS·영업이익률·애널수 4열. 영업이익률 컨센은 야후 미제공이라
-         **최근 4분기 실적 영업이익률(TTM)** 을 참고치로 같은 칸에 표시한다(추정 아님을 명시). */
-      const ttm=(()=>{ const a=q.slice(-4).filter(z=>z.s&&z.o!=null);
-        if(!a.length) return null; const s=a.reduce((x,z)=>x+z.s,0), o=a.reduce((x,z)=>x+z.o,0);
-        return s?o/s*100:null; })();
-      t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $)</span>
+      /* (2026-08-09) 매출·EPS·애널수 3열. 영업이익률은 야후가 영업익 추정 자체를 안 줘서
+         컨센 산출 불가 — 모든 행에 같은 TTM 값이 반복돼 오해만 주므로 열을 뺐다
+         (실적 기준 영업이익률은 위 분기 실적표에 이미 있다). */
+      t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
-        <th>매출(E)</th><th>EPS(E)</th><th>영업이익률</th><th>애널수</th></tr>`+
+        <th>매출(E)</th><th>EPS(E)</th><th>애널수</th></tr>`+
         J.est.map(e2=>`<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
             <td style="padding:3px 4px"><b>${LBL[e2.per]||e2.per}</b></td><td style="text-align:center">${E(e2.end||'')}</td>
             <td style="text-align:right">${F(e2.rev)}</td>
             <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td>
-            <td style="text-align:right">${ttm==null?'—':`<span class="note">${ttm.toFixed(1)}%</span>`}</td>
-            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+
-        `</table><div class="note">영업이익률은 <b>컨센 미제공</b> — 최근 4분기 실적 기준 TTM 마진을 참고치로 표시</div></div>`;
+            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+'</table></div>';
       /* 직전 실적발표 가이던스 — 회사가 제시한 기간별 전망 vs 발표시점 컨센 + 서프 판정 */
       const gd2=J.gd;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">직전 실적발표 가이던스</b> <span class="note">${gd2?`(발표일 ${E(gd2.d)} · 8-K 보도자료 파싱)`:'(파싱된 값 없음)'}</span>
