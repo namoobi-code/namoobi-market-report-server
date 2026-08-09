@@ -446,14 +446,31 @@ def us_fin(sym: str):
                 snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4], "tp": r0[5]}
                         for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp FROM snap WHERE sym=? ORDER BY d", (sym,))]
                 cx.close()
-                # (2026-08-09) 매출 컨센(발표 시점) — 분기말 이후 첫 스냅샷의 rq0(진행분기 매출 추정)
-                # 이 그 분기의 '발표 전 컨센'이다. 스냅샷 적립 시작(08-09) 이후 분기부터 채워진다.
+                # (2026-08-09 재수정) 매출 컨센(발표 시점) — 조건은 하나뿐이다:
+                #   "그 분기가 끝난 뒤 ~ **그 분기 실적을 발표하기 전**" 사이의 스냅샷 rq0.
+                # 발표가 끝나면 0q 가 다음 분기로 넘어가므로 그 뒤 스냅샷은 다른 분기 값이다
+                # (실측 SNDK: 08-09 rq0=10,695 는 6월 분기가 아니라 9월 분기 추정이었다).
+                # 스냅샷 적립은 08-09 시작 → 그 이전에 발표된 분기는 값이 없는 게 정상.
+                anns = {}
+                try:
+                    lv = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
+                    for d8 in sorted(lv.get("days") or {}):
+                        for it in lv["days"][d8]:
+                            if it.get("c") == sym:
+                                anns.setdefault(d8, 1)
+                except Exception:
+                    pass
                 for r2 in q:
                     y0, m0 = int(r2["p"][:4]), int(r2["p"][5:7])
-                    qe = f"{y0:04d}-{m0:02d}-"
-                    cand = [s for s in snap if s.get("rq0") and s["d"] > qe]
+                    qe = f"{y0:04d}-{m0:02d}-31"
+                    am = y0 * 12 + m0
+                    ann = next((f"{d[:4]}-{d[4:6]}-{d[6:8]}" for d in sorted(anns)
+                                if 1 <= (int(d[:4]) * 12 + int(d[4:6])) - am <= 4), None)
+                    if not ann:
+                        continue
+                    cand = [s for s in snap if s.get("rq0") and qe < s["d"] < ann]
                     if cand:
-                        r2["sE"] = round(cand[0]["rq0"] / 1e6, 1)
+                        r2["sE"] = round(cand[-1]["rq0"] / 1e6, 1)   # 발표 직전 값
         except Exception:
             pass
         # ④ 최근 가이던스 (8-K 보도자료 파싱 · earnings_live_us) — 매출·EPS 중간값 + 컨센 갭
