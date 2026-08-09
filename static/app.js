@@ -5762,17 +5762,20 @@ await _canvasFlow(c);
          if(x.roundRect){ x.beginPath(); x.roundRect(bx,by,wmax,bh,8); x.fill(); x.stroke(); }
          else { x.fillRect(bx,by,wmax,bh); x.strokeRect(bx,by,wmax,bh); }
          x.fillStyle='#c0392b'; x.font='bold 15px sans-serif'; x.fillText(head, bx+10, by+21);
-         x.fillStyle='#3d454f'; x.font='15px sans-serif';
+         /* (2026-08-09) 실적팝업과 동일 구조 — 원본이 있는 행은 파란 링크 스타일로 그리고
+            그 자리에 실제 <a> 오버레이를 겹친다(제목 자체가 링크). */
          lines.forEach((z,q)=>{ let tx=z;
-           while(x.measureText(tx).width>wmax-20 && tx.length>4) tx=tx.slice(0,-2);
+           const link=(its[q]&&its[q].id!=null);
+           x.fillStyle=link?'#1f6feb':'#3d454f'; x.font='15px sans-serif';
+           while(x.measureText(tx).width>wmax-38 && tx.length>4) tx=tx.slice(0,-2);
            if(tx!==z) tx=tx.slice(0,-1)+'…';
-           x.fillText(tx, bx+10, by+42+q*22); });
+           x.fillText(tx+(link?' ↗':''), bx+10, by+42+q*22); });
          its.forEach((z,q)=>{ if(z.id!=null)
            _PLK.push({x:bx+7, y:by+42+q*22-17, w:wmax-14, h:22, u:'/dv/'+dcode+'/'+z.id}); });
-         if(byD[_DSEL].length>6){ x.fillStyle='#98a2ad';
+         if(byD[_DSEL].length>6){ x.fillStyle='#98a2ad'; x.font='15px sans-serif';
            x.fillText(`외 ${byD[_DSEL].length-6}건`, bx+10, by+42+lines.length*22); }
-         x.fillStyle='#1f6feb'; x.font='bold 13px sans-serif';
-         x.fillText('📄 행 클릭 → 공시 원본 열기 ↗', bx+10, by+bh-8);
+         x.fillStyle='#98a2ad'; x.font='12px sans-serif';
+         x.fillText('파란 제목 클릭 = 공시 원본 새 탭', bx+10, by+bh-8);
        }
      }
      // 십자선 — 호버 중인 봉 위치
