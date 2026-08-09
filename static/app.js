@@ -5512,10 +5512,13 @@ await _canvasFlow(c);
     const qoq=(i,k)=>pct(q[i][k], at(shift(q[i].p,-3),k));
     const P=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
     const opm=i=>(q[i].s&&q[i].o!=null)?(q[i].o/q[i].s*100):null;
+    /* 전환 배지 — QoQ 칸에 붙으며 **부호가 바뀐 그 분기에만** 표시한다.
+       ⚡흑전 = 직전 분기 적자(−) → 이번 분기 흑자(+) · ⚡적전 = 흑자(+) → 적자(−)
+       흑자를 계속 유지 중인 분기에는 붙지 않는다(전환이 아니라 유지이므로). */
     const turn=(i,k)=>{ const pv=at(shift(q[i].p,-3),k), cv=q[i][k];
       if(pv==null||cv==null) return '';
-      if(pv<0&&cv>0) return ' <b style="color:#1f9d55">⚡흑전</b>';
-      if(pv>0&&cv<0) return ' <b style="color:#c0392b">⚡적전</b>'; return ''; };
+      if(pv<0&&cv>0) return ` <b style="color:#1f9d55" title="직전 분기 ${pv.toFixed(2)} 적자 → 이번 분기 ${cv.toFixed(2)} 흑자">⚡흑전</b>`;
+      if(pv>0&&cv<0) return ` <b style="color:#c0392b" title="직전 분기 ${pv.toFixed(2)} 흑자 → 이번 분기 ${cv.toFixed(2)} 적자">⚡적전</b>`; return ''; };
     /* ① 분기 실적표 — (2026-08-09) 미국식 보는 순서: 매출 → EPS → 서프라이즈 → 영업이익률.
        영업익·순익 열은 빼고(이익률 계산에만 사용) EPS 를 전면에 — 미국 시장의 정식 지표. */
     const eF=v=>v==null?'—':(+v).toFixed(2);
@@ -5538,7 +5541,8 @@ await _canvasFlow(c);
         <td style="text-align:right"><b>${eF(r.eps)}</b></td><td style="text-align:right">${P(yoy(i,'eps'))}</td><td style="text-align:right">${P(qoq(i,'eps'))}${turn(i,'eps')}</td>
         <td style="text-align:right">${cCell(r.sE,ssp,false)}</td><td style="text-align:right">${cCell(r.epsE,r.sprE,true)}</td>
         <td style="text-align:right">${m==null?'—':m.toFixed(1)+'%'}</td></tr>`; });
-    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b> · 음수 기저 비율은 부호 왜곡 가능</div>';
+    t1+='</table><div class="note" style="margin-top:3px">실적치(10-Q/K) — 최신 분기는 보고서 제출까지 며칠 지연 가능 · EPS컨센·서프는 발표 시점 기준(야후 · 최근 4분기) · <b>매출 컨센(발표시점)은 08-09 시작한 일별 스냅샷이 쌓인 다음 분기부터</b>'
+      +'<br>변화율 = (이번−기저)÷|기저| · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
     /* (2026-08-09) 가이던스 vs 컨센 비교 표+막대 — 실전 우선순위 ①매출 ②EPS.
        자동 파싱 가능한 두 항목만 숫자로, 마진·EBITDA·FCF·CAPEX·가입자 등은 보도자료·어닝콜
        원문에만 있어(형식 자유) 링크로 안내한다. 비교 대상은 '회사 가이던스 vs 애널 컨센'
