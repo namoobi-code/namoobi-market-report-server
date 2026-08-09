@@ -72,6 +72,12 @@ def parse(fd):
         v = rv(d)
         if v is not None:
             out[lab] = v
+    # (2026-08-09) 분기 종료일 — 가이던스가 어느 분기를 가리키는지 판정하는 기준.
+    # 회사가 말하는 '다음 분기' = 발표 시점에 진행 중인 분기(0q) 이므로 종료일 비교가 필요하다.
+    for lab, per in (("q0e", "0q"), ("q1e", "+1q")):
+        t_ = next((x for x in et if x.get("period") == per), None)
+        if t_ and t_.get("endDate"):
+            out[lab] = t_["endDate"]
     t1 = next((x for x in et if x.get("period") == "+1q"), None)
     if t1:
         rr = t1.get("epsRevisions") or {}

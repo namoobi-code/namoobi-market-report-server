@@ -60,6 +60,7 @@ def main():
             r = pool_us.get(c) or {}
             if r.get("rq1") is None and r.get("eq1") is None:
                 continue
+            it["_d8"] = d8                                # 발표일 보관(기준 분기 판정)
             todo[c] = it
     syms = list(todo)
     if LIMIT:
@@ -78,7 +79,9 @@ def main():
         time.sleep(0.15)
         try:
             g = parse_guidance(exhibit_text(cik, acc))
-            return sym, guidance_gap(sym, g, pool_us)
+            d8 = todo[sym].get("_d8")                    # 그 항목의 발표일(기준 분기 판정용)
+            ann = f"{d8[:4]}-{d8[4:6]}-{d8[6:8]}" if d8 else None
+            return sym, guidance_gap(sym, g, pool_us, ann)
         except Exception:
             return sym, {}
 

@@ -538,7 +538,9 @@ def us_fin(sym: str):
                 for it in live["days"][d8]:
                     if it.get("c") == sym and (it.get("g_rev") is not None or it.get("g_eps") is not None):
                         gd = {"d": d8, "rev": it.get("g_rev"), "revGap": it.get("g_rev_gap"),
-                              "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"), "acc": it.get("acc")}
+                              "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"),
+                              "per": it.get("g_per") or "0q",     # 가이던스가 가리키는 분기
+                              "acc": it.get("acc")}
         except Exception:
             pass
         # (2026-08-09) 예전엔 여기서 10분기로 잘라 앞쪽 행의 YoY 기준(t−4)이 사라졌다.
@@ -740,13 +742,33 @@ def earn_dates_us(sym: str, days: int = 400):
             it = (items[i] if i < len(items) else "") or ""
             if f == "8-K" and "2.02" in it:
                 out.append({"d": d.replace("-", ""), "acc": accs[i], "f": "8-K"})
-            elif f == "6-K":
+            elif f == "6-K":                                # (아래 6-K 는 원래 분기당 1건)
                 q = d[:4] + str((int(d[5:7]) - 1) // 3)      # 분기당 1건만
                 if q in seen_q:
                     continue
                 seen_q.add(q)
                 out.append({"d": d.replace("-", ""), "acc": accs[i], "f": "6-K"})
         out.sort(key=lambda x: x["d"])
+        # (2026-08-09) 1년에 5~6개가 찍히던 문제 — Item 2.02 는 정규 분기실적 외에
+        # **잠정치 사전 공시·실적 정정**에도 쓰인다(실측 ESE: 4/15 예비 + 5/7 확정으로 2건).
+        # 실적발표는 분기당 1회이므로, '보고 대상 분기'별로 묶어 **마지막(확정) 1건만** 남긴다.
+        # 보고 대상 분기 = 접수일에서 10일을 뺀 시점이 속한 직전 분기말(회계연도와 무관하게
+        # 분기말이 3·6·9·12월인 대부분의 기업에 들어맞는다).
+        def _rq(d8):
+            y, m = int(d8[:4]), int(d8[4:6])
+            if int(d8[6:8]) <= 10:                          # 월초 접수는 직전 달 기준으로
+                m -= 1
+                if m == 0: y, m = y - 1, 12
+            qm = ((m - 1) // 3) * 3                          # 직전 분기말 월(0,3,6,9)
+            if qm == 0: y, qm = y - 1, 12
+            return f"{y}{qm:02d}"
+        keep = {}
+        for z in out:
+            if z["f"] == "8-K":
+                keep[_rq(z["d"])] = z                        # 같은 분기면 뒤(확정)가 남는다
+            else:
+                keep[z["d"]] = z
+        out = sorted(keep.values(), key=lambda x: x["d"])
         res = {"items": out, "cik": cik}
         _earn_cache[sym] = (now, res)
         if len(_earn_cache) > 400:

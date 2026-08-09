@@ -175,28 +175,45 @@ def parse_guidance(txt):
     return out
 
 
-def guidance_gap(sym, g, pool_us):
-    """가이던스 중간값 vs 애널리스트 컨센서스(다음 분기) → 갭%.
+def guidance_gap(sym, g, pool_us, ann=None):
+    """가이던스 중간값 vs **그 가이던스가 가리키는 분기**의 컨센서스 → 갭%.
 
-    컨센서스는 screener_pool 의 rq1(매출)·eq1(EPS) — Yahoo earningsTrend '+1q' 값이다.
+    (2026-08-09 근본 수정) 예전에는 무조건 +1q(rq1·eq1)와 비교했다. 그러나 회사가 실적을
+    발표하며 제시하는 '다음 분기'는 **그 시점에 진행 중인 분기**, 즉 Yahoo 의 0q 다.
+    +1q 는 그 다음 분기여서 한 칸 밀린 값과 비교하게 된다.
+      실측 ESE(2026-08-06 발표, 가이던스 EPS 2.55~2.65 = 중간값 2.60)
+        0q(9/30 종료) 컨센 2.57 → 갭 +1.0%  ← 실제(사실상 인라인)
+        +1q(12/31 종료) 컨센 1.81 → 갭 +43.3% ← 예전 표시(대폭 상회로 왜곡)
+      실측 SNDK: 0q 기준 −1.4% 인데 +1q 기준 −14.0% 로 과장됐다.
+    → 발표일 이후에 끝나는 첫 분기를 기준으로 삼는다(보통 0q, 야후가 아직 롤오버 전이면 +1q).
     """
     r = pool_us.get(sym) or {}
     out = {}
+    # 기준 분기 선택: 발표일(ann, YYYY-MM-DD) 이후에 끝나는 첫 컨센 분기
+    base_eps, base_rev, base_per = r.get("eq0"), r.get("rq0"), "0q"
+    if ann:
+        e0, e1 = r.get("q0e"), r.get("q1e")               # 각 분기 종료일(us_consensus 가 저장)
+        if e0 and e0 <= ann and e1:                        # 0q 가 이미 끝났으면(롤오버 전) +1q
+            base_eps, base_rev, base_per = r.get("eq1"), r.get("rq1"), "+1q"
+    if base_eps is None and base_rev is None:              # 스냅샷 이전 데이터 폴백
+        base_eps, base_rev, base_per = r.get("eq1"), r.get("rq1"), "+1q"
     # 분기 가이던스가 컨센서스와 ±60% 넘게 벌어지는 일은 사실상 없다.
     # 그 정도면 연간↔분기를 잘못 물렸거나 파싱이 틀린 것 → 버린다(틀린 값보다 빈칸이 낫다).
     LIM = 60.0
-    if g.get("rev_lo") and r.get("rq1"):
+    if g.get("rev_lo") and base_rev:
         mid = (g["rev_lo"] + g["rev_hi"]) / 2
-        gp = (mid / r["rq1"] - 1) * 100
+        gp = (mid / base_rev - 1) * 100
         if abs(gp) <= LIM:
             out["g_rev"] = round(mid / 1e6, 1)              # 백만 달러
             out["g_rev_gap"] = round(gp, 1)
-    if g.get("eps_lo") and r.get("eq1") and r["eq1"] > 0:
+    if g.get("eps_lo") and base_eps and base_eps > 0:
         mid = (g["eps_lo"] + g["eps_hi"]) / 2
-        gp = (mid / r["eq1"] - 1) * 100
+        gp = (mid / base_eps - 1) * 100
         if abs(gp) <= LIM:
             out["g_eps"] = round(mid, 2)
             out["g_eps_gap"] = round(gp, 1)
+    if out:
+        out["g_per"] = base_per                             # 어느 분기와 비교했는지 기록
     return out
 
 
@@ -259,7 +276,8 @@ def main():
         gd = {}
         if is_ern:                                   # 실적 8-K 만 보도자료를 열어 가이던스 확인
             try:
-                gd = guidance_gap(sym, parse_guidance(exhibit_text(cik, ac.group(1))), pool_us)
+                gd = guidance_gap(sym, parse_guidance(exhibit_text(cik, ac.group(1))), pool_us,
+                                  et.strftime("%Y-%m-%d"))     # 발표일 → 기준 분기 판정
             except Exception:
                 gd = {}
             if gd.get("g_rev_gap") is not None:
