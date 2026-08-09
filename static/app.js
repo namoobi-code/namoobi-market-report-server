@@ -5559,16 +5559,24 @@ await _canvasFlow(c);
          (실적 기준 영업이익률은 위 분기 실적표에 이미 있다). */
       /* (2026-08-09) 순서: 가이던스(회사 전망) → 컨센서스 추정(애널) — 실전 우선순위대로 */
       const gd2=J.gd;
+      /* 8-K 접수 인덱스 → 보도자료(Exhibit 99) 원문. 진행분기·다음분기·연간 전망의
+         실제 문장이 여기에 있다(우리 파서는 분기 매출·EPS만 자동 추출). */
+      const gdU=(gd2&&gd2.acc&&_ECIK)?`https://www.sec.gov/Archives/edgar/data/${parseInt(_ECIK,10)}/${String(gd2.acc).replace(/-/g,'')}/${gd2.acc}-index.htm`:null;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">직전 실적발표 가이던스</b> <span class="note">${gd2?`(발표일 ${E(gd2.d)} · 8-K 보도자료 파싱)`:'(파싱된 값 없음)'}</span>
+        ${gdU?`<a href="${gdU}" target="_blank" rel="noopener" style="font-size:11px">📄 실적발표 자료 원문↗</a>`:''}
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th>
         <th>매출 가이던스</th><th>매출 컨센</th><th>판정</th><th>EPS 가이던스</th><th>EPS 컨센</th><th>판정</th></tr>`+
         ['0q','+1q','0y','+1y'].map(per=>{
           const e3=(J.est||[]).find(z=>z.per===per)||{};
-          /* 8-K 파서는 '다음 분기(+1q)' 가이던스만 신뢰 가능하게 뽑는다(연간은 분기 컨센과
-             섞이는 오류가 잦아 제외 — 실측 DELL $27~60B). 나머지 기간은 회사 미제시/미지원. */
-          const gr=(per==='+1q'&&gd2)?gd2.rev:null, ge=(per==='+1q'&&gd2)?gd2.eps:null;
-          const jr=(per==='+1q'&&gd2)?gd2.revGap:null, je=(per==='+1q'&&gd2)?gd2.epsGap:null;
+          /* (2026-08-09 수정) 가이던스를 **그 값이 실제로 가리키는 분기 행**에 놓는다.
+             회사가 실적발표에서 주는 '다음 분기'는 그 시점 진행 중인 분기(0q)라
+             예전처럼 +1q 행에 고정하면 컨센 열과 갭이 서로 다른 분기가 됐다
+             (실측 ABNB: 가이던스 4,730 · 갭 0.0% 인데 옆 컨센은 +1q 3,154). */
+          const gper=(gd2&&gd2.per)||'0q';
+          const hit=(gd2&&per===gper);
+          const gr=hit?gd2.rev:null, ge=hit?gd2.eps:null;
+          const jr=hit?gd2.revGap:null, je=hit?gd2.epsGap:null;
           const J2=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':'dn'}"><b>${v>0?'상회':'하회'}</b> ${v>0?'+':''}${(+v).toFixed(1)}%</span>`;
           return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b> <span class="note">${E(e3.end||'')}</span></td>
             <td style="text-align:right">${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'}</td>
