@@ -371,27 +371,62 @@ def kr_seg(code: str):
         raise HTTPException(400, "bad code")
     now = time.time()
     hit = _seg_cache.get(code)
-    if hit and now - hit[0] < 86400:
+    if hit and now - hit[0] < 600:                    # 메모리 10분 (빠른 재조회용)
         return hit[1]
     import io, zipfile
     CL = lambda x: re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", x)).strip()
-    res = {"reports": [], "wise": None, "ir": None}
+    # ── (2026-08-09) 디스크 영구 캐시 — 사용자 첫 조회가 수십 초 걸리는 문제 해소.
+    #    새벽 cron(kr_seg_warm.py)이 시총 상위 + 기존 조회 종목을 미리 만들어 둔다.
+    #    24h 지나면 목록 1콜로 '새 보고서 여부'만 확인 — 같으면 재파싱 없이 그대로 쓴다.
+    segdb_p = DB / "kr_seg_db.json"
+    try:
+        segdb = json.loads(segdb_p.read_text(encoding="utf-8"))
+    except Exception:
+        segdb = {}
+    ent = segdb.get(code)
+    def _picked_list(key, cc):
+        bgn = (datetime.now() - timedelta(days=400)).strftime("%Y%m%d")
+        j = json.loads(urllib.request.urlopen(
+            f"https://opendart.fss.or.kr/api/list.json?crtfc_key={key}&corp_code={cc}"
+            f"&bgn_de={bgn}&end_de={datetime.now().strftime('%Y%m%d')}&pblntf_ty=A&page_count=30",
+            timeout=20).read())
+        picked, seen = [], set()
+        for r0 in j.get("list") or []:                # 최신순 — 유형별 첫 건만
+            for ty in ("사업보고서", "반기보고서", "분기보고서"):
+                if ty in (r0.get("report_nm") or "") and ty not in seen:
+                    seen.add(ty); picked.append((ty, r0))
+        return picked[:3]
+    def _save(ent2):
+        segdb[code] = ent2
+        try:
+            segdb_p.write_text(json.dumps(segdb, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+    key = cc = None
     try:
         key = (BASE / "keys" / "opendart.txt").read_text().strip()
         cc = (json.loads((BASE / "data" / "watch" / "dart_corp_map.json").read_text(encoding="utf-8"))
               .get("map") or {}).get(code)
+    except Exception:
+        pass
+    if ent:
+        if now - ent.get("at", 0) < 86400:
+            _seg_cache[code] = (now, ent["res"]); return ent["res"]
+        try:                                          # 하루 지남 → 새 보고서 있는지만 확인(1콜)
+            picked = _picked_list(key, cc) if (key and cc) else []
+            rset = [p[1]["rcept_no"] for p in picked]
+            if rset == ent.get("rset"):
+                ent["at"] = now; _save(ent)
+                _seg_cache[code] = (now, ent["res"]); return ent["res"]
+        except Exception:                             # 확인 실패 시 저장분이라도 반환
+            _seg_cache[code] = (now, ent["res"]); return ent["res"]
+    res = {"reports": [], "wise": None, "ir": None}
+    rset = []
+    try:
         if key and cc:
-            bgn = (datetime.now() - timedelta(days=400)).strftime("%Y%m%d")
-            j = json.loads(urllib.request.urlopen(
-                f"https://opendart.fss.or.kr/api/list.json?crtfc_key={key}&corp_code={cc}"
-                f"&bgn_de={bgn}&end_de={datetime.now().strftime('%Y%m%d')}&pblntf_ty=A&page_count=30",
-                timeout=20).read())
-            picked, seen = [], set()
-            for r0 in j.get("list") or []:                      # 최신순 — 유형별 첫 건만
-                for ty in ("사업보고서", "반기보고서", "분기보고서"):
-                    if ty in (r0.get("report_nm") or "") and ty not in seen:
-                        seen.add(ty); picked.append((ty, r0))
-            for ty, r0 in picked[:3]:
+            picked = _picked_list(key, cc)
+            rset = [p[1]["rcept_no"] for p in picked]
+            for ty, r0 in picked:
                 try:
                     b = urllib.request.urlopen(
                         f"https://opendart.fss.or.kr/api/document.xml?crtfc_key={key}"
@@ -452,8 +487,9 @@ def kr_seg(code: str):
     IRS = {"000660": "https://www.skhynix.com/ir/UI-FR-IR06/",
            "005930": "https://www.samsung.com/global/ir/reports-disclosures/earnings-release/"}
     res["ir"] = IRS.get(code)
+    _save({"at": now, "rset": rset, "res": res})
     _seg_cache[code] = (now, res)
-    if len(_seg_cache) > 100:
+    if len(_seg_cache) > 200:
         _seg_cache.clear()
     return res
 
