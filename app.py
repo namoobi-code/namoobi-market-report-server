@@ -417,6 +417,7 @@ def us_fin(sym: str):
         # 12분기 제공 · 마진 계산용 영업익·순익 포함.
         sa_ok = False
         sa_seg = []
+        cur = None      # (2026-08-10) 결산 통화 — ADR 판별 (실측 ASML EUR·TSM TWD·MFG JPY·HSBC USD)
         try:
             sa = json.loads(urllib.request.urlopen(urllib.request.Request(
                 f"https://stockanalysis.com/stocks/{sym.lower()}/financials/__data.json?p=quarterly",
@@ -467,6 +468,13 @@ def us_fin(sym: str):
                             vals.append(round(v2 / 1e6, 1) if isinstance(v2, (int, float)) else None)
                         rows2.append({"p": str(d2)[:7].replace("-", "/"), "v": vals})
                     sa_seg.append({"cols": [_lab(c) for c in cols], "rows": rows2})
+            # (2026-08-10) 결산 통화 — 같은 응답의 메타 노드("currency" 인덱스 참조)
+            for v0 in arr:
+                if isinstance(v0, dict) and "currency" in v0 and isinstance(v0["currency"], int):
+                    c0 = arr[v0["currency"]]
+                    if isinstance(c0, str) and len(c0) == 3:
+                        cur = c0.upper()
+                        break
         except Exception:
             pass
         # (2026-08-09) **실적 표는 한 소스만 쓴다** — 소스를 섞으면 같은 분기의 값이
@@ -578,7 +586,15 @@ def us_fin(sym: str):
         # earnings-history 표가 발표일·매출컨센·실제매출을 기본 2년(8분기) 제공한다
         # (거래소가 틀려도 자동 리다이렉트 — 실측 NYSE/ABNB→NASDAQ/ABNB, 서버 IP 허용 확인).
         # 예전의 자체 스냅샷 유도값(rq0)과 섞으면 열 안에서 소스가 갈리므로 이 열은 이것만 쓴다.
+        # (2026-08-10) **US$ 결산 종목만** — 현지통화 결산 ADR 은 MB 데이터가 신뢰 불가:
+        #   · 통화 뒤섞임 (실측 TSM: US$ 와 NT$ 가 한 열에, MFG: ¥ 값을 $ 로 오표기)
+        #   · 환율 시점 차이로 판정 부호까지 뒤집힘 (실측 ASML Q1'25: € 기준 소폭 미스인데
+        #     MB US$ 쌍은 +11% 비트 — 추정은 환율 1.05 시점, 실제는 1.13 시점 환산)
+        #   · EPS 도 오염 (실측 ASML Q2'25: 실제는 비트인데 MB 는 −23.4% 미스)
+        # ADR 은 EPS 컨센을 기존 야후(ADR US$ · 내부 일관)로 쓰고 매출컨센 열은 프론트가 숨긴다.
         try:
+            if cur not in (None, "USD"):
+                raise ValueError("non-USD reporter — MB skip")
             hmb = urllib.request.urlopen(urllib.request.Request(
                 f"https://www.marketbeat.com/stocks/NASDAQ/{sym.upper()}/earnings/",
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126"}),
@@ -644,8 +660,9 @@ def us_fin(sym: str):
         # 스냅샷(매일 08:00, 08-09 시작)의 rq0 중 '분기말 < d < 발표일' 구간 마지막 값
         # = 발표 직전 컨센. 우선순위는 MarketBeat → 스냅샷 순으로 고정해 두 값이 섞이지 않는다.
         # (08-09 이전 발표 분기는 폴백도 불가 — 공란이 정직한 표기)
+        # 스냅샷 rq0 도 야후 US$ 추정이므로 현지통화 결산 ADR 에는 같은 이유로 쓰지 않는다.
         try:
-            if any(r2.get("sE") is None for r2 in q) and snap:
+            if cur in (None, "USD") and any(r2.get("sE") is None for r2 in q) and snap:
                 anns = set()
                 try:
                     lv = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
@@ -683,7 +700,7 @@ def us_fin(sym: str):
             pass
         # (2026-08-09) 예전엔 여기서 10분기로 잘라 앞쪽 행의 YoY 기준(t−4)이 사라졌다.
         # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
-        res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg,
+        res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg, "cur": cur,
                "unit": "백만$ · EPS=$",
                "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + MarketBeat(발표시점 매출·EPS컨센) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
