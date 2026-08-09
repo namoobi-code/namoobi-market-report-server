@@ -570,31 +570,42 @@ def us_fin(sym: str):
                     snap = [{"d": r0[0], "eq0": r0[1], "rq0": r0[2], "eq1": r0[3], "rq1": r0[4], "tp": r0[5]}
                             for r0 in cx.execute("SELECT d,eq0,rq0,eq1,rq1,tp FROM snap WHERE sym=? ORDER BY d", (sym,))]
                 cx.close()
-                # (2026-08-09 재수정) 매출 컨센(발표 시점) — 조건은 하나뿐이다:
-                #   "그 분기가 끝난 뒤 ~ **그 분기 실적을 발표하기 전**" 사이의 스냅샷 rq0.
-                # 발표가 끝나면 0q 가 다음 분기로 넘어가므로 그 뒤 스냅샷은 다른 분기 값이다
-                # (실측 SNDK: 08-09 rq0=10,695 는 6월 분기가 아니라 9월 분기 추정이었다).
-                # 스냅샷 적립은 08-09 시작 → 그 이전에 발표된 분기는 값이 없는 게 정상.
-                anns = {}
-                try:
-                    lv = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
-                    for d8 in sorted(lv.get("days") or {}):
-                        for it in lv["days"][d8]:
-                            if it.get("c") == sym:
-                                anns.setdefault(d8, 1)
-                except Exception:
-                    pass
-                for r2 in q:
-                    y0, m0 = int(r2["p"][:4]), int(r2["p"][5:7])
-                    qe = f"{y0:04d}-{m0:02d}-31"
-                    am = y0 * 12 + m0
-                    ann = next((f"{d[:4]}-{d[4:6]}-{d[6:8]}" for d in sorted(anns)
-                                if 1 <= (int(d[:4]) * 12 + int(d[4:6])) - am <= 4), None)
-                    if not ann:
+        except Exception:
+            pass
+        # ③-2 (2026-08-10) 매출 컨센(발표 시점) — MarketBeat 어닝 이력 표 **단일 소스**.
+        # Yahoo 는 과거 매출 컨센을 안 준다(어닝 캘린더 API 에 revenue 필드를 넣으면
+        # HTTP 400 — 실측). MarketBeat /stocks/{거래소}/{sym}/earnings/ 의
+        # earnings-history 표가 발표일·매출컨센·실제매출을 기본 2년(8분기) 제공한다
+        # (거래소가 틀려도 자동 리다이렉트 — 실측 NYSE/ABNB→NASDAQ/ABNB, 서버 IP 허용 확인).
+        # 예전의 자체 스냅샷 유도값(rq0)과 섞으면 열 안에서 소스가 갈리므로 이 열은 이것만 쓴다.
+        try:
+            hmb = urllib.request.urlopen(urllib.request.Request(
+                f"https://www.marketbeat.com/stocks/NASDAQ/{sym.upper()}/earnings/",
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126"}),
+                timeout=20).read().decode("utf-8", "ignore")
+            i0 = hmb.find('id="earnings-history"')
+            mnq = lambda p: int(p[:4]) * 12 + int(p[5:7])
+
+            def _mbv(s):                       # "$78.42B" → 백만$ (표의 s 와 같은 단위)
+                m2 = re.search(r"\$([\d,.]+)\s*([BMK]?)", s or "")
+                if not m2:
+                    return None
+                return float(m2.group(1).replace(",", "")) * {"B": 1e3, "M": 1.0, "K": 1e-3}.get(m2.group(2), 1e-6)
+            if i0 > 0:
+                for tr0 in re.findall(r"<tr[^>]*>(.*?)</tr>", hmb[i0:i0 + 60000], re.S):
+                    cs = [re.sub(r"<[^>]+>", "", c).strip()
+                          for c in re.findall(r"<td[^>]*>(.*?)</td>", tr0, re.S)]
+                    # 열: 발표일|회계분기|EPS컨센|보고EPS|Beat/Miss|GAAP EPS|매출컨센|실제매출
+                    if len(cs) < 8 or "Estimated" in cs[0]:
+                        continue                # 미래 예정 행
+                    m3 = re.match(r"(\d{1,2})/(\d{1,2})/(\d{4})", cs[0])
+                    revE = _mbv(cs[6])
+                    if not m3 or revE is None:
                         continue
-                    cand = [s for s in snap if s.get("rq0") and qe < s["d"] < ann]
-                    if cand:
-                        r2["sE"] = round(cand[-1]["rq0"] / 1e6, 1)   # 발표 직전 값
+                    am3 = int(m3.group(3)) * 12 + int(m3.group(1))
+                    cand3 = [r2 for r2 in q if 0 <= am3 - mnq(r2["p"]) <= 3]  # 발표일 직전 분기
+                    if cand3:
+                        max(cand3, key=lambda z: mnq(z["p"]))["sE"] = round(revE, 1)
         except Exception:
             pass
         # ④ 최근 가이던스 (8-K 보도자료 파싱 · earnings_live_us) — 매출·EPS 중간값 + 컨센 갭
@@ -614,7 +625,7 @@ def us_fin(sym: str):
         # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
         res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg,
                "unit": "백만$ · EPS=$",
-               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + 일별 스냅샷"}
+               "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + MarketBeat(발표시점 매출컨센) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
         if len(_usfin_cache) > 300:
             _usfin_cache.clear()
