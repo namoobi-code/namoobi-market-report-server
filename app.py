@@ -631,6 +631,35 @@ def us_fin(sym: str):
                         r2["sprE"] = round((ea3 - ee3) / abs(ee3) * 100, 1)
         except Exception:
             pass
+        # ③-3 (2026-08-10) MarketBeat 이력에 구멍이 난 분기만 자체 스냅샷으로 폴백.
+        # 실측 BAC: 7/14 발표 행이 한 달 지나도 이력에 없다(최근 실적이 4/15 로 표시).
+        # 스냅샷(매일 08:00, 08-09 시작)의 rq0 중 '분기말 < d < 발표일' 구간 마지막 값
+        # = 발표 직전 컨센. 우선순위는 MarketBeat → 스냅샷 순으로 고정해 두 값이 섞이지 않는다.
+        # (08-09 이전 발표 분기는 폴백도 불가 — 공란이 정직한 표기)
+        try:
+            if any(r2.get("sE") is None for r2 in q) and snap:
+                anns = set()
+                try:
+                    lv = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
+                    for d8 in sorted(lv.get("days") or {}):
+                        if any(it.get("c") == sym for it in lv["days"][d8]):
+                            anns.add(d8)
+                except Exception:
+                    pass
+                for r2 in q:
+                    if r2.get("sE") is not None:
+                        continue
+                    y0, m0 = int(r2["p"][:4]), int(r2["p"][5:7])
+                    qe, am = f"{y0:04d}-{m0:02d}-31", y0 * 12 + m0
+                    ann = next((f"{d[:4]}-{d[4:6]}-{d[6:8]}" for d in sorted(anns)
+                                if 1 <= (int(d[:4]) * 12 + int(d[4:6])) - am <= 4), None)
+                    if not ann:
+                        continue
+                    cand = [s0 for s0 in snap if s0.get("rq0") and qe < s0["d"] < ann]
+                    if cand:
+                        r2["sE"] = round(cand[-1]["rq0"] / 1e6, 1)
+        except Exception:
+            pass
         # ④ 최근 가이던스 (8-K 보도자료 파싱 · earnings_live_us) — 매출·EPS 중간값 + 컨센 갭
         gd = None
         try:
