@@ -516,7 +516,8 @@ def us_fin(sym: str):
                                 "epsY": raw(ee.get("yearAgoEps")), "revY": (raw(re_.get("yearAgoRevenue")) or 0) / 1e6 or None})
                     tr = t0.get("epsTrend") or {}
                     rev.append({"per": per, "cur": raw(tr.get("current")), "d7": raw(tr.get("7daysAgo")),
-                                "d30": raw(tr.get("30daysAgo")), "d90": raw(tr.get("90daysAgo"))})
+                                "d30": raw(tr.get("30daysAgo")), "d60": raw(tr.get("60daysAgo")),
+                                "d90": raw(tr.get("90daysAgo"))})
         except Exception:
             pass
         # ③ 스냅샷 (목표가·추정 일별 — 2026-08-09 적립 시작)

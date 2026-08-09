@@ -5607,7 +5607,7 @@ await _canvasFlow(c);
          기간 순서와 색 순서가 일치해 범례를 안 봐도 어느 선이 먼 미래인지 짐작된다. */
       const COLS={'0q':'#e03131','+1q':'#f08c00','0y':'#2f9e44','+1y':'#1c7ed6'};
       const Xp=t=>52+(t+90)/90*(w-118);
-      const pcv=z=>[['d90',-90],['d30',-30],['d7',-7],['cur',0]]
+      const pcv=z=>[['d90',-90],['d60',-60],['d30',-30],['d7',-7],['cur',0]]
         .map(([k,t])=>(z[k]!=null&&z.d90)?[t,(z[k]/z.d90)*100,z[k]]:null).filter(Boolean);
       let lo=100,hi=100;
       RV.forEach(z=>pcv(z).forEach(([t,v])=>{ if(v<lo)lo=v; if(v>hi)hi=v; }));
@@ -5617,28 +5617,33 @@ await _canvasFlow(c);
       const ticks=[100+sp,100,100-sp].map(v=>
         `<line x1="52" y1="${Yc(v).toFixed(1)}" x2="${w-8}" y2="${Yc(v).toFixed(1)}" stroke="${Math.abs(v-100)<.01?'#c9d2dd':'#eef1f5'}" ${Math.abs(v-100)<.01?'stroke-dasharray="4,3"':''}/>`+
         `<text x="48" y="${(Yc(v)+3).toFixed(1)}" font-size="9" fill="#8a94a3" text-anchor="end">${v>100?'+':''}${(v-100).toFixed(1)}%</text>`).join('');
+      /* 숫자 라벨은 처음(90일 전)과 끝(현재)에만 — 중간 점은 겹쳐서 읽히지 않는다(호버로 확인) */
       const parts=RV.map(z=>{ const col=COLS[z.per]||'#888', pt=pcv(z);
         return (pt.length>=2?`<polyline points="${pt.map(([t,p])=>`${Xp(t).toFixed(1)},${Yc(p).toFixed(1)}`).join(' ')}" fill="none" stroke="${col}" stroke-width="2"/>`:'')+
           pt.map(([t,p,raw2])=>`<circle cx="${Xp(t).toFixed(1)}" cy="${Yc(p).toFixed(1)}" r="3" fill="${col}"><title>${LBL[z.per]||z.per} ${t===0?'현재':(-t)+'일 전'} EPS ${raw2.toFixed(2)} (90일 전 대비 ${p-100>0?'+':''}${(p-100).toFixed(1)}%)</title></circle>`
-            +`<text x="${Xp(t).toFixed(1)}" y="${(Yc(p)-6).toFixed(1)}" font-size="9" fill="${col}" text-anchor="middle">${raw2.toFixed(2)}</text>`).join(''); }).join('');
+            +((t===-90||t===0)?`<text x="${Xp(t).toFixed(1)}" y="${(Yc(p)-6).toFixed(1)}" font-size="9" fill="${col}" text-anchor="${t===0?'end':'start'}">${raw2.toFixed(2)}</text>`:'')).join(''); }).join('');
       /* 범례 = 90일 전 → 현재 총 변화(추정치가 오르는 중인지 내리는 중인지) */
       const leg=RV.map(z=>{ const ch=(z.d90&&z.cur!=null)?((z.cur-z.d90)/Math.abs(z.d90)*100):null;
         return `<span style="color:${COLS[z.per]||'#888'}">● ${LBL[z.per]||z.per}${ch!=null?` ${ch>0?'▲ +':'▼ '}${ch.toFixed(1)}%`:''}</span>`; }).join(' ');
-      const xl=`<text x="52" y="${hh-4}" font-size="9" fill="#8a94a3">90일 전</text><text x="${Xp(-30).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">30일 전</text><text x="${Xp(-7).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">7일 전</text><text x="${(w-8).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="end">현재</text>`;
-      /* (2026-08-09) '90일 변화' 열 제거 — 각 시점 값 옆에 (현재 대비 %) 를 붙여
-         "그때 대비 지금 얼마나 올라왔나"를 한 줄에서 바로 읽게 한다. */
+      const xl=`<text x="52" y="${hh-4}" font-size="9" fill="#8a94a3">90일 전</text><text x="${Xp(-60).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">60일 전</text><text x="${Xp(-30).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">30일 전</text><text x="${Xp(-7).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="middle">7일 전</text><text x="${(w-8).toFixed(1)}" y="${hh-4}" font-size="9" fill="#8a94a3" text-anchor="end">현재</text>`;
+      /* (2026-08-09 재수정) 표와 그래프의 기준 통일 — 둘 다 **90일 전 대비 누적 변화율**.
+         이전엔 표가 '현재 대비'라 왼쪽부터 읽으면 −16.4→−15.5→−1.9 로 줄어드는데
+         그래프는 0→−16 으로 커져 서로 반대로 보였다. 이제 표를 왼쪽→오른쪽으로 읽으면
+         그래프 궤적과 정확히 같다. 60일 전 열 추가(야후 제공 확인). */
       const f2=v=>v==null?'—':v.toFixed(2);
-      /* 반올림해서 0.0% 이면 변화 없음 — 부호 없이 검은색(±0.05% 미만은 방향이 무의미) */
-      const vsNow=(v,cur)=>{ if(v==null||cur==null||Math.abs(v)<1e-9) return '';
-        const p=(cur/v-1)*100, z=Math.abs(p)<0.05;
+      const vs90=(v,d90)=>{ if(v==null||d90==null||Math.abs(d90)<1e-9) return '';
+        const p=(v/d90-1)*100, z=Math.abs(p)<0.05;
         return ` <span class="${z?'':(p>0?'up':'dn')}" style="font-size:10.5px${z?';color:#3d454f':''}">(${z?'0.0':(p>0?'+':'')+p.toFixed(1)}%)</span>`; };
-      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(Yahoo 가 90/30/7일 전 추정치를 직접 제공 — 즉시 곡선 · 괄호 = 현재 대비 변화율)</span>
+      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(Yahoo 가 90/60/30/7일 전 추정치를 직접 제공 · 괄호 = 90일 전 대비 누적 변화 — 그래프와 동일 기준)</span>
         <table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">
-        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전<span class="note">(현재대비)</span></th><th>30일 전<span class="note">(현재대비)</span></th><th>7일 전<span class="note">(현재대비)</span></th><th>현재</th></tr>`+
+        <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전<span class="note">(기준)</span></th><th>60일 전</th><th>30일 전</th><th>7일 전</th><th>현재</th></tr>`+
         RV.map(z=>
           `<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px"><b style="color:${COLS[z.per]||'#888'}">${LBL[z.per]||z.per}</b></td>
-            <td style="text-align:right">${f2(z.d90)}${vsNow(z.d90,z.cur)}</td><td style="text-align:right">${f2(z.d30)}${vsNow(z.d30,z.cur)}</td>
-            <td style="text-align:right">${f2(z.d7)}${vsNow(z.d7,z.cur)}</td><td style="text-align:right"><b>${f2(z.cur)}</b></td></tr>`).join('')+'</table>'+
+            <td style="text-align:right">${f2(z.d90)}</td>
+            <td style="text-align:right">${f2(z.d60)}${vs90(z.d60,z.d90)}</td>
+            <td style="text-align:right">${f2(z.d30)}${vs90(z.d30,z.d90)}</td>
+            <td style="text-align:right">${f2(z.d7)}${vs90(z.d7,z.d90)}</td>
+            <td style="text-align:right"><b>${f2(z.cur)}</b>${vs90(z.cur,z.d90)}</td></tr>`).join('')+'</table>'+
         `<div style="margin-top:4px"><svg width="${w}" height="${hh}" style="max-width:100%">${ticks}${parts}${xl}</svg>
           <div class="note">${leg} <span style="color:#8a94a3">— y축 = <b>90일 전 대비 변화율</b>(각 항목을 90일 전=0%로 맞춰 비교 · 점선이 0%) · 점 위 숫자는 실제 EPS($) · ▲ 상향 / ▼ 하향</span></div></div></div>`;
     }
