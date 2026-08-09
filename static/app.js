@@ -4229,7 +4229,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let dcode=null;
   function hideDetail(){
     if(_EXT){ _extClose(); const ed=document.getElementById('etf_detail'); if(ed) ed.style.display='none'; return; }
-    const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null; }
+    const d=$('scr_detail'); if(d) d.style.display='none'; dcode=null;
+    /* (2026-08-09) 상세를 보는 동안 미룬 표 갱신을 닫을 때 반영 */
+    try{ if(loaded && stage===1) refresh(); }catch(e){} }
   {const b=$('sd_close'); if(b) b.onclick=hideDetail;}
   /* 차트 소스: canvas(자체) / tv(TradingView 임베드). 네이버는 새창(임베드 시 시세 차단)
      종목을 열면 항상 자체차트로 시작한다 — TradingView 는 그 종목을 보는 동안만 유지(저장 안 함) */
@@ -6660,6 +6662,12 @@ await _canvasFlow(c);
       if(!d||!d.kr||!d.kr.length) return;
       POOL={kr:d.kr||[],us:d.us||[]}; mergeSec(); if(s2loaded) S2=POOL;
       $('scr_asof').innerHTML=poolMeta(d);
+      /* (2026-08-09) 종목 상세를 열어 아래쪽을 보고 있으면 표를 다시 그리지 않는다.
+         재렌더 순간 표가 무너졌다 다시 커지며 스크롤이 클램프돼 위로 튀는데, 값 복원만으로는
+         (차트·실적표가 비동기로 도착해 높이를 또 바꾸므로) 완전히 막지 못했다.
+         데이터(POOL)는 이미 갱신했으므로 상세를 닫을 때 반영된다. */
+      {const dv=$('scr_detail');
+       if(dv && dv.style.display!=='none') return;}
       /* (2026-07-24) 자동 갱신이 표·칩을 다시 그리며 스크롤이 최상단으로 튀는 문제 —
          갱신 전 위치(페이지 + 표 내부)를 저장했다가 복원.
          (2026-08-09 보강) 2프레임 복원으로는 부족했다 — 종목 상세가 열려 있으면 기업개요·
