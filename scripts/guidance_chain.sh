@@ -9,6 +9,9 @@
 #   4) earnings_join — 풀에 gapR/gapE/pgapR/pgapE 반영
 #   5) guidance_portal — 포털 대조값(검증 전용) 수집 후 다시 join
 cd /home/ubuntu/namoobi || exit 1
+# 단계가 겹치면 서로의 결과를 덮어쓴다(실측: 갭 479건 소실). 한 번에 하나만 돈다.
+exec 9>/tmp/gchain.lock
+flock -n 9 || { echo "[chain] 이미 실행 중 — 종료" >> /tmp/gchain.log; exit 0; }
 LOG=/tmp/gchain.log
 say() { echo "[chain $(date +%H:%M)] $*" >> $LOG; }
 
@@ -18,11 +21,12 @@ say() { echo "[chain $(date +%H:%M)] $*" >> $LOG; }
 while pgrep -f "python3 scripts/guidance_backfill.py" >/dev/null; do sleep 20; done
 
 say "1/6 us_consensus 시작"
-nice -n 15 ionice -c3 python3 scripts/us_consensus.py >> logs/us_consensus.log 2>&1
+# (재실행) 컨센은 이미 채워져 있어 건너뛴다
+#nice -n 15 ionice -c3 python3 scripts/us_consensus.py >> logs/us_consensus.log 2>&1
 say "1/6 us_consensus 완료 rc=$?"
 
 say "2/6 zacks_spr 시작"
-nice -n 15 ionice -c3 python3 scripts/zacks_spr.py >> logs/zacks_spr.log 2>&1
+#nice -n 15 ionice -c3 python3 scripts/zacks_spr.py >> logs/zacks_spr.log 2>&1
 say "2/6 zacks_spr 완료 rc=$?"
 
 say "3/6 가이던스 재파싱(--force) 시작"
@@ -33,7 +37,7 @@ say "4/6 join"
 flock /tmp/intra_kr.lock python3 scripts/earnings_join.py >> $LOG 2>&1
 
 say "5/6 포털 대조값 수집"
-nice -n 15 ionice -c3 python3 scripts/guidance_portal.py --days 200 >> $LOG 2>&1
+nice -n 15 ionice -c3 python3 scripts/guidance_portal.py --days 60 >> $LOG 2>&1
 
 say "6/6 join"
 flock /tmp/intra_kr.lock python3 scripts/earnings_join.py >> $LOG 2>&1

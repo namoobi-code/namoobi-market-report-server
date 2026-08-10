@@ -108,6 +108,39 @@ def fetch_rows(sym):
     return out
 
 
+P_FIELDS = ("g_rev_p", "g_rev_gap_p", "g_rev_per_p", "g_eps_p", "g_eps_gap_p", "g_eps_per_p")
+
+
+def _save(live):
+    """저장 직전 디스크를 다시 읽어 **내 필드만** 얹는다.
+
+    (2026-08-10) 이 파일은 여러 스크립트가 통째로 읽고 쓴다. 그대로 덮어쓰면 내가
+    읽은 뒤에 다른 스크립트가 채운 값이 사라진다 — 실측으로 가이던스 갭 479건이
+    한 번에 날아갔다(풀에서 겪은 덮어쓰기와 같은 문제). 임시 파일에 쓰고 rename 해
+    중간에 죽어도 파일이 깨지지 않게 한다.
+    """
+    try:
+        disk = json.loads(LIVE.read_text(encoding="utf-8"))
+    except Exception:
+        disk = live
+    idx = {}
+    for d8, arr in (live.get("days") or {}).items():
+        for it in arr:
+            if it.get("c"):
+                idx[(d8, it["c"])] = it
+    for d8, arr in (disk.get("days") or {}).items():
+        for it in arr:
+            src = idx.get((d8, it.get("c")))
+            if not src:
+                continue
+            for k in P_FIELDS:
+                if src.get(k) is not None:
+                    it[k] = src[k]
+    tmp = LIVE.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(LIVE)
+
+
 def main():
     pool = json.loads(POOL.read_text(encoding="utf-8"))
     by = {r.get("c"): r for r in (pool.get("us") or []) if r.get("c")}
@@ -163,9 +196,9 @@ def main():
                 else:
                     diff += 1
         if (n + 1) % 50 == 0:
-            LIVE.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
+            _save(live)
             print(f"    [{n+1}/{len(todo)}] 포털값 {got} · 일치 {same} · 불일치 {diff}", flush=True)
-    LIVE.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
+    _save(live)
     print(f"[gpor] 완료 — 포털값 {got}건 · 우리 파싱과 일치 {same} · 불일치 {diff} "
           f"(포털 값은 검증 전용 — 판정·표시에는 사용하지 않음)")
 

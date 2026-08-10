@@ -49,6 +49,44 @@ def recent_earn_8k(cik):
     return None
 
 
+G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_own",
+            "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_eps_src", "g_eps_own",
+            "g_per", "acc", "_d8")
+
+
+def _save(live):
+    """가이던스 필드만 디스크에 얹는다(임시파일 + rename).
+
+    (2026-08-10) 통째로 덮어쓰던 탓에, 이 스크립트가 도는 동안 다른 수집기가 채운
+    값이 통째로 사라졌다(실측: 갭 479건 소실). 저장 직전 디스크를 다시 읽어
+    **내 필드만** 반영한다. --force 로 지운 필드는 지운 상태 그대로 반영해야 하므로
+    (오파싱 제거가 목적) 값이 없으면 디스크 쪽 값도 지운다.
+    """
+    try:
+        disk = json.loads(OUT.read_text(encoding="utf-8"))
+    except Exception:
+        disk = live
+    idx = {}
+    for d8, arr in (live.get("days") or {}).items():
+        for it in arr:
+            if it.get("c"):
+                idx[(d8, it["c"])] = it
+    for d8, arr in (disk.get("days") or {}).items():
+        for it in arr:
+            src = idx.get((d8, it.get("c")))
+            if not src:
+                continue
+            for k in G_FIELDS:
+                if src.get(k) is not None:
+                    it[k] = src[k]
+                else:
+                    it.pop(k, None)
+    disk["asof"] = live.get("asof") or disk.get("asof")
+    tmp = OUT.with_suffix(".json.tmp")
+    tmp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(OUT)
+
+
 def main():
     live = json.loads(OUT.read_text(encoding="utf-8"))
     pool_us = {r["c"]: r for r in json.loads(POOL.read_text(encoding="utf-8")).get("us") or []}
@@ -105,10 +143,10 @@ def main():
                 todo[sym].update(gap); got += 1
             if (i + 1) % 100 == 0:
                 live["asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                OUT.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
+                _save(live)
                 print(f"    [{i+1}/{len(syms)}] 가이던스 확보 {got}", flush=True)
     live["asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    OUT.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
+    _save(live)
     print(f"[gbf] 완료 — 가이던스 갭 {got}/{len(syms)}종목 채움")
 
 
