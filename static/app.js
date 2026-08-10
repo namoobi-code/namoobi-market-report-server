@@ -6058,7 +6058,7 @@ await _canvasFlow(c);
         <th style="${HB}">%</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th>
         <th style="${HB}">%</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th>
         <th style="${HB}">분기</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th>
-        <th style="${HB}">분기</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th><th style="${HB}" title="회계연도 누적 CapEx ÷ 누적 매출 — 매출 대비 설비투자 강도">/매출</th></tr>`;
+        <th style="${HB}">분기</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th><th style="${HB}" title="회계연도 누적 CapEx ÷ 누적 매출 — 매출 대비 설비투자 강도">CapEx/Revenue</th></tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
        (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
