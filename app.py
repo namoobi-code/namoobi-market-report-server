@@ -439,11 +439,15 @@ def us_fin(sym: str):
                     g = lambda key, dv=1: (num((blk.get(key) or [None] * 99)[k2]) or None)
                     rv2, op2 = g("revenue"), g("opinc")
                     ni2, ep2 = g("netinccmn"), g("epsdil")
+                    gp2 = g("gp")                       # (2026-08-10) 매출총이익 — Gross Margin 재료
                     qsa.append({"p": str(d2)[:7].replace("-", "/"),
                                 "s": rv2 / 1e6 if rv2 is not None else None,
                                 "o": op2 / 1e6 if op2 is not None else None,
                                 "n": ni2 / 1e6 if ni2 is not None else None,
-                                "eps": ep2})
+                                "gp": gp2 / 1e6 if gp2 is not None else None,
+                                "eps": ep2,
+                                "fq": (blk.get("fiscalQuarter") or [None] * 99)[k2],
+                                "fy": (blk.get("fiscalYear") or [None] * 99)[k2]})
                 if len(qsa) >= 6:
                     # (2026-08-09) 소스는 20분기를 준다 — 12개로 자르면 앞쪽 4행의 YoY 기준
                     # (t−4)이 잘려 '—' 가 됐다. 전량 보관하고, 표시 개수는 프론트가 정한다.
@@ -468,6 +472,38 @@ def us_fin(sym: str):
                             vals.append(round(v2 / 1e6, 1) if isinstance(v2, (int, float)) else None)
                         rows2.append({"p": str(d2)[:7].replace("-", "/"), "v": vals})
                     sa_seg.append({"cols": [_lab(c) for c in cols], "rows": rows2})
+            # (2026-08-10) 현금흐름 분기표 — FCF·CapEx (사용자 요청 실적표 항목).
+            # 같은 stockanalysis 의 cash-flow-statement 엔드포인트에 fcf·capex 가 분기별로 있다
+            # (실측 NVDA). 손익과 **동일 소스**라 분기 라벨이 정확히 맞아 결합이 안전하다.
+            try:
+                cf = json.loads(urllib.request.urlopen(urllib.request.Request(
+                    f"https://stockanalysis.com/stocks/{sym.lower()}/financials/cash-flow-statement/__data.json?p=quarterly",
+                    headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}), timeout=25).read())
+                arr2 = [n for n in cf.get("nodes", []) if n.get("type") == "data"][-1]["data"]
+
+                def _dr2(i):
+                    v = arr2[i]
+                    if isinstance(v, list):  return [_dr2(x) for x in v]
+                    if isinstance(v, dict):  return {k: _dr2(x) for k, x in v.items()}
+                    return v
+                cb = None
+                for i0, v0 in enumerate(arr2):
+                    if isinstance(v0, dict) and "datekey" in v0 and ("fcf" in v0 or "capex" in v0):
+                        cb = _dr2(i0); break
+                if cb and cb.get("datekey"):
+                    cmap = {}
+                    for k2, d2 in enumerate(cb["datekey"]):
+                        gg = lambda key: (None if (cb.get(key) or [None] * 99)[k2] in (None, "", "-")
+                                          else float((cb.get(key) or [None] * 99)[k2]))
+                        cmap[str(d2)[:7].replace("-", "/")] = (gg("fcf"), gg("capex"))
+                    for r2 in q:
+                        fv, cv = cmap.get(r2["p"], (None, None))
+                        if fv is not None:
+                            r2["fcf"] = round(fv / 1e6, 1)
+                        if cv is not None:
+                            r2["capex"] = round(abs(cv) / 1e6, 1)      # 부호는 회사마다 다름 → 절대값
+            except Exception:
+                pass
             # (2026-08-10) 결산 통화 — 같은 응답의 메타 노드("currency" 인덱스 참조)
             for v0 in arr:
                 if isinstance(v0, dict) and "currency" in v0 and isinstance(v0["currency"], int):
@@ -738,6 +774,43 @@ def us_fin(sym: str):
             pass
         # (2026-08-09) 예전엔 여기서 10분기로 잘라 앞쪽 행의 YoY 기준(t−4)이 사라졌다.
         # 전량(최대 20분기)을 주고 표시 개수는 프론트가 정한다.
+        # (2026-08-10) 분기별 **발표일** + FCF·CapEx 회계연도 누적(YTD) — 실적표 요청 항목.
+        # 발표일은 Zacks 이력(위에서 이미 읽은 hz)의 날짜를 분기에 매칭해 넣는다.
+        try:
+            if 'hz' in dir() and hz:
+                mz2 = re.search(r"obj_data\s*=\s*(\{.*?\});", hz, re.S)
+                dz2 = json.loads(mz2.group(1)) if mz2 else {}
+                for row in (dz2.get("earnings_announcements_earnings_table") or []):
+                    if len(row) < 2:
+                        continue
+                    pe = re.sub(r"<[^>]+>", "", row[1]).strip()
+                    d0 = re.sub(r"<[^>]+>", "", row[0]).strip()
+                    m4 = re.match(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", d0)
+                    try:
+                        mm, yy = pe.split("/")
+                        tgt = int(yy) * 12 + int(mm)
+                    except Exception:
+                        continue
+                    if not m4:
+                        continue
+                    y5 = int(m4.group(3)); y5 += 2000 if y5 < 100 else 0
+                    for r2 in q:
+                        if abs(int(r2["p"][:4]) * 12 + int(r2["p"][5:7]) - tgt) <= 1 and not r2.get("ed"):
+                            r2["ed"] = f"{y5:04d}-{int(m4.group(1)):02d}-{int(m4.group(2)):02d}"
+        except Exception:
+            pass
+        try:                       # 회계연도 누적(YTD) — fiscalQuarter 가 1로 돌아가면 리셋
+            accf = accc = 0.0
+            for r2 in q:
+                # fiscalQuarter 표기는 'Q1'/1 두 형태 모두 나온다(실측 NVDA 'Q1')
+                if str(r2.get("fq") or "").upper().replace("Q", "") == "1":
+                    accf = accc = 0.0
+                if r2.get("fcf") is not None:
+                    accf += r2["fcf"]; r2["fcfY"] = round(accf, 1)
+                if r2.get("capex") is not None:
+                    accc += r2["capex"]; r2["capexY"] = round(accc, 1)
+        except Exception:
+            pass
         res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg, "cur": cur,
                "unit": "백만$ · EPS=$",
                "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + Zacks(발표시점 매출·EPS컨센·판정) + 일별 스냅샷"}
