@@ -2500,6 +2500,69 @@ def apt_stat():
             pass
     return out
 
+
+@app.get("/api/apt/rank")
+def apt_rank(ym0: str = "", ym1: str = "", region: str = "", kind: str = "apt",
+             deal: str = "sale", n: int = 20):
+    """기간을 직접 지정해 '많이 거래된 단지'를 줄 세운다.
+
+    (2026-08-10 신설) "2026.1~7 서울에서 가장 많이 팔린 아파트 TOP20" 같은 질문에 답하는
+    엔드포인트. 기존 /api/apt/series 는 단지를 먼저 고른 뒤 시계열을 보는 구조라
+    '무엇이 많이 팔렸나'를 역으로 찾을 수 없었다.
+
+    주의: 원본 테이블이 (단지·면적·**월**) 집계라 기간 경계는 **월 단위**다.
+          일 단위(예: 7/28까지)는 원자료가 없어 지원하지 않는다.
+    ym0/ym1 은 YYYYMM. 비우면 최근 12개월.
+    deal: sale(매매) · jeon(전세) · wol(월세)
+    """
+    if deal not in ("sale", "jeon", "wol"):
+        raise HTTPException(400, "deal 은 sale/jeon/wol")
+    ok = lambda s: bool(re.fullmatch(r"\d{6}", s or ""))
+    if not ok(ym1):
+        ym1 = datetime.now().strftime("%Y%m")
+    if not ok(ym0):
+        y, m = int(ym1[:4]), int(ym1[4:])
+        ym0 = "%04d%02d" % (y - 1, m)
+    if ym0 > ym1:
+        ym0, ym1 = ym1, ym0
+    n = max(1, min(n, 200))
+
+    where, args = ["s.ym BETWEEN ? AND ?"], [ym0, ym1]
+    region = (region or "").strip()
+    if region and region != "전국":
+        pre = [k for k, v in SGG2.items() if v == region]
+        if pre:                                        # 시도 전체
+            where.append("substr(a.sgg,1,2)=?"); args.append(pre[0])
+        else:
+            t = region.split()
+            if len(t) > 1 and t[0] in SGG2.values():    # '경기 화성시'
+                p2 = [k for k, v in SGG2.items() if v == t[0]]
+                where.append("substr(a.sgg,1,2)=?"); args.append(p2[0])
+                region = " ".join(t[1:])
+            esc = region.replace("%", chr(92) + "%").replace("_", chr(92) + "_")
+            where.append("(a.umd LIKE ? ESCAPE '\\')"); args.append(f"%{esc}%")
+
+    # 가격 열 이름이 거래 유형마다 다르다 — 월세는 보증금(dep)을 대표값으로 쓴다
+    pcol = "avg" if deal in ("sale", "jeon") else "dep"
+    args.append(n)
+    with _aptcx(kind) as cx:
+        rows = cx.execute(
+            f"""SELECT a.id, a.name, a.umd, a.sgg, a.build_year,
+                       SUM(s.n) AS cnt,
+                       SUM(COALESCE(s.{pcol},0)*s.n)/NULLIF(SUM(CASE WHEN s.{pcol} IS NULL THEN 0 ELSE s.n END),0) AS px
+                FROM {deal} s JOIN apt a ON a.id=s.apt_id
+                WHERE {' AND '.join(where)}
+                GROUP BY a.id HAVING cnt>0
+                ORDER BY cnt DESC, px DESC LIMIT ?""", args).fetchall()
+        span = cx.execute("SELECT MIN(ym), MAX(ym) FROM done").fetchone()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["sido"] = SGG2.get(str(d["sgg"])[:2], "")
+        out.append(d)
+    return {"ym0": ym0, "ym1": ym1, "deal": deal, "kind": kind, "region": region or "전국",
+            "db_ym0": span[0], "db_ym1": span[1], "rows": out}
+
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
 CHARTS = BASE / "data" / "charts"

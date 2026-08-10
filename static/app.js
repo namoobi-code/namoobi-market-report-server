@@ -1280,7 +1280,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     // (2026-08-08) 계열이 비면 지우고 끝낸다 — 호출부마다 잔상 제거를 빠뜨리는 실수를 원천 차단
     if(!arr||!arr.length||!arr.some(a=>a&&a.v&&a.v.some(v=>v!=null))) return;
-    const P={l:8,r:52,t:10,b:18};
+    /* (2026-08-10) opts.r2 = 보조축(좌측) 계열 — bars() 와 같은 규칙.
+       단위가 다른 지표(예: 12개월 누적 증감 '조원' vs 주택 거래량 '건')를 겹쳐 본다. */
+    const R2=(opts&&opts.r2&&opts.r2.length&&opts.r2.some(s=>s.v&&s.v.some(v=>v!=null)))?opts.r2:null;
+    const P={l:R2?46:8,r:52,t:10,b:18};
     const N=Math.max(...arr.map(a=>a.v.length));
     const all=arr.flatMap(a=>a.v).filter(v=>v!=null);
     /* (2026-08-08) 로그 스케일 — 청약경쟁률처럼 0.02~35,000 같이 자릿수가 크게 벌어지는
@@ -1349,6 +1352,25 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       else seg(0,a.v.length-1,false);
       x.restore(); });
     x.lineWidth=1;
+    if(R2){                                              // 보조축 — 눈금은 좌측에, 선은 약간 투명
+      let l2=Infinity,h2=-Infinity;
+      R2.forEach(s=>s.v.forEach(v=>{ if(v==null) return; if(v<l2)l2=v; if(v>h2)h2=v; }));
+      if(h2===l2){ h2=l2+1; }
+      const p2=(h2-l2)*0.10; l2-=p2; h2+=p2;
+      const Y2=v=>P.t+(H-P.t-P.b)*(1-(v-l2)/(h2-l2));
+      x.save(); x.font='10px sans-serif'; x.fillStyle='#98a2ad';
+      for(let g=0;g<=4;g++){ const yv=l2+(h2-l2)*g/4;
+        x.fillText(Math.round(yv).toLocaleString(), 2, Y2(yv)+3); }
+      R2.forEach(s=>{ x.strokeStyle=s.color; x.lineWidth=1.9; x.globalAlpha=.95;
+        x.beginPath(); let st=false;
+        for(let i=0;i<s.v.length;i++){ const v=s.v[i]; if(v==null) continue;
+          st?x.lineTo(X(i),Y2(v)):(x.moveTo(X(i),Y2(v)),st=true); }
+        x.stroke();
+        let li=-1; for(let i=s.v.length-1;i>=0;i--) if(s.v[i]!=null){li=i;break;}
+        if(li>=0){ x.globalAlpha=1; x.fillStyle=s.color;
+          const tx=s.label+' '+Math.round(s.v[li]).toLocaleString();
+          x.fillText(tx, Math.max(P.l+2, X(li)-x.measureText(tx).width-4), Y2(s.v[li])-4); } });
+      x.restore(); }
     /* 라벨 — 마지막 값 위치를 기준으로 잡되, 위아래로 겹치면 최소 간격만큼 밀어낸다 */
     const labs=[];
     arr.forEach(a=>{ let li=-1; for(let i=a.v.length-1;i>=0;i--) if(a.v[i]!=null){li=i;break;}
@@ -2243,7 +2265,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     const W=cv.clientWidth||700, H=cv.clientHeight||300; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     if(!t||!t.length||!series||!series.length) return;
-    const P={l:8,r:56,t:16,b:18}, N=t.length;
+    /* (2026-08-10) opts.r2 = 보조축(좌측) 계열 — 단위가 전혀 다른 지표를 겹쳐 본다.
+       예: 가계대출 증감액(조원, 막대) 위에 주택 매매거래량(건, 선).
+       같은 축에 올리면 조원(±20)이 건수(수만)에 눌려 일직선이 된다. */
+    const R2=(opts.r2&&opts.r2.length&&opts.r2.some(s=>s.v&&s.v.some(v=>v!=null)))?opts.r2:null;
+    const P={l:R2?46:8,r:56,t:16,b:18}, N=t.length;
     let lo=0, hi=0;
     for(let i=0;i<N;i++){ let up=0,dn=0;
       series.forEach(s=>{const v=s.v[i]; if(v==null) return; v>=0?up+=v:dn+=v;});
@@ -2268,11 +2294,26 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       for(let i=0;i<N;i++){ const v=s.v[i]; if(v==null) continue;
         st?x.lineTo(X(i),Y(v)):(x.moveTo(X(i),Y(v)),st=true); }
       x.stroke(); x.lineWidth=1; });
+    if(R2){                                              // 보조축 — 눈금은 좌측에
+      let l2=Infinity,h2=-Infinity;
+      R2.forEach(s=>s.v.forEach(v=>{ if(v==null) return; if(v<l2)l2=v; if(v>h2)h2=v; }));
+      if(h2===l2){ h2=l2+1; }
+      const p2=(h2-l2)*0.10; l2-=p2; h2+=p2;
+      const Y2=v=>P.t+(H-P.t-P.b)*(1-(v-l2)/(h2-l2));
+      x.fillStyle='#98a2ad'; x.textAlign='left';
+      for(let g=0;g<=4;g++){ const yv=l2+(h2-l2)*g/4;
+        x.fillText(Math.round(yv).toLocaleString(), 2, Y2(yv)+3); }
+      R2.forEach(s=>{ x.strokeStyle=s.color; x.lineWidth=1.9; x.globalAlpha=.95;
+        x.beginPath(); let st=false;
+        for(let i=0;i<N;i++){ const v=s.v[i]; if(v==null) continue;
+          st?x.lineTo(X(i),Y2(v)):(x.moveTo(X(i),Y2(v)),st=true); }
+        x.stroke(); x.globalAlpha=1; x.lineWidth=1; });
+    }
     x.fillStyle='#98a2ad';
     for(let i=0;i<N;i++){ const s=String(t[i]);
       if(s.slice(4)==='01') x.fillText(s.slice(0,4), X(i)-12, H-4); }
     let lx=P.l+2;                                        // 범례 — 좌상단 가로 배치
-    series.concat(opts.extra||[]).forEach(s=>{ x.fillStyle=s.color; x.fillRect(lx,P.t-10,8,8);
+    series.concat(opts.extra||[]).concat(R2||[]).forEach(s=>{ x.fillStyle=s.color; x.fillRect(lx,P.t-10,8,8);
       x.fillStyle='#5b6673'; x.fillText(s.label, lx+11, P.t-3);
       lx+=13+x.measureText(s.label).width+8; });
   }
@@ -2289,7 +2330,28 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   const _hcNum=v=>v==null?'—':(Math.abs(v)>=100?Math.round(v).toLocaleString():v.toFixed(1));
   const _hcSgn=v=>v==null?'—':(v>0?'+':'')+_hcNum(v);
 
-  let _hcInit=false, _hcMode='chg', _hcSplit='use', _hcSpan='60';
+  let _hcInit=false, _hcMode='chg', _hcSplit='use', _hcSpan='60', _hcVol='all', _hcVReg='전국';
+  /* (2026-08-10) 주택 매매거래량 — htrade.json (KOSIS 국토부/부동산원 · 매일 07:20)
+     RTMS 실거래 DB 는 아직 전국 일부 시군구만 채워져 있어 전국 총량으로 못 쓴다.
+     총량은 국토부 공식 집계를 그대로 겹친다. ym 키로 맞춰야 해서 맵으로 들고 있는다. */
+  let _htRaw=null, _htP=null;
+  /* 두 카드(가계대출·아파트 실거래 지역비교)가 같이 쓰므로 한 번만 받아 공유한다 */
+  const htrade=()=>{ if(!_htP) _htP=fetch('/api/db/htrade').then(r=>r.ok?r.json():null)
+      .then(h=>{ if(h&&h.t&&h.t.length) _htRaw=h; return _htRaw; }).catch(()=>null);
+    return _htP; };
+  const _htMap=(kind,reg)=>{ if(!_htRaw||!_htRaw.t) return null;
+    const a=(_htRaw[kind]||{})[reg]; if(!a) return null;
+    const m={}; _htRaw.t.forEach((ym,i)=>{ if(a[i]!=null) m[ym]=a[i]; }); return m; };
+  /* hcredit 의 t 배열(2004~)에 거래량(2006~)을 맞춘다. roll=true 면 12개월 합. */
+  function _htAlign(t, kind, reg, roll){
+    const m=_htMap(kind,reg); if(!m) return null;
+    const T=_htRaw.t, idx={}; T.forEach((ym,i)=>idx[ym]=i);
+    const arr=(_htRaw[kind]||{})[reg]||[];
+    return t.map(ym=>{ const i=idx[ym]; if(i==null) return null;
+      if(!roll) return arr[i]==null?null:arr[i];
+      if(i<11) return null;
+      let s=0; for(let k=i-11;k<=i;k++){ if(arr[k]==null) return null; s+=arr[k]; } return s; });
+  }
   function initHCredit(){
     if(_hcInit) return; _hcInit=true;
     fetch('/api/db/hcredit').then(r=>r.ok?r.json():null).then(d=>{
@@ -2301,8 +2363,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         segbar('hc_mode', [['chg','월별 증감액'],['bal','잔액']], ()=>_hcMode, v=>_hcMode=v, redraw);
         segbar('hc_split',[['use','용도별'],['ind','업권별']],   ()=>_hcSplit,v=>_hcSplit=v,redraw);
         segbar('hc_span', [['36','3년'],['60','5년'],['120','10년'],['999','전체']], ()=>_hcSpan, v=>_hcSpan=v, redraw);
+        segbar('hc_vol',  [['off','끄기'],['all','주택 전체'],['apt','아파트']], ()=>_hcVol, v=>_hcVol=v, redraw);
+        const regs=_htRaw?Object.keys(_htRaw.all||{}):['전국'];
+        const ord=['전국','서울','경기','인천','부산','대구','광주','대전','울산','세종',
+                   '강원','충북','충남','전북','전남','경북','경남','제주'].filter(r=>regs.includes(r));
+        segbar('hc_vreg', ord.map(r=>[r,r]), ()=>_hcVReg, v=>_hcVReg=v, redraw);
       };
       const redraw=()=>{ bar(); draw(); };
+      htrade().then(h=>{ if(h) redraw(); });
 
       function draw(){
         const B=(_hcSplit==='use')?d.hh:d.ind, T=B.t||[], S=B.s||{};
@@ -2319,7 +2387,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             : [['예금은행','예금은행','#2f6fed'], ['비은행','비은행권','#c2185b']];
           const ser=defs.map(([k,l,c])=>({v:cut(D(k)), label:l, color:c}));
           const tot={v:cut(D('전체')), label:'합계', color:'#1f2937'};
-          bars('hc_main', t, ser, {extra:[tot]});
+          const vol=(_hcVol==='off')?null:_htAlign(t,_hcVol,_hcVReg,false);
+          bars('hc_main', t, ser, {extra:[tot], r2: vol?[{v:vol, color:'#0ea5e9',
+            label:`${_hcVReg} ${_hcVol==='apt'?'아파트':'주택'} 거래량(건·좌축)`}]:null});
           const lt=t[t.length-1];
           const parts=ser.map(s=>`${s.label} <b class="${last(s.v)>0?'up':'dn'}">${_hcSgn(last(s.v))}조</b>`);
           const y12=(()=>{const a=S['전체']||[]; const n=a.length;
@@ -2328,14 +2398,19 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             +` · 합계 <b class="${last(tot.v)>0?'up':'dn'}">${_hcSgn(last(tot.v))}조</b>`
             +(y12!=null?` · 최근 12개월 순증 <b>${_hcSgn(y12)}조</b>`:'')
             +` <span class="note">— 0선 아래로 내려간 달은 가계대출이 줄어든 달. `
-            +`주택관련대출 순증이 꺾이면 통상 몇 달 뒤 실거래 건수가 따라 꺾인다. ECOS 공표 ~1개월 지연.</span>`;
+            +`주택관련대출 순증이 꺾이면 통상 몇 달 뒤 실거래 건수가 따라 꺾인다. ECOS 공표 ~1개월 지연.</span>`
+            +(vol?`<br><span class="note">🔵 하늘색 선 = <b>${_hcVReg} ${_hcVol==='apt'?'아파트':'주택'} 매매거래량</b>`
+              +`(좌축·건, ${(_htRaw&&_htRaw.src)||'KOSIS'}) — 막대(대출 증감)가 먼저 움직이고 선(거래량)이 따라오는지 보는 차트다. `
+              +`거래량은 국토부 공표가 ~1개월 더 늦고 최근 1~2개월은 잠정치라 오른쪽 끝은 덜 채워져 보인다.</span>`:'');
         } else {
           const defs=(_hcSplit==='use')
             ? [['전체','전체','#1f2937'], ['주담대_전체','주택관련','#e08e3c'], ['기타_전체','기타','#5f9e5f'],
                ['주담대_은행','주택관련(은행)','#b45309']]
             : [['전체','전체','#1f2937'], ['예금은행','예금은행','#2f6fed'], ['비은행','비은행권','#c2185b'],
                ['저축은행','저축은행','#7c3aed'], ['상호금융','상호금융','#0e9aa7'], ['새마을금고','새마을금고','#9e9d24']];
-          line('hc_main', defs.filter(([k])=>S[k]).map(([k,l,c])=>({t, v:cut(S[k]), label:l, color:c})));
+          const bvol=(_hcVol==='off')?null:_htAlign(t,_hcVol,_hcVReg,false);
+          line('hc_main', defs.filter(([k])=>S[k]).map(([k,l,c])=>({t, v:cut(S[k]), label:l, color:c})),
+               {r2: bvol?[{v:bvol, color:'#0ea5e9', label:`${_hcVReg} 거래량`}]:null});
           const a=S['전체']||[], n=a.length, y1=yoy(T,a);
           $('hc_main_n').innerHTML=`<b>${fm(T[n-1])} 말잔 = ${_hcNum(a[n-1])}조원</b>`
             +(y1!=null?` · YoY <b class="${y1>0?'up':'dn'}">${(y1>0?'+':'')+y1.toFixed(1)}%</b>`:'')
@@ -2348,10 +2423,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          const rdefs=(_hcSplit==='use')
            ? [['전체','전체','#1f2937'], ['주담대_전체','주택관련','#e08e3c'], ['기타_전체','기타','#5f9e5f']]
            : [['전체','전체','#1f2937'], ['예금은행','예금은행','#2f6fed'], ['비은행','비은행권','#c2185b']];
-         line('hc_roll', rdefs.filter(([k])=>S[k]).map(([k,l,c])=>({t, v:cut(R(k)), label:l, color:c})), {base:0});
+         const rvol=(_hcVol==='off')?null:_htAlign(t,_hcVol,_hcVReg,true);
+         line('hc_roll', rdefs.filter(([k])=>S[k]).map(([k,l,c])=>({t, v:cut(R(k)), label:l, color:c})),
+              {base:0, r2: rvol?[{v:rvol, color:'#0ea5e9',
+                label:`${_hcVReg} 거래량 12M누적`}]:null});
          const rt=R('전체'), lv=last(rt);
          $('hc_roll_n').innerHTML=`최근 12개월 순증 <b class="${lv>0?'up':'dn'}">${_hcSgn(lv)}조</b>`
-           +` <span class="note">— 0선을 뚫고 내려가면 가계 디레버리징(자금 이탈) 국면. 정책(DSR·대출총량) 효과가 여기에 가장 먼저 찍힌다.</span>`;}
+           +` <span class="note">— 0선을 뚫고 내려가면 가계 디레버리징(자금 이탈) 국면. 정책(DSR·대출총량) 효과가 여기에 가장 먼저 찍힌다.</span>`
+           +(rvol?`<br><span class="note">🔵 ${_hcVReg} 매매거래량 12개월 누적(좌축·건) — 둘 다 계절성을 뺀 값이라 <b>선후 관계가 가장 또렷하게</b> 보인다.</span>`:'');}
 
         /* 전세자금·정책대출 — 용도별 블록에만 있다 */
         {const P=d.hh.s||{}, PT=d.hh.t||[];
@@ -2451,8 +2530,80 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     }).catch(()=>{});
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     (2026-08-10) 🏆 많이 거래된 단지 — /api/apt/rank
+
+     기존 카드들은 전부 '지역을 고른 뒤 추세를 본다'는 방향이라
+     "이 기간에 뭐가 제일 많이 팔렸나"를 되물을 수가 없었다. 그 역방향 조회.
+     원자료가 (단지·면적·월) 집계라 기간은 월 단위까지만 잘린다.
+     ══════════════════════════════════════════════════════════════════════════ */
+  let _arInit=false, _arKind='apt', _arDeal='sale', _arN='20';
+  function initAptRank(){
+    if(_arInit) return; _arInit=true;
+    const e0=$('ar_ym0'), e1=$('ar_ym1'); if(!e0||!e1) return;
+    const ymOf=d=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const now=new Date();
+    e1.value=ymOf(now); {const p=new Date(now); p.setMonth(p.getMonth()-11); e0.value=ymOf(p);}
+    const setSpan=m=>{ const b=new Date(), a=new Date(); a.setMonth(a.getMonth()-(m-1));
+      e1.value=ymOf(b); e0.value=ymOf(a); run(); };
+    const setYtd=y=>{ e0.value=`${y}-01`;
+      e1.value=(y===now.getFullYear())?ymOf(now):`${y}-12`; run(); };
+    $('ar_quick').innerHTML=[['최근 3개월',()=>setSpan(3)],['최근 6개월',()=>setSpan(6)],
+        ['최근 1년',()=>setSpan(12)],[`${now.getFullYear()}년`,()=>setYtd(now.getFullYear())],
+        [`${now.getFullYear()-1}년`,()=>setYtd(now.getFullYear()-1)]]
+      .map(([l],i)=>`<button data-q="${i}" style="padding:3px 8px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff">${l}</button>`).join('');
+    const QF=[()=>setSpan(3),()=>setSpan(6),()=>setSpan(12),()=>setYtd(now.getFullYear()),()=>setYtd(now.getFullYear()-1)];
+    $('ar_quick').querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>QF[+b.dataset.q]());
+    const bar=()=>{
+      segbar('ar_kind',[['apt','아파트'],['offi','오피스텔·기타']],()=>_arKind,v=>_arKind=v,run);
+      segbar('ar_deal',[['sale','매매'],['jeon','전세'],['wol','월세']],()=>_arDeal,v=>_arDeal=v,run);
+      segbar('ar_n',[['20','20'],['50','50'],['100','100']],()=>_arN,v=>_arN=v,run);
+    };
+    const E4=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    function run(){
+      bar();
+      const a=(e0.value||'').replace('-',''), b=(e1.value||'').replace('-','');
+      const reg=($('ar_reg').value||'').trim();
+      $('ar_n_note').textContent='조회 중…';
+      const u=`/api/apt/rank?ym0=${a}&ym1=${b}&kind=${_arKind}&deal=${_arDeal}&n=${_arN}`
+              +`&region=${encodeURIComponent(reg)}`;
+      fetch(u).then(r=>r.ok?r.json():null).then(d=>{
+        if(!d){ $('ar_tbl').innerHTML=''; $('ar_n_note').textContent='조회 실패 — 해당 유형의 DB가 아직 없을 수 있습니다.'; return; }
+        const rows=d.rows||[];
+        if(!rows.length){ $('ar_tbl').innerHTML='';
+          $('ar_n_note').innerHTML=`결과 없음 — 이 기간·지역엔 수집된 거래가 없습니다. `
+            +`<span class="note">실거래 DB 수집 범위: ${d.db_ym0||'—'}~${d.db_ym1||'—'}</span>`; return; }
+        const unit=_arDeal==='wol'?'보증금(억)':'평균가(억)';
+        const mx=rows[0].cnt||1;
+        $('ar_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12.5px">`
+          +`<thead><tr style="background:#f7f8fa">`
+          +['순위','지역','단지명','준공','거래량',unit].map(h=>`<th style="padding:5px 8px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap">${h}</th>`).join('')
+          +`</tr></thead><tbody>`
+          +rows.map((r,i)=>`<tr style="border-bottom:1px solid #f2f4f7">`
+            +`<td style="padding:4px 8px;color:#8a93a0">${i+1}</td>`
+            +`<td style="padding:4px 8px;white-space:nowrap">${E4(r.sido)} ${E4(r.umd||'')}</td>`
+            +`<td style="padding:4px 8px"><b>${E4(r.name)}</b></td>`
+            +`<td style="padding:4px 8px;color:#8a93a0">${r.build_year||'—'}</td>`
+            +`<td style="padding:4px 8px;white-space:nowrap">`
+              +`<span style="display:inline-block;height:9px;width:${Math.max(2,Math.round(70*r.cnt/mx))}px;background:#7c9bd1;border-radius:2px;vertical-align:middle;margin-right:6px"></span>`
+              +`<b>${(r.cnt||0).toLocaleString()}</b>건</td>`
+            +`<td style="padding:4px 8px">${r.px!=null?r.px.toFixed(r.px>=10?1:2):'—'}</td>`
+          +`</tr>`).join('')+`</tbody></table>`;
+        const f=s=>s?`${String(s).slice(0,4)}.${String(s).slice(4)}`:'—';
+        $('ar_n_note').innerHTML=`<b>${f(d.ym0)} ~ ${f(d.ym1)}</b> · ${E4(d.region)} · `
+          +`${_arDeal==='sale'?'매매':_arDeal==='jeon'?'전세':'월세'} 거래건수 상위 ${rows.length}개 단지 `
+          +`<span class="note">— 국토부 실거래 신고 기준(RTMS). 기간 경계는 <b>월 단위</b>로만 잘립니다(원자료가 월별 집계). `
+          +`최근 2개월은 신고가 진행 중이라 과소 집계됩니다. `
+          +`실거래 DB 수집 범위 ${f(d.db_ym0)}~${f(d.db_ym1)} — <b>아직 전국 전체가 아니라 수집된 시군구만</b> 포함됩니다.</span>`;
+      }).catch(()=>{ $('ar_n_note').textContent='조회 실패'; });
+    }
+    $('ar_go').onclick=run;
+    $('ar_reg').addEventListener('keydown',e=>{ if(e.key==='Enter') run(); });
+    run();
+  }
+
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq();
+    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
@@ -2518,6 +2669,18 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                     '#512da8','#0097a7','#afb42b','#4e342e','#ad1457','#283593'];
          const E=z=>String(z??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));  // 부동산 IIFE엔 전역 E 없음(ReferenceError 수정)
          const METRICS=[['avg','평균가(억)'],['med','중위가(억)'],['n','매매 거래량'],['dep','전세 보증금(억)']];
+         /* (2026-08-10) '전국 전체(공식)' — RTMS 실거래는 아직 전국 250여 시군구 중 일부만
+            채워져 있어 시군구를 다 합쳐도 전국 총량이 안 된다(실측: 아파트 53개 시군구).
+            그래서 **거래량 지표에 한해** 국토부 공식 집계(KOSIS htrade.json)를 계열로 끼워 넣는다.
+            평균가·중위가·전세보증금은 공식 집계에 없으므로 그 지표에선 자동으로 빠진다. */
+         const KRALL='KR_ALL', KRAPT='KR_APT';
+         const injectKR=()=>{ if(!_htRaw||!_htRaw.t||N[KRALL]) return false;
+           const put=(code,label,kind)=>{ const a=(_htRaw[kind]||{})['전국']; if(!a) return;
+             const m={}; _htRaw.t.forEach((ym,i)=>{ if(a[i]!=null) m[ym]={n:a[i]}; });
+             N[code]=label; (R.sale=R.sale||{})[code]={m}; };
+           put(KRALL,'전국 전체(공식·주택)','all'); put(KRAPT,'전국 전체(공식·아파트)','apt');
+           return true; };
+         injectKR();
          let mset=['A11','A26','A41'].filter(c=>N[c]); if(!mset.length) mset=Object.keys(N).slice(0,3);
          let met='avg';
          const q=$('re_cmp_q'), list=$('re_cmp_list');
@@ -2554,7 +2717,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              mset.push(x.dataset.add); q.value=''; list.style.display='none'; chips(); drawBig(true);});};
          /* (2026-08-08) 원클릭 프리셋 — 하나씩 고르기 번거로운 조합을 버튼으로.
             'TOP30' 은 현재 선택된 지표의 최신값 기준 상위 30(시군구만, 시도 합산 ★ 제외) */
-         const isAgg=c=>String(c).startsWith('A');
+         /* 합산 계열(시도 ★ · 전국 공식)은 TOP30 순위 대상에서 뺀다 — 총량이 시군구를 다 눌러버린다 */
+         const isAgg=c=>String(c).startsWith('A')||String(c).startsWith('KR_');
          /* 정렬·TOP 선정 기준값 — **잠정 구간 직전의 확정 최신월**을 쓴다.
             최근 2개월은 실거래 신고가 덜 들어와 값이 과소·요동치므로 순위 기준으로 부적합하다. */
          const confCut=()=>{const d=new Date(); d.setMonth(d.getMonth()-2);
@@ -2579,6 +2743,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            ['부산 전체구','부산 16개 구·군 전부', ()=>Object.keys(N).filter(c=>!isAgg(c)&&c.startsWith('26'))],
            ['경기 TOP30','경기 시군구 중 상위 30', ()=>topN(c=>c.startsWith('41'),30)],
            ['전국 TOP30','전국 시군구 중 상위 30', ()=>topN(()=>true,30)],
+           ['전국 전체(공식)','국토부 공식 집계 — 거래량 지표에서만 표시', ()=>[KRALL,KRAPT].filter(c=>N[c])],
          ];
          const pbar=()=>{$('re_cmp_preset').innerHTML=PRESET.map(([lab,tip],i)=>
              `<button data-p="${i}" title="${tip}" style="padding:3px 9px;font-size:11.5px;border:1px solid #b45309;color:#b45309;background:#fff;border-radius:6px;cursor:pointer">${lab}</button>`).join('')
@@ -2626,7 +2791,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              el.style.boxShadow=on?'0 0 0 2px #1f2937':'';
              el.style.fontWeight=on?'700':'400';});
            const ml=METRICS.find(x=>x[0]===met)[1];
-           $('re_rt_big_n').innerHTML=`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · 시도 전체 중위가는 <b>거래량 가중 근사치</b>':''} · 주황 음영=신고 진행 중(잠정) · 🖱 휠=X축 확대/축소·드래그=좌우 이동(표시 ${ts.length}/${curL}개월) · 지역별 스케일 차이가 크면 거래량으로 비교 권장`;
+           const hasKR=mset.some(c=>String(c).startsWith('KR_'));
+           $('re_rt_big_n').innerHTML=(hasKR?`<b style="color:#b45309">전국 전체(공식)</b>는 국토부·한국부동산원 월별 집계(주택 매매거래 신고 건수)라 다른 계열(RTMS 아파트 실거래)과 <b>집계 대상이 다르다</b> — 총량 추세를 볼 때만 쓰세요.<br>`:'')
+             +`<b>${ml}</b> · ${arr.length}개 지역 겹쳐보기 — 시도 전체(★)는 시군구 합산(거래건수 가중)${met==='med'?' · 시도 전체 중위가는 <b>거래량 가중 근사치</b>':''} · 주황 음영=신고 진행 중(잠정) · 🖱 휠=X축 확대/축소·드래그=좌우 이동(표시 ${ts.length}/${curL}개월) · 지역별 스케일 차이가 크면 거래량으로 비교 권장`;
          }
          {const cv2=$('re_rt_big');
           cv2.addEventListener('wheel',e=>{ e.preventDefault();
@@ -2671,7 +2838,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             vOff=Math.max(0,Math.min(curL-n0,dr2.o+Math.round((e.clientX-dr2.x)/bw))); drawBig(); });
           cv2.addEventListener('mouseup',()=>{ dr2=null; });
           cv2.addEventListener("mouseleave",()=>{ dr2=null; if(hiLab){hiLab=null; drawBig();} });}
-         mbar(); chips(); drawBig(true);}
+         mbar(); chips(); drawBig(true);
+         /* htrade 가 아직 안 왔으면 도착한 뒤 '전국 전체(공식)'를 끼워 넣고 버튼만 다시 그린다 */
+         htrade().then(()=>{ if(injectKR()){ pbar(); } });}
       }).catch(()=>{});
       /* ⑤ 주택 시가총액 — 수도권 비중 추이(연간) + 전국 규모 */
       try{

@@ -725,6 +725,8 @@
           <span class="note">보기</span><span id="hc_mode" style="display:inline-flex;gap:3px"></span>
           <span class="note" style="margin-left:6px">구분</span><span id="hc_split" style="display:inline-flex;gap:3px"></span>
           <span class="note" style="margin-left:6px">기간</span><span id="hc_span" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px">거래량 겹쳐보기</span><span id="hc_vol" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px">지역</span><span id="hc_vreg" style="display:inline-flex;gap:3px"></span>
           <span class="note" id="hc_asof" style="margin-left:auto"></span>
         </div>
         <canvas id="hc_main" style="width:100%;height:330px"></canvas>
@@ -789,6 +791,25 @@
         </div>
         <canvas id="re_rt_big" style="width:100%;height:680px"></canvas>
         <div class="note" id="re_rt_big_n" style="margin-top:4px;line-height:1.6"></div>
+      </div>
+      <!-- (2026-08-10) 🏆 기간 지정 단지 랭킹 — RTMS 실거래(apt.sqlite) -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🏆 많이 거래된 단지 <span class="note">(기간을 직접 정해 줄 세운다 — "2026.1~7 서울에서 가장 많이 팔린 아파트" 같은 질문용 · <b>월 단위</b>)</span></b>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
+          <span class="note">기간</span>
+          <input type="month" id="ar_ym0" style="padding:3px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:6px">
+          <span class="note">~</span>
+          <input type="month" id="ar_ym1" style="padding:3px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:6px">
+          <span id="ar_quick" style="display:inline-flex;gap:3px;flex-wrap:wrap;margin-left:4px"></span>
+          <span class="note" style="margin-left:6px">지역</span>
+          <input type="text" id="ar_reg" placeholder="전국 / 서울 / 경기 화성시 / 잠실동" style="width:190px;padding:3px 8px;font-size:12px;border:1px solid #d7dce3;border-radius:6px">
+          <span class="note" style="margin-left:6px">유형</span><span id="ar_kind" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px">거래</span><span id="ar_deal" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px">개수</span><span id="ar_n" style="display:inline-flex;gap:3px"></span>
+          <button id="ar_go" style="margin-left:6px;padding:4px 14px;font-size:12px;border:1px solid #1f2937;background:#1f2937;color:#fff;border-radius:6px;cursor:pointer">조회</button>
+        </div>
+        <div id="ar_tbl" style="overflow:auto"></div>
+        <div class="note" id="ar_n_note" style="margin-top:4px;line-height:1.6"></div>
       </div>
       <!-- (2026-08-08) 청약경쟁률 — 청약홈 (실거래는 후행, 청약은 선행 지표) -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
