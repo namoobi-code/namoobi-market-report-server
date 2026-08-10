@@ -728,6 +728,11 @@ def us_fin(sym: str):
                               # (2026-08-10) 근거 문장 — 표에서 값에 마우스만 올리면
                               # 보도자료 원문 어디서 뽑았는지 즉시 확인된다(파싱 신뢰성 감사)
                               "revEv": it.get("g_rev_ev"), "epsEv": it.get("g_eps_ev"),
+                              # (2026-08-10) 2단계 승격 상태 — '8-K'(직접 파싱) ·
+                              # 'verified'(포털과 일치 · 교차검증) · 'portal'(포털 값으로 교체)
+                              "revSrc": it.get("g_rev_src") or "8-K",
+                              "epsSrc": it.get("g_eps_src") or "8-K",
+                              "revOwn": it.get("g_rev_own"), "epsOwn": it.get("g_eps_own"),
                               "acc": it.get("acc")}
         except Exception:
             pass

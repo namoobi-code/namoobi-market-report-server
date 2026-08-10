@@ -5649,12 +5649,16 @@ await _canvasFlow(c);
           const J2=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':'dn'}"><b>${v>0?'상회':'하회'}</b> ${v>0?'+':''}${(+v).toFixed(1)}%</span>`;
           /* (2026-08-10) 근거 문장 툴팁 — 파싱값이 보도자료 어디서 나왔는지 즉시 확인.
              "값이 맞나?"를 화면에서 바로 검증할 수 있어야 신뢰할 수 있다. */
+          /* (2026-08-10) 2단계 승격 배지 — ✓=포털과 대조해 일치(교차검증) · ⤴=포털 값으로 교체.
+             배지가 없으면 아직 우리 8-K 파싱값만 있는 상태(발표 직후). */
+          const SB=(src,own)=>src==='verified'?' <b style="color:#1f9d55" title="MarketBeat 포털 값과 일치 — 교차검증 완료">✓</b>'
+            :src==='portal'?` <b style="color:#1c7ed6" title="포털(MarketBeat) 값으로 교체 — 8-K 직접 파싱값은 ${own??'—'}">⤴</b>`:'';
           const evR=(gd2&&per===grp&&gd2.revEv)?` title="근거: ${E(gd2.revEv)}"`:'';
           const evE=(gd2&&per===gep&&gd2.epsEv)?` title="근거: ${E(gd2.epsEv)}"`:'';
           return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b> <span class="note">${E(e3.end||'')}</span></td>
-            <td style="text-align:right"${evR}>${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'}</td>
+            <td style="text-align:right"${evR}>${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'+SB(gd2.revSrc,gd2.revOwn)}</td>
             <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
-            <td style="text-align:right"${evE}>${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'}</td>
+            <td style="text-align:right"${evE}>${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'+SB(gd2.epsSrc,gd2.epsOwn)}</td>
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td></tr>`; }).join('')+
         `</table><div class="note">판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치</div></div>`;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
