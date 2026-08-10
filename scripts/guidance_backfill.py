@@ -19,7 +19,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from earnings_8k_watch import cik_map, exhibit_text, parse_guidance, guidance_gap
+from earnings_8k_watch import cik_map, exhibit_text, parse_guidance, guidance_gap, RAW_CACHE
+from guidance_table import parse_tables
 
 BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "earnings_live_us.json"
@@ -129,7 +130,23 @@ def main():
             return sym, {}
         time.sleep(0.15)
         try:
-            g = parse_guidance(exhibit_text(cik, acc))
+            # (2026-08-10) **표 우선 → 문장 폴백.**
+            # 가이던스가 표로 제시되면 열 머리글에 기간·기준이 그대로 적혀 있어
+            # 문장 규칙으로 추측할 필요가 없다(실측 PTC: 문장에선 Q4 열과 헷갈려 FY 값
+            # 8.46 을 분기로 분류 → 표에선 'FY’26 Guidance' 열로 정확히 확정).
+            # 표에서 못 찾은 항목만 문장 파서 결과로 채운다.
+            txt = exhibit_text(cik, acc)
+            g = parse_guidance(txt)
+            try:
+                gt = parse_tables(RAW_CACHE.get((str(cik), acc)) or "")
+            except Exception:
+                gt = {}
+            if gt:
+                ev = dict(g.get("_ev") or {}); ev.update(gt.get("_ev") or {})
+                for k, v in gt.items():
+                    if not k.startswith("_"):
+                        g[k] = v                       # 표 값이 문장 값을 이긴다
+                g["_ev"] = ev
             d8 = todo[sym].get("_d8")                    # 그 항목의 발표일(기준 분기 판정용)
             ann = f"{d8[:4]}-{d8[4:6]}-{d8[6:8]}" if d8 else None
             return sym, guidance_gap(sym, g, pool_us, ann)

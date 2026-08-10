@@ -75,6 +75,11 @@ def _to_num(v, unit, hint=None):
         return x * _MULT[u]
     return x * (_MULT[hint] if hint in _MULT else 1)
 
+# 직전에 내려받은 첨부의 원문 HTML — {(cik, accno): html}. 표 파서가 재사용한다.
+# 스레드마다 한 건씩만 들고 있으면 되므로 매번 비우고 새로 담는다(메모리 954MB 서버).
+RAW_CACHE = {}
+
+
 def exhibit_text(cik, accno):
     """8-K 첨부 중 **실적 보도자료** 본문 → 태그 제거한 평문.
 
@@ -108,6 +113,11 @@ def exhibit_text(cik, accno):
     except Exception:
         return ""
     t = raw.decode("utf-8", "ignore")
+    # (2026-08-10) 원문 HTML 을 남겨 둔다 — 표 파서(guidance_table)가 같은 첨부를 다시
+    # 내려받지 않게 하기 위함이다(SEC 호출을 두 배로 늘리면 곧바로 차단당한다).
+    if len(RAW_CACHE) > 8:        # 워커 4개가 동시에 쓰므로 통째로 비우면 남의 것을 지운다
+        RAW_CACHE.clear()
+    RAW_CACHE[(str(cik), accno)] = t
     t = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", t, flags=re.S | re.I)
     t = re.sub(r"<[^>]+>", " ", t)
     t = _html.unescape(t)                       # &#177;→± &#8217;→' 등 일괄 해제
