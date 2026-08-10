@@ -12,7 +12,7 @@
       이후 야후 수집기가 EPS 수치를 채우면 태그는 유지된다.
 cron: * 5-8 * * 2-6 · * 19-22 * * 1-5 (flock)
 """
-import html as _html, json, re, urllib.request
+import gzip, html as _html, json, re, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -76,8 +76,27 @@ def _to_num(v, unit, hint=None):
     return x * (_MULT[hint] if hint in _MULT else 1)
 
 # 직전에 내려받은 첨부의 원문 HTML — {(cik, accno): html}. 표 파서가 재사용한다.
-# 스레드마다 한 건씩만 들고 있으면 되므로 매번 비우고 새로 담는다(메모리 954MB 서버).
 RAW_CACHE = {}
+
+# (2026-08-10) 첨부 원문을 **디스크에 캐시**한다.
+# 파서를 고칠 때마다 전 종목을 다시 파싱해야 하는데, 그때마다 SEC 를 다시 부르면
+# 속도 제한에 걸린다(실제로 걸려서 가이던스가 통째로 비는 사고가 났다).
+# 보도자료는 한 번 제출되면 바뀌지 않으므로 접수번호로 캐시하면 영구 재사용할 수 있다.
+# → 재파싱은 SEC 호출 0회. 몇 번을 돌리든 상관없다.
+EXC_DIR = Path(__file__).resolve().parent.parent / "data" / "cache" / "exhibit"
+
+
+def _exc_path(accno):
+    EXC_DIR.mkdir(parents=True, exist_ok=True)
+    return EXC_DIR / f"{accno}.html.gz"
+
+
+def _strip(t):
+    t = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", t, flags=re.S | re.I)
+    t = re.sub(r"<[^>]+>", " ", t)
+    t = _html.unescape(t)                       # &#177;→± &#8217;→' 등 일괄 해제
+    t = t.replace("–", "-").replace("—", "-")
+    return re.sub(r"\s+", " ", t)
 
 
 def exhibit_text(cik, accno):
@@ -90,6 +109,17 @@ def exhibit_text(cik, accno):
       R*.htm 같은 XBRL 렌더링 파일은 제외) 순으로 고른다.
     """
     an = accno.replace("-", "")
+    # 캐시가 있으면 SEC 를 부르지 않는다. 보도자료는 제출 뒤 바뀌지 않는다.
+    cp = _exc_path(accno)
+    if cp.exists():
+        try:
+            t = gzip.decompress(cp.read_bytes()).decode("utf-8", "ignore")
+            if len(RAW_CACHE) > 8:
+                RAW_CACHE.clear()
+            RAW_CACHE[(str(cik), accno)] = t
+            return _strip(t)
+        except Exception:
+            pass
     try:
         idx = json.loads(get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/index.json"))
         items = idx.get("directory", {}).get("item", [])
@@ -118,11 +148,13 @@ def exhibit_text(cik, accno):
     if len(RAW_CACHE) > 8:        # 워커 4개가 동시에 쓰므로 통째로 비우면 남의 것을 지운다
         RAW_CACHE.clear()
     RAW_CACHE[(str(cik), accno)] = t
-    t = re.sub(r"<(script|style)[^>]*>.*?</\1>", " ", t, flags=re.S | re.I)
-    t = re.sub(r"<[^>]+>", " ", t)
-    t = _html.unescape(t)                       # &#177;→± &#8217;→' 등 일괄 해제
-    t = t.replace("\u2013", "-").replace("\u2014", "-")
-    return re.sub(r"\s+", " ", t)
+    try:                          # 다음 재파싱부터는 SEC 호출 없이 이 파일을 쓴다
+        tmp = cp.with_suffix(".tmp")
+        tmp.write_bytes(gzip.compress(t.encode("utf-8"), 6))
+        tmp.replace(cp)
+    except Exception:
+        pass
+    return _strip(t)
 
 
 _FYRE = r"full[- ]year|fiscal year|for the year|full fiscal|annual|FY\\s?20\\d\\d"
