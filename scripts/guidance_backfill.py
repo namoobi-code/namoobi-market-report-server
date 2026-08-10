@@ -27,6 +27,11 @@ POOL = BASE / "data" / "db" / "screener_pool.json"
 H = {"User-Agent": "namoobi research namoobi@gmail.com"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
 DAYS, WORKERS, LIMIT = ARG("--days", 45), ARG("--workers", 4), ARG("--limit", 0)
+# (2026-08-10) --force = 이미 값이 있는 항목도 다시 파싱한다.
+# 기본 동작은 '비어 있는 것만'이라, 파서를 고쳐도 **이미 잘못 채워진 값은 그대로 남는다**
+# (실측 AMGN GAAP EPS 오채택 · ABT 연간을 분기로 분류 → 고쳐도 화면은 옛 값). 파서를
+# 수정한 뒤에는 --force 로 전체를 다시 돌려야 수정이 실제로 반영된다.
+FORCE = "--force" in sys.argv
 
 
 def recent_earn_8k(cik):
@@ -55,8 +60,16 @@ def main():
         for it in live["days"][d8]:
             c = it.get("c")
             # 이미 갭이 있거나, 컨센서스(rq1·eq1)가 없어 비교 자체가 불가능하면 건너뛴다
-            if not c or it.get("g_rev_gap") is not None or it.get("g_eps_gap") is not None:
+            if not c:
                 continue
+            if not FORCE and (it.get("g_rev_gap") is not None or it.get("g_eps_gap") is not None):
+                continue
+            if FORCE:
+                # 재파싱 전에 옛 값을 지운다 — 안 지우면 이번에 기각된 항목(오파싱이라
+                # 걸러낸 것)이 옛 값 그대로 남아 "고쳤는데 화면은 그대로"가 된다.
+                for k in ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev",
+                          "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_per"):
+                    it.pop(k, None)
             r = pool_us.get(c) or {}
             if r.get("rq1") is None and r.get("eq1") is None:
                 continue

@@ -24,6 +24,11 @@ import json, re, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pool_merge import save_pool_merged
+# (2026-08-10) 이 스크립트가 책임지는 필드만 병합 저장 — 다른 수집기 결과를 덮지 않는다
+ZSPR_FIELDS = ("sspr","ssprD")
 
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
@@ -109,10 +114,10 @@ def main():
                 got += 1
             if (i + 1) % 300 == 0:           # 중간 저장 — 백필 도중 끊겨도 이어감
                 pool["zspr_asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                POOL.write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")
+                save_pool_merged(pool, ZSPR_FIELDS, mkts=("us",), extra_meta=("zspr_asof",))
                 print(f"    [{i+1}/{len(syms)}] 확보 {got}", flush=True)
     pool["zspr_asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    POOL.write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")
+    save_pool_merged(pool, ZSPR_FIELDS, mkts=("us",), extra_meta=("zspr_asof",))
     print(f"[zspr] 완료 — sspr {got}/{len(syms)} · 풀 보유 {sum(1 for r in us if r.get('sspr') is not None)}")
 
 

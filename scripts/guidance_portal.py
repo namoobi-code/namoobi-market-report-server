@@ -1,23 +1,25 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""guidance_portal.py — 가이던스 2단계 승격: 직접 파싱 → 포털 교차검증 (2026-08-10 신설).
+"""guidance_portal.py — 가이던스 **검증용** 포털 값 수집 (2026-08-10 재작성).
 
-설계 (사용자 제안)
+역할 (사용자 지정)
 ------------------
-  1단계  회사가 발표하면 **우리가 8-K 보도자료를 직접 파싱**한 값을 즉시 쓴다(발표 수 분 내).
-  2단계  며칠 뒤 포털(MarketBeat)이 같은 가이던스를 정리해 올리면 그것과 **대조**한다.
-           · 일치(±1%)  → 'verified' 표시. 값은 그대로, 신뢰도만 올라간다.
-           · 불일치     → 포털 값으로 교체('portal'). 우리 값은 근거와 함께 남겨 감사 가능.
-           · 포털 미제공 → 우리 값 유지('8-K').
+  · 표시·판정에 쓰는 값은 **우리가 8-K 보도자료에서 직접 파싱한 것**뿐이다.
+  · 포털(MarketBeat) 값은 **오직 대조·검증용**으로 따로 저장한다 —
+    같은 화면·필터에 나란히 놓고 "우리 파싱이 맞나"를 눈으로 확인하기 위함.
+  · 포털 값으로 우리 값을 덮어쓰거나 자동 교정하지 **않는다**(그건 파싱 실패를 숨기는 것).
 
-왜 포털을 '그대로 대체'하지 않는가 (실측)
------------------------------------------
-MarketBeat 의 'Company Guidance' 열은 회사마다 **매출인지 EPS인지, 단위가 무엇인지**
-표기가 없다 — NVDA 는 '$52.9 B - $55.1 B'(매출), QCOM 은 '2.050 - 2.250'(EPS).
-게다가 분기 라벨(Q3 2026)이 회사 회계연도 기준이라 우리 분기와 어긋난다.
-그래서 라벨을 믿지 않고 **컨센서스 값으로 역매칭**한다 — MarketBeat 가 같은 행에 적어 둔
-EPS/매출 컨센이 우리 컨센(eq0/rq0 등)과 일치하는 행만 그 분기의 가이던스로 인정한다.
-이 방식으로 QCOM Q4 EPS(2.05~2.25)·WAT Q3 EPS(3.95~4.05)가 우리 파싱값과 정확히 일치함을 확인했다.
+왜 그대로 못 쓰는가 (실측)
+--------------------------
+MarketBeat 'Company Guidance' 열은 회사마다 매출인지 EPS인지·단위가 무엇인지 표기가 없다
+(NVDA '$52.9 B - $55.1 B'=매출 · QCOM '2.050 - 2.250'=EPS). 분기 라벨도 회계연도 기준이라
+우리 분기와 어긋난다. 그래서 라벨을 믿지 않고 **컨센 값으로 역매칭**해 기간을 확정한다
+(MarketBeat 가 같은 행에 적어 둔 EPS/매출 컨센이 우리 컨센과 일치하는 행만 인정).
+
+저장 필드 (earnings_live_us 의 해당 발표 항목)
+  g_rev_gap_p / g_eps_gap_p   포털 기준 갭%  (검증 전용)
+  g_rev_p     / g_eps_p       포털 가이던스 중간값
+  g_rev_per_p / g_eps_per_p   포털 값이 매칭된 기간(0q/+1q/0y/+1y)
 
 사용: guidance_portal.py [--days 30] [--limit N]
 cron: 매일 08:40 (guidance_backfill·earnings_join 뒤)
@@ -32,11 +34,10 @@ LIVE = BASE / "data" / "db" / "earnings_live_us.json"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
 DAYS, LIMIT = ARG("--days", 30), ARG("--limit", 0)
-TOL = 0.01                      # 1% 이내면 같은 값으로 본다(반올림 표기 차이 흡수)
 
 
 def _v(s):
-    """'$52.9 B' → 52900(백만) · '2.050' → 2.05 · '' → None"""
+    """'$52.9 B' → (52900, 'rev') · '2.050' → (2.05, 'eps') · '' → (None, None)"""
     s = (s or "").strip()
     m = re.match(r"\$?\s*([\d,.]+)\s*([BMK])?\b", s)
     if not m:
@@ -54,34 +55,40 @@ def _v(s):
 
 
 def fetch_rows(sym):
-    """MarketBeat 추정 표 → [{eps컨센, 매출컨센(백만), 가이던스 lo/hi, 종류}]"""
-    try:
-        h = urllib.request.urlopen(urllib.request.Request(
-            f"https://www.marketbeat.com/stocks/NASDAQ/{sym.upper()}/earnings/", headers=UA),
-            timeout=20).read().decode("utf-8", "ignore")
-    except Exception:
-        return []
+    """MarketBeat 추정 표 → [{epsE, revE(백만), lo, hi, kind}]
+
+    URL 에 거래소가 들어가는데 우리 풀에는 거래소 구분이 없어 NASDAQ·NYSE 를 차례로 시도한다
+    (실측: NVDA·QCOM 은 NASDAQ, ABT 는 NYSE — 하나만 쓰면 NYSE 종목이 전부 빈다).
+    """
+    h = ""
+    for exch in ("NASDAQ", "NYSE", "NYSEAMERICAN"):
+        try:
+            h = urllib.request.urlopen(urllib.request.Request(
+                f"https://www.marketbeat.com/stocks/{exch}/{sym.upper()}/earnings/", headers=UA),
+                timeout=20).read().decode("utf-8", "ignore")
+        except Exception:
+            h = ""
+        if "Company Revenue Guidance" in h:
+            break
     i = h.find("Company Revenue Guidance")
     if i < 0:
         return []
-    seg = h[max(0, i - 500):i + 4000]
     out = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", seg, re.S):
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", h[max(0, i - 500):i + 4000], re.S):
         cs = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
         # 열: 분기 | 추정수 | 최저 | 최고 | 평균EPS | 매출컨센 | 회사 가이던스
         if len(cs) < 7 or not cs[0]:
             continue
         epsE, _ = _v(cs[4])
         revE, _ = _v(cs[5])
-        g = cs[6]
-        mg = re.match(r"(.+?)\s*-\s*(.+)$", g)
+        mg = re.match(r"(.+?)\s*-\s*(.+)$", cs[6])
         if not mg:
             continue
         lo, k1 = _v(mg.group(1))
         hi, k2 = _v(mg.group(2))
         if lo is None or hi is None or k1 != k2:
             continue
-        out.append({"per": cs[0], "epsE": epsE, "revE": revE, "lo": lo, "hi": hi, "kind": k1})
+        out.append({"epsE": epsE, "revE": revE, "lo": lo, "hi": hi, "kind": k1})
     return out
 
 
@@ -90,36 +97,29 @@ def main():
     by = {r.get("c"): r for r in (pool.get("us") or []) if r.get("c")}
     live = json.loads(LIVE.read_text(encoding="utf-8"))
     cut = (datetime.now() - timedelta(days=DAYS)).strftime("%Y%m%d")
-    todo = []
-    for d8 in sorted(live.get("days") or {}):
-        if d8 < cut:
-            continue
-        for it in live["days"][d8]:
-            if it.get("c") in by and (it.get("g_rev") is not None or it.get("g_eps") is not None):
-                todo.append(it)
+    todo = [it for d8 in sorted(live.get("days") or {}) if d8 >= cut
+            for it in live["days"][d8] if it.get("c") in by]
     if LIMIT:
         todo = todo[:LIMIT]
-    print(f"[gpor] 대조 대상 {len(todo)}건 (최근 {DAYS}일 · 파싱값 보유분)", flush=True)
-    ver = rep = 0
+    print(f"[gpor] 검증 대상 {len(todo)}건 (최근 {DAYS}일)", flush=True)
+    got = same = diff = 0
     for n, it in enumerate(todo):
         sym = it["c"]
         r = by[sym]
         rows = fetch_rows(sym)
         time.sleep(0.3)
         if not rows:
-            it["g_src"] = it.get("g_src") or "8-K"
             continue
-        for metric, gk, pk in (("rev", "g_rev", "g_rev_per"), ("eps", "g_eps", "g_eps_per")):
-            mine = it.get(gk)
-            if mine is None:
-                continue
-            per = it.get(pk) or "0q"
-            # 컨센 역매칭 — 라벨 대신 값으로 어느 분기인지 확정한다
+        for metric, gk in (("rev", "g_rev"), ("eps", "g_eps")):
+            # 기간은 우리 파싱 결과의 기간을 기준으로 같은 기간의 포털 값을 찾는다.
+            # (우리 값이 없으면 진행분기 0q 기준으로 조회 — 검증 목적상 그래도 보여준다)
+            per = it.get(gk + "_per") or it.get("g_per") or "0q"
             base = {"0q": ("eq0", "rq0"), "+1q": ("eq1", "rq1"),
                     "0y": ("ey0", "ry0"), "+1y": ("ey1", "ry1")}.get(per)
             if not base:
                 continue
-            ce, cr = r.get(base[0]), r.get(base[1])
+            ce = r.get(base[0])
+            cr = r.get(base[1])
             cr = cr / 1e6 if cr else None
             hit = None
             for row in rows:
@@ -127,29 +127,31 @@ def main():
                     continue
                 ok_e = ce and row.get("epsE") and abs(row["epsE"] / ce - 1) <= 0.02
                 ok_r = cr and row.get("revE") and abs(row["revE"] / cr - 1) <= 0.02
-                if ok_e or ok_r:
+                if ok_e or ok_r:                       # 컨센 역매칭으로 기간 확정
                     hit = row
                     break
             if not hit:
-                it["g_src"] = it.get("g_src") or "8-K"
                 continue
-            pmid = (hit["lo"] + hit["hi"]) / 2
-            if abs(pmid / mine - 1) <= TOL:                 # 일치 → 교차검증 완료
-                it[gk + "_src"] = "verified"
-                ver += 1
-            else:                                            # 불일치 → 포털 채택, 우리 값 보존
-                it[gk + "_own"] = mine
-                it[gk] = round(pmid, 2 if metric == "eps" else 1)
-                cbase = ce if metric == "eps" else cr
-                if cbase:
-                    it[("g_eps_gap" if metric == "eps" else "g_rev_gap")] = round((pmid / cbase - 1) * 100, 1)
-                it[gk + "_src"] = "portal"
-                rep += 1
+            mid = (hit["lo"] + hit["hi"]) / 2
+            cbase = ce if metric == "eps" else cr
+            if not cbase:
+                continue
+            it[gk + "_p"] = round(mid, 2 if metric == "eps" else 1)
+            it[gk + "_gap_p"] = round((mid / cbase - 1) * 100, 1)
+            it[gk + "_per_p"] = per
+            got += 1
+            mine = it.get(gk)
+            if mine:
+                if abs(mid / mine - 1) <= 0.01:
+                    same += 1
+                else:
+                    diff += 1
         if (n + 1) % 50 == 0:
             LIVE.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
-            print(f"    [{n+1}/{len(todo)}] 검증 {ver} · 교체 {rep}", flush=True)
+            print(f"    [{n+1}/{len(todo)}] 포털값 {got} · 일치 {same} · 불일치 {diff}", flush=True)
     LIVE.write_text(json.dumps(live, ensure_ascii=False), encoding="utf-8")
-    print(f"[gpor] 완료 — 교차검증 일치 {ver} · 포털 값으로 교체 {rep} / {len(todo)}건")
+    print(f"[gpor] 완료 — 포털값 {got}건 · 우리 파싱과 일치 {same} · 불일치 {diff} "
+          f"(포털 값은 검증 전용 — 판정·표시에는 사용하지 않음)")
 
 
 if __name__ == "__main__":

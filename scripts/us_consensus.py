@@ -24,6 +24,11 @@ import http.cookiejar, json, sys, time, urllib.parse, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pool_merge import save_pool_merged
+# (2026-08-10) 이 스크립트가 책임지는 필드만 병합 저장 — 다른 수집기 결과를 덮지 않는다
+CONS_FIELDS = ("spr","sprb","sprn","spra","cr7","cr30","cr90","cup","cdn","eq0","rq0","eq1","rq1","nan1","q0e","q1e","ey0","ey1","ry0","ry1","tprv","tprv90")
 
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
@@ -200,7 +205,7 @@ def main():
                 r[lab] = round((tp / pv - 1) * 100, 2); ntp += 1
     cx.close()
     pool["us_cons_asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    POOL.write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")
+    save_pool_merged(pool, CONS_FIELDS, mkts=("us",), extra_meta=("us_cons_asof",))
     have = lambda k: sum(1 for r in us if r.get(k) is not None)
     print(f"[uscons] 패치 {n}/{len(us)} · spr {have('spr')} · cr30 {have('cr30')} · rq1 {have('rq1')}"
           f" · 스냅샷 {ns}행 · 목표가리비전 {ntp}")

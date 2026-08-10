@@ -25,6 +25,11 @@ US 의 spr·sprb·cr30 은 screener_pool.py 가 Yahoo 에서 직접 받아 이�
 import json
 from datetime import datetime
 from pathlib import Path
+import sys as _sys
+_sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pool_merge import save_pool_merged
+# (2026-08-10) 이 스크립트가 책임지는 필드만 병합 저장 — 다른 수집기 결과를 덮지 않는다
+JOIN_FIELDS = ("cr30","cr90","tprv","tprv90","tpn","tpu","tpd","edl","r1","r5","r20","gap","gapR","gapE","gapRp","gapEp","pgapR","pgapE","spr","sspr","syoy","oyoy","nyoy","sqoq","oqoq","nqoq","opmn","opmy","oqt","nqt")
 
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
@@ -139,7 +144,7 @@ def main():
             d8, it = ev.get(c, (None, None))
             # (2026-08-10) 가이던스 필드는 매 실행마다 **초기화 후 재기록** — 소급 재파싱으로
             # 값이 빠진 경우(예: ±25% 초과 오파싱 제거)에도 풀에 옛 값이 남으면 안 된다.
-            for k in ("gapR", "gapE", "gapRp", "gapEp", "gap"):
+            for k in ("gapR", "gapE", "gapRp", "gapEp", "gap", "pgapR", "pgapE"):
                 r.pop(k, None)
             if it:
                 patch["edl"] = d8
@@ -154,6 +159,12 @@ def main():
                 if it.get("g_eps_gap") is not None:
                     patch["gapE"] = it["g_eps_gap"]
                     patch["gapEp"] = it.get("g_eps_per") or it.get("g_per")
+                # (2026-08-10) 포털 갭 — **검증 전용**. 우리 파싱값(gapR/gapE) 옆에 나란히 보여
+                # 파싱이 맞는지 눈으로 대조하기 위한 것이며, 비트/미스 판정에는 절대 쓰지 않는다.
+                if it.get("g_rev_gap_p") is not None:
+                    patch["pgapR"] = it["g_rev_gap_p"]
+                if it.get("g_eps_gap_p") is not None:
+                    patch["pgapE"] = it["g_eps_gap_p"]
                 g = it.get("g_rev_gap")
                 if g is None:
                     g = it.get("g_eps_gap")
@@ -173,7 +184,7 @@ def main():
                 r.update(patch); n += 1
         stat[mk] = n
     pool["ern_join_asof"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-    POOL.write_text(json.dumps(pool, ensure_ascii=False), encoding="utf-8")
+    save_pool_merged(pool, JOIN_FIELDS, mkts=("kr","us"), extra_meta=("ern_join_asof",))
     tot = {mk: len(pool.get(mk) or []) for mk in ("kr", "us")}
     print(f"[join] KR {stat.get('kr',0)}/{tot['kr']} · US {stat.get('us',0)}/{tot['us']} 종목에 실적·전망 패치")
 

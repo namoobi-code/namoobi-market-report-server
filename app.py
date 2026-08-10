@@ -788,6 +788,11 @@ def us_fin(sym: str):
                               "revSrc": it.get("g_rev_src") or "8-K",
                               "epsSrc": it.get("g_eps_src") or "8-K",
                               "revOwn": it.get("g_rev_own"), "epsOwn": it.get("g_eps_own"),
+                              # (2026-08-10) 포털(MarketBeat) 대조값 — **검증 전용**.
+                              # 표에 파싱 갭 옆에 나란히 놓아 눈으로 대조만 하고,
+                              # 상회/하회 판정에는 절대 쓰지 않는다(사용자 지시).
+                              "revP": it.get("g_rev_p"), "revGapP": it.get("g_rev_gap_p"),
+                              "epsP": it.get("g_eps_p"), "epsGapP": it.get("g_eps_gap_p"),
                               "acc": it.get("acc")}
         except Exception:
             pass

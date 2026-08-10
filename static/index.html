@@ -718,6 +718,46 @@
         <canvas id="re_tdep" style="width:100%;height:230px"></canvas>
         <div class="note" id="re_tdep_n" style="margin-top:4px;line-height:1.6"></div>
       </div>
+      <!-- (2026-08-10) 💳 가계대출 — ECOS 151Y005(용도별)·151Y002(업권별) · 매일 07:15 -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">💳 가계대출 — 잔액 · 월별 증감액 <span class="note">(한국은행 ECOS · 말잔 · <b>잔액보다 증감액</b>이 매수 자금의 크기다 — 증가폭이 꺾이면 몇 달 뒤 거래량이 따라 꺾인다)</span></b>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
+          <span class="note">보기</span><span id="hc_mode" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px">구분</span><span id="hc_split" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px">기간</span><span id="hc_span" style="display:inline-flex;gap:3px"></span>
+          <span class="note" id="hc_asof" style="margin-left:auto"></span>
+        </div>
+        <canvas id="hc_main" style="width:100%;height:330px"></canvas>
+        <div class="note" id="hc_main_n" style="margin-top:4px;line-height:1.6"></div>
+        <div class="grid g2" style="margin-top:10px">
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>12개월 누적 증감</b> — 계절성을 걷어낸 연간 순증 추세</div>
+            <canvas id="hc_roll" style="width:100%;height:210px"></canvas>
+            <div class="note" id="hc_roll_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>전세자금대출 · 정책대출</b> — 전세 수요와 정책 공급의 크기</div>
+            <canvas id="hc_pol" style="width:100%;height:210px"></canvas>
+            <div class="note" id="hc_pol_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+        </div>
+      </div>
+      <!-- (2026-08-10) ⚠ 대출 연체율 — ECOS 901Y054(장기)·141Y005(지역별) -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">⚠ 대출 연체율 <span class="note">(가계·주택관련 연체율이 오르면 급매·경매 물량이 늘어난다 — 지역별로 보면 어디가 먼저 무너지는지 앞서 드러난다)</span></b>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:6px 0 4px">
+          <span id="dq_view" style="display:inline-flex;gap:3px"></span>
+          <span class="note" style="margin-left:6px" id="dq_kindlab">차주</span><span id="dq_kind" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span>
+          <span id="dq_regwrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+            <span class="note" style="margin-left:6px">지역</span>
+            <span id="dq_preset" style="display:inline-flex;gap:3px"></span>
+            <span id="dq_reg" style="display:inline-flex;gap:3px;flex-wrap:wrap"></span>
+          </span>
+          <span class="note" id="dq_asof" style="margin-left:auto"></span>
+        </div>
+        <canvas id="dq_main" style="width:100%;height:340px"></canvas>
+        <div class="note" id="dq_main_n" style="margin-top:4px;line-height:1.6"></div>
+      </div>
       <!-- (2026-08-08) 미국 주택 선행지표 — FRED 무인증 CSV -->
       <div class="box" style="padding:12px 14px;grid-column:1/-1">
         <b style="font-size:13px">🇺🇸 미국 주택 선행지표 <span class="note">(FRED · 건축허가는 착공에 6개월 선행 · 글로벌 유동성 사이클 참고)</span></b>
@@ -1574,7 +1614,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260812t"></script>
+<script src="/app.js?v=20260810hd"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}

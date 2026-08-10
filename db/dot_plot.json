@@ -1,40 +1,35 @@
 {
- "marker": "2026-08",
- "as_of": "2026-08-08",
+ "marker": "2026-06-17",
+ "as_of": "2026-08-10",
  "data": {
   "rows": [
    {
-    "year": "2026",
-    "jun": 3.8,
+    "year": "2026년말",
     "mar": 3.4,
+    "jun": 3.8,
     "change": "+0.4"
    },
    {
-    "year": "2027",
-    "jun": 3.6,
+    "year": "2027년말",
     "mar": 3.1,
+    "jun": 3.6,
     "change": "+0.5"
    },
    {
-    "year": "2028",
-    "jun": 3.4,
+    "year": "2028년말",
     "mar": 3.1,
+    "jun": 3.4,
     "change": "+0.3"
    },
    {
     "year": "장기중립",
-    "jun": 3.1,
     "mar": 3.1,
+    "jun": 3.1,
     "change": "+0.0"
    }
   ],
-  "unit": "%",
-  "summary": "2026-06-17 SEP(점도표)에서 2026년말 정책금리 중간값이 3월 3.4%→6월 3.8%로 매파적 급선회(18명 중 9명이 연내 1회 이상 인상 전망) — 관세발 인플레·노동시장 견조함 반영. 2027년말 3.6%, 2028년말 3.4%로 상향, 장기중립금리는 3.1%로 유지. 다음 SEP는 2026-09-15~16 예정.",
-  "policy_rate": "3.50~3.75% (2026-07-29 FOMC, 5회 연속 동결)",
-  "next_meeting": "2026-09-15~16 (SEP 점도표 발표 예정)",
-  "as_of": "2026-08-08",
-  "reuse_note": "2026-08-08 재확인: python3 nmr_db.py check dot_plot 2026-06-17 결과 'due'(DB marker='2026-08'≠관측값)였으나, WebSearch(tradingkey.com, forbes.com) 재확인 결과 직전 SEP(2026-06-17) 이후 신규 SEP·긴급 FOMC 없음(7/28-29 FOMC도 SEP 미실시 재확인). 다음 SEP는 2026-09-15~16 예정. DB db/dot_plot.json 값 그대로 재사용, 신규 조사 없음(추정 아님).",
-  "source": "federalreserve.gov FOMC Summary of Economic Projections (fomcprojtabl20260617.htm, fomcprojtabl20260318.htm)",
-  "source_url": "https://www.federalreserve.gov/monetarypolicy/fomcprojtabl20260617.htm"
+  "fomc_sep_date": "2026-06-17",
+  "comment": "2026-06-17 SEP(6월 점도표)가 2026-03-18 SEP(3월 점도표) 대비 전반적으로 매파적 상향 — 2026년말 중간값 3.4%→3.8%(참가자 18명 중 9명이 연내 1회 이상 인상 전망), 2027년말 3.1%→3.6%, 2028년말 3.1%→3.4%. 장기중립금리는 3.1%로 불변. 다음 SEP(9월 정례 아님, 실제로는 12월)은 회의 스케줄상 2026-09-16(분기 공개일)에 갱신 예정.",
+  "source": "federalreserve.gov FOMC Summary of Economic Projections 2026-03-18, 2026-06-17 (fomc_meetings note 교차확인)"
  }
 }

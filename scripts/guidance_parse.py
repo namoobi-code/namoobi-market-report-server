@@ -51,7 +51,8 @@ _GAAP = r"(?<!non-)(?<!non )\bgaap\b"
 # (2026-08-10) 과거 실적을 가리키는 분기 표현은 기간 판정에서 제외한다.
 # 실측 SRE: "affirming its 2026 adjusted EPS guidance ... reflecting actual results **through the
 # second quarter**" → 연간 가이던스인데 '2분기'로 잡혀 분기 컨센과 비교돼 +396% 오판정.
-_QPAST = r"(?:through|results through|reported|ended|completed|in the|during the|versus the|vs\.? the)\s+$"
+_QPAST = (r"(?:through|results through|through the|reported|ended|completed|"
+          r"in the|during the|versus the|vs\.? the)\s+$")
 _QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|ending)|"
         r"for the (?:first|second|third|fourth) quarter|next quarter|current quarter")
 # (2026-08-10) 연간 표시에 **"연도 + Outlook/전망"** 형태를 추가한다. 실측 오분류:
@@ -146,17 +147,35 @@ def _period(txt, start, end):
       ④ 그래도 없으면 뒤 90자
     어디서도 확정 못 하면 None → 채택하지 않는다(추측하지 않는다).
     """
-    def pick(seg):
+    def pick(seg, anchor=None):
+        """seg 안에서 기간 표현을 찾되, **숫자에 가장 가까운** 것을 택한다.
+
+        (2026-08-10 수정) 예전엔 '더 뒤에 나온 표현'을 골랐는데, 뒤에 있다고 값에
+        가까운 건 아니다. 실측 ABT: 헤드라인 불릿이 마침표 없이 ' - ' 로만 이어져
+        한 문장으로 잡히는 바람에, 값 **뒤** 불릿의 'second quarter' 가 값 **바로 앞**
+        'full-year 2026' 을 이겨 연간 가이던스 5.45~5.60 이 분기로 분류됐다
+        (분기 컨센 1.42 대비 +289%). 영어는 기간 수식어가 값 앞에 오므로
+        앞쪽 표현을 우선하고(뒤쪽은 거리 3배 페널티), 그중 가장 가까운 것을 쓴다.
+        """
         q = [m.start() for m in re.finditer(_QRE, seg, re.I)
              if not re.search(_QPAST, seg[:m.start()][-30:], re.I)]
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)]
-        if q and not y:
-            return "Q"
-        if y and not q:
+        if not q and not y:
+            return None
+        if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)
+            if q and not y:
+                return "Q"
+            if y and not q:
+                return "Y"
+            return "Q" if max(q) > max(y) else "Y"
+        d = lambda p: (anchor - p) if p <= anchor else (p - anchor) * 3
+        dq = min([d(p) for p in q], default=None)
+        dy = min([d(p) for p in y], default=None)
+        if dq is None:
             return "Y"
-        if q and y:
-            return "Q" if max(q) > max(y) else "Y"      # 더 뒤(=값에 가까운) 표현
-        return None
+        if dy is None:
+            return "Q"
+        return "Q" if dq < dy else "Y"
 
     # ① 매칭 구절 안
     r0 = pick(txt[start:end])
@@ -165,12 +184,14 @@ def _period(txt, start, end):
     # ② 같은 문장 안 (마침표·세미콜론·불릿 경계)
     ls = max(txt.rfind(". ", 0, start), txt.rfind("; ", 0, start), txt.rfind("• ", 0, start))
     rs = txt.find(". ", end)
-    sent = txt[(ls + 2 if ls > 0 else max(0, start - 400)):(rs if rs > 0 else min(len(txt), end + 200))]
-    r1 = pick(sent)
+    s0 = (ls + 2 if ls > 0 else max(0, start - 400))
+    sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
+    r1 = pick(sent, start - s0)
     if r1:
         return r1
     # ③ 앞 문맥 400자 — 가장 가까운 표현
-    r2 = pick(txt[max(0, start - 400):end])
+    b0 = max(0, start - 400)
+    r2 = pick(txt[b0:end], start - b0)
     if r2:
         return r2
     # ④ 뒤 90자
@@ -230,10 +251,21 @@ def parse_guidance(txt):
                         continue
                     add("rev", per, lo, hi, ctx)
                 else:
-                    adj = bool(re.search(_ADJ, ctx, re.I))
-                    if re.search(_GAAP, ctx, re.I) and not adj:
+                    # 회계 기준 판정은 **가까운 것부터** 본다.
+                    # 넓은 ctx 하나로 판정하면 GAAP↔non-GAAP 조정표에서 두 단어가 함께 잡혀
+                    # GAAP 값이 조정값으로 오인된다(실측 AMGN: "Reconciliation of GAAP EPS
+                    # Guidance to Non-GAAP EPS Guidance / GAAP diluted EPS guidance $15.80-$17.08"
+                    # → 조정 컨센 22.9 대비 −28% 로 잘못 표시). 숫자 바로 앞 라벨(near)이
+                    # 기준을 명시하면 그것이 결론이고, 침묵할 때만 넓은 문맥으로 넘어간다.
+                    def _basis(seg):
+                        a = bool(re.search(_ADJ, seg, re.I))
+                        g = bool(re.search(_GAAP, seg, re.I))
+                        return "adj" if (a and not g) else ("gaap" if (g and not a) else None)
+                    bas = _basis(near) or _basis(back) or _basis(ctx)
+                    if bas == "gaap":
                         skip.append(f"eps: GAAP 기준 → 조정 컨센과 비교 불가 · {ctx[:130]}")
                         continue
+                    adj = bas == "adj"
                     if not (-100 < lo <= hi < 1000):
                         skip.append(f"eps: 값 범위 비정상({lo}~{hi}) · {ctx[:120]}")
                         continue

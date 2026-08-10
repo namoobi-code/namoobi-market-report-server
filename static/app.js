@@ -2225,8 +2225,234 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     }).catch(()=>{});
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     (2026-08-10) 💳 가계대출 + ⚠ 대출 연체율 — hcredit.json (ECOS · 매일 07:15)
+
+     가계대출 잔액은 20년째 우상향이라 그림이 안 나온다. 신호는 **월별 증감액**에 있다.
+     주택관련대출 순증이 꺾이면 몇 달 뒤 거래량이 따라 꺾이는 패턴이 반복된다.
+     연체율은 그 반대편 — 가계·주택관련 연체율이 오르면 급매·경매 물량이 늘고,
+     지역별로 보면 어느 지역이 먼저 무너지는지 총량보다 앞서 드러난다.
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  /* 0선 기준 누적 막대. line() 은 선만 그린다 —
+     증감액은 부호가 뒤집히는 지표라 0 기준선과 막대가 있어야
+     '순증에서 순감으로 돌아선 달'이 한눈에 들어온다. */
+  function bars(cvId, t, series, opts){
+    opts=opts||{};
+    const cv=$(cvId); if(!cv) return;
+    const W=cv.clientWidth||700, H=cv.clientHeight||300; cv.width=W; cv.height=H;
+    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    if(!t||!t.length||!series||!series.length) return;
+    const P={l:8,r:56,t:16,b:18}, N=t.length;
+    let lo=0, hi=0;
+    for(let i=0;i<N;i++){ let up=0,dn=0;
+      series.forEach(s=>{const v=s.v[i]; if(v==null) return; v>=0?up+=v:dn+=v;});
+      if(up>hi) hi=up; if(dn<lo) lo=dn; }
+    (opts.extra||[]).forEach(s=>s.v.forEach(v=>{ if(v==null) return; if(v>hi)hi=v; if(v<lo)lo=v; }));
+    if(hi===lo){ hi=1; lo=-1; }
+    const pad=(hi-lo)*0.08; hi+=pad; lo-=pad;
+    const X=i=>P.l+(W-P.l-P.r)*(i+0.5)/N, Y=v=>P.t+(H-P.t-P.b)*(1-(v-lo)/(hi-lo));
+    const bw=Math.max(1,(W-P.l-P.r)/N*0.72), dec=(hi-lo)<10?1:0;
+    x.font='10px sans-serif'; x.strokeStyle='#eceff3'; x.fillStyle='#98a2ad';
+    for(let g=0;g<=4;g++){ const yv=lo+(hi-lo)*g/4, yy=Y(yv);
+      x.beginPath(); x.moveTo(P.l,yy); x.lineTo(W-P.r,yy); x.stroke();
+      x.fillText(yv.toFixed(dec), W-P.r+4, yy+3); }
+    x.strokeStyle='#8f9aa6'; x.lineWidth=1.2;
+    x.beginPath(); x.moveTo(P.l,Y(0)); x.lineTo(W-P.r,Y(0)); x.stroke(); x.lineWidth=1;
+    for(let i=0;i<N;i++){ let up=0,dn=0;
+      series.forEach(s=>{ const v=s.v[i]; if(v==null) return; x.fillStyle=s.color;
+        if(v>=0){ x.fillRect(X(i)-bw/2, Y(up+v), bw, Math.max(0.6,Y(up)-Y(up+v))); up+=v; }
+        else    { x.fillRect(X(i)-bw/2, Y(dn),    bw, Math.max(0.6,Y(dn+v)-Y(dn))); dn+=v; } }); }
+    (opts.extra||[]).forEach(s=>{ x.strokeStyle=s.color; x.lineWidth=1.8;
+      x.beginPath(); let st=false;
+      for(let i=0;i<N;i++){ const v=s.v[i]; if(v==null) continue;
+        st?x.lineTo(X(i),Y(v)):(x.moveTo(X(i),Y(v)),st=true); }
+      x.stroke(); x.lineWidth=1; });
+    x.fillStyle='#98a2ad';
+    for(let i=0;i<N;i++){ const s=String(t[i]);
+      if(s.slice(4)==='01') x.fillText(s.slice(0,4), X(i)-12, H-4); }
+    let lx=P.l+2;                                        // 범례 — 좌상단 가로 배치
+    series.concat(opts.extra||[]).forEach(s=>{ x.fillStyle=s.color; x.fillRect(lx,P.t-10,8,8);
+      x.fillStyle='#5b6673'; x.fillText(s.label, lx+11, P.t-3);
+      lx+=13+x.measureText(s.label).width+8; });
+  }
+
+  /* 세그먼트 버튼 한 줄 — 부동산 탭의 다른 카드(rd_sd·et_met)와 같은 모양 */
+  function segbar(id, opts, cur, set, after){
+    const el=$(id); if(!el) return;
+    el.innerHTML=opts.map(([k,l])=>{ const on=String(k)===String(cur());
+      return `<button data-k="${k}" style="padding:3px 9px;font-size:11.5px;border:1px solid #d7dce3;`
+        +`border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#333'}">${l}</button>`;}).join('');
+    el.querySelectorAll('button').forEach(b=>b.onclick=()=>{ set(b.dataset.k); after&&after(); });
+  }
+
+  const _hcNum=v=>v==null?'—':(Math.abs(v)>=100?Math.round(v).toLocaleString():v.toFixed(1));
+  const _hcSgn=v=>v==null?'—':(v>0?'+':'')+_hcNum(v);
+
+  let _hcInit=false, _hcMode='chg', _hcSplit='use', _hcSpan='60';
+  function initHCredit(){
+    if(_hcInit) return; _hcInit=true;
+    fetch('/api/db/hcredit').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.hh||!(d.hh.t||[]).length){
+        const e=$('hc_main_n'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:15)부터 표시됩니다.'; return; }
+      {const e=$('hc_asof'); if(e) e.textContent=`한국은행 ECOS · 말잔(조원) · 수집 ${d.asof||''}`;}
+
+      const bar=()=>{
+        segbar('hc_mode', [['chg','월별 증감액'],['bal','잔액']], ()=>_hcMode, v=>_hcMode=v, redraw);
+        segbar('hc_split',[['use','용도별'],['ind','업권별']],   ()=>_hcSplit,v=>_hcSplit=v,redraw);
+        segbar('hc_span', [['36','3년'],['60','5년'],['120','10년'],['999','전체']], ()=>_hcSpan, v=>_hcSpan=v, redraw);
+      };
+      const redraw=()=>{ bar(); draw(); };
+
+      function draw(){
+        const B=(_hcSplit==='use')?d.hh:d.ind, T=B.t||[], S=B.s||{};
+        const want=(_hcSpan==='999')?T.length:+_hcSpan;
+        const st=Math.max(0, T.length-Math.min(want,T.length));
+        const t=T.slice(st);
+        const D=k=>{ const a=S[k]||[]; return a.map((v,i)=>(i===0||v==null||a[i-1]==null)?null:v-a[i-1]); };
+        const cut=a=>(a||[]).slice(st);
+        const last=a=>{ for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return null; };
+
+        if(_hcMode==='chg'){
+          const defs=(_hcSplit==='use')
+            ? [['주담대_전체','주택관련대출','#e08e3c'], ['기타_전체','기타대출','#5f9e5f']]
+            : [['예금은행','예금은행','#2f6fed'], ['비은행','비은행권','#c2185b']];
+          const ser=defs.map(([k,l,c])=>({v:cut(D(k)), label:l, color:c}));
+          const tot={v:cut(D('전체')), label:'합계', color:'#1f2937'};
+          bars('hc_main', t, ser, {extra:[tot]});
+          const lt=t[t.length-1];
+          const parts=ser.map(s=>`${s.label} <b class="${last(s.v)>0?'up':'dn'}">${_hcSgn(last(s.v))}조</b>`);
+          const y12=(()=>{const a=S['전체']||[]; const n=a.length;
+            return (n>13&&a[n-1]!=null&&a[n-13]!=null)?a[n-1]-a[n-13]:null;})();
+          $('hc_main_n').innerHTML=`<b>${fm(lt)}</b> 전월 대비 — ${parts.join(' · ')}`
+            +` · 합계 <b class="${last(tot.v)>0?'up':'dn'}">${_hcSgn(last(tot.v))}조</b>`
+            +(y12!=null?` · 최근 12개월 순증 <b>${_hcSgn(y12)}조</b>`:'')
+            +` <span class="note">— 0선 아래로 내려간 달은 가계대출이 줄어든 달. `
+            +`주택관련대출 순증이 꺾이면 통상 몇 달 뒤 실거래 건수가 따라 꺾인다. ECOS 공표 ~1개월 지연.</span>`;
+        } else {
+          const defs=(_hcSplit==='use')
+            ? [['전체','전체','#1f2937'], ['주담대_전체','주택관련','#e08e3c'], ['기타_전체','기타','#5f9e5f'],
+               ['주담대_은행','주택관련(은행)','#b45309']]
+            : [['전체','전체','#1f2937'], ['예금은행','예금은행','#2f6fed'], ['비은행','비은행권','#c2185b'],
+               ['저축은행','저축은행','#7c3aed'], ['상호금융','상호금융','#0e9aa7'], ['새마을금고','새마을금고','#9e9d24']];
+          line('hc_main', defs.filter(([k])=>S[k]).map(([k,l,c])=>({t, v:cut(S[k]), label:l, color:c})));
+          const a=S['전체']||[], n=a.length, y1=yoy(T,a);
+          $('hc_main_n').innerHTML=`<b>${fm(T[n-1])} 말잔 = ${_hcNum(a[n-1])}조원</b>`
+            +(y1!=null?` · YoY <b class="${y1>0?'up':'dn'}">${(y1>0?'+':'')+y1.toFixed(1)}%</b>`:'')
+            +` <span class="note">— 잔액은 늘 우상향이라 방향은 '월별 증감액' 탭에서 봐야 한다.</span>`;
+        }
+
+        /* 12개월 누적 증감 — 계절성(1월 감소·연말 증가)을 걷어낸 연간 순증 추세 */
+        {const R=k=>{ const a=S[k]||[];
+           return a.map((v,i)=>(i<12||v==null||a[i-12]==null)?null:v-a[i-12]); };
+         const rdefs=(_hcSplit==='use')
+           ? [['전체','전체','#1f2937'], ['주담대_전체','주택관련','#e08e3c'], ['기타_전체','기타','#5f9e5f']]
+           : [['전체','전체','#1f2937'], ['예금은행','예금은행','#2f6fed'], ['비은행','비은행권','#c2185b']];
+         line('hc_roll', rdefs.filter(([k])=>S[k]).map(([k,l,c])=>({t, v:cut(R(k)), label:l, color:c})), {base:0});
+         const rt=R('전체'), lv=last(rt);
+         $('hc_roll_n').innerHTML=`최근 12개월 순증 <b class="${lv>0?'up':'dn'}">${_hcSgn(lv)}조</b>`
+           +` <span class="note">— 0선을 뚫고 내려가면 가계 디레버리징(자금 이탈) 국면. 정책(DSR·대출총량) 효과가 여기에 가장 먼저 찍힌다.</span>`;}
+
+        /* 전세자금·정책대출 — 용도별 블록에만 있다 */
+        {const P=d.hh.s||{}, PT=d.hh.t||[];
+         const pst=Math.max(0, PT.length-Math.min((_hcSpan==='999')?PT.length:+_hcSpan, PT.length));
+         const pdefs=[['전세자금','예금은행 전세자금','#0e9aa7'], ['정책대출','정책대출(HF·주택기금)','#7c3aed']];
+         const av=pdefs.filter(([k])=>P[k]);
+         if(av.length){
+           line('hc_pol', av.map(([k,l,c])=>({t:PT.slice(pst), v:(P[k]||[]).slice(pst), label:l, color:c})));
+           const f=k=>{const a=P[k]||[]; for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return a[i]; return null;};
+           $('hc_pol_n').innerHTML=`전세자금 <b>${_hcNum(f('전세자금'))}조</b> · 정책대출 <b>${_hcNum(f('정책대출'))}조</b>`
+             +` <span class="note">— 전세자금대출 잔액이 늘면 전세 수요가 살아있다는 뜻(전세가 지지). `
+             +`정책대출은 금리와 무관하게 공급되는 자금이라 시장금리만 봐서는 안 되는 이유다. 2015년부터 제공.</span>`;
+         } else { $('hc_pol_n').textContent='전세자금·정책대출 계열 없음 — hcredit.py --full 로 재수집하세요.'; }}
+      }
+      redraw();
+    }).catch(()=>{});
+  }
+
+  /* ⚠ 대출 연체율 — 전국 장기(901Y054, 1일 이상)와 지역별(141Y005, 1개월 이상)은
+     연체 인정 기준이 달라 숫자가 다르다. 같은 차트에 섞지 않고 탭으로 나눈다. */
+  const DQPAL=['#d9534f','#2f6fed','#27ae60','#e08e3c','#7c3aed','#0e9aa7','#c2185b','#5d4037',
+               '#455a64','#9e9d24','#00838f','#e91e63','#3f51b5','#ff9800','#8bc34a','#1976d2','#795548','#43a047'];
+  let _dqInit=false, _dqView='reg', _dqKind='가계', _dqBank='은행전체',
+      _dqRegs=['전국','서울','경기','인천'];
+  function initDelq(){
+    if(_dqInit) return; _dqInit=true;
+    fetch('/api/db/hcredit').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.dreg||!(d.dreg.t||[]).length){
+        const e=$('dq_main_n'); if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:15)부터 표시됩니다.'; return; }
+      const REGS=d.dreg.regions||[];
+      const KINDS=['가계','주택관련','대기업','중소기업','기업','전체'].filter(k=>d.dreg.s&&d.dreg.s[k]);
+      if(KINDS.length && !KINDS.includes(_dqKind)) _dqKind=KINDS[0];
+      _dqRegs=_dqRegs.filter(r=>REGS.includes(r));
+      if(!_dqRegs.length) _dqRegs=REGS.slice(0,4);
+
+      const bar=()=>{
+        segbar('dq_view', [['reg','🗺 지역별 (1개월 이상 · 2019.12~)'],['nat','📉 전국 장기 (1일 이상 · 2005~)']],
+               ()=>_dqView, v=>_dqView=v, redraw);
+        const lab=$('dq_kindlab'); if(lab) lab.textContent=(_dqView==='reg')?'차주':'은행';
+        if(_dqView==='reg'){
+          segbar('dq_kind', KINDS.map(k=>[k,k]), ()=>_dqKind, v=>_dqKind=v, redraw);
+          $('dq_regwrap').style.display='inline-flex';
+          segbar('dq_preset', [['sudo','수도권'],['metro','5대광역시'],['all','전지역']], ()=>'', k=>{
+            _dqRegs = k==='sudo' ? ['전국','서울','경기','인천']
+                    : k==='metro'? ['전국','부산','대구','인천','광주','대전'].filter(r=>REGS.includes(r))
+                    : REGS.slice();
+          }, redraw);
+          $('dq_reg').innerHTML=REGS.map(r=>{ const on=_dqRegs.includes(r);
+            return `<button data-r="${r}" style="padding:2px 7px;font-size:11px;border:1px solid ${on?'#1f2937':'#d7dce3'};`
+              +`border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#5b6672'}">${r}</button>`;}).join('');
+          $('dq_reg').querySelectorAll('button').forEach(b=>b.onclick=()=>{
+            const r=b.dataset.r;
+            _dqRegs = _dqRegs.includes(r) ? _dqRegs.filter(z=>z!==r) : _dqRegs.concat([r]);
+            redraw(); });
+        } else {
+          const BANKS=Object.keys((d.delq&&d.delq.s)||{});
+          if(BANKS.length && !BANKS.includes(_dqBank)) _dqBank=BANKS[0];
+          segbar('dq_kind', BANKS.map(k=>[k,k]), ()=>_dqBank, v=>_dqBank=v, redraw);
+          $('dq_regwrap').style.display='none';
+        }
+      };
+      const redraw=()=>{ bar(); draw(); };
+
+      function draw(){
+        if(_dqView==='reg'){
+          const T=d.dreg.t||[], S=(d.dreg.s||{})[_dqKind]||{};
+          const arr=_dqRegs.filter(r=>S[r]).map((r,i)=>({t:T, v:S[r], label:r,
+            color:r==='전국'?'#1f2937':DQPAL[REGS.indexOf(r)%DQPAL.length]}));
+          line('dq_main', arr);
+          {const e=$('dq_asof'); if(e) e.textContent=`예금은행 지역별 연체율(1개월 이상) · 수집 ${d.asof||''}`;}
+          const nat=S['전국']||[], n=T.length, lv=nat[n-1], pv=nat[n-2], py=nat[n-13];
+          // 최신월 기준 높은 지역 순 — 어디가 먼저 무너지는지가 이 카드의 핵심
+          const rank=Object.entries(S).filter(([r,a])=>r!=='전국'&&a[n-1]!=null)
+            .sort((a,b)=>b[1][n-1]-a[1][n-1]).slice(0,5)
+            .map(([r,a])=>`${r} <b>${a[n-1].toFixed(2)}</b>`);
+          $('dq_main_n').innerHTML=`<b>${_dqKind}</b> 연체율 ${fm(T[n-1])} — 전국 <b>${lv!=null?lv.toFixed(2)+'%':'—'}</b>`
+            +(pv!=null&&lv!=null?` (전월 ${lv-pv>0?'+':''}${(lv-pv).toFixed(2)}p)`:'')
+            +(py!=null&&lv!=null?` · 전년 <b class="${lv-py>0?'dn':'up'}">${lv-py>0?'+':''}${(lv-py).toFixed(2)}p</b>`:'')
+            +(rank.length?`<br>높은 지역 — ${rank.join(' · ')}`:'')
+            +` <span class="note">— 연체율이 오르는 지역은 급매·경매 물량이 먼저 늘어난다. `
+            +`'주택관련'은 주담대만 뽑은 것이라 부동산 스트레스를 가장 직접적으로 보여준다. 1개월 이상 연체 기준.</span>`;
+        } else {
+          const T=d.delq.t||[], S=(d.delq.s||{})[_dqBank]||{};
+          const defs=[['가계','가계대출','#d9534f'],['기업','기업대출','#2f6fed'],['신용카드','신용카드대출','#e08e3c']];
+          line('dq_main', defs.filter(([k])=>S[k]).map(([k,l,c])=>({t:T, v:S[k], label:l, color:c})));
+          {const e=$('dq_asof'); if(e) e.textContent=`은행대출금 연체율(1일 이상) · ${_dqBank} · 수집 ${d.asof||''}`;}
+          const a=S['가계']||[], n=T.length, lv=a[n-1], py=a[n-13];
+          const mx=Math.max(...a.filter(v=>v!=null));
+          $('dq_main_n').innerHTML=`<b>${_dqBank}</b> 가계대출 연체율 ${fm(T[n-1])} — <b>${lv!=null?lv.toFixed(2)+'%':'—'}</b>`
+            +(py!=null&&lv!=null?` · 전년 <b class="${lv-py>0?'dn':'up'}">${lv-py>0?'+':''}${(lv-py).toFixed(2)}p</b>`:'')
+            +(isFinite(mx)?` · 2005년 이후 최고 <b>${mx.toFixed(2)}%</b>`:'')
+            +` <span class="note">— 1일 이상 연체 기준이라 아래 지역별(1개월 이상)보다 수치가 높다. `
+            +`두 지표는 기준이 달라 섞어 읽지 말 것. 카드사 부실이 먼저 튀는 경향이 있어 신용카드 계열을 같이 본다.</span>`;
+        }
+      }
+      redraw();
+    }).catch(()=>{});
+  }
+
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse();
+    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
@@ -3372,6 +3598,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
       gapE:{label:'EPS 가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
+      /* (2026-08-10) 포털 가이던스 갭 — **파싱 검증 전용**.
+         우리가 8-K 보도자료에서 직접 파싱한 값(gap·gapE) 옆에 포털(MarketBeat) 값을 나란히 두어
+         "우리 파싱이 맞는지"를 눈으로 대조하기 위한 것이다.
+         비트/미스 판정·전략 버튼·종합 점수에는 이 값을 절대 쓰지 않는다. */
+      gapP:{label:'매출 가이던스 갭(포털)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
+      gapEP:{label:'EPS 가이던스 갭(포털)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
       /* (2026-08-09) US 목표주가 리비전 — 미국 목표가는 '현재 유효한 목표가 평균'(기간 개념 없음 ·
          커버리지 중단 시에만 제외)이라 일별 스냅샷을 쌓아 차분한다(us_consensus.sqlite · 08-09 시작).
          30일 = 2026-09-08~ · 90일 = 2026-11-07~ 유효 — 그 전엔 값이 비어 있다. */
@@ -3398,7 +3632,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               'ern','cov','upside','rec','rev','nan',
               /* (2026-08-09) 실적발표 이벤트 — 실적(서프)·전망(리비전·가이던스)·주가(반응) 순
                  (2026-08-10) cr7 · gapE 추가 — 리비전 7일 / 가이던스 갭 매출·EPS 분리 */
-              'edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapE','r1','r20',
+              'edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
      파생 z 3종(베이시스·풋콜(OI)·IV스큐 — 방향지표만, GEX·OI 제외):
@@ -3777,7 +4011,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
     /* (2026-08-09) 실적발표 — 필터 6종과 1:1 대응. 필터가 있으면 컬럼도 있어야 표에서 값을 확인할 수 있다. */
     edld:{l:'실적발표일',n:1,m:'both'}, spr:{l:'실적서프%',n:1,m:'both'}, sspr:{l:'매출서프%',n:1,m:'both'}, sprb:{l:'비트4Q',n:1,m:'us'}, cr7:{l:'컨센7일',n:1,m:'us'}, cr30:{l:'컨센30일',n:1,m:'both'},
-    cr90:{l:'추정90일',n:1,m:'both'}, tprv:{l:'목표가30일',n:1,m:'both'}, tprv90:{l:'목표가90일',n:1,m:'both'}, gap:{l:'매출가이던스갭',n:1,m:'us'}, gapE:{l:'EPS가이던스갭',n:1,m:'us'},
+    cr90:{l:'추정90일',n:1,m:'both'}, tprv:{l:'목표가30일',n:1,m:'both'}, tprv90:{l:'목표가90일',n:1,m:'both'}, gap:{l:'매출 가이던스 갭',n:1,m:'us'}, gapP:{l:'매출 가이던스 갭(포털)',n:1,m:'us'},
+    gapE:{l:'EPS 가이던스 갭',n:1,m:'us'}, gapEP:{l:'EPS 가이던스 갭(포털)',n:1,m:'us'},
     r1:{l:'발표D+1',n:1,m:'both'}, r20:{l:'발표D+20',n:1,m:'both'},
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
@@ -3910,6 +4145,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'cr30': return r.cr30!=null?r.cr30*100:null;             // 컨센서스 30일 리비전%
       case 'gap':  return r.gapR!=null?r.gapR:null;                 // 매출 가이던스 vs 컨센 갭%(US)
       case 'gapE': return r.gapE!=null?r.gapE:null;                 // EPS 가이던스 vs 컨센 갭%(US)
+      /* 포털 갭 — 8-K 직접 파싱값 검증용 대조 값. 판정에는 쓰지 않는다(사용자 지시). */
+      case 'gapP': return r.pgapR!=null?r.pgapR:null;
+      case 'gapEP':return r.pgapE!=null?r.pgapE:null;
       case 'r1':   return r.r1;                                     // 발표 후 1거래일 등락%
       case 'r20':  return r.r20;                                    // 발표 후 20거래일 수익%(PEAD)
       case 'tprv': return r.tprv;                                   // 목표주가 30일 리비전%(KR)
@@ -4009,6 +4247,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'tprv': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="최근 30일 증권사 목표주가 평균 변동률 · 리포트 ${r.tpn??'—'}건(상향 ${r.tpu??'—'}·하향 ${r.tpd??'—'})">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'gap': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="회사 매출 가이던스 중간값 vs 발표시점 컨센서스">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'gapE': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="회사 EPS 가이던스 중간값 vs 발표시점 컨센서스">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      /* (2026-08-10) 포털 갭 — 검증 전용이라 색(up/dn)을 쓰지 않는다.
+         색은 '판정에 쓰는 값'의 표시이므로, 포털 값까지 물들이면 두 값이 같은 지위로 보인다. */
+      case 'gapP': case 'gapEP': {
+        const mine=key==='gapP'?r.gapR:r.gapE, nm=key==='gapP'?'매출':'EPS';
+        const d=(mine!=null)?(Math.abs(v-mine)<=1?' · 파싱값과 일치':` · 파싱값 ${mine>0?'+':''}${mine.toFixed(1)}% 와 차이 ${Math.abs(v-mine).toFixed(1)}%p`):' · 파싱값 없음';
+        return `<span class="note" title="포털(MarketBeat) ${nm} 가이던스 vs 컨센 — 우리 8-K 파싱값 검증용${d} · 비트/미스 판정에는 사용하지 않음">⤴${v>0?'+':''}${v.toFixed(1)}%</span>`; }
       case 'r1': case 'r20': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="발표 직전 종가 대비 ${key==='r1'?'다음 거래일':'20거래일 뒤'}${r.edl?' · 발표 '+r.edl.slice(4,6)+'/'+r.edl.slice(6):''}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
@@ -4263,7 +4507,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','mom']],
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapE','r1','r20']],
+      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
     ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
@@ -4475,7 +4719,7 @@ await _canvasFlow(c);
              ['기간수익률',['r1m','r3m','r6m','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapE','r1','r20']],
+      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
              ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
@@ -5672,7 +5916,8 @@ await _canvasFlow(c);
         ${gdU?`<a href="${gdU}" target="_blank" rel="noopener" style="font-size:11px">📄 실적발표 자료 원문↗</a>`:''}
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
-        <th>매출 가이던스</th><th>매출 컨센</th><th>판정</th><th>EPS 가이던스</th><th>EPS 컨센</th><th>판정</th></tr>`+
+        <th>매출 가이던스</th><th>매출 컨센</th><th>매출 가이던스 갭</th><th class="note">매출 가이던스 갭(포털)</th>
+        <th>EPS 가이던스</th><th>EPS 컨센</th><th>EPS 가이던스 갭</th><th class="note">EPS 가이던스 갭(포털)</th></tr>`+
         ['0q','+1q','0y','+1y'].map(per=>{
           const e3=(J.est||[]).find(z=>z.per===per)||{};
           /* (2026-08-09 수정) 가이던스를 **그 값이 실제로 가리키는 분기 행**에 놓는다.
@@ -5688,18 +5933,25 @@ await _canvasFlow(c);
           const J2=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':'dn'}"><b>${v>0?'상회':'하회'}</b> ${v>0?'+':''}${(+v).toFixed(1)}%</span>`;
           /* (2026-08-10) 근거 문장 툴팁 — 파싱값이 보도자료 어디서 나왔는지 즉시 확인.
              "값이 맞나?"를 화면에서 바로 검증할 수 있어야 신뢰할 수 있다. */
-          /* (2026-08-10) 2단계 승격 배지 — ✓=포털과 대조해 일치(교차검증) · ⤴=포털 값으로 교체.
-             배지가 없으면 아직 우리 8-K 파싱값만 있는 상태(발표 직후). */
-          const SB=(src,own)=>src==='verified'?' <b style="color:#1f9d55" title="MarketBeat 포털 값과 일치 — 교차검증 완료">✓</b>'
-            :src==='portal'?` <b style="color:#1c7ed6" title="포털(MarketBeat) 값으로 교체 — 8-K 직접 파싱값은 ${own??'—'}">⤴</b>`:'';
+          /* (2026-08-10) 교차검증 배지 — 포털 값과 대조한 결과만 표시한다.
+             표시·판정에 쓰는 값은 언제나 우리 8-K 파싱값이며, 포털 값으로 교체하지 않는다
+             (사용자 지시: "단, 판정에 사용은 하지 말것"). */
+          const SB=(src,own)=>src==='verified'?' <b style="color:#1f9d55" title="MarketBeat 포털 값과 일치 — 교차검증 완료">✓</b>':'';
+          /* 포털 갭 셀 — 색 없이(note) 표시해 '판정에 쓰는 값이 아님'을 시각적으로 구분 */
+          const GP=(v,mine,nm)=>{
+            if(v==null) return '<span class="note" title="포털에 같은 기간 가이던스가 없거나 컨센 역매칭 실패 — 대조 불가">—</span>';
+            const d=(mine!=null)?(Math.abs(v-mine)<=1?'파싱값과 일치':`파싱값과 ${Math.abs(v-mine).toFixed(1)}%p 차이`):'파싱값 없음';
+            return `<span class="note" title="포털(MarketBeat) ${nm} 가이던스 갭 — 파싱 검증용 대조값 · ${d} · 판정에는 사용하지 않음">⤴${v>0?'+':''}${(+v).toFixed(1)}%</span>`; };
           const evR=(gd2&&per===grp&&gd2.revEv)?` title="근거: ${E(gd2.revEv)}"`:'';
           const evE=(gd2&&per===gep&&gd2.epsEv)?` title="근거: ${E(gd2.epsEv)}"`:'';
           return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b></td><td style="text-align:center" class="note">${E(e3.end||'—')}</td>
             <td style="text-align:right"${evR}>${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'+SB(gd2.revSrc,gd2.revOwn)}</td>
             <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
+            <td style="text-align:right">${(gd2&&per===grp)?GP(gd2.revGapP,gd2.revGap,'매출'):'<span class="note">—</span>'}</td>
             <td style="text-align:right"${evE}>${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'+SB(gd2.epsSrc,gd2.epsOwn)}</td>
-            <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td></tr>`; }).join('')+
-        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치</div></div>`;
+            <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td>
+            <td style="text-align:right">${(gd2&&per===gep)?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td></tr>`; }).join('')+
+        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(MarketBeat)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
@@ -6673,7 +6925,7 @@ await _canvasFlow(c);
     us:[['n','종목',0],['rscore','종합',1,'z'],['z_val','V',1,'z'],['z_grw','G',1,'z'],['z_mom','M',1,'z'],['z_qly','Q',1,'z'],
         ['fpe','PE',1],['pb','PB',1],['divy','배당%',1],['g_new','성장',1],
         ['w52','52주',1],['hi52','고점比',1],['vs200','200일선',1],['rev','리비전',1],
-        ['edld','발표일',1],['spr','EPS서프%',1],['sspr','매출서프%',1],['sprb','비트4Q',1],['cr7','컨센7일',1],['cr30','컨센30일',1],['cr90','컨센90일',1],['tprv','목표가30일',1],['tprv90','목표가90일',1],['gap','매출가이던스갭',1],['gapE','EPS가이던스갭',1],['r1','발표D+1',1],['r20','발표D+20',1],
+        ['edld','발표일',1],['spr','EPS서프%',1],['sspr','매출서프%',1],['sprb','비트4Q',1],['cr7','컨센7일',1],['cr30','컨센30일',1],['cr90','컨센90일',1],['tprv','목표가30일',1],['tprv90','목표가90일',1],['gap','매출 가이던스 갭',1],['gapP','매출 가이던스 갭(포털)',1],['gapE','EPS 가이던스 갭',1],['gapEP','EPS 가이던스 갭(포털)',1],['r1','발표D+1',1],['r20','발표D+20',1],
         ['roe','ROE',1],['fcfy','FCF%',1],['de','부채비율',1]]
   };
   function cell2(r,c){const k=c[0];
