@@ -158,24 +158,9 @@ def guidance_gap(sym, g, pool_us, ann=None):
     # 값이 크게 벌어지면 그건 실제 신호다(가이던스 쇼크) — 지우지 않는다.
     # (가이던스 lo, hi, 컨센 기준값, 기간라벨) — 앞에서부터 우선 채택
     _ev = g.get("_ev") or {}
-    # (2026-08-10) **기간 오분류 자동 검출** — 파서가 분기로 본 값이 연간 컨센과 사실상
-    # 일치하면(±8%) 그건 연간 가이던스다. 문장 표현이 아무리 제각각이어도 '숫자가 증언'하므로
-    # 규칙으로 못 잡은 케이스를 여기서 바로잡는다(임계값으로 지우는 게 아니라 **기간을 고침**).
-    def _fix_period(lo, hi, q_base, y_base):
-        if not (lo and hi) or not q_base or not y_base:
-            return False
-        mid = (lo + hi) / 2
-        near_y = abs(mid / y_base - 1) <= 0.08
-        far_q = abs(mid / q_base - 1) > 0.35
-        return near_y and far_q
-    if _fix_period(g.get("rev_lo"), g.get("rev_hi"), q_rev, r.get("ry0")):
-        g["fy_rev_lo"], g["fy_rev_hi"] = g.pop("rev_lo"), g.pop("rev_hi")
-        if (g.get("_ev") or {}).get("rev"):
-            g["_ev"]["fy_rev"] = g["_ev"].pop("rev")
-    if _fix_period(g.get("eps_lo"), g.get("eps_hi"), q_eps, r.get("ey0")):
-        g["fy_eps_lo"], g["fy_eps_hi"] = g.pop("eps_lo"), g.pop("eps_hi")
-        if (g.get("_ev") or {}).get("eps"):
-            g["_ev"]["fy_eps"] = g["_ev"].pop("eps")
+    # (2026-08-10) 값으로 기간을 되돌리는 '자동 교정'은 넣지 않는다 —
+    # 그건 파싱 실패를 숨기는 땜빵이다. 기간은 **파서가 문장에서 확정**하고,
+    # 확정 못 하면 값을 내보내지 않는다(guidance_parse._period).
     rev_try = [(g.get("rev_lo"), g.get("rev_hi"), q_rev, q_per, "rev"),
                (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry0"), "0y", "fy_rev"),
                (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry1"), "+1y", "fy_rev")]

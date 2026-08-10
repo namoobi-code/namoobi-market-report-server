@@ -60,7 +60,10 @@ _QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|endin
 #     (AGCO 10,150 vs 분기 2,330 = +335% → 연간 10,179 대비 -0.3% 가 정답).
 _YRE = (r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d|"
         r"\b20\d\d\s+(?:eps\s+|adjusted\s+)?(?:guidance|outlook)|outlook for (?:fiscal\s+)?20\d\d|"
-        r"(?:guidance|outlook)\s+for\s+(?:the\s+)?full[-\s]year")
+        r"(?:guidance|outlook)\s+for\s+(?:the\s+)?full[-\s]year|"
+        # "net sales **for 2026** are expected to be $10.1-$10.2 billion"(실측 AGCO) —
+        # 분기 표시 없이 연도만 붙으면 그 해 **전체**를 뜻한다.
+        r"(?:for|in|during|through)\s+(?:fiscal\s+|calendar\s+)?20\d\d\b")
 
 
 def _num(v, unit, hint=None):
@@ -130,28 +133,48 @@ def _pair(kind, m):
 def _period(txt, start, end):
     """이 후보가 가리키는 기간 — 'Q'(분기) · 'Y'(연간) · None(확정 불가 → 기각).
 
-    **가장 가까운 기간 표현**을 쓴다. 실측상 기간은 문단 머리에 한 번만 쓰고
-    ("Outlook for the third quarter of fiscal 2027 is as follows: • Revenue …")
-    이후 항목엔 반복하지 않는 경우가 많아, 매칭 지점 바로 앞만 보면 멀쩡한 값을
-    '기간 미명시'로 버리게 된다. 그래서 앞 400자에서 **마지막**(=가장 가까운) 표현을
-    찾고, 없으면 뒤 90자까지 본다. 그래도 없으면 확정 불가 → 기각.
+    **문법 구조 우선순위**로 판정한다. 기간을 수식하는 말은 그 값에 가장 가까운 구절에
+    붙어 있고, 멀리 있는 표현은 다른 내용일 뿐이다.
+
+      ① 매칭 구절 안(라벨~숫자)  — "net sales **for 2026** are expected to be $10.1-$10.2B"
+                                    (실측 AGCO: 앞 문장의 'second quarter of 2026' 이 더 가까워
+                                     분기로 오분류됐다 → 구절 안이 최우선이어야 한다)
+      ② 같은 문장 안             — "Our 2026 outlook … we are narrowing our revenue forecast to $51.0-$51.4B"
+                                    (실측 NFLX)
+      ③ 앞 400자에서 가장 가까운 표현 — 표·불릿처럼 문단 머리에 한 번만 쓰는 형식
+                                    ("Outlook for the third quarter of fiscal 2027 is as follows: • Revenue …")
+      ④ 그래도 없으면 뒤 90자
+    어디서도 확정 못 하면 None → 채택하지 않는다(추측하지 않는다).
     """
-    # 매칭 구간(start~end) 안에 기간 표현이 들어 있는 경우도 있다 —
-    # 실측 PNW "2026 EPS guidance of $4.55-$4.75" 는 라벨(EPS) 바로 앞에 연도가 붙어
-    # start 이전만 보면 놓친다. 그래서 스캔 범위를 end 까지로 잡는다.
-    back = txt[max(0, start - 400):end]
-    cand = [(m.start(), "Q") for m in re.finditer(_QRE, back, re.I)
-            if not re.search(_QPAST, back[:m.start()][-30:], re.I)]
-    cand += [(m.start(), "Y") for m in re.finditer(_YRE, back, re.I)]
-    if cand:
-        return max(cand)[1]                       # 가장 뒤(가까운) 표현
-    fwd = txt[end:end + 90]
-    q, y = re.search(_QRE, fwd, re.I), re.search(_YRE, fwd, re.I)
-    if q and (not y or q.start() < y.start()):
-        return "Q"
-    if y:
-        return "Y"
-    return None
+    def pick(seg):
+        q = [m.start() for m in re.finditer(_QRE, seg, re.I)
+             if not re.search(_QPAST, seg[:m.start()][-30:], re.I)]
+        y = [m.start() for m in re.finditer(_YRE, seg, re.I)]
+        if q and not y:
+            return "Q"
+        if y and not q:
+            return "Y"
+        if q and y:
+            return "Q" if max(q) > max(y) else "Y"      # 더 뒤(=값에 가까운) 표현
+        return None
+
+    # ① 매칭 구절 안
+    r0 = pick(txt[start:end])
+    if r0:
+        return r0
+    # ② 같은 문장 안 (마침표·세미콜론·불릿 경계)
+    ls = max(txt.rfind(". ", 0, start), txt.rfind("; ", 0, start), txt.rfind("• ", 0, start))
+    rs = txt.find(". ", end)
+    sent = txt[(ls + 2 if ls > 0 else max(0, start - 400)):(rs if rs > 0 else min(len(txt), end + 200))]
+    r1 = pick(sent)
+    if r1:
+        return r1
+    # ③ 앞 문맥 400자 — 가장 가까운 표현
+    r2 = pick(txt[max(0, start - 400):end])
+    if r2:
+        return r2
+    # ④ 뒤 90자
+    return pick(txt[end:end + 90])
 
 
 def parse_guidance(txt):
