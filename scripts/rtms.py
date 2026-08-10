@@ -316,6 +316,13 @@ def main():
         k = "A" + pfx
         sale[k] = {"m": agg_region(codes, "avg")}; rent[k] = {"m": agg_region(codes, "dep")}
         names[k] = f"{snm} 전체({len(codes)})"
+    # (2026-08-10) 전국 합산 — 시도 합산과 완전히 같은 방식(거래건수 가중)으로 246개 시군구를 묶는다.
+    #   광주광역시 5개 구는 위 주석대로 국토부 API 가 전 구·전 월 0건이라 REGIONS 에 없다.
+    #   따라서 이 값은 '광주 제외 전국'이다 — 이름에 개수를 적어 오해를 막는다.
+    allc = list(REGIONS)
+    if len(allc) >= 2:
+        sale["AKR"] = {"m": agg_region(allc, "avg")}; rent["AKR"] = {"m": agg_region(allc, "dep")}
+        names["AKR"] = f"전국 전체({len(allc)})"
     sale.pop("SEOUL", None); rent.pop("SEOUL", None); sale.pop("BUSAN", None); rent.pop("BUSAN", None)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({"asof": datetime.now().strftime("%Y-%m-%d %H:%M"),

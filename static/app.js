@@ -2570,9 +2570,16 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       fetch(u).then(r=>r.ok?r.json():null).then(d=>{
         if(!d){ $('ar_tbl').innerHTML=''; $('ar_n_note').textContent='조회 실패 — 해당 유형의 DB가 아직 없을 수 있습니다.'; return; }
         const rows=d.rows||[];
+        /* (2026-08-10) '부산이 왜 안 나오나' — 단지 DB 는 시군구를 하나씩 훑는 심층 백필이
+           채우는 중이라 아직 전국이 아니다. 빈 결과일 때 어디까지 채워졌는지 그대로 보여준다. */
+        const av=(d.avail||[]).filter(a=>a.apt>0);
+        const avTxt=av.length?av.map(a=>`${E4(a.sido)}(${a.apt.toLocaleString()}단지)`).join(' · '):'없음';
         if(!rows.length){ $('ar_tbl').innerHTML='';
-          $('ar_n_note').innerHTML=`결과 없음 — 이 기간·지역엔 수집된 거래가 없습니다. `
-            +`<span class="note">실거래 DB 수집 범위: ${d.db_ym0||'—'}~${d.db_ym1||'—'}</span>`; return; }
+          $('ar_n_note').innerHTML=`<b>결과 없음</b> — 이 기간·지역엔 수집된 거래가 없습니다.<br>`
+            +`<span class="note">단지 DB에 <b>지금 채워진 지역</b>: ${avTxt} `
+            +`— 단지 단위 DB는 시군구를 하나씩 훑는 심층 백필(매일 01:30)이 채우는 중이라 아직 전국이 아닙니다. `
+            +`전국 총량·시도 비교는 위 <b>'아파트 실거래 — 지역 비교'</b> 카드(246개 시군구 전부 수집)를 쓰세요. `
+            +`수집 기간 ${d.db_ym0||'—'}~${d.db_ym1||'—'}</span>`; return; }
         const unit=_arDeal==='wol'?'보증금(억)':'평균가(억)';
         const mx=rows[0].cnt||1;
         $('ar_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12.5px">`
@@ -2743,7 +2750,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            ['부산 전체구','부산 16개 구·군 전부', ()=>Object.keys(N).filter(c=>!isAgg(c)&&c.startsWith('26'))],
            ['경기 TOP30','경기 시군구 중 상위 30', ()=>topN(c=>c.startsWith('41'),30)],
            ['전국 TOP30','전국 시군구 중 상위 30', ()=>topN(()=>true,30)],
-           ['전국 전체(공식)','국토부 공식 집계 — 거래량 지표에서만 표시', ()=>[KRALL,KRAPT].filter(c=>N[c])],
+           /* (2026-08-10) 전국 합산 — 시도 합산(★)과 같은 방식으로 246개 시군구를 묶은 계열.
+              rtms.py 가 만들어 주므로 4개 지표 모두 나온다. */
+           ['★ 전국 전체','수집된 246개 시군구 합산 — 4개 지표 모두 표시', ()=>N['AKR']?['AKR']:[]],
+           /* 공식 집계는 거래량밖에 없다 → 평균가 상태에서 누르면 빈 차트가 나온다.
+              (실제로 그렇게 눌러 빈 화면을 봤다) → 지표를 거래량으로 함께 바꿔준다. */
+           ['공식 집계(국토부)','국토부·부동산원 월별 집계 — 거래량 지표로 자동 전환',
+             ()=>{ if(met!=='n'){ met='n'; _refYm=null; mbar(); } return [KRALL,KRAPT].filter(c=>N[c]); }],
          ];
          const pbar=()=>{$('re_cmp_preset').innerHTML=PRESET.map(([lab,tip],i)=>
              `<button data-p="${i}" title="${tip}" style="padding:3px 9px;font-size:11.5px;border:1px solid #b45309;color:#b45309;background:#fff;border-radius:6px;cursor:pointer">${lab}</button>`).join('')
@@ -2781,7 +2794,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            const arr=mset.map((c,i)=>({t:ts,v:ts.map(t=>{const e=((src[c]||{}).m||{})[t]; return e?(e[met]??null):null;}),
                                        label:(N[c]||c).replace(/\(.*\)/,''),color:PAL[i%PAL.length]})).filter(a=>a.v.some(v=>v!=null));
            if(!arr.length){ const cvb=$('re_rt_big'); cvb.getContext('2d').clearRect(0,0,cvb.width,cvb.height);
-             $('re_rt_big_n').innerHTML='선택 지역엔 이 지표 데이터가 없습니다 — 다음 수집(매일 07:20) 후 시도 전체 중위가(근사)가 채워집니다'; return; }
+             const onlyKR=mset.length&&mset.every(c=>String(c).startsWith('KR_'));
+             $('re_rt_big_n').innerHTML=onlyKR
+               ? `<b>공식 집계에는 '${E(METRICS.find(x=>x[0]===met)[1])}' 가 없습니다</b> — 국토부·부동산원 월별 집계는 <b>거래 건수만</b> 공표합니다.`
+                 +` <span class="note">가격까지 보시려면 위 <b>매매 거래량</b> 으로 바꾸거나, <b>★ 전국 전체</b>(실거래 246개 시군구 합산)를 쓰세요.</span>`
+               : '선택 지역엔 이 지표 데이터가 없습니다 — 다음 수집(매일 07:20) 후 시도 전체 중위가(근사)가 채워집니다';
+             return; }
            _bigArr=arr;                       // 차트 hover 로 근접 계열을 찾기 위해 보관
            const rIdx=(()=>{const t=refYm(); return t?ts.indexOf(t):-1;})();
            line('re_rt_big',arr,{provIdx,hi:hiLab,refIdx:rIdx});

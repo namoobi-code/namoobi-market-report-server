@@ -2555,13 +2555,17 @@ def apt_rank(ym0: str = "", ym1: str = "", region: str = "", kind: str = "apt",
                 GROUP BY a.id HAVING cnt>0
                 ORDER BY cnt DESC, px DESC LIMIT ?""", args).fetchall()
         span = cx.execute("SELECT MIN(ym), MAX(ym) FROM done").fetchone()
+        # (2026-08-10) 단지 DB 는 시군구를 하나씩 훑는 심층 백필(매일 01:30)이 채우는 중이라
+        # 아직 전국이 아니다. "부산이 왜 안 나오나"에 답할 수 있게 수집된 시도를 함께 준다.
+        av = cx.execute("SELECT substr(sgg,1,2) s, COUNT(*) FROM apt GROUP BY s ORDER BY 2 DESC").fetchall()
+    avail = [{"sido": SGG2.get(str(a[0]), a[0]), "apt": a[1]} for a in av]
     out = []
     for r in rows:
         d = dict(r)
         d["sido"] = SGG2.get(str(d["sgg"])[:2], "")
         out.append(d)
     return {"ym0": ym0, "ym1": ym1, "deal": deal, "kind": kind, "region": region or "전국",
-            "db_ym0": span[0], "db_ym1": span[1], "rows": out}
+            "db_ym0": span[0], "db_ym1": span[1], "avail": avail, "rows": out}
 
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
