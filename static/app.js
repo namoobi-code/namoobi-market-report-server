@@ -3508,11 +3508,21 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       else if(f.cat){o[k]={v:null};}
       else {o[k]={min:null,max:null};} } return o; }
   function allF(){ F_ST[mkt]=clearF(); F=F_ST[mkt]; }
+  /* (2026-08-10) 저장 상태 정규화 — sessionStorage 에 남은 옛 값에 **문자열**이 섞이면
+     칩 표시(fmt: v=>v.toFixed(…))에서 'v.toFixed is not a function' 으로 화면 전체가 죽는다
+     (실측: 미국 탭 '풀 로드 실패: TypeError: v.toFixed is not a function' — 표가 통째로 안 나옴).
+     범위형 필터의 min/max 는 항상 숫자 또는 null 이어야 한다. */
+  function normF(o){ const d=DEF[mkt]||{};
+    for(const k in o){ const f=d[k], st=o[k]; if(!f||!st||f.tgl||f.cat||f.fixed!==undefined) continue;
+      for(const s of ['min','max']){
+        if(st[s]==null||st[s]==='') { st[s]=null; continue; }
+        const n=+st[s]; st[s]=Number.isFinite(n)?n:null; } }
+    return o; }
   function loadF(){ if(!F_ST[mkt]) F_ST[mkt]=buildF();           // 마켓 전환 → 저장분 로드(원복 안함)
     else { const df=buildF();
       for(const k in df) if(!(k in F_ST[mkt])) F_ST[mkt][k]=df[k];        // 신규 필터키 백필
       for(const k in F_ST[mkt]) if(!(k in df)) delete F_ST[mkt][k]; }     // 없어진 필터키 정리(구버전 세션 호환)
-    F=F_ST[mkt]; }
+    F=normF(F_ST[mkt]); }
   const ageOf=r=>r.yr?nowY-r.yr:null;
   function pass(r){ const d=DEF[mkt];
     for(const k in F){ const f=d[k], st=F[k];
@@ -3557,7 +3567,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(f.cat) return `${L}: <span class="cv">${E(dispOpt(f,st.v)||'전체')}</span>`;
     if(f.exclGE) return `${L}: <span class="cv">${st.max==null?'전체':st.max+'년이상 제외'}</span>`;
     const lo=st.min, hi=st.max;
-    let v = (lo==null&&hi==null)?'전체' : (hi==null?f.fmt(lo)+' ↑' : (lo==null?f.fmt(hi)+' ↓' : f.fmt(lo)+'~'+f.fmt(hi)));
+    /* (2026-08-10) fmt 는 숫자 전제(v.toFixed 등) — 방어적으로 감싼다. 칩 하나의 표시 실패가
+       스크리너 전체 렌더를 중단시키면 안 된다(실측 사고). 실패 시 원값을 그대로 보여준다. */
+    const FM=x=>{ try{ return f.fmt(x); }catch(e){ return String(x); } };
+    let v = (lo==null&&hi==null)?'전체' : (hi==null?FM(lo)+' ↑' : (lo==null?FM(hi)+' ↓' : FM(lo)+'~'+FM(hi)));
     /* (2026-07-24) 파생·수급판정 — CASE 다중선택이 걸려 있으면 칩에 표기 */
     if(k==='drvj'&&Array.isArray(st.cs)&&st.cs.length&&st.cs.length<3)
       v=(v==='전체'?'':v+' · ')+'CASE'+st.cs.join('·');
