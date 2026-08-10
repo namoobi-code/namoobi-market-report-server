@@ -249,8 +249,12 @@ def _period(txt, start, end):
     # "Full year 2026 reported diluted EPS … $9.97 and $10.17; and adjusted diluted EPS
     #  expected to be between $11.05 and $11.25" — 세미콜론에서 자르면 뒤 항목이
     # 'Full year 2026' 을 못 봐 연간 11.05 가 분기로 분류된다(+300%대).
-    ls = max(txt.rfind(". ", 0, start), txt.rfind("• ", 0, start))
-    rs = txt.find(". ", end)
+    ls = max(txt.rfind(". ", 0, start), *(txt.rfind(b, 0, start) for b in ("• ", "● ", "▪ ", "· ")))
+    # (2026-08-10) 오른쪽 경계도 **다음 불릿**에서 끊는다. 예전엔 다음 마침표까지만 봐서
+    # 불릿 목록이 통째로 한 문장이 됐고, 값 뒤 항목의 분기 표현이 근거로 채택돼
+    # 연간 가이던스가 분기로 분류됐다(실측 ILMN·LIFE·BFLY·EW·HLT).
+    rs = min([p for p in ([txt.find(". ", end)] +
+                          [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
     r1 = pick(sent, start - s0)
@@ -258,6 +262,23 @@ def _period(txt, start, end):
         r1 = None                       # 지난 실적을 말하는 분기 표현이면 근거로 쓰지 않는다
     if r1:
         return r1
+    # ②-b **블록 머리글** — 보도자료는 "Fiscal year 2026 guidance … we now expect:" ·
+    #    "Second Quarter Fiscal Year 2027 Guidance:" 처럼 머리글을 두고 그 아래에 불릿으로
+    #    항목을 나열한다. 값이 속한 블록의 머리글이 곧 그 값의 기간이다.
+    #    앞 400자를 무작정 훑으면 문서 여기저기의 "Second quarter 2026 results" 같은
+    #    **다른 블록 머리글**을 집어 연간 가이던스가 분기로 떨어진다(실측 ILMN·LIFE·BFLY·EW).
+    #    → 값 바로 위의 머리글(콜론으로 끝나는 전망 문구)을 먼저 본다.
+    hs, h0 = None, max(0, start - 800)
+    for hm in re.finditer(r"(?:guidance|outlook|expects?|expectations|anticipates?)"
+                          r"[^.•●▪:]{0,40}:", txt[h0:start], re.I):
+        hs = hm                                   # 가장 가까운(=마지막) 머리글
+    if hs:
+        seg = txt[max(0, h0 + hs.start() - 130):h0 + hs.end()]
+        r15 = pick(seg, len(seg))                 # 머리글 끝(콜론)에 가장 가까운 표현
+        if r15 == "Q" and not _fwd_q(seg):
+            r15 = None
+        if r15:
+            return r15
     # ③ 앞 문맥 400자 — 가장 가까운 표현.
     #    단, 여기서 나온 **분기 표시는 전망 문맥일 때만** 인정한다. 문단 머리의
     #    "Outlook for the third quarter of fiscal 2027 is as follows:" 는 정당하지만,
