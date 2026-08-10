@@ -772,7 +772,11 @@ def us_fin(sym: str):
             live = json.loads((DB / "earnings_live_us.json").read_text(encoding="utf-8"))
             for d8 in sorted(live.get("days") or {}):
                 for it in live["days"][d8]:
-                    if it.get("c") == sym and (it.get("g_rev") is not None or it.get("g_eps") is not None):
+                    # (2026-08-10) 포털 대조값만 있어도 내려보낸다 — 우리가 파싱하지 못한
+                    # 종목이야말로 포털 값을 봐야 하는 경우다. 예전엔 파싱값이 있을 때만
+                    # 블록을 만들어, 표의 포털 열이 통째로 '—' 로 보였다.
+                    if it.get("c") == sym and any(it.get(k) is not None for k in
+                                                  ("g_rev", "g_eps", "g_rev_p", "g_eps_p")):
                         gd = {"d": d8, "rev": it.get("g_rev"), "revGap": it.get("g_rev_gap"),
                               "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"),
                               "per": it.get("g_per") or "0q",     # 대표 기간(구버전 호환)
@@ -793,6 +797,8 @@ def us_fin(sym: str):
                               # 상회/하회 판정에는 절대 쓰지 않는다(사용자 지시).
                               "revP": it.get("g_rev_p"), "revGapP": it.get("g_rev_gap_p"),
                               "epsP": it.get("g_eps_p"), "epsGapP": it.get("g_eps_gap_p"),
+                              # 포털 값이 붙는 기간 — 파싱값이 없을 때도 알맞은 행에 놓기 위해
+                              "revPerP": it.get("g_rev_per_p"), "epsPerP": it.get("g_eps_per_p"),
                               "acc": it.get("acc")}
         except Exception:
             pass

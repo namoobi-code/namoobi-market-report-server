@@ -46,6 +46,18 @@ _CORP_W = {"total", "net", "consolidated", "company", "companywide", "overall", 
            "of", "in", "and", "expects", "expect", "expected", "anticipates", "projects",
            "guidance", "outlook", "estimates", "estimate", "s", "is", "to", "be", "we",
            "a", "for", "with", "at", "approximately", "about", "around", "range", "revenues"}
+# 라벨(매출·EPS)과 금액 사이에 이런 말이 끼면, 그 금액은 **다른 항목**의 것이다.
+_OTHER = (r"\b(?:expense|expenditures?|capex|capital expenditure|interest|tax|"
+          r"ebitda|ebit|operating income|net income|cash flow|free cash|"
+          r"amortization|depreciation|debt|buyback|repurchase|dividend|"
+          r"headcount|margin|share count|shares outstanding)\b")
+
+
+def _OTHER_HIT(s):
+    m = re.search(_OTHER, s, re.I)
+    return m.group(0) if m else "?"
+
+
 _ADJ = r"non[-\s]?gaap|adjusted|core\s+(?:eps|earnings)|operating earnings"
 _GAAP = r"(?<!non-)(?<!non )\bgaap\b"
 # (2026-08-10) 과거 실적을 가리키는 분기 표현은 기간 판정에서 제외한다.
@@ -189,10 +201,12 @@ def _period(txt, start, end):
              if not re.search(_QPAST, seg[:m.start()][-30:], re.I)]
         # 연도 앞에 분기 표시가 붙어 있으면(“third quarter 2026” · “Q3 2026”) 그건 분기다.
         # 연도만 보고 연간으로 세면 분기 가이던스를 연간 컨센과 비교하게 된다.
+        # (2026-08-10 2차) 범위를 40자로 넓힌다. "Second Quarter **Fiscal Year 2027** Guidance"
+        # (FLEX) · "third quarter of **fiscal 2026**"(NET) 처럼 분기 뒤에 회계연도가 따라붙는
+        # 표기가 흔한데, 25자만 보면 연도 토큰이 살아남아 분기 가이던스가 연간으로 분류된다
+        # (연간 컨센과 비교돼 −75% 대 갭). 분기 낱말이 앞 40자 안에 있으면 그 연도는 분기 소속이다.
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)
-             if not re.search(r"(?:Q[1-4]|first|second|third|fourth)[-\s](?:quarter\s+)?$|"
-                              r"quarter\s+(?:of|ending|ended)?\s*$",
-                              seg[:m.start()][-25:], re.I)]
+             if not re.search(r"\bquarter\b|\bQ[1-4]\b", seg[:m.start()][-40:], re.I)]
         if not q and not y:
             return None
         if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)
@@ -294,6 +308,33 @@ def parse_guidance(txt):
                 ctx = txt[max(0, m.start() - 130):min(len(txt), m.end() + 40)]
                 if not re.search(_FORE, ctx, re.I):
                     continue                                       # 전망 문맥 아님 → 조용히 통과
+                # (2026-08-10) 라벨과 숫자 사이에 **다른 항목**이 끼어 있으면 그 숫자는
+                # 그 항목의 것이다. 실측:
+                #   TTMI "…of net sales in the third quarter and R&D expenditures … interest
+                #         expense of approximately $11.3 million" → 이자비용을 매출로 채택(−99%)
+                #   PWR  "…$1.2 billion - $1.4 billion of revenues and approximately $120 million
+                #         to $140 million of adjusted EBITDA" → EBITDA 를 매출로 채택(−99.7%)
+                lead = re.split(r"\$", txt[m.start():m.end()], 1)[0]   # 라벨~첫 금액 사이
+                # 금액 뒤 60자도 본다 — "…$120 million to $140 million **of adjusted EBITDA**"
+                # 처럼 범위 뒤에 항목명이 오는 표기가 흔하다(실측 PWR).
+                tail = txt[m.end():m.end() + 60]
+                bad = (_OTHER_HIT(lead) if re.search(_OTHER, lead, re.I)
+                       else (_OTHER_HIT(tail) if re.search(
+                           r"^[^.•]{0,60}?\b(?:of|in)\s+(?:adjusted\s+|non-gaap\s+)?" + _OTHER,
+                           tail, re.I) else None))
+                if bad:
+                    skip.append(f"{metric}: 숫자가 다른 항목({bad})의 것 · {ctx[:110]}")
+                    continue
+                # 증분·기여분은 수준(level)이 아니다 — 가이던스 값으로 쓰면 안 된다. 실측:
+                #   WEX "increased 2026 revenue and EPS guidance **by** approximately $32 million"
+                #   INCY "Estimated **impact** on … net sales from improved GTN $40 - $50 million"
+                if re.search(r"\b(?:by|impact(?:ed|s)? (?:on|of)|contribut\w*|incremental|"
+                             r"headwind|tailwind|benefit of|reduc\w* by|increas\w* by)\b\s*"
+                             r"(?:approximately\s+|about\s+|around\s+)?$",
+                             txt[max(0, m.start()):m.start() + lead.__len__()][-45:], re.I) or \
+                   re.search(r"estimated impact|impact on", ctx, re.I):
+                    skip.append(f"{metric}: 증분·기여분 표현(수준 아님) · {ctx[:110]}")
+                    continue
                 per = _period(txt, m.start(), m.end())
                 if not per:
                     skip.append(f"{metric}: 기간 미명시(분기/연간 확정 불가) · {ctx[:130]}")

@@ -6134,10 +6134,10 @@ await _canvasFlow(c);
           return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b></td><td style="text-align:center" class="note">${E(e3.end||'—')}</td>
             <td style="text-align:right"${evR}>${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'+SB(gd2.revSrc,gd2.revOwn)}</td>
             <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
-            <td style="text-align:right">${(gd2&&per===grp)?GP(gd2.revGapP,gd2.revGap,'매출'):'<span class="note">—</span>'}</td>
+            <td style="text-align:right">${(gd2&&per===((gd2.revPerP||grp)))?GP(gd2.revGapP,gd2.revGap,'매출'):'<span class="note">—</span>'}</td>
             <td style="text-align:right"${evE}>${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'+SB(gd2.epsSrc,gd2.epsOwn)}</td>
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td>
-            <td style="text-align:right">${(gd2&&per===gep)?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td></tr>`; }).join('')+
+            <td style="text-align:right">${(gd2&&per===((gd2.epsPerP||gep)))?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td></tr>`; }).join('')+
         `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(MarketBeat)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
