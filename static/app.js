@@ -6072,7 +6072,7 @@ await _canvasFlow(c);
       /* (2026-08-10) **직전 실적발표 분기**는 한국 화면과 같이 연녹색으로 구분한다.
          표의 마지막 행이 방금 발표된 분기다 — 지금 판단에 쓰는 값이라 눈에 먼저 들어와야 한다. */
       const LST=(i===q.length-1)?';background:#f6faf6':'';
-      t1+=`<tr style="border-bottom:1px solid #f2f4f7${LST}"><td style="padding:2px 4px"><b>${r.p}</b></td>
+      t1+=`<tr style="border-bottom:1px solid #f2f4f7${LST}"><td style="padding:2px 4px"><b>${r.p}</b>${/4$/.test(String(r.fq||"").toUpperCase().replace("Q",""))?' <b style="color:#1c7ed6;font-size:9.5px" title="회계연도 4분기 — 연간보고서(10-K) 기준. 나머지 분기는 10-Q">연간</b>':''}</td>
         <td style="text-align:center;padding:2px 4px" class="note">${r.ed?E(String(r.ed).slice(2)):'—'}</td>
         <td style="${TD}"><b>${eF(r[epsK])}</b></td><td style="${TD}">${P(yoy(i,epsK))}</td><td style="${TD}">${P(qoq(i,epsK))}${turn(i,epsK)}</td>
         <td style="${TD}" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
@@ -6084,7 +6084,7 @@ await _canvasFlow(c);
         <td style="${TD}">${F1(r.fcf)}</td><td style="${TD}">${P(yoy(i,'fcf'))}</td><td style="${TD}">${P(qoq(i,'fcf'))}</td><td style="${TD}">${F1(r.fcfY)}</td><td style="${TD}">${P(yoy(i,'fcfY'))}</td>
         <td style="${TD}">${F1(r.capex)}</td><td style="${TD}">${P(yoy(i,'capex'))}</td><td style="${TD}">${P(qoq(i,'capex'))}</td><td style="${TD}">${F1(r.capexY)}</td><td style="${TD}">${P(yoy(i,'capexY'))}</td>
         <td style="${TD}" title="회계연도 누적 CapEx ÷ 누적 매출">${r.cxr==null?'<span class="note">—</span>':'<b>'+r.cxr.toFixed(1)+'%</b>'}</td></tr>`; });
-    t1+='</table><div class="note" style="margin-top:3px"><b>출처</b> — 실적·마진·FCF·CapEx: stockanalysis(10-Q/K) · 발표날짜·발표시점 컨센·판정: Zacks(조정 EPS 기준) · '
+    t1+='</table><div class="note" style="margin-top:3px"><b>출처</b> — 실적·마진·FCF·CapEx: stockanalysis(10-Q/K · 분기 옆 <b style="color:#1c7ed6">연간</b> 표시는 회계연도 4분기=10-K 기준) · 발표날짜·발표시점 컨센·판정: Zacks(조정 EPS 기준) · '
       +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — ${sK==='sUS'?`매출·EPS·컨센·판정 전부 Zacks <b>US$ ADR 기준으로 통일</b>(영업이익률만 현지 공시 재무의 비율 — 통화 무관)`:`EPS·EPS컨센·판정은 Zacks <b>US$ ADR·조정 EPS 통일</b> · 매출은 ${J.cur} 유지(Zacks 매출 실제가 공시 매출과 규모 불일치 — 정의가 달라 US$ 통일 시 틀린 값이 됨)`}`
              :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')
       +'<br>변화율 = (이번−기저)÷|기저| · 마진은 <b>%p</b> 차이 · YTD = 회계연도 누적(Q1 리셋) · <b style="color:#1f9d55">⚡흑전</b> = 직전 분기 적자(−)에서 이번 분기 흑자(+)로 <b>바뀐 분기에만</b> 표시 · <b style="color:#c0392b">⚡적전</b> = 그 반대 · 흑자를 계속 유지 중인 분기에는 배지가 붙지 않는다(전환이 아니므로)</div>';
