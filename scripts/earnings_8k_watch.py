@@ -230,6 +230,15 @@ def guidance_gap(sym, g, pool_us, ann=None):
     if out:
         # 대표 기간(구버전 호환) — 매출 기준 우선, 없으면 EPS 기준
         out["g_per"] = out.get("g_rev_per") or out.get("g_eps_per") or q_per
+    # (2026-08-10) 설비투자 가이던스 — 컨센서스가 없으므로 갭은 계산하지 않고 **값만** 싣는다.
+    # 회사가 제시할 때만 채우고, 없으면 화면에 '미제시'로 둔다(추정하지 않는다).
+    for pre, per in (("", q_per), ("fy_", "0y")):
+        lo, hi = g.get(pre + "capex_lo"), g.get(pre + "capex_hi")
+        if lo and hi and "g_capex" not in out:
+            out["g_capex"] = round((lo + hi) / 2 / 1e6, 1)      # 백만 달러
+            out["g_capex_per"] = per
+            if (g.get("_ev") or {}).get(pre + "capex"):
+                out["g_capex_ev"] = g["_ev"][pre + "capex"][:300]
     return out
 
 

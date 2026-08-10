@@ -6145,12 +6145,27 @@ await _canvasFlow(c);
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
-        <th>매출(E)</th><th>EPS(E)</th><th>애널수</th></tr>`+
-        J.est.map(e2=>`<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
+        <th>매출(E)</th><th>EPS(E)</th><th title="영업현금흐름(최근 4분기) × 매출 성장 − CapEx(E) · 회사가 CapEx 가이던스를 준 경우만">FCF(E)</th><th title="회사가 제시한 설비투자 가이던스 — 애널리스트 CapEx 컨센서스는 존재하지 않는다">CapEx(E)</th><th>CapEx/Revenue(E)</th><th>애널수</th></tr>`+
+        /* (2026-08-10) CapEx(E)·FCF(E) — **회사 가이던스가 있을 때만** 채운다.
+           CapEx 는 애널리스트 컨센서스가 무료로 존재하지 않는다(FMP·Yahoo·Massive 모두 없음).
+           그래서 8-K 에서 파싱한 회사 제시분만 쓰고, 없으면 '미제시'로 둔다(추정하지 않는다).
+           FCF(E) 는 시황 보고서 3.1.8 과 같은 산식 — 영업현금흐름 × 매출성장 − CapEx. */
+        J.est.map(e2=>{
+          const gc=(J.gd&&J.gd.capex!=null&&(J.gd.capexPer||'0y')===e2.per)?J.gd.capex:null;
+          // 영업현금흐름(TTM) = FCF + CapEx 합 · 매출(TTM)
+          let ocf=0,rvT=0,ok=0;
+          (J.q||[]).slice(-4).forEach(z=>{ if(z.fcf!=null&&z.capex!=null&&z.s!=null){ ocf+=z.fcf+Math.abs(z.capex); rvT+=z.s; ok++; } });
+          const fcfE=(gc!=null&&ok===4&&rvT>0&&e2.rev)?(ocf*(e2.rev/rvT)-gc):null;
+          const MI='<span class="note">미제시</span>';
+          return `<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
             <td style="padding:3px 4px"><b>${LBL[e2.per]||e2.per}</b></td><td style="text-align:center">${E(e2.end||'')}</td>
             <td style="text-align:right">${F(e2.rev)}</td>
             <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td>
-            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+'</table></div>';
+            <td style="text-align:right" title="${fcfE!=null?'추정 — 영업현금흐름(TTM) '+Math.round(ocf).toLocaleString()+' × 매출성장 − CapEx(E)':''}">${fcfE==null?MI:'<span class="note">≈</span>'+Math.round(fcfE).toLocaleString()}</td>
+            <td style="text-align:right" title="${gc!=null?E(J.gd.capexEv||''):''}">${gc==null?MI:'<b>'+Math.round(gc).toLocaleString()+'</b>'}</td>
+            <td style="text-align:right">${(gc!=null&&e2.rev)?((gc/e2.rev*100).toFixed(1)+'%'):MI}</td>
+            <td style="text-align:right">${e2.nan??'—'}</td></tr>`; }).join('')+
+        '<tr><td colspan="8" class="note" style="padding:3px 4px">CapEx(E) = <b>회사가 제시한 설비투자 가이던스</b>(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않은 회사는 \'미제시\'. · FCF(E) 는 <b>추정</b>(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식</td></tr></table></div>';
     }
     /* ② EPS 추정 리비전 — 표 + 4점 곡선 (즉시) */
     let t3='';

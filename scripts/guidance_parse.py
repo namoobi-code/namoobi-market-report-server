@@ -323,8 +323,12 @@ def parse_guidance(txt):
             out[pre + metric + "_basis"] = basis
         ev[pre + metric] = re.sub(r"\s+", " ", ctx)[:400]
 
+    # (2026-08-10) 설비투자(CapEx) 가이던스 추가 — 회사가 제시할 때만 채운다.
+    # 애널리스트 CapEx 컨센서스는 무료로 구할 수 없어(FMP·Yahoo·Massive 모두 없음),
+    # 회사 발표가 유일한 근거다. 없으면 화면에 '미제시'로 둔다(추정하지 않는다).
     for metric, label in (("rev", r"(?:revenues?|net sales)"),
-                          ("eps", r"(?:diluted\s+)?earnings per share|\beps\b")):
+                          ("eps", r"(?:diluted\s+)?earnings per share|\beps\b"),
+                          ("capex", r"(?:capital expenditures?|\bcapex\b)")):
         for kind, pat in _forms(label, metric):
             for m in re.finditer(pat, txt, re.I):
                 lo, hi = _pair(kind, m)
@@ -348,7 +352,8 @@ def parse_guidance(txt):
                 # 금액 뒤 60자도 본다 — "…$120 million to $140 million **of adjusted EBITDA**"
                 # 처럼 범위 뒤에 항목명이 오는 표기가 흔하다(실측 PWR).
                 tail = txt[m.end():m.end() + 60]
-                bad = (_OTHER_HIT(lead) if re.search(_OTHER, lead, re.I)
+                # CapEx 는 라벨 자체가 'capital expenditures' 라 _OTHER 에 걸린다 — 제외
+                bad = None if metric == "capex" else (_OTHER_HIT(lead) if re.search(_OTHER, lead, re.I)
                        else (_OTHER_HIT(tail) if re.search(
                            r"^[^.•]{0,60}?\b(?:of|in)\s+(?:adjusted\s+|non-gaap\s+)?" + _OTHER,
                            tail, re.I) else None))
@@ -369,7 +374,16 @@ def parse_guidance(txt):
                 if not per:
                     skip.append(f"{metric}: 기간 미명시(분기/연간 확정 불가) · {ctx[:130]}")
                     continue
-                if metric == "rev":
+                if metric == "capex":
+                    # 단위 표기가 있어야 자릿수를 확정할 수 있다(주당 금액이 아니다)
+                    if not re.search(r"(billion|million|bn|mm)\b|\$\s?[\d,.]+\s*[BM]\b", ctx):
+                        skip.append(f"capex: 단위 미표기 · {ctx[:110]}")
+                        continue
+                    if not (0 < lo <= hi and lo > 1e5 and hi / lo < 3):
+                        skip.append(f"capex: 범위 비정상({lo:.0f}~{hi:.0f}) · {ctx[:110]}")
+                        continue
+                    add("capex", per, lo, hi, ctx)
+                elif metric == "rev":
                     if re.search(_PART, near, re.I):
                         skip.append(f"rev: 전사 아님(부분 지표) · {ctx[:130]}")
                         continue

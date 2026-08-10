@@ -799,6 +799,9 @@ def us_fin(sym: str):
                               "epsP": it.get("g_eps_p"), "epsGapP": it.get("g_eps_gap_p"),
                               # 포털 값이 붙는 기간 — 파싱값이 없을 때도 알맞은 행에 놓기 위해
                               "revPerP": it.get("g_rev_per_p"), "epsPerP": it.get("g_eps_per_p"),
+                              # 설비투자 가이던스(회사 제시분만) — 컨센서스는 존재하지 않는다
+                              "capex": it.get("g_capex"), "capexPer": it.get("g_capex_per"),
+                              "capexEv": it.get("g_capex_ev"),
                               "acc": it.get("acc")}
         except Exception:
             pass

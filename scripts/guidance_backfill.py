@@ -56,7 +56,7 @@ def recent_earn_8k(cik):
 
 G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_own",
             "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_eps_src", "g_eps_own",
-            "g_per", "acc", "_d8")
+            "g_per", "g_capex", "g_capex_per", "g_capex_ev", "acc", "_d8")
 
 
 def _save(live):
@@ -117,7 +117,8 @@ def main():
                 # 재파싱 전에 옛 값을 지운다 — 안 지우면 이번에 기각된 항목(오파싱이라
                 # 걸러낸 것)이 옛 값 그대로 남아 "고쳤는데 화면은 그대로"가 된다.
                 for k in ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev",
-                          "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_per"):
+                          "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_per",
+                          "g_capex", "g_capex_per", "g_capex_ev"):
                     it.pop(k, None)
             r = pool_us.get(c) or {}
             if r.get("rq1") is None and r.get("eq1") is None:
