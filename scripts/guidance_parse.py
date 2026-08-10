@@ -59,7 +59,14 @@ _QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|endin
 #   AGCO "Outlook … 2026" · NFLX "Our 2026 outlook" · XRAY "2026 Outlook … net sales"
 #   → 연간 가이던스인데 분기로 잡혀 분기 컨센과 비교되며 +300%대 갭이 나왔다
 #     (AGCO 10,150 vs 분기 2,330 = +335% → 연간 10,179 대비 -0.3% 가 정답).
-_YRE = (r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d|"
+#   (2026-08-10 2차) "2026 **standalone adjusted diluted** EPS guidance"(HTO) ·
+#   "2026 adjusted EPS of $8.25"(LCII) · "FY’26 Guidance"(PTC) 처럼 연도와 지표 사이에
+#   수식어가 몇 개씩 끼면 종전 패턴이 못 잡아 전부 분기로 떨어졌다(+300~700% 갭).
+#   규칙을 문법대로 다시 쓴다 — **분기 표시가 없는 연도가 지표를 수식하면 그 해 전체**.
+#   연도와 지표 사이 수식어는 최대 4개까지 허용한다.
+_YMET = r"(?:guidance|outlook|eps|earnings per share|earnings|revenues?|net sales|sales)"
+_YRE = (r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d|FY\s?[’']\d\d|"
+        r"\b20\d\d\b(?=(?:\s+[A-Za-z’'\-]+){0,4}\s+" + _YMET + r"\b)|"
         r"\b20\d\d\s+(?:eps\s+|adjusted\s+)?(?:guidance|outlook)|outlook for (?:fiscal\s+)?20\d\d|"
         r"(?:guidance|outlook)\s+for\s+(?:the\s+)?full[-\s]year|"
         # "net sales **for 2026** are expected to be $10.1-$10.2 billion"(실측 AGCO) —
@@ -159,7 +166,12 @@ def _period(txt, start, end):
         """
         q = [m.start() for m in re.finditer(_QRE, seg, re.I)
              if not re.search(_QPAST, seg[:m.start()][-30:], re.I)]
-        y = [m.start() for m in re.finditer(_YRE, seg, re.I)]
+        # 연도 앞에 분기 표시가 붙어 있으면(“third quarter 2026” · “Q3 2026”) 그건 분기다.
+        # 연도만 보고 연간으로 세면 분기 가이던스를 연간 컨센과 비교하게 된다.
+        y = [m.start() for m in re.finditer(_YRE, seg, re.I)
+             if not re.search(r"(?:Q[1-4]|first|second|third|fourth)[-\s](?:quarter\s+)?$|"
+                              r"quarter\s+(?:of|ending|ended)?\s*$",
+                              seg[:m.start()][-25:], re.I)]
         if not q and not y:
             return None
         if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)
@@ -175,23 +187,44 @@ def _period(txt, start, end):
             return "Y"
         if dy is None:
             return "Q"
+        # 분기·연간 표시가 값 바로 앞에 **나란히** 있으면 어느 쪽 값인지 알 수 없다.
+        # 실측 PTC: "…Non-GAAP EPS Guidance | FY’26 Guidance | Q4’26 Guidance | EPS $8.46 to $9.18 | $0.94 to $1.17"
+        # 은 열 머리글이 두 개 늘어선 표라, 거리로 고르면 Q4 열이 이겨 연간 값 8.46 이
+        # 분기로 분류된다(+300%대). 추측하지 않고 기각한다.
+        if dq <= 60 and dy <= 60:
+            return None
         return "Q" if dq < dy else "Y"
 
-    # ① 매칭 구절 안
-    r0 = pick(txt[start:end])
+    # ① 매칭 구절 안 — 여기서도 '값에 가까운 표현'이 이겨야 한다
+    r0 = pick(txt[start:end], 0)
     if r0:
         return r0
-    # ② 같은 문장 안 (마침표·세미콜론·불릿 경계)
-    ls = max(txt.rfind(". ", 0, start), txt.rfind("; ", 0, start), txt.rfind("• ", 0, start))
+    # ② 같은 문장 안 (마침표·불릿 경계)
+    # (2026-08-10) 세미콜론은 경계에서 뺀다 — 세미콜론은 한 문장 안의 나열이라
+    # 앞부분의 기간 표시가 뒤 항목에도 그대로 걸린다. 실측 DGX:
+    # "Full year 2026 reported diluted EPS … $9.97 and $10.17; and adjusted diluted EPS
+    #  expected to be between $11.05 and $11.25" — 세미콜론에서 자르면 뒤 항목이
+    # 'Full year 2026' 을 못 봐 연간 11.05 가 분기로 분류된다(+300%대).
+    ls = max(txt.rfind(". ", 0, start), txt.rfind("• ", 0, start))
     rs = txt.find(". ", end)
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
     r1 = pick(sent, start - s0)
     if r1:
         return r1
-    # ③ 앞 문맥 400자 — 가장 가까운 표현
+    # ③ 앞 문맥 400자 — 가장 가까운 표현.
+    #    단, 여기서 나온 **분기 표시는 전망 문맥일 때만** 인정한다. 문단 머리의
+    #    "Outlook for the third quarter of fiscal 2027 is as follows:" 는 정당하지만,
+    #    멀리 있는 "second quarter results" 같은 지난 실적 언급까지 기간 근거로 쓰면
+    #    연도 표시가 없는 연간 가이던스가 분기로 떨어진다(실측 EW 2.95 → 분기 컨센 대비 +324%).
     b0 = max(0, start - 400)
-    r2 = pick(txt[b0:end], start - b0)
+    seg3 = txt[b0:end]
+    r2 = pick(seg3, start - b0)
+    if r2 == "Q":
+        near_q = [m.start() for m in re.finditer(_QRE, seg3, re.I)]
+        if not any(re.search(r"guidance|outlook|expect|anticipat|forecast|project|estimat",
+                             seg3[max(0, p - 60):p + 60], re.I) for p in near_q):
+            r2 = None
     if r2:
         return r2
     # ④ 뒤 90자
@@ -207,6 +240,18 @@ def parse_guidance(txt):
     def add(metric, per, lo, hi, ctx, basis=None):
         pre = "" if per == "Q" else "fy_"
         if pre + metric + "_lo" in out:
+            return
+        # (2026-08-10) 같은 수치가 이미 **다른 기간**으로 등록돼 있으면 무시한다.
+        # 한 회사의 같은 숫자가 분기이면서 동시에 연간일 수는 없다 — 같은 문장이 본문에
+        # 두 번 나오는데 한쪽에만 연도가 붙은 경우다(실측 IDXX: "Increases 2026 EPS
+        # outlook to $14.69"(연간) 와 "updated its EPS outlook range to $14.69"(연도 없음)
+        # → 뒤엣것이 분기로 잡혀 분기 컨센 대비 +340%). 값 기반 '교정'이 아니라 중복 제거다.
+        # 값이 완전히 같지 않아도 ±5% 안이면 같은 항목이다(실측 COR: 연간 17.70~17.90 과
+        # 17.75~17.95 — 표와 헤드라인의 반올림 차이). 분기 EPS 가 연간 EPS 와 5% 이내로
+        # 붙는 일은 실무상 없으므로, 이 경우 뒤늦게 잡힌 쪽을 버린다.
+        other = ("fy_" if pre == "" else "") + metric
+        ol, oh = out.get(other + "_lo"), out.get(other + "_hi")
+        if ol and oh and lo and hi and abs(lo / ol - 1) <= 0.05 and abs(hi / oh - 1) <= 0.05:
             return
         out[pre + metric + "_lo"], out[pre + metric + "_hi"] = (
             (lo, hi) if metric == "rev" else (round(lo, 2), round(hi, 2)))

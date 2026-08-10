@@ -70,25 +70,41 @@ def fetch_rows(sym):
             h = ""
         if "Company Revenue Guidance" in h:
             break
-    i = h.find("Company Revenue Guidance")
-    if i < 0:
+    # 열 구성이 종목마다 다르다(실측): 매출 가이던스만·EPS 가이던스만·둘 다·매출컨센 유무.
+    #   NVDA  분기|추정수|최저|최고|평균EPS|매출컨센|회사 매출 가이던스
+    #   ABT   분기|추정수|최저|최고|평균EPS|회사 EPS 가이던스              ← 6열
+    #   QCOM  분기|추정수|최저|최고|평균EPS|매출컨센|회사 EPS 가이던스|회사 매출 가이던스
+    # 위치를 고정하면 6열짜리가 통째로 빠진다(실측 ABT·AMGN·XRAY·SRE 전부 0건).
+    # 그래서 **헤더 이름으로 열 번호를 찾는다**.
+    m = re.search(r"<thead>(.*?)</thead>(.*?)</tbody>", h, re.S)
+    while m and "Guidance" not in m.group(1):
+        h = h[m.end():]
+        m = re.search(r"<thead>(.*?)</thead>(.*?)</tbody>", h, re.S)
+    if not m:
         return []
+    cols = [re.sub(r"<[^>]+>", "", c).strip()
+            for c in re.findall(r"<th[^>]*>(.*?)</th>", m.group(1), re.S)]
+    ix = lambda name: next((i for i, c in enumerate(cols) if c == name), None)
+    i_eps, i_rev = ix("Average Estimate"), ix("Revenue Estimate")
+    i_geps, i_grev = ix("Company EPS Guidance"), ix("Company Revenue Guidance")
     out = []
-    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", h[max(0, i - 500):i + 4000], re.S):
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", m.group(2), re.S):
         cs = [re.sub(r"<[^>]+>", "", c).strip() for c in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
-        # 열: 분기 | 추정수 | 최저 | 최고 | 평균EPS | 매출컨센 | 회사 가이던스
-        if len(cs) < 7 or not cs[0]:
+        if len(cs) < len(cols) or not cs[0]:
             continue
-        epsE, _ = _v(cs[4])
-        revE, _ = _v(cs[5])
-        mg = re.match(r"(.+?)\s*-\s*(.+)$", cs[6])
-        if not mg:
-            continue
-        lo, k1 = _v(mg.group(1))
-        hi, k2 = _v(mg.group(2))
-        if lo is None or hi is None or k1 != k2:
-            continue
-        out.append({"epsE": epsE, "revE": revE, "lo": lo, "hi": hi, "kind": k1})
+        epsE = _v(cs[i_eps])[0] if i_eps is not None else None
+        revE = _v(cs[i_rev])[0] if i_rev is not None else None
+        for gi, metric in ((i_geps, "eps"), (i_grev, "rev")):
+            if gi is None:
+                continue
+            mg = re.match(r"(.+?)\s*-\s*(.+)$", cs[gi])
+            if not mg:
+                continue
+            lo = _v(mg.group(1))[0]
+            hi = _v(mg.group(2))[0]
+            if lo is None or hi is None or hi < lo:
+                continue
+            out.append({"epsE": epsE, "revE": revE, "lo": lo, "hi": hi, "kind": metric})
     return out
 
 
