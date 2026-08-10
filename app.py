@@ -701,6 +701,25 @@ def us_fin(sym: str):
                 if not ok:
                     for r2 in q:
                         r2.pop("sUS", None)
+            mnq = lambda pp: int(pp[:4]) * 12 + int(pp[5:7])
+            # (2026-08-10) Earnings Call 트랜스크립트 링크 — Zacks 가 분기별로 제공(Aiera).
+            # 요약문을 무료로 주는 소스는 없어서, **원문 청취·읽기 링크**를 분기 행에 붙인다
+            # (실적 발표를 읽는 순서 6번 'Earnings Call Q&A' 로 바로 갈 수 있게).
+            for row in (dz.get("earnings_announcements_transcript_table") or []):
+                if len(row) < 2:
+                    continue
+                d0 = _zc(row[0])
+                m5 = re.match(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", d0)
+                lk = re.search(r'data-src="([^"]+)"', row[2] if len(row) > 2 else "")
+                if not m5 or not lk:
+                    continue
+                y6 = int(m5.group(3)); y6 += 2000 if y6 < 100 else 0
+                am6 = y6 * 12 + int(m5.group(1))
+                cand6 = [r2 for r2 in q if 0 <= am6 - mnq(r2["p"]) <= 3]
+                if cand6:
+                    r6 = max(cand6, key=lambda z: mnq(z["p"]))
+                    r6.setdefault("call", lk.group(1))
+                    r6.setdefault("callT", _zc(row[1])[:60])
             for row in (dz.get("earnings_announcements_earnings_table") or []):
                 if len(row) < 4:
                     continue

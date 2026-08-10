@@ -1131,11 +1131,20 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             const bits=[];
             /* ① 실적 — 컨센서스 대비. (2026-08-09) US 는 미국식 순서에 맞춰
                'EPS서프 + (실제 vs 컨센)' 을 한 덩어리로 보여 차트 팝업과 구조를 통일한다. */
-            const sLab = mk==='us' ? 'EPS서프' : (lv.spr!=null?'영업익 컨센比':'영업익YoY');
-            bits.push(`${sLab} ${pct(rv)||'—'}`
-              + ((mk==='us'&&lv.eps!=null&&lv.est!=null)
-                  ? ` <span class="note">(실제 ${(+lv.eps).toFixed(2)} vs 컨센 ${(+lv.est).toFixed(2)})</span>` : ''));
-            if(mk==='kr'&&lv.spr_s!=null) bits.push(`매출 컨센比 ${pct(lv.spr_s)}`);
+            /* (2026-08-10) 미국은 **실적발표 요약 템플릿** 문구로 통일 —
+               'EPS: Consensus 대비 Beat/Miss', 'Revenue: Consensus 대비 Beat/Miss'.
+               차트 실적 팝업(EPS/Revenue/Gross Margin/Operating Margin 4줄)과 같은 표현을 쓴다.
+               YoY/QoQ·마진은 분기 재무가 필요해 종목 상세(차트 팝업)에서 제공한다. */
+            if(mk==='us'){
+              if(rv!=null) bits.push(`<b>EPS</b> Consensus 대비 ${rv>0?'Beat':'Miss'} ${pct(rv)}`
+                + ((lv.eps!=null&&lv.est!=null)?` <span class="note">(Actual ${(+lv.eps).toFixed(2)} vs Consensus ${(+lv.est).toFixed(2)})</span>`:''));
+              const _ss=r.sspr;   // 풀 행(r)에 이미 Zacks 매출 서프라이즈가 들어 있다
+              if(_ss!=null) bits.push(`<b>Revenue</b> Consensus 대비 ${_ss>0?'Beat':'Miss'} ${pct(_ss)}`);
+            }else{
+              const sLab = lv.spr!=null?'영업익 컨센比':'영업익YoY';
+              bits.push(`${sLab} ${pct(rv)||'—'}`);
+              if(lv.spr_s!=null) bits.push(`매출 컨센比 ${pct(lv.spr_s)}`);
+            }
             if(mk==='kr'){
               const yy=[]; if(lv.sales_yoy!=null) yy.push('매출'+pct(lv.sales_yoy));
               if(lv.spr!=null&&lv.op_yoy!=null) yy.push('영업익'+pct(lv.op_yoy));
@@ -5563,15 +5572,21 @@ await _canvasFlow(c);
           <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:3px">
           <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">발표일</th>
           <th style="text-align:left">실적발표 자료<span class="note"> (Earnings Release·프레젠테이션·보충자료)</span></th>
-          <th style="text-align:left">정기보고서</th></tr>`+
+          <th style="text-align:left">정기보고서</th><th style="text-align:left">Earnings Call</th></tr>`+
           ers.map(er=>{
             /* 발표 후 0~50일 내 접수된 첫 10-Q/10-K 를 그 분기 보고서로 매칭 */
             const D8=s=>new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`);
             const m10=tq.find(z=>z.d>=er.d && (D8(z.d)-D8(er.d))/864e5<=50);
             return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${dl(er.d)}</b></td>
               <td><a href="${idxU(er.acc)}" target="_blank" rel="noopener">📄 8-K 접수 인덱스↗</a></td>
-              <td>${m10?`<a href="${idxU(m10.acc)}" target="_blank" rel="noopener">${m10.f==='10-K'?'📕 10-K (4분기·연간)':'📘 10-Q (분기)'}↗</a> <span class="note">${dl(m10.d)}</span>`:'<span class="note">제출 전 또는 45일 초과</span>'}</td></tr>`; }).join('')+
-          `</table><div class="note" style="margin-top:2px">8-K 인덱스의 Exhibit 99.1 = 보도자료 · 99.2 = 프레젠테이션(첨부한 회사만) · 콘퍼런스콜 음성·원고는 SEC 미접수 — 회사 IR 페이지에서 확인</div></div>`;
+              <td>${m10?`<a href="${idxU(m10.acc)}" target="_blank" rel="noopener">${m10.f==='10-K'?'📕 10-K (4분기·연간)':'📘 10-Q (분기)'}↗</a> <span class="note">${dl(m10.d)}</span>`:'<span class="note">제출 전 또는 45일 초과</span>'}</td>
+              <td>${(()=>{ /* (2026-08-10) 어닝콜 — 발표일에 해당하는 분기 행의 트랜스크립트 링크(Zacks→Aiera) */
+                const am=+er.d.slice(0,4)*12 + +er.d.slice(4,6);
+                const hit=(q||[]).filter(z=>{const zm=+z.p.slice(0,4)*12 + +z.p.slice(5,7); return am-zm>=0 && am-zm<=3 && z.call;})
+                                 .sort((a,b)=>(+b.p.slice(0,4)*12 + +b.p.slice(5,7))-(+a.p.slice(0,4)*12 + +a.p.slice(5,7)))[0];
+                return hit?`<a href="${hit.call}" target="_blank" rel="noopener" title="${E(hit.callT||'')}">🎧 콜 원문·오디오↗</a>`
+                          :'<span class="note">링크 없음</span>'; })()}</td></tr>`; }).join('')+
+          `</table><div class="note" style="margin-top:2px">8-K 인덱스의 Exhibit 99.1 = 보도자료 · 99.2 = 프레젠테이션(첨부한 회사만) · <b>Earnings Call</b> = 콜 원문·오디오(Zacks 제공 Aiera 링크) — 요약문을 주는 무료 소스는 없어 원문으로 연결한다(읽는 순서 6번 Q&amp;A)</div></div>`;
       }
     }catch(e){}
     /* (2026-08-10) 읽는 순서 가이드 — 위 표들이 왜 이 순서로 놓여 있는지, 발표를 어떤
