@@ -64,8 +64,25 @@ def _num(v, unit, hint=None):
     return x * (_MULT[hint] if hint in _MULT else 1)
 
 
-def _forms(label):
-    """한 지표에 대해 실측된 4가지 표기 — 범위형·±금액·±퍼센트·근사형."""
+# (2026-08-10) EPS 는 **금액 표기($ 또는 cents)만** 받는다.
+#  실측 오파싱이 전부 성장률 문장이었다 — "EPS growth of 20-25 percent"(HNI),
+#  "core EPS to grow approximately 28%"(GLW), "EPS growth of 14-16%"(ATEN) 를
+#  주당 금액으로 읽어 갭이 1,000~10,000% 로 튀었다. 정상 가이던스는 예외 없이 $ 표기
+#  (QCOM $2.05-$2.25 · WAT $3.95-$4.05 · PNW $4.55-$4.75) 이므로 $ 를 필수로 두면
+#  성장률 문장이 구조적으로 걸러진다. 'NN cents' 표기(실측 SOFI)는 /100 해서 인정.
+_NUM_D = r"\$\s?([\d,]+(?:\.\d+)?)()"                      # 금액($) — 단위 그룹은 빈 자리
+_NUM_C = r"([\d,]+(?:\.\d+)?)\s*(cents?)"                  # 60 cents → 0.60
+
+
+def _forms(label, metric):
+    """실측된 표기 4종 — 범위형·±금액·±퍼센트·근사형. EPS 는 금액 표기만."""
+    if metric == "eps":
+        return [
+            ("range", label + r"[^$%]{0,60}?" + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D),
+            ("rangec", label + r"[^$%]{0,60}?" + _NUM_C + r"\s*(?:to|through|-|and)\s*" + _NUM_C),
+            ("approx", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM_D),
+            ("approxc", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM_C),
+        ]
     return [
         ("range", label + r"[^$%]{0,60}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM),
         ("pm", label + r"[^$%]{0,60}?" + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM),
@@ -75,6 +92,13 @@ def _forms(label):
 
 
 def _pair(kind, m):
+    if kind == "rangec":                       # "60 cents to 65 cents" → 0.60~0.65
+        a, b = _num(m.group(1), None), _num(m.group(3), None)
+        return (a / 100 if a is not None else None, b / 100 if b is not None else None)
+    if kind == "approxc":
+        a = _num(m.group(1), None)
+        a = a / 100 if a is not None else None
+        return a, a
     if kind == "range":
         h = (m.group(4) or m.group(2) or "").lower()
         return _num(m.group(1), m.group(2), h), _num(m.group(3), m.group(4), h)
@@ -137,7 +161,7 @@ def parse_guidance(txt):
 
     for metric, label in (("rev", r"(?:revenues?|net sales)"),
                           ("eps", r"(?:diluted\s+)?earnings per share|\beps\b")):
-        for kind, pat in _forms(label):
+        for kind, pat in _forms(label, metric):
             for m in re.finditer(pat, txt, re.I):
                 lo, hi = _pair(kind, m)
                 if lo is None or hi is None:

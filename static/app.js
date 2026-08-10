@@ -5776,8 +5776,19 @@ await _canvasFlow(c);
           `</table><div class="note" style="margin-top:2px">8-K 인덱스의 Exhibit 99.1 = 보도자료 · 99.2 = 프레젠테이션(첨부한 회사만) · 콘퍼런스콜 음성·원고는 SEC 미접수 — 회사 IR 페이지에서 확인</div></div>`;
       }
     }catch(e){}
+    /* (2026-08-10) 읽는 순서 가이드 — 위 표들이 왜 이 순서로 놓여 있는지, 발표를 어떤
+       순서로 확인해야 하는지 (사용자 제공 체크리스트). 화면 맨 아래에 접이식으로 둔다. */
+    const GUIDE=`<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px"><b>📖 실적 발표를 읽는 순서</b> <span class="note">(클릭하여 펼치기)</span></summary>
+      <ol style="margin:6px 0 0 18px;padding:0;font-size:11.5px;line-height:1.75;color:#475467">
+        <li><b>EPS Actual vs. Consensus</b> — 주당순이익이 예상치를 넘었는지 확인합니다.</li>
+        <li><b>Revenue Actual vs. Consensus</b> — 매출이 예상치를 넘었는지 확인합니다.</li>
+        <li><b>Gross Margin 및 Operating Margin</b> — 수익성이 개선됐는지 봅니다.</li>
+        <li><b>Guidance</b> — 다음 분기와 연간 전망을 확인합니다.</li>
+        <li><b>FCF 및 CapEx</b> — 이익이 실제 현금으로 연결되는지 확인합니다.</li>
+        <li><b>Earnings Call Q&amp;A</b> — 경영진이 수요·경쟁·비용·재고·AI 투자 등을 어떻게 설명하는지 듣습니다.</li>
+      </ol></details>`;
     el.innerHTML=`<div class="box" style="padding:10px 12px"><b style="font-size:12.5px">📊 실적·전망</b> <span class="note">(${E(J.src||'')} · ${E(J.unit||'')})</span>
-      <div style="overflow:auto;margin-top:6px">${t1}</div>${t3}${t2}${t5}</div>`;
+      <div style="overflow:auto;margin-top:6px">${t1}</div>${t3}${t2}${t5}${GUIDE}</div>`;
   }
   /* ── (2026-08-09) 매출 구성·제품 정보 — 우측 열 하단. 소스 3종을 출처와 함께 비교.
      ① DART 정기보고서(사업/반기/분기) 「매출실적」 표 원문 그대로 — 기업마다 상세도가 다르다
