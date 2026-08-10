@@ -77,7 +77,9 @@ _QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|endin
 #   규칙을 문법대로 다시 쓴다 — **분기 표시가 없는 연도가 지표를 수식하면 그 해 전체**.
 #   연도와 지표 사이 수식어는 최대 4개까지 허용한다.
 _YMET = r"(?:guidance|outlook|eps|earnings per share|earnings|revenues?|net sales|sales)"
-_YRE = (r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d|FY\s?[’']\d\d|"
+#  FY26 · FY’26 · FY 2026 셋 다 인정한다(실측 RGEN "FY26 … adjusted EPS to $2.03-$2.09" 가
+#  연도 표기로 잡히지 않아 통째로 기각됐다).
+_YRE = (r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?[’']?\s?\d{2}(?:\d{2})?\b|"
         r"\b20\d\d\b(?=(?:\s+[A-Za-z’'\-]+){0,4}\s+" + _YMET + r"\b)|"
         r"\b20\d\d\s+(?:eps\s+|adjusted\s+)?(?:guidance|outlook)|outlook for (?:fiscal\s+)?20\d\d|"
         r"(?:guidance|outlook)\s+for\s+(?:the\s+)?full[-\s]year|"
@@ -205,8 +207,15 @@ def _period(txt, start, end):
         # (FLEX) · "third quarter of **fiscal 2026**"(NET) 처럼 분기 뒤에 회계연도가 따라붙는
         # 표기가 흔한데, 25자만 보면 연도 토큰이 살아남아 분기 가이던스가 연간으로 분류된다
         # (연간 컨센과 비교돼 −75% 대 갭). 분기 낱말이 앞 40자 안에 있으면 그 연도는 분기 소속이다.
+        # (2026-08-10 3차) 분기 낱말이 앞 40자 안에 '있기만 하면' 빼는 건 과했다.
+        # "Reports Second Quarter 2026 Results **Reaffirms 2026 Outlook** for Adjusted EPS"(GPC)
+        # 처럼 앞 문구가 지난 분기 실적이고 뒤가 연간 전망인 문장이 흔하다.
+        # 분기 낱말이 연도에 **바로 붙어 있을 때만**(사이에 of/the/fiscal/공백뿐) 그 연도를
+        # 분기 소속으로 본다 — "Second Quarter Fiscal Year 2027"(FLEX) · "third quarter of fiscal 2026"(NET).
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)
-             if not re.search(r"\bquarter\b|\bQ[1-4]\b", seg[:m.start()][-40:], re.I)]
+             if not re.search(r"(?:\bquarter\b|\bQ[1-4]\b)"
+                              r"(?:\s+(?:of|the|ended|ending|for)){0,2}\s*(?:fiscal\s+|calendar\s+)?"
+                              r"(?:year\s+)?$", seg[:m.start()][-40:], re.I)]
         if not q and not y:
             return None
         if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)
