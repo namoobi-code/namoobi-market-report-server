@@ -6049,16 +6049,16 @@ await _canvasFlow(c);
     let t1=`<table style="width:100%;font-size:11px;border-collapse:collapse">
       <tr style="background:#f8fafc"><th rowspan="2" style="${HB};text-align:left">분기</th><th rowspan="2" style="${HB}">발표날짜</th>
         <th colspan="4" style="${HB}">EPS <span class="note">(${isADR?'US$ ADR·조정':'$'})</span></th>
-        <th colspan="4" style="${HB}">Revenue <span class="note">(백만${isADR?(sK==='sUS'?' US$ ADR':' '+J.cur):'$'})</span></th>
+        <th colspan="6" style="${HB}">Revenue <span class="note">(백만${isADR?(sK==='sUS'?' US$ ADR':' '+J.cur):'$'})</span></th>
         <th colspan="3" style="${HB}">Gross Margin</th><th colspan="3" style="${HB}">Operating Margin</th>
-        <th colspan="5" style="${HB}">FCF <span class="note">(백만$)</span></th><th colspan="5" style="${HB}">CapEx <span class="note">(백만$)</span></th></tr>
+        <th colspan="5" style="${HB}">FCF <span class="note">(백만$)</span></th><th colspan="6" style="${HB}">CapEx <span class="note">(백만$)</span></th></tr>
       <tr style="background:#f8fafc;font-size:10.5px;color:#667085">
         <th style="${HB}">Actual</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">Consensus</th>
-        <th style="${HB}">Actual</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">Consensus</th>
+        <th style="${HB}">Actual</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">Consensus</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th>
         <th style="${HB}">%</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th>
         <th style="${HB}">%</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th>
         <th style="${HB}">분기</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th>
-        <th style="${HB}">분기</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th></tr>`;
+        <th style="${HB}">분기</th><th style="${HB}">YoY</th><th style="${HB}">QoQ</th><th style="${HB}">YTD</th><th style="${HB}">YoY</th><th style="${HB}" title="회계연도 누적 CapEx ÷ 누적 매출 — 매출 대비 설비투자 강도">/매출</th></tr>`;
     /* (2026-08-09) 계산은 전체(최대 20분기)로 하고 표시는 최근 분기만.
        앞쪽 행은 1년 전 분기가 화면 밖에 있을 뿐 YoY 는 정상 계산된다.
        (2026-08-10) 10→8분기 — 매출컨센(발표시점)이 MarketBeat 2년치(8분기)라
@@ -6075,10 +6075,12 @@ await _canvasFlow(c);
         <td style="${TD}" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
         <td style="${TD}">${F(r[sK])}</td><td style="${TD}">${P(yoy(i,sK))}</td><td style="${TD}">${P(qoq(i,sK))}</td>
         <td style="${TD}" title="${r.sE==null?'발표시점 매출컨센 없음 — Zacks 에 이 분기 추정치 없음':''}">${cCell(r.sE,ssp,false)}</td>
+        <td style="${TD}">${F(r.sY)}</td><td style="${TD}">${P(yoy(i,'sY'))}</td>
         <td style="${TD}">${MG(gmv(i))}</td><td style="${TD}">${PP(dpp(i,gmv,12))}</td><td style="${TD}">${PP(dpp(i,gmv,3))}</td>
         <td style="${TD}">${MG(m)}</td><td style="${TD}">${PP(dpp(i,opm,12))}</td><td style="${TD}">${PP(dpp(i,opm,3))}</td>
         <td style="${TD}">${F1(r.fcf)}</td><td style="${TD}">${P(yoy(i,'fcf'))}</td><td style="${TD}">${P(qoq(i,'fcf'))}</td><td style="${TD}">${F1(r.fcfY)}</td><td style="${TD}">${P(yoy(i,'fcfY'))}</td>
-        <td style="${TD}">${F1(r.capex)}</td><td style="${TD}">${P(yoy(i,'capex'))}</td><td style="${TD}">${P(qoq(i,'capex'))}</td><td style="${TD}">${F1(r.capexY)}</td><td style="${TD}">${P(yoy(i,'capexY'))}</td></tr>`; });
+        <td style="${TD}">${F1(r.capex)}</td><td style="${TD}">${P(yoy(i,'capex'))}</td><td style="${TD}">${P(qoq(i,'capex'))}</td><td style="${TD}">${F1(r.capexY)}</td><td style="${TD}">${P(yoy(i,'capexY'))}</td>
+        <td style="${TD}" title="회계연도 누적 CapEx ÷ 누적 매출">${r.cxr==null?'<span class="note">—</span>':'<b>'+r.cxr.toFixed(1)+'%</b>'}</td></tr>`; });
     t1+='</table><div class="note" style="margin-top:3px"><b>출처</b> — 실적·마진·FCF·CapEx: stockanalysis(10-Q/K) · 발표날짜·발표시점 컨센·판정: Zacks(조정 EPS 기준) · '
       +(isADR?`<b>현지통화(${J.cur}) 결산 ADR</b> — ${sK==='sUS'?`매출·EPS·컨센·판정 전부 Zacks <b>US$ ADR 기준으로 통일</b>(영업이익률만 현지 공시 재무의 비율 — 통화 무관)`:`EPS·EPS컨센·판정은 Zacks <b>US$ ADR·조정 EPS 통일</b> · 매출은 ${J.cur} 유지(Zacks 매출 실제가 공시 매출과 규모 불일치 — 정의가 달라 US$ 통일 시 틀린 값이 됨)`}`
              :'매출·EPS 컨센(발표시점)·판정은 Zacks 발표 이력(컨센·실제 쌍 · 조정 EPS 기준)')

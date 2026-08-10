@@ -830,15 +830,21 @@ def us_fin(sym: str):
         except Exception:
             pass
         try:                       # 회계연도 누적(YTD) — fiscalQuarter 가 1로 돌아가면 리셋
-            accf = accc = 0.0
+            accf = accc = accs = 0.0
             for r2 in q:
                 # fiscalQuarter 표기는 'Q1'/1 두 형태 모두 나온다(실측 NVDA 'Q1')
                 if str(r2.get("fq") or "").upper().replace("Q", "") == "1":
-                    accf = accc = 0.0
+                    accf = accc = accs = 0.0
                 if r2.get("fcf") is not None:
                     accf += r2["fcf"]; r2["fcfY"] = round(accf, 1)
                 if r2.get("capex") is not None:
                     accc += r2["capex"]; r2["capexY"] = round(accc, 1)
+                # (2026-08-10) 매출도 회계연도 누적을 준다 — CapEx 를 매출 대비로 봐야
+                # 설비투자 강도를 비교할 수 있다(분기 단독은 계절성 때문에 튄다).
+                if r2.get("s") is not None:
+                    accs += r2["s"]; r2["sY"] = round(accs, 1)
+                    if r2.get("capexY") is not None and accs:
+                        r2["cxr"] = round(abs(r2["capexY"]) / accs * 100, 1)
         except Exception:
             pass
         res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg, "cur": cur,
