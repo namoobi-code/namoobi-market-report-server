@@ -25,6 +25,7 @@ MarketBeat 'Company Guidance' 열은 회사마다 매출인지 EPS인지·단위
 cron: 매일 08:40 (guidance_backfill·earnings_join 뒤)
 """
 import json, re, sys, time, urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -33,7 +34,7 @@ POOL = BASE / "data" / "db" / "screener_pool.json"
 LIVE = BASE / "data" / "db" / "earnings_live_us.json"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
-DAYS, LIMIT = ARG("--days", 30), ARG("--limit", 0)
+DAYS, LIMIT, WORKERS = ARG("--days", 30), ARG("--limit", 0), ARG("--workers", 6)
 
 
 def _v(s):
@@ -150,13 +151,16 @@ def main():
             for it in live["days"][d8] if it.get("c") in by]
     if LIMIT:
         todo = todo[:LIMIT]
-    print(f"[gpor] 검증 대상 {len(todo)}건 (최근 {DAYS}일)", flush=True)
+    print(f"[gpor] 검증 대상 {len(todo)}건 (최근 {DAYS}일) · 동시 {WORKERS}", flush=True)
     got = same = diff = 0
+    # (2026-08-10) 종목당 최대 3번(거래소 3종) HTTP 왕복이라 순차로는 2시간이 넘는다.
+    # 내려받기만 병렬로 하고, 값 반영·저장은 메인에서 순차로 해 경쟁을 없앤다.
+    with ThreadPoolExecutor(max_workers=WORKERS) as ex:
+        fetched = list(ex.map(lambda x: fetch_rows(x["c"]), todo))
     for n, it in enumerate(todo):
         sym = it["c"]
         r = by[sym]
-        rows = fetch_rows(sym)
-        time.sleep(0.3)
+        rows = fetched[n]
         if not rows:
             continue
         for metric, gk in (("rev", "g_rev"), ("eps", "g_eps")):

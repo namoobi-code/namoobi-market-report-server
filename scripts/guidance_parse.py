@@ -138,6 +138,22 @@ def _pair(kind, m):
     return a, a
 
 
+_FWD = r"guidance|outlook|expect|anticipat|forecast|project|estimat|to be in the range"
+
+
+def _fwd_q(seg):
+    """이 구간의 분기 표현이 **전망**을 가리키는가.
+
+    (2026-08-10) 헤드라인이 마침표 없이 이어지는 보도자료에서는 한 '문장'에 지난 분기
+    실적과 연간 가이던스가 함께 들어온다. 그때 "Third Quarter … EPS of \\$4.48"(실적) 이
+    기간 근거로 채택돼 연간 가이던스가 분기로 분류됐다(실측 COR 17.75 → +289%,
+    EW 2.95 → +307%, ILMN·AVY·FLS 등 |갭|>300% 26건). 분기 표현 근처(±60자)에
+    전망을 뜻하는 말이 없으면 그 분기 표현은 근거로 쓰지 않는다.
+    """
+    return any(re.search(_FWD, seg[max(0, m.start() - 60):m.start() + 60], re.I)
+               for m in re.finditer(_QRE, seg, re.I))
+
+
 def _period(txt, start, end):
     """이 후보가 가리키는 기간 — 'Q'(분기) · 'Y'(연간) · None(확정 불가 → 기각).
 
@@ -210,6 +226,8 @@ def _period(txt, start, end):
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
     r1 = pick(sent, start - s0)
+    if r1 == "Q" and not _fwd_q(sent):
+        r1 = None                       # 지난 실적을 말하는 분기 표현이면 근거로 쓰지 않는다
     if r1:
         return r1
     # ③ 앞 문맥 400자 — 가장 가까운 표현.
@@ -220,11 +238,8 @@ def _period(txt, start, end):
     b0 = max(0, start - 400)
     seg3 = txt[b0:end]
     r2 = pick(seg3, start - b0)
-    if r2 == "Q":
-        near_q = [m.start() for m in re.finditer(_QRE, seg3, re.I)]
-        if not any(re.search(r"guidance|outlook|expect|anticipat|forecast|project|estimat",
-                             seg3[max(0, p - 60):p + 60], re.I) for p in near_q):
-            r2 = None
+    if r2 == "Q" and not _fwd_q(seg3):
+        r2 = None
     if r2:
         return r2
     # ④ 뒤 90자
