@@ -6069,7 +6069,10 @@ await _canvasFlow(c);
          실적(stockanalysis)과 비교. ADR 은 sSpr 만 유효(통화가 다르므로). */
       const ssp=r.sSpr!=null?r.sSpr:((!isADR&&r.s!=null&&r.sE)?((r.s/r.sE-1)*100):null);
       const TD='text-align:right;padding:2px 4px';
-      t1+=`<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:2px 4px"><b>${r.p}</b></td>
+      /* (2026-08-10) **직전 실적발표 분기**는 한국 화면과 같이 연녹색으로 구분한다.
+         표의 마지막 행이 방금 발표된 분기다 — 지금 판단에 쓰는 값이라 눈에 먼저 들어와야 한다. */
+      const LST=(i===q.length-1)?';background:#f6faf6':'';
+      t1+=`<tr style="border-bottom:1px solid #f2f4f7${LST}"><td style="padding:2px 4px"><b>${r.p}</b></td>
         <td style="text-align:center;padding:2px 4px" class="note">${r.ed?E(String(r.ed).slice(2)):'—'}</td>
         <td style="${TD}"><b>${eF(r[epsK])}</b></td><td style="${TD}">${P(yoy(i,epsK))}</td><td style="${TD}">${P(qoq(i,epsK))}${turn(i,epsK)}</td>
         <td style="${TD}" title="${r.epsA!=null?`발표 조정EPS ${(+r.epsA).toFixed(2)} vs 컨센 ${r.epsE!=null?(+r.epsE).toFixed(2):'—'}`:''}">${cCell(r.epsE,r.sprE,true)}</td>
@@ -6134,7 +6137,7 @@ await _canvasFlow(c);
             return `<span class="note" title="포털(MarketBeat) ${nm} 가이던스 갭 — 파싱 검증용 대조값 · ${d} · 판정에는 사용하지 않음">⤴${v>0?'+':''}${(+v).toFixed(1)}%</span>`; };
           const evR=(gd2&&per===grp&&gd2.revEv)?` title="근거: ${E(gd2.revEv)}"`:'';
           const evE=(gd2&&per===gep&&gd2.epsEv)?` title="근거: ${E(gd2.epsEv)}"`:'';
-          return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b></td><td style="text-align:center" class="note">${E(e3.end||'—')}</td>
+          return `<tr style="border-bottom:1px solid #f2f4f7;background:#f6faf6"><td style="padding:3px 4px"><b>${LBL[per]}</b></td><td style="text-align:center" class="note">${E(e3.end||'—')}</td>
             <td style="text-align:right"${evR}>${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'+SB(gd2.revSrc,gd2.revOwn)}</td>
             <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
             <td style="text-align:right">${(gd2&&per===((gd2.revPerP||grp)))?GP(gd2.revGapP,gd2.revGap,'매출'):'<span class="note">—</span>'}</td>
