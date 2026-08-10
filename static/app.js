@@ -140,7 +140,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   $('nav').innerHTML=[
     ['s311','3.1.1 금리'],['s333','3.1.1 HY'],['s312','3.1.2 물가'],['s313','3.1.3 고용'],['s314','3.1.4 OECD CLI'],
     ['s315','3.1.5 경기선행'],['d316','3.1.6 FactSet'],['s318','3.1.8 CAPEX'],['s319','3.1.9 HBM'],['s3110','3.1.10 수출'],
-    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['s_veps','3.1.15 선행지표'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],['s78','7.8 네이버'],
+    ['s3111','3.1.11 반도체'],['s3113','3.1.13 파생'],['s3114','3.1.14 유동성'],['s_veps','3.1.15 선행지표'],['s_appe','부록E 피지컬AI'],['d332','3.3.2 리밸런싱'],['s32','3.2 KRX'],['d6','6 크립토'],['s78','7.8 네이버'],
     ['sberk','버크셔']]
     .map(([i,t])=>`<a href="#${i}" data-go="${i}">${t}</a>`).join('');
   // 앵커 클릭: 본문 컨테이너 내부 스크롤 (URL 해시 오염 없이)
@@ -734,6 +734,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     krx_brief:'KRX 증시 Brief·공매도 데일리 브리프 회차 메타 (3.2.4/3.2.5)',
     leading:'한국 경기선행지수 순환변동치 최근월 요약 (3.1.5)',
     memory:'메모리(DRAM·NAND·HBM) 가격·시장 스냅샷 (3.1.9)',
+    appe:'피지컬 AI(휴머노이드) 밸류체인 상장 54종 — 6계층(두뇌·센서·액추에이터·소재배터리·시뮬레이션·완성체) 시세·수익률 (부록E)',
     kr_liquidity:'국내 유동성·레버리지 — 예탁금·미수금·반대매매·신용잔고(코스피/코스닥)·M2 (3.1.14, 원본=data/kr_liquidity.db)',
     oecd_cli:'OECD 경기선행지수(CLI) 주요국 월별 (3.1.4)',
     policy_rates:'주요 6개국 정책금리 daily 실측 — 美FRED·韓ECOS·유로존FRED·영일중 global-rates, monthly 이력 자동 upsert (3.1.1)',
@@ -799,7 +800,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     ta_flag:'TradingAgents 스크리닝 완료 플래그 — 거래일·완료 여부'};
   // (2026-07-17) 수집 주체 — 🖥 서버 cron 자체 수집(리포트 실행과 무관하게 최신) vs 📄 리포트 실행 시 수집
   const SRV={customs:'06:35·15:35',leading:'06:35·15:35',series_leading:'06:35·15:35',krx_brief:'06:35·15:35',
-    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',kr_liquidity:'06:35·14:10·16:10',
+    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',kr_liquidity:'06:35·14:10·16:10',appe:'06:50·15:50',
     // (2026-07-19 서버화 2차) market_prefetch2(05:45·16:05)·report_prefetch·개별 크론
     policy_rates:'05:45·16:05',events_calendar:'05:45·16:05',cb_meetings:'05:45·16:05',brokers3:'05:45·16:05',
     ism_pmi:'05:45·16:05',ib_insights:'05:45·16:05',rebalance_news:'05:45·16:05',factset_insight:'05:45·16:05',
@@ -7693,6 +7694,34 @@ await _canvasFlow(c);
     alert('분석요청 TOP '+t.length+'종 (클립보드 복사됨):\n'+t.join(', ')+'\n\n/namoobi-trading-agents 실행 시 이 종목으로 토론·리스크심사합니다.'); };}
 })();
 
+/* ── [부록E·F] 피지컬 AI 밸류체인 — /api/db/appe (서버 1일 2회 수집) ── */
+(async function renderAppE(){
+  const box=document.getElementById('d_appe'); if(!box) return;
+  let A; try{ A=await (await fetch('/api/db/appe')).json(); }catch(e){ box.innerHTML='<div class="note">appe.json 없음 — 서버 수집 대기</div>'; return; }
+  const P=v=>(v==null||v==='')?'<span class="note">-</span>':`<span class="${v>=0?'up':'dn'}">${v>=0?'+':''}${Number(v).toFixed(1)}%</span>`;
+  const CCY={USD:'$',JPY:'¥',KRW:'₩',TWD:'NT$',CNY:'CN¥',HKD:'HK$',AUD:'A$'};
+  const esc2=t=>String(t==null?'':t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const num=v=>(v==null||v==='')?'-':Number(v).toLocaleString(undefined,{maximumFractionDigits:2});
+  const GL='①②③④⑤⑥';
+  box.innerHTML=(A.groups||[]).map((g,gi)=>{
+    const rows=(A.rows||{})[g]||[]; if(!rows.length) return '';
+    return `<h3>${GL[gi]||'■'} ${esc2(g)} <span class="note">${rows.length}종</span></h3>
+      <div class="box" style="overflow-x:auto"><table>
+      <tr>${['종목','현재가','1일','1주','1개월','3개월','6개월','1년','역할'].map(h=>`<th>${h}</th>`).join('')}</tr>
+      ${rows.map(x=>`<tr>
+        <td><b>${esc2(x.name||'')}</b> <span class="note">${esc2(x.code||'')}</span></td>
+        <td class="num">${(CCY[x.ccy]||'$')}${num(x.current)}</td>
+        <td class="num">${P(x['1d_pct'])}</td><td class="num">${P(x['1w_pct'])}</td><td class="num">${P(x['1mo_pct'])}</td>
+        <td class="num">${P(x['3mo_pct'])}</td><td class="num">${P(x['6mo_pct'])}</td><td class="num">${P(x['1y_pct'])}</td>
+        <td class="note">${esc2(x.desc||'')}</td></tr>`).join('')}</table></div>`;
+  }).join('') + (A.asof?`<div class="src">기준 ${esc2(A.asof)}${A.as_of?' · 수집 '+esc2(A.as_of):''} · 구성 근거: 한경비즈니스 2026.08.05-11 커버스토리 '피지컬 AI 핵심 밸류체인' + 모건스탠리 2025 선정 핵심기업</div>`:'');
+  const bf=document.getElementById('d_appf');
+  if(bf) bf.innerHTML=`<div class="appd">
+    <img src="/img/appf_physical_ai_1.png" alt="피지컬 AI 밸류체인 관계도 1" loading="lazy">
+    <img src="/img/appf_physical_ai_2.png" alt="피지컬 AI 밸류체인 관계도 2" loading="lazy">
+    <img src="/img/appf_physical_ai_3.png" alt="피지컬 AI 밸류체인 관계도 3" loading="lazy">
+    </div><div class="src">구성이 바뀔 때만 갱신되는 정적 관계도 (부록E와 동일 54종 + 비상장 9곳).</div>`;
+})();
 /* ── 3.1.14 국내 유동성·레버리지 점검 — /api/krliq (서버 1일 3회 수집 · 보고서 renderKrLiquidity 와 동일 구성) ── */
 (async()=>{
   const $=i=>document.getElementById(i);

@@ -92,3 +92,7 @@
 #   기본 실행은 최근 8개월만 받아 머지하므로 ECOS 일 10만건 한도에 여유가 크다.
 #   최초 1회만 서버에서 `python3 scripts/hcredit.py --full` 로 전 구간 백필할 것.
 15 7 * * * cd /home/ubuntu/namoobi && python3 scripts/hcredit.py >> /home/ubuntu/namoobi/hcredit.log 2>&1
+
+# ── [부록E] 피지컬 AI(휴머노이드) 밸류체인 54종 수집 (1일 2회 — 미국 종가 후 06:50 · 한국 종가 후 15:50) ──
+50 6  * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_appe.py data/db appe >> /home/ubuntu/namoobi/appe.log 2>&1
+50 15 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_appe.py data/db appe >> /home/ubuntu/namoobi/appe.log 2>&1
