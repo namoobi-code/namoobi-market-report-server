@@ -137,6 +137,10 @@ def main():
                 if cc.get("tp90") is not None:
                     patch["tprv90"] = cc["tp90"]
             d8, it = ev.get(c, (None, None))
+            # (2026-08-10) 가이던스 필드는 매 실행마다 **초기화 후 재기록** — 소급 재파싱으로
+            # 값이 빠진 경우(예: ±25% 초과 오파싱 제거)에도 풀에 옛 값이 남으면 안 된다.
+            for k in ("gapR", "gapE", "gapRp", "gapEp", "gap"):
+                r.pop(k, None)
             if it:
                 patch["edl"] = d8
                 for k in ("r1", "r5", "r20"):

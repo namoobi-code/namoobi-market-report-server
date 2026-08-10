@@ -214,9 +214,11 @@ def guidance_gap(sym, g, pool_us, ann=None):
             q_eps, q_rev, q_per = r.get("eq1"), r.get("rq1"), "+1q"
     if q_eps is None and q_rev is None:                    # 스냅샷 이전 데이터 폴백
         q_eps, q_rev, q_per = r.get("eq1"), r.get("rq1"), "+1q"
-    # 가이던스가 컨센서스와 ±60% 넘게 벌어지는 일은 사실상 없다.
-    # 그 정도면 기간을 잘못 물렸거나 파싱이 틀린 것 → 버린다(틀린 값보다 빈칸이 낫다).
-    LIM = 60.0
+    # (2026-08-10) 허용 폭 ±60% → ±25% 로 조임. 실측 분포: |갭| 중앙값이 매출 0.5%·EPS 1.6%
+    # 이고 25% 초과가 매출 10건·EPS 11건뿐인데, 그 꼬리가 전부 파싱 오류였다
+    # (실측 QCOM EPS −39.1% · WAT 매출 −51.0% — 보도자료의 다른 숫자를 물린 것).
+    # 진짜로 컨센을 25% 넘게 벗어나는 가이던스는 대형 뉴스라 사실상 없다 → 틀린 값보다 빈칸.
+    LIM = 25.0
     # (가이던스 lo, hi, 컨센 기준값, 기간라벨) — 앞에서부터 우선 채택
     rev_try = [(g.get("rev_lo"), g.get("rev_hi"), q_rev, q_per),
                (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry0"), "0y"),
