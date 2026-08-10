@@ -93,15 +93,29 @@ def _pair(kind, m):
     return a, a
 
 
-def _period(ctx):
-    """이 후보가 가리키는 기간 — 'Q'(분기) · 'Y'(연간) · None(확정 불가 → 기각)."""
-    q, y = re.search(_QRE, ctx, re.I), re.search(_YRE, ctx, re.I)
-    if q and not y:
+def _period(txt, start, end):
+    """이 후보가 가리키는 기간 — 'Q'(분기) · 'Y'(연간) · None(확정 불가 → 기각).
+
+    **가장 가까운 기간 표현**을 쓴다. 실측상 기간은 문단 머리에 한 번만 쓰고
+    ("Outlook for the third quarter of fiscal 2027 is as follows: • Revenue …")
+    이후 항목엔 반복하지 않는 경우가 많아, 매칭 지점 바로 앞만 보면 멀쩡한 값을
+    '기간 미명시'로 버리게 된다. 그래서 앞 400자에서 **마지막**(=가장 가까운) 표현을
+    찾고, 없으면 뒤 90자까지 본다. 그래도 없으면 확정 불가 → 기각.
+    """
+    # 매칭 구간(start~end) 안에 기간 표현이 들어 있는 경우도 있다 —
+    # 실측 PNW "2026 EPS guidance of $4.55-$4.75" 는 라벨(EPS) 바로 앞에 연도가 붙어
+    # start 이전만 보면 놓친다. 그래서 스캔 범위를 end 까지로 잡는다.
+    back = txt[max(0, start - 400):end]
+    cand = [(m.start(), "Q") for m in re.finditer(_QRE, back, re.I)]
+    cand += [(m.start(), "Y") for m in re.finditer(_YRE, back, re.I)]
+    if cand:
+        return max(cand)[1]                       # 가장 뒤(가까운) 표현
+    fwd = txt[end:end + 90]
+    q, y = re.search(_QRE, fwd, re.I), re.search(_YRE, fwd, re.I)
+    if q and (not y or q.start() < y.start()):
         return "Q"
-    if y and not q:
+    if y:
         return "Y"
-    if q and y:                       # 둘 다 있으면 더 가까운(뒤에 있는) 쪽
-        return "Q" if q.start() > y.start() else "Y"
     return None
 
 
@@ -136,7 +150,7 @@ def parse_guidance(txt):
                 ctx = txt[max(0, m.start() - 130):min(len(txt), m.end() + 40)]
                 if not re.search(_FORE, ctx, re.I):
                     continue                                       # 전망 문맥 아님 → 조용히 통과
-                per = _period(ctx)
+                per = _period(txt, m.start(), m.end())
                 if not per:
                     skip.append(f"{metric}: 기간 미명시(분기/연간 확정 불가) · {ctx[:130]}")
                     continue

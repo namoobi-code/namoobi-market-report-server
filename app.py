@@ -725,6 +725,9 @@ def us_fin(sym: str):
                               # (우선순위: 진행분기→다음분기→올해FY→내년FY)
                               "revPer": it.get("g_rev_per") or it.get("g_per"),
                               "epsPer": it.get("g_eps_per") or it.get("g_per"),
+                              # (2026-08-10) 근거 문장 — 표에서 값에 마우스만 올리면
+                              # 보도자료 원문 어디서 뽑았는지 즉시 확인된다(파싱 신뢰성 감사)
+                              "revEv": it.get("g_rev_ev"), "epsEv": it.get("g_eps_ev"),
                               "acc": it.get("acc")}
         except Exception:
             pass

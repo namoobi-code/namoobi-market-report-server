@@ -157,27 +157,30 @@ def guidance_gap(sym, g, pool_us, ann=None):
     # 모두 확인하므로, 여기서는 '같은 기간·같은 기준끼리' 비교만 하면 된다.
     # 값이 크게 벌어지면 그건 실제 신호다(가이던스 쇼크) — 지우지 않는다.
     # (가이던스 lo, hi, 컨센 기준값, 기간라벨) — 앞에서부터 우선 채택
-    rev_try = [(g.get("rev_lo"), g.get("rev_hi"), q_rev, q_per),
-               (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry0"), "0y"),
-               (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry1"), "+1y")]
-    eps_try = [(g.get("eps_lo"), g.get("eps_hi"), q_eps, q_per),
-               (g.get("fy_eps_lo"), g.get("fy_eps_hi"), r.get("ey0"), "0y"),
-               (g.get("fy_eps_lo"), g.get("fy_eps_hi"), r.get("ey1"), "+1y")]
-    for lo, hi, base, per in rev_try:
+    rev_try = [(g.get("rev_lo"), g.get("rev_hi"), q_rev, q_per, "rev"),
+               (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry0"), "0y", "fy_rev"),
+               (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry1"), "+1y", "fy_rev")]
+    eps_try = [(g.get("eps_lo"), g.get("eps_hi"), q_eps, q_per, "eps"),
+               (g.get("fy_eps_lo"), g.get("fy_eps_hi"), r.get("ey0"), "0y", "fy_eps"),
+               (g.get("fy_eps_lo"), g.get("fy_eps_hi"), r.get("ey1"), "+1y", "fy_eps")]
+    _ev = g.get("_ev") or {}
+    for lo, hi, base, per, evk in rev_try:
         if lo and hi and base:
             mid = (lo + hi) / 2
-            gp = (mid / base - 1) * 100
             out["g_rev"] = round(mid / 1e6, 1)              # 백만 달러
-            out["g_rev_gap"] = round(gp, 1)
+            out["g_rev_gap"] = round((mid / base - 1) * 100, 1)
             out["g_rev_per"] = per
+            if _ev.get(evk):                                # 근거 문장 — 화면에서 검증 가능하게
+                out["g_rev_ev"] = _ev[evk][:300]
             break
-    for lo, hi, base, per in eps_try:
+    for lo, hi, base, per, evk in eps_try:
         if lo and hi and base and base > 0:
             mid = (lo + hi) / 2
-            gp = (mid / base - 1) * 100
             out["g_eps"] = round(mid, 2)
-            out["g_eps_gap"] = round(gp, 1)
+            out["g_eps_gap"] = round((mid / base - 1) * 100, 1)
             out["g_eps_per"] = per
+            if _ev.get(evk):
+                out["g_eps_ev"] = _ev[evk][:300]
             break
     if out:
         # 대표 기간(구버전 호환) — 매출 기준 우선, 없으면 EPS 기준

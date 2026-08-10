@@ -125,7 +125,9 @@ def main(force=False):
             r["volx"] = round((nv["vol"]/frac)/va, 2)
         st_upd += 1
     pool["live_at"] = now.strftime("%m-%d %H:%M") + " 장중"
-    T.save_db("screener_pool", pool)
+    # (2026-08-10) 통째 덮어쓰기 → **병합 저장**. 이 스크립트는 수 분간 돌기 때문에
+    # 그 사이 다른 수집기가 쓴 값(컨센·가이던스 등)이 옛 사본으로 지워지는 사고가 있었다.
+    save_pool_merged(pool, LIVE_FIELDS, mkts=("kr",), extra_meta=("live_at",))
     print(f"intraday: 시세 {upd} · 지표 {st_upd} / {len(kr)} · frac={frac:.2f} · {pool['live_at']}")
 
 if __name__ == "__main__":
