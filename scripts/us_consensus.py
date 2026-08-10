@@ -104,6 +104,12 @@ def parse(fd):
             v = _raw((t_.get("earningsEstimate") or {}).get("avg"))
             if v is not None:
                 out[lab] = v
+            # (2026-08-10) 연간 **매출** 컨센 — 연간(FY) 가이던스 갭 계산의 기준.
+            # 보도자료 가이던스의 상당수가 분기가 아니라 연간이라(실측 TAP·APA 등)
+            # 분기 컨센만으로는 비교 자체가 불가능해 통째로 버려지고 있었다.
+            v2 = _raw((t_.get("revenueEstimate") or {}).get("avg"))
+            if v2 is not None:
+                out["ry0" if per == "0y" else "ry1"] = v2
 
     hs = (fd.get("earningsHistory") or {}).get("history", []) or []
     vs = sorted([((h.get("quarter") or {}).get("fmt") or "", _raw(h.get("surprisePercent")))

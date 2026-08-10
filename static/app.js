@@ -1,5 +1,8 @@
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
+/* (2026-08-10) 가이던스 비교 기간 라벨 — 우선순위 ①진행분기 ②다음분기 ③올해(FY) ④내년(FY).
+   상세표·캘린더 팝업·차트 팝업이 **같은 라벨**을 쓰도록 전역 공용으로 둔다. */
+function _GPER(p){ return ({'0q':'진행분기','+1q':'다음분기','0y':'올해(FY)','+1y':'내년(FY)'})[p]||'해당분기'; }
 
 /* ══════════════════════════════════════════════════════════════════
    대시보드 자동 새로고침 — 켜둔 화면에 서버 갱신(cron·장중 증분)을 자동 반영. (2026-07-17 도입 → 07-19 재구성 때 유실 → 07-26 복원)
@@ -1143,9 +1146,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
               if(qq.length) bits.push(`<span class="note">QoQ</span> ${qq.join(' ')}`);
               if(lv.opm!=null) bits.push(`<span class="note">이익률</span> ${lv.opm}%${lv.opm_ch!=null?` (${lv.opm_ch>0?'+':''}${lv.opm_ch}%p)`:''}`);
             }
-            // ② 전망 — 가이던스 갭(US) / 컨센 30일 리비전(KR·US 공통)
-            if(lv.g_rev_gap!=null) bits.push(`가이던스 매출 ${pct(lv.g_rev_gap)} <span class="note">vs 컨센</span>`);
-            else if(lv.g_eps_gap!=null) bits.push(`가이던스 EPS ${pct(lv.g_eps_gap)} <span class="note">vs 컨센</span>`);
+            /* ② 전망 — 가이던스 갭(US) / 컨센 30일 리비전(KR·US 공통)
+               (2026-08-10) 매출·EPS 를 **둘 다** 보여주고, 어느 기간과 비교한 값인지
+               라벨을 붙인다(우선순위 진행분기→다음분기→올해FY→내년FY · _GPER). */
+            if(lv.g_rev_gap!=null) bits.push(`가이던스 매출 ${pct(lv.g_rev_gap)} <span class="note">vs ${_GPER(lv.g_rev_per||lv.g_per)} 컨센</span>`);
+            if(lv.g_eps_gap!=null) bits.push(`가이던스 EPS ${pct(lv.g_eps_gap)} <span class="note">vs ${_GPER(lv.g_eps_per||lv.g_per)} 컨센</span>`);
             if(lv.cons_rev30!=null) bits.push(`<span class="note">컨센30일</span> ${pct(lv.cons_rev30*100)}`);
             // ③ 주가 — 실제로 어떻게 받아들였나
             const rr=[]; if(lv.r1!=null) rr.push(`D+1 ${pct(lv.r1)}`);
@@ -5635,17 +5640,19 @@ await _canvasFlow(c);
              회사가 실적발표에서 주는 '다음 분기'는 그 시점 진행 중인 분기(0q)라
              예전처럼 +1q 행에 고정하면 컨센 열과 갭이 서로 다른 분기가 됐다
              (실측 ABNB: 가이던스 4,730 · 갭 0.0% 인데 옆 컨센은 +1q 3,154). */
-          const gper=(gd2&&gd2.per)||'0q';
-          const hit=(gd2&&per===gper);
-          const gr=hit?gd2.rev:null, ge=hit?gd2.eps:null;
-          const jr=hit?gd2.revGap:null, je=hit?gd2.epsGap:null;
+          /* (2026-08-10) 매출·EPS 가 **각각 다른 기간**을 가리킬 수 있다 —
+             매출은 분기만, EPS 는 연간만 주는 회사가 흔하다. 서버가 우선순위
+             (진행분기→다음분기→올해FY→내년FY)로 고른 기간을 항목별로 받아 그 행에 놓는다. */
+          const grp=(gd2&&(gd2.revPer||gd2.per))||'0q', gep=(gd2&&(gd2.epsPer||gd2.per))||'0q';
+          const gr=(gd2&&per===grp)?gd2.rev:null, ge=(gd2&&per===gep)?gd2.eps:null;
+          const jr=(gd2&&per===grp)?gd2.revGap:null, je=(gd2&&per===gep)?gd2.epsGap:null;
           const J2=v=>v==null?'<span class="note">—</span>':`<span class="${v>0?'up':'dn'}"><b>${v>0?'상회':'하회'}</b> ${v>0?'+':''}${(+v).toFixed(1)}%</span>`;
           return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 4px"><b>${LBL[per]}</b> <span class="note">${E(e3.end||'')}</span></td>
             <td style="text-align:right">${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'}</td>
             <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
             <td style="text-align:right">${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'}</td>
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td></tr>`; }).join('')+
-        `</table><div class="note">판정 = 가이던스 중간값 ÷ 발표시점 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · 연간(FY) 가이던스는 분기 컨센과 혼동 위험이 커 자동 파싱 제외</div></div>`;
+        `</table><div class="note">판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치</div></div>`;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
@@ -6127,8 +6134,13 @@ await _canvasFlow(c);
             /* 가이던스 → 컨센 리비전 (미국식 순서의 마지막 축) — 최근 발표분에만 값이 있다 */
             if(latest){
               const gl=[];
-              if(rw.gap!=null) gl.push(`가이던스 ${pc(rw.gap)} vs 컨센`);
+              /* (2026-08-10) 매출·EPS 가이던스를 각각, 비교 기간 라벨과 함께
+                 (우선순위 진행분기→다음분기→올해FY→내년FY — 표·캘린더와 동일) */
+              if(rw.gapR!=null) gl.push(`매출 가이던스 ${pc(rw.gapR)} vs ${_GPER(rw.gapRp)} 컨센`);
+              else if(rw.gap!=null) gl.push(`가이던스 ${pc(rw.gap)} vs 컨센`);
+              if(rw.gapE!=null) gl.push(`EPS 가이던스 ${pc(rw.gapE)} vs ${_GPER(rw.gapEp)} 컨센`);
               if(rw.sprb!=null) gl.push(`4분기 중 ${rw.sprb}회 상회`);
+              if(rw.cr7!=null) gl.push(`컨센 7일 ${pc(rw.cr7*100)}`);
               if(rw.cr30!=null) gl.push(`컨센 30일 ${pc(rw.cr30*100)}`);
               if(gl.length) rows.push(['전망', gl.join('   ')]);
             }

@@ -720,7 +720,11 @@ def us_fin(sym: str):
                     if it.get("c") == sym and (it.get("g_rev") is not None or it.get("g_eps") is not None):
                         gd = {"d": d8, "rev": it.get("g_rev"), "revGap": it.get("g_rev_gap"),
                               "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"),
-                              "per": it.get("g_per") or "0q",     # 가이던스가 가리키는 분기
+                              "per": it.get("g_per") or "0q",     # 대표 기간(구버전 호환)
+                              # (2026-08-10) 매출·EPS 가 서로 다른 기간을 가리킬 수 있다
+                              # (우선순위: 진행분기→다음분기→올해FY→내년FY)
+                              "revPer": it.get("g_rev_per") or it.get("g_per"),
+                              "epsPer": it.get("g_eps_per") or it.get("g_per"),
                               "acc": it.get("acc")}
         except Exception:
             pass

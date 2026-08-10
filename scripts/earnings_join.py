@@ -146,8 +146,10 @@ def main():
                 # (gap=병합값은 구버전 호환으로 유지)
                 if it.get("g_rev_gap") is not None:
                     patch["gapR"] = it["g_rev_gap"]
+                    patch["gapRp"] = it.get("g_rev_per") or it.get("g_per")   # 비교 기간(0q/+1q/0y/+1y)
                 if it.get("g_eps_gap") is not None:
                     patch["gapE"] = it["g_eps_gap"]
+                    patch["gapEp"] = it.get("g_eps_per") or it.get("g_per")
                 g = it.get("g_rev_gap")
                 if g is None:
                     g = it.get("g_eps_gap")

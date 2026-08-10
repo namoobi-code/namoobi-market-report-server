@@ -115,8 +115,11 @@ def exhibit_text(cik, accno):
     return re.sub(r"\s+", " ", t)
 
 
+_FYRE = r"full[- ]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d"
+
+
 def parse_guidance(txt):
-    """보도자료 평문 → {rev_lo, rev_hi, eps_lo, eps_hi}. 못 잡으면 빈 dict.
+    """보도자료 평문 → 분기 {rev_lo,rev_hi,eps_lo,eps_hi} + 연간 {fy_rev_lo,…,fy_eps_hi}.
 
     실측한 세 가지 표기를 모두 지원한다.
       범위형  SNDK "revenue of $10.3 billion to $10.8 billion"
@@ -124,14 +127,19 @@ def parse_guidance(txt):
       근사형        "revenue of approximately $10.5 billion"
     '전망'을 말하는 구간만 본다(expect/guidance/outlook/anticipate) — 과거 실적 서술을
     잡으면 완전히 틀린 숫자가 나온다.
+
+    (2026-08-10) 연간(FY) 전망을 **버리지 않고 따로** 담는다. 예전에는 분기 컨센과
+    비교하면 4배 차이가 나 "+292%" 같은 엉터리 갭이 나오므로 통째로 폐기했는데
+    (실측 WGO·FDS·GBX·AVAV), 이제 연간 컨센(ry0/ey0·ry1/ey1)이 있어 같은 기간끼리
+    비교할 수 있다. 실측상 보도자료 가이던스의 절반 이상이 연간 기준이라
+    이걸 살리면 커버리지가 크게 는다.
     """
     out = {}
     sents = re.split(r"(?<=[.;])\s+", txt)
-    lead = [x for x in sents
-            if re.search(r"\b(expect|expects|guidance|outlook|anticipat|forecast|project)", x, re.I)
-            # 연간(FY) 전망 문장은 버린다 — 분기 컨센서스와 비교하면 4배 차이가 나
-            # "+292%" 같은 엉터리 갭이 만들어진다(실측 WGO·FDS·GBX·AVAV).
-            and not re.search(r"full[- ]year|fiscal year|for the year|annual|FY\s?20\d\d", x, re.I)]
+    fore = [x for x in sents
+            if re.search(r"\b(expect|expects|guidance|outlook|anticipat|forecast|project)", x, re.I)]
+    lead = [x for x in fore if not re.search(_FYRE, x, re.I)]        # 분기 전망 문장
+    fyl = [x for x in fore if re.search(_FYRE, x, re.I)]             # 연간 전망 문장
 
     def grab(seg, label_re, is_eps):
         m = re.search(label_re + r"[^$%]{0,80}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM, seg, re.I)
@@ -161,17 +169,20 @@ def parse_guidance(txt):
             return a, a
         return None, None
 
-    for s_ in lead[:80]:
-        if "rev_lo" not in out:
-            a, b = grab(s_, r"(?:revenue|net sales)", False)
-            # 분기 가이던스 폭은 보통 ±5% 안쪽이다. 상·하단이 1.6배를 넘으면 연간 전망이나
-            # 무관한 숫자를 잘못 물린 것(실측 DELL: $27B~$60B) → 버린다.
-            if a and b and a <= b and a > 1e5 and b / a < 1.6:
-                out["rev_lo"], out["rev_hi"] = a, b
-        if "eps_lo" not in out:
-            a, b = grab(s_, r"(?:diluted )?earnings per share|\beps\b", True)
-            if a is not None and b is not None and -100 < a <= b < 1000:
-                out["eps_lo"], out["eps_hi"] = round(a, 2), round(b, 2)
+    def scan(sent_list, pre):
+        for s_ in sent_list[:80]:
+            if pre + "rev_lo" not in out:
+                a, b = grab(s_, r"(?:revenue|net sales)", False)
+                # 가이던스 폭은 보통 ±5% 안쪽이다. 상·하단이 1.6배를 넘으면
+                # 무관한 숫자를 잘못 물린 것(실측 DELL: $27B~$60B) → 버린다.
+                if a and b and a <= b and a > 1e5 and b / a < 1.6:
+                    out[pre + "rev_lo"], out[pre + "rev_hi"] = a, b
+            if pre + "eps_lo" not in out:
+                a, b = grab(s_, r"(?:diluted )?earnings per share|\beps\b", True)
+                if a is not None and b is not None and -100 < a <= b < 1000:
+                    out[pre + "eps_lo"], out[pre + "eps_hi"] = round(a, 2), round(b, 2)
+    scan(lead, "")            # 분기
+    scan(fyl, "fy_")          # 연간(FY)
     return out
 
 
@@ -186,34 +197,54 @@ def guidance_gap(sym, g, pool_us, ann=None):
         +1q(12/31 종료) 컨센 1.81 → 갭 +43.3% ← 예전 표시(대폭 상회로 왜곡)
       실측 SNDK: 0q 기준 −1.4% 인데 +1q 기준 −14.0% 로 과장됐다.
     → 발표일 이후에 끝나는 첫 분기를 기준으로 삼는다(보통 0q, 야후가 아직 롤오버 전이면 +1q).
+
+    (2026-08-10) **우선순위 4단계** (사용자 지정):
+        ① 진행분기(0q) ② 다음분기(+1q) ③ 올해 FY(0y) ④ 내년 FY(+1y)
+    분기 가이던스가 있으면 분기끼리, 없고 연간 가이던스만 있으면 연간 컨센(ry0/ey0·ry1/ey1)과
+    같은 기간끼리 비교한다. 매출·EPS 는 각각 독립적으로 우선순위를 적용한다
+    (매출은 분기만, EPS 는 연간만 주는 회사가 흔하다).
     """
     r = pool_us.get(sym) or {}
     out = {}
-    # 기준 분기 선택: 발표일(ann, YYYY-MM-DD) 이후에 끝나는 첫 컨센 분기
-    base_eps, base_rev, base_per = r.get("eq0"), r.get("rq0"), "0q"
+    # 분기 기준 선택: 발표일(ann, YYYY-MM-DD) 이후에 끝나는 첫 컨센 분기
+    q_eps, q_rev, q_per = r.get("eq0"), r.get("rq0"), "0q"
     if ann:
         e0, e1 = r.get("q0e"), r.get("q1e")               # 각 분기 종료일(us_consensus 가 저장)
         if e0 and e0 <= ann and e1:                        # 0q 가 이미 끝났으면(롤오버 전) +1q
-            base_eps, base_rev, base_per = r.get("eq1"), r.get("rq1"), "+1q"
-    if base_eps is None and base_rev is None:              # 스냅샷 이전 데이터 폴백
-        base_eps, base_rev, base_per = r.get("eq1"), r.get("rq1"), "+1q"
-    # 분기 가이던스가 컨센서스와 ±60% 넘게 벌어지는 일은 사실상 없다.
-    # 그 정도면 연간↔분기를 잘못 물렸거나 파싱이 틀린 것 → 버린다(틀린 값보다 빈칸이 낫다).
+            q_eps, q_rev, q_per = r.get("eq1"), r.get("rq1"), "+1q"
+    if q_eps is None and q_rev is None:                    # 스냅샷 이전 데이터 폴백
+        q_eps, q_rev, q_per = r.get("eq1"), r.get("rq1"), "+1q"
+    # 가이던스가 컨센서스와 ±60% 넘게 벌어지는 일은 사실상 없다.
+    # 그 정도면 기간을 잘못 물렸거나 파싱이 틀린 것 → 버린다(틀린 값보다 빈칸이 낫다).
     LIM = 60.0
-    if g.get("rev_lo") and base_rev:
-        mid = (g["rev_lo"] + g["rev_hi"]) / 2
-        gp = (mid / base_rev - 1) * 100
-        if abs(gp) <= LIM:
-            out["g_rev"] = round(mid / 1e6, 1)              # 백만 달러
-            out["g_rev_gap"] = round(gp, 1)
-    if g.get("eps_lo") and base_eps and base_eps > 0:
-        mid = (g["eps_lo"] + g["eps_hi"]) / 2
-        gp = (mid / base_eps - 1) * 100
-        if abs(gp) <= LIM:
-            out["g_eps"] = round(mid, 2)
-            out["g_eps_gap"] = round(gp, 1)
+    # (가이던스 lo, hi, 컨센 기준값, 기간라벨) — 앞에서부터 우선 채택
+    rev_try = [(g.get("rev_lo"), g.get("rev_hi"), q_rev, q_per),
+               (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry0"), "0y"),
+               (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry1"), "+1y")]
+    eps_try = [(g.get("eps_lo"), g.get("eps_hi"), q_eps, q_per),
+               (g.get("fy_eps_lo"), g.get("fy_eps_hi"), r.get("ey0"), "0y"),
+               (g.get("fy_eps_lo"), g.get("fy_eps_hi"), r.get("ey1"), "+1y")]
+    for lo, hi, base, per in rev_try:
+        if lo and hi and base:
+            mid = (lo + hi) / 2
+            gp = (mid / base - 1) * 100
+            if abs(gp) <= LIM:
+                out["g_rev"] = round(mid / 1e6, 1)          # 백만 달러
+                out["g_rev_gap"] = round(gp, 1)
+                out["g_rev_per"] = per
+                break
+    for lo, hi, base, per in eps_try:
+        if lo and hi and base and base > 0:
+            mid = (lo + hi) / 2
+            gp = (mid / base - 1) * 100
+            if abs(gp) <= LIM:
+                out["g_eps"] = round(mid, 2)
+                out["g_eps_gap"] = round(gp, 1)
+                out["g_eps_per"] = per
+                break
     if out:
-        out["g_per"] = base_per                             # 어느 분기와 비교했는지 기록
+        # 대표 기간(구버전 호환) — 매출 기준 우선, 없으면 EPS 기준
+        out["g_per"] = out.get("g_rev_per") or out.get("g_eps_per") or q_per
     return out
 
 
