@@ -33,6 +33,10 @@ DAYS, WORKERS, LIMIT = ARG("--days", 45), ARG("--workers", 4), ARG("--limit", 0)
 # (실측 AMGN GAAP EPS 오채택 · ABT 연간을 분기로 분류 → 고쳐도 화면은 옛 값). 파서를
 # 수정한 뒤에는 --force 로 전체를 다시 돌려야 수정이 실제로 반영된다.
 FORCE = "--force" in sys.argv
+# 표 파서 사용 여부 — 기본 끔(검증 전). --table 을 주면 켠다.
+USE_TABLE = "--table" in sys.argv
+# 본문을 못 받은 종목(=SEC 속도 제한). 저장 때 옛 값을 지우지 않는다.
+FETCH_FAIL = set()
 
 
 def recent_earn_8k(cik):
@@ -76,6 +80,12 @@ def _save(live):
         for it in arr:
             src = idx.get((d8, it.get("c")))
             if not src:
+                continue
+            # (2026-08-10) 본문을 못 받은 종목은 **건드리지 않는다**.
+            # SEC 가 속도 제한을 걸면 본문이 0자로 와서 파싱 결과가 비는데, --force 는
+            # 이미 옛 값을 지운 뒤라 그대로 저장하면 화면의 가이던스가 통째로 사라진다
+            # (실측: 이 사고로 갭 표시가 0건이 됐다). 받아오기 실패는 '값 없음'이 아니다.
+            if it.get("c") in FETCH_FAIL:
                 continue
             for k in G_FIELDS:
                 if src.get(k) is not None:
@@ -136,16 +146,24 @@ def main():
             # 8.46 을 분기로 분류 → 표에선 'FY’26 Guidance' 열로 정확히 확정).
             # 표에서 못 찾은 항목만 문장 파서 결과로 채운다.
             txt = exhibit_text(cik, acc)
+            if not txt:                      # 받아오기 실패 — 값 없음이 아니다
+                FETCH_FAIL.add(sym)
+                return sym, {}
             g = parse_guidance(txt)
             try:
                 gt = parse_tables(RAW_CACHE.get((str(cik), acc)) or "")
             except Exception:
                 gt = {}
-            if gt:
+            # (2026-08-10 되돌림) 표 값을 문장 값보다 **우선**시켰더니 전체 이상치가
+            # 매출 6.2%→12.3% 로 늘었다(실측 USNA +26,655% · PSKY +13,160% · MEC +4,869%).
+            # 표 인식은 PTC·QCOM 같은 정형 표에서는 정확하지만, 회사마다 표 모양이 제각각이라
+            # 행·열을 잘못 짚는 경우가 많다. 검증이 끝날 때까지 표 값은 **쓰지 않는다**
+            # (guidance_table.py 는 단독 도구로 남겨 두고 표본을 넓혀 규칙을 다듬는다).
+            if gt and USE_TABLE:
                 ev = dict(g.get("_ev") or {}); ev.update(gt.get("_ev") or {})
                 for k, v in gt.items():
                     if not k.startswith("_"):
-                        g[k] = v                       # 표 값이 문장 값을 이긴다
+                        g[k] = v
                 g["_ev"] = ev
             d8 = todo[sym].get("_d8")                    # 그 항목의 발표일(기준 분기 판정용)
             ann = f"{d8[:4]}-{d8[4:6]}-{d8[6:8]}" if d8 else None
