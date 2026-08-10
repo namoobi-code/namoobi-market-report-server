@@ -115,75 +115,12 @@ def exhibit_text(cik, accno):
     return re.sub(r"\s+", " ", t)
 
 
-_FYRE = r"full[- ]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d"
+_FYRE = r"full[- ]year|fiscal year|for the year|full fiscal|annual|FY\\s?20\\d\\d"
 
-
-def parse_guidance(txt):
-    """보도자료 평문 → 분기 {rev_lo,rev_hi,eps_lo,eps_hi} + 연간 {fy_rev_lo,…,fy_eps_hi}.
-
-    실측한 세 가지 표기를 모두 지원한다.
-      범위형  SNDK "revenue of $10.3 billion to $10.8 billion"
-      ±형     MU   "Revenue $50.0 billion ± $1.0 billion" (표 안, 문장 아님)
-      근사형        "revenue of approximately $10.5 billion"
-    '전망'을 말하는 구간만 본다(expect/guidance/outlook/anticipate) — 과거 실적 서술을
-    잡으면 완전히 틀린 숫자가 나온다.
-
-    (2026-08-10) 연간(FY) 전망을 **버리지 않고 따로** 담는다. 예전에는 분기 컨센과
-    비교하면 4배 차이가 나 "+292%" 같은 엉터리 갭이 나오므로 통째로 폐기했는데
-    (실측 WGO·FDS·GBX·AVAV), 이제 연간 컨센(ry0/ey0·ry1/ey1)이 있어 같은 기간끼리
-    비교할 수 있다. 실측상 보도자료 가이던스의 절반 이상이 연간 기준이라
-    이걸 살리면 커버리지가 크게 는다.
-    """
-    out = {}
-    sents = re.split(r"(?<=[.;])\s+", txt)
-    fore = [x for x in sents
-            if re.search(r"\b(expect|expects|guidance|outlook|anticipat|forecast|project)", x, re.I)]
-    lead = [x for x in fore if not re.search(_FYRE, x, re.I)]        # 분기 전망 문장
-    fyl = [x for x in fore if re.search(_FYRE, x, re.I)]             # 연간 전망 문장
-
-    def grab(seg, label_re, is_eps):
-        m = re.search(label_re + r"[^$%]{0,80}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM, seg, re.I)
-        if m:
-            hint = (m.group(4) or m.group(2) or "").lower()
-            return _to_num(m.group(1), m.group(2), hint), _to_num(m.group(3), m.group(4), hint)
-        # ± 금액형 — MU "Revenue $50.0 billion ± $1.0 billion"
-        m = re.search(label_re + r"[^$%]{0,80}?" + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM, seg, re.I)
-        if m:
-            hint = (m.group(2) or m.group(4) or "").lower()
-            c, d = _to_num(m.group(1), m.group(2), hint), _to_num(m.group(3), m.group(4), hint)
-            if c is not None and d is not None:
-                return c - d, c + d
-        # ± 퍼센트형 — NVDA "revenue is expected to be $45.0 billion, plus or minus 2%"
-        m = re.search(label_re + r"[^$]{0,80}?" + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%", seg, re.I)
-        if m:
-            c = _to_num(m.group(1), m.group(2))
-            try:
-                pc = float(m.group(3)) / 100
-            except Exception:
-                pc = None
-            if c is not None and pc is not None:
-                return c * (1 - pc), c * (1 + pc)
-        m = re.search(label_re + r"[^$%]{0,80}?(?:approximately|about|around)\s*" + _NUM, seg, re.I)
-        if m:
-            a = _to_num(m.group(1), m.group(2))
-            return a, a
-        return None, None
-
-    def scan(sent_list, pre):
-        for s_ in sent_list[:80]:
-            if pre + "rev_lo" not in out:
-                a, b = grab(s_, r"(?:revenue|net sales)", False)
-                # 가이던스 폭은 보통 ±5% 안쪽이다. 상·하단이 1.6배를 넘으면
-                # 무관한 숫자를 잘못 물린 것(실측 DELL: $27B~$60B) → 버린다.
-                if a and b and a <= b and a > 1e5 and b / a < 1.6:
-                    out[pre + "rev_lo"], out[pre + "rev_hi"] = a, b
-            if pre + "eps_lo" not in out:
-                a, b = grab(s_, r"(?:diluted )?earnings per share|\beps\b", True)
-                if a is not None and b is not None and -100 < a <= b < 1000:
-                    out[pre + "eps_lo"], out[pre + "eps_hi"] = round(a, 2), round(b, 2)
-    scan(lead, "")            # 분기
-    scan(fyl, "fy_")          # 연간(FY)
-    return out
+# (2026-08-10) 가이던스 파서는 guidance_parse.py 로 분리 — 규칙이 길어져 이 파일에 두면
+# 8-K 감시 로직과 뒤섞인다. 파서는 후보별로 ①전사 여부 ②GAAP/조정 ③기간 명시 ④단위·범위를
+# 모두 확인해야 채택하고, 근거(_ev)·기각 사유(_skip)를 함께 돌려준다.
+from guidance_parse import parse_guidance  # noqa: E402  (같은 폴더)
 
 
 def guidance_gap(sym, g, pool_us, ann=None):
@@ -214,11 +151,11 @@ def guidance_gap(sym, g, pool_us, ann=None):
             q_eps, q_rev, q_per = r.get("eq1"), r.get("rq1"), "+1q"
     if q_eps is None and q_rev is None:                    # 스냅샷 이전 데이터 폴백
         q_eps, q_rev, q_per = r.get("eq1"), r.get("rq1"), "+1q"
-    # (2026-08-10) 허용 폭 ±60% → ±25% 로 조임. 실측 분포: |갭| 중앙값이 매출 0.5%·EPS 1.6%
-    # 이고 25% 초과가 매출 10건·EPS 11건뿐인데, 그 꼬리가 전부 파싱 오류였다
-    # (실측 QCOM EPS −39.1% · WAT 매출 −51.0% — 보도자료의 다른 숫자를 물린 것).
-    # 진짜로 컨센을 25% 넘게 벗어나는 가이던스는 대형 뉴스라 사실상 없다 → 틀린 값보다 빈칸.
-    LIM = 25.0
+    # (2026-08-10 재설계) **갭 크기로 자르는 임계값을 없앴다.**
+    # 예전엔 |갭|>60%(→25%)를 오파싱으로 보고 버렸는데, 이는 진짜 큰 갭까지 지우는 땜빵이었다.
+    # 이제 파서(guidance_parse.py)가 채택 전에 ①전사 지표 ②조정 기준 ③기간 명시 ④단위·범위를
+    # 모두 확인하므로, 여기서는 '같은 기간·같은 기준끼리' 비교만 하면 된다.
+    # 값이 크게 벌어지면 그건 실제 신호다(가이던스 쇼크) — 지우지 않는다.
     # (가이던스 lo, hi, 컨센 기준값, 기간라벨) — 앞에서부터 우선 채택
     rev_try = [(g.get("rev_lo"), g.get("rev_hi"), q_rev, q_per),
                (g.get("fy_rev_lo"), g.get("fy_rev_hi"), r.get("ry0"), "0y"),
@@ -230,20 +167,18 @@ def guidance_gap(sym, g, pool_us, ann=None):
         if lo and hi and base:
             mid = (lo + hi) / 2
             gp = (mid / base - 1) * 100
-            if abs(gp) <= LIM:
-                out["g_rev"] = round(mid / 1e6, 1)          # 백만 달러
-                out["g_rev_gap"] = round(gp, 1)
-                out["g_rev_per"] = per
-                break
+            out["g_rev"] = round(mid / 1e6, 1)              # 백만 달러
+            out["g_rev_gap"] = round(gp, 1)
+            out["g_rev_per"] = per
+            break
     for lo, hi, base, per in eps_try:
         if lo and hi and base and base > 0:
             mid = (lo + hi) / 2
             gp = (mid / base - 1) * 100
-            if abs(gp) <= LIM:
-                out["g_eps"] = round(mid, 2)
-                out["g_eps_gap"] = round(gp, 1)
-                out["g_eps_per"] = per
-                break
+            out["g_eps"] = round(mid, 2)
+            out["g_eps_gap"] = round(gp, 1)
+            out["g_eps_per"] = per
+            break
     if out:
         # 대표 기간(구버전 호환) — 매출 기준 우선, 없으면 EPS 기준
         out["g_per"] = out.get("g_rev_per") or out.get("g_eps_per") or q_per
