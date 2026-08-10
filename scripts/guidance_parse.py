@@ -48,9 +48,19 @@ _CORP_W = {"total", "net", "consolidated", "company", "companywide", "overall", 
            "a", "for", "with", "at", "approximately", "about", "around", "range", "revenues"}
 _ADJ = r"non[-\s]?gaap|adjusted|core\s+(?:eps|earnings)|operating earnings"
 _GAAP = r"(?<!non-)(?<!non )\bgaap\b"
-_QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|ending|ended)|"
+# (2026-08-10) 과거 실적을 가리키는 분기 표현은 기간 판정에서 제외한다.
+# 실측 SRE: "affirming its 2026 adjusted EPS guidance ... reflecting actual results **through the
+# second quarter**" → 연간 가이던스인데 '2분기'로 잡혀 분기 컨센과 비교돼 +396% 오판정.
+_QPAST = r"(?:through|results through|reported|ended|completed|in the|during the|versus the|vs\.? the)\s+$"
+_QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|ending)|"
         r"for the (?:first|second|third|fourth) quarter|next quarter|current quarter")
-_YRE = r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d|\b20\d\d\s+(?:eps\s+)?guidance"
+# (2026-08-10) 연간 표시에 **"연도 + Outlook/전망"** 형태를 추가한다. 실측 오분류:
+#   AGCO "Outlook … 2026" · NFLX "Our 2026 outlook" · XRAY "2026 Outlook … net sales"
+#   → 연간 가이던스인데 분기로 잡혀 분기 컨센과 비교되며 +300%대 갭이 나왔다
+#     (AGCO 10,150 vs 분기 2,330 = +335% → 연간 10,179 대비 -0.3% 가 정답).
+_YRE = (r"full[-\s]year|fiscal year|for the year|full fiscal|annual|FY\s?20\d\d|"
+        r"\b20\d\d\s+(?:eps\s+|adjusted\s+)?(?:guidance|outlook)|outlook for (?:fiscal\s+)?20\d\d|"
+        r"(?:guidance|outlook)\s+for\s+(?:the\s+)?full[-\s]year")
 
 
 def _num(v, unit, hint=None):
@@ -70,7 +80,7 @@ def _num(v, unit, hint=None):
 #  주당 금액으로 읽어 갭이 1,000~10,000% 로 튀었다. 정상 가이던스는 예외 없이 $ 표기
 #  (QCOM $2.05-$2.25 · WAT $3.95-$4.05 · PNW $4.55-$4.75) 이므로 $ 를 필수로 두면
 #  성장률 문장이 구조적으로 걸러진다. 'NN cents' 표기(실측 SOFI)는 /100 해서 인정.
-_NUM_D = r"\$\s?([\d,]+(?:\.\d+)?)()"                      # 금액($) — 단위 그룹은 빈 자리
+_NUM_D = r"\$\s?([\d,]+(?:\.\d+)?)(?!\s*(?:billion|million|bn|mm)\b)()"   # 주당 금액($) — 뒤에 단위가 붙으면 총액이므로 제외(실측 VRRM $120 million)
 _NUM_C = r"([\d,]+(?:\.\d+)?)\s*(cents?)"                  # 60 cents → 0.60
 
 
@@ -130,7 +140,8 @@ def _period(txt, start, end):
     # 실측 PNW "2026 EPS guidance of $4.55-$4.75" 는 라벨(EPS) 바로 앞에 연도가 붙어
     # start 이전만 보면 놓친다. 그래서 스캔 범위를 end 까지로 잡는다.
     back = txt[max(0, start - 400):end]
-    cand = [(m.start(), "Q") for m in re.finditer(_QRE, back, re.I)]
+    cand = [(m.start(), "Q") for m in re.finditer(_QRE, back, re.I)
+            if not re.search(_QPAST, back[:m.start()][-30:], re.I)]
     cand += [(m.start(), "Y") for m in re.finditer(_YRE, back, re.I)]
     if cand:
         return max(cand)[1]                       # 가장 뒤(가까운) 표현
