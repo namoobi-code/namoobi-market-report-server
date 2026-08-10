@@ -3780,8 +3780,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
      const od=Object.getOwnPropertyDescriptor(CDEF[k],'l');
      const orig=()=>od&&(od.get?od.get.call(CDEF[k]):od.value);
      Object.defineProperty(CDEF[k],'l',{configurable:true,get(){
-       const d=DEF[mkt]&&DEF[mkt][F2C[k]||k];
-       return (d&&d.label&&d.fixed===undefined)?d.label:orig(); }});
+       /* (2026-08-10) 방어 — 라벨 조회가 실패해도 **표 렌더는 멈추면 안 된다**.
+          이 getter 는 헤더·컬럼패널·필터칩이 매번 호출하므로 예외가 나면 화면이 통째로
+          비어 버린다(전환 직후 DEF 미준비 등). 실패 시 원래 라벨로 조용히 되돌린다. */
+       try{ const d=DEF[mkt]&&DEF[mkt][F2C[k]||k];
+            return (d&&d.label&&d.fixed===undefined)?d.label:orig(); }
+       catch(e){ return orig(); } }});
    });}
   const cl =k=>_MALBL[k]?_MALBL[k][mkt]:CDEF[k].l;   // 표 헤더 = 패널 = 필터 (이평선은 시장별 라벨)
   const cpl=cl;
