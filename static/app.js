@@ -6110,7 +6110,7 @@ await _canvasFlow(c);
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
         <th>매출 가이던스</th><th>매출 컨센</th><th>매출 가이던스 갭</th><th class="note">매출 가이던스 갭(포털)</th>
-        <th>EPS 가이던스</th><th>EPS 컨센</th><th>EPS 가이던스 갭</th><th class="note">EPS 가이던스 갭(포털)</th></tr>`+
+        <th>EPS 가이던스</th><th>EPS 컨센</th><th>EPS 가이던스 갭</th><th class="note">EPS 가이던스 갭(포털)</th><th title="회사가 제시한 설비투자 가이던스 — 애널리스트 CapEx 컨센서스는 존재하지 않는다">CapEx(E)</th><th>CapEx/Revenue(E)</th><th title="영업현금흐름(최근 4분기) × 매출 성장 − CapEx(E) · 추정">FCF(E)</th></tr>`+
         ['0q','+1q','0y','+1y'].map(per=>{
           const e3=(J.est||[]).find(z=>z.per===per)||{};
           /* (2026-08-09 수정) 가이던스를 **그 값이 실제로 가리키는 분기 행**에 놓는다.
@@ -6135,6 +6135,20 @@ await _canvasFlow(c);
             if(v==null) return '<span class="note" title="포털에 같은 기간 가이던스가 없거나 컨센 역매칭 실패 — 대조 불가">—</span>';
             const d=(mine!=null)?(Math.abs(v-mine)<=1?'파싱값과 일치':`파싱값과 ${Math.abs(v-mine).toFixed(1)}%p 차이`):'파싱값 없음';
             return `<span class="note" title="포털(MarketBeat) ${nm} 가이던스 갭 — 파싱 검증용 대조값 · ${d} · 판정에는 사용하지 않음">⤴${v>0?'+':''}${(+v).toFixed(1)}%</span>`; };
+          /* (2026-08-10) 설비투자 3열 — 회사가 CapEx 가이던스를 준 기간 행에만 채운다.
+             애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다.
+             FCF(E) 는 추정(≈) — 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E)
+             (시황 보고서 3.1.8 과 같은 산식). CapEx 가 없으면 FCF 도 만들지 않는다. */
+          const CXC=(pp,e4)=>{
+            const MI='<td style="text-align:right"><span class="note">미제시</span></td>';
+            const gc=(gd2&&gd2.capex!=null&&(gd2.capexPer||'0y')===pp)?gd2.capex:null;
+            if(gc==null) return MI+MI+MI;
+            let ocf=0,rvT=0,ok=0;
+            (J.q||[]).slice(-4).forEach(z=>{ if(z.fcf!=null&&z.capex!=null&&z.s!=null){ ocf+=z.fcf+Math.abs(z.capex); rvT+=z.s; ok++; } });
+            const rv=e4&&e4.rev, fe=(ok===4&&rvT>0&&rv)?(ocf*(rv/rvT)-gc):null;
+            return `<td style="text-align:right" title="${E(gd2.capexEv||'')}"><b>${Math.round(gc).toLocaleString()}</b></td>`
+                 + `<td style="text-align:right">${rv?((gc/rv*100).toFixed(1)+'%'):'<span class="note">—</span>'}</td>`
+                 + `<td style="text-align:right" title="추정 — 영업현금흐름(TTM) ${Math.round(ocf).toLocaleString()} 기준">${fe==null?'<span class="note">—</span>':'<span class="note">≈</span>'+Math.round(fe).toLocaleString()}</td>`; };
           const evR=(gd2&&per===grp&&gd2.revEv)?` title="근거: ${E(gd2.revEv)}"`:'';
           const evE=(gd2&&per===gep&&gd2.epsEv)?` title="근거: ${E(gd2.epsEv)}"`:'';
           return `<tr style="border-bottom:1px solid #f2f4f7;background:#f6faf6"><td style="padding:3px 4px"><b>${LBL[per]}</b></td><td style="text-align:center" class="note">${E(e3.end||'—')}</td>
@@ -6143,32 +6157,18 @@ await _canvasFlow(c);
             <td style="text-align:right">${(gd2&&per===((gd2.revPerP||grp)))?GP(gd2.revGapP,gd2.revGap,'매출'):'<span class="note">—</span>'}</td>
             <td style="text-align:right"${evE}>${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'+SB(gd2.epsSrc,gd2.epsOwn)}</td>
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td>
-            <td style="text-align:right">${(gd2&&per===((gd2.epsPerP||gep)))?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td></tr>`; }).join('')+
-        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(MarketBeat)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
+            <td style="text-align:right">${(gd2&&per===((gd2.epsPerP||gep)))?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td>
+            ${CXC(per,e3)}</tr>`; }).join('')+
+        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(MarketBeat)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>
-        <th>매출(E)</th><th>EPS(E)</th><th title="영업현금흐름(최근 4분기) × 매출 성장 − CapEx(E) · 회사가 CapEx 가이던스를 준 경우만">FCF(E)</th><th title="회사가 제시한 설비투자 가이던스 — 애널리스트 CapEx 컨센서스는 존재하지 않는다">CapEx(E)</th><th>CapEx/Revenue(E)</th><th>애널수</th></tr>`+
-        /* (2026-08-10) CapEx(E)·FCF(E) — **회사 가이던스가 있을 때만** 채운다.
-           CapEx 는 애널리스트 컨센서스가 무료로 존재하지 않는다(FMP·Yahoo·Massive 모두 없음).
-           그래서 8-K 에서 파싱한 회사 제시분만 쓰고, 없으면 '미제시'로 둔다(추정하지 않는다).
-           FCF(E) 는 시황 보고서 3.1.8 과 같은 산식 — 영업현금흐름 × 매출성장 − CapEx. */
-        J.est.map(e2=>{
-          const gc=(J.gd&&J.gd.capex!=null&&(J.gd.capexPer||'0y')===e2.per)?J.gd.capex:null;
-          // 영업현금흐름(TTM) = FCF + CapEx 합 · 매출(TTM)
-          let ocf=0,rvT=0,ok=0;
-          (J.q||[]).slice(-4).forEach(z=>{ if(z.fcf!=null&&z.capex!=null&&z.s!=null){ ocf+=z.fcf+Math.abs(z.capex); rvT+=z.s; ok++; } });
-          const fcfE=(gc!=null&&ok===4&&rvT>0&&e2.rev)?(ocf*(e2.rev/rvT)-gc):null;
-          const MI='<span class="note">미제시</span>';
-          return `<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
+        <th>매출(E)</th><th>EPS(E)</th><th>애널수</th></tr>`+
+        J.est.map(e2=>`<tr style="border-bottom:1px solid #f2f4f7;background:#fff7ea">
             <td style="padding:3px 4px"><b>${LBL[e2.per]||e2.per}</b></td><td style="text-align:center">${E(e2.end||'')}</td>
             <td style="text-align:right">${F(e2.rev)}</td>
             <td style="text-align:right">${e2.eps==null?'—':e2.eps.toFixed(2)}</td>
-            <td style="text-align:right" title="${fcfE!=null?'추정 — 영업현금흐름(TTM) '+Math.round(ocf).toLocaleString()+' × 매출성장 − CapEx(E)':''}">${fcfE==null?MI:'<span class="note">≈</span>'+Math.round(fcfE).toLocaleString()}</td>
-            <td style="text-align:right" title="${gc!=null?E(J.gd.capexEv||''):''}">${gc==null?MI:'<b>'+Math.round(gc).toLocaleString()+'</b>'}</td>
-            <td style="text-align:right">${(gc!=null&&e2.rev)?((gc/e2.rev*100).toFixed(1)+'%'):MI}</td>
-            <td style="text-align:right">${e2.nan??'—'}</td></tr>`; }).join('')+
-        '<tr><td colspan="8" class="note" style="padding:3px 4px">CapEx(E) = <b>회사가 제시한 설비투자 가이던스</b>(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않은 회사는 \'미제시\'. · FCF(E) 는 <b>추정</b>(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식</td></tr></table></div>';
+            <td style="text-align:right">${e2.nan??'—'}</td></tr>`).join('')+'</table></div>';
     }
     /* ② EPS 추정 리비전 — 표 + 4점 곡선 (즉시) */
     let t3='';
