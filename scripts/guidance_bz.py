@@ -27,17 +27,27 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
 LIVE = BASE / "data" / "db" / "earnings_live_us.json"
+# 받아온 레코드를 종목별로 저장한다 — 판정 규칙을 바꿀 때 4.9시간을 다시 쓰지 않기 위함.
+BZC = BASE / "data" / "cache" / "bz"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
 DAYS, LIMIT, GAP = ARG("--days", 45), ARG("--limit", 0), ARG("--gap", 5)
 P_FIELDS = ("g_rev_p", "g_rev_gap_p", "g_rev_per_p", "g_eps_p", "g_eps_gap_p", "g_eps_per_p",
+            "g_rev_bzp", "g_eps_bzp",
             "g_bz_period", "g_bz_type", "g_bz_date")
 NUM = lambda v: (float(v) if v not in (None, "", "0.000") else None)
 
 
-def fetch(sym):
+def fetch(sym, use_cache=True):
     """→ (레코드 리스트, 429 여부). 레코드는 최신순."""
+    BZC.mkdir(parents=True, exist_ok=True)
+    cp = BZC / f"{sym.upper()}.json"
+    if use_cache and cp.exists():
+        try:
+            return json.loads(cp.read_text(encoding="utf-8")), False
+        except Exception:
+            pass
     try:
         h = urllib.request.urlopen(urllib.request.Request(
             f"https://www.benzinga.com/quote/{sym.upper()}/earnings-forecasts",
@@ -57,6 +67,10 @@ def fetch(sym):
             continue
         out.append(d)
     out.sort(key=lambda d: str(d.get("date") or ""), reverse=True)
+    try:
+        cp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    except Exception:
+        pass
     return out, False
 
 
@@ -81,30 +95,41 @@ def main():
         if not rows:
             continue
         r = pool[it["c"]]
-        d = rows[0]                       # 가장 최근 가이던스
-        per = {"FY": "0y"}.get(d.get("period")) or (
-            "0q" if str(d.get("period", "")).startswith("Q") else None)
-        it["g_bz_period"] = f"{d.get('period')}{d.get('period_year')}"
-        it["g_bz_type"] = d.get("eps_type")
-        it["g_bz_date"] = d.get("date")
-        for metric, lo_k, hi_k, base_k, gk in (
-                ("eps", "eps_guidance_min", "eps_guidance_max", ("ey0" if per == "0y" else "eq0"), "g_eps"),
-                ("rev", "revenue_guidance_min", "revenue_guidance_max", ("ry0" if per == "0y" else "rq0"), "g_rev")):
+        it["g_bz_date"] = rows[0].get("date")
+        it["g_bz_period"] = f"{rows[0].get('period')}{rows[0].get('period_year')}"
+        it["g_bz_type"] = rows[0].get("eps_type")
+        # (2026-08-11 수정) Benzinga 는 같은 발표에서 **연간과 분기 가이던스를 모두** 싣는다.
+        # 무조건 최신 1건만 보면 우리가 연간을 뽑았는데 포털의 분기 레코드와 비교하게 돼
+        # '기간 불일치'로 오인된다(실측 NFLX 우리 FY 51,200 / 포털 Q3 12,860 — 둘 다 맞다).
+        # → 항목별로 **우리가 확정한 기간과 같은 기간의 레코드**를 골라 견준다.
+        for metric, lo_k, hi_k, gk in (
+                ("eps", "eps_guidance_min", "eps_guidance_max", "g_eps"),
+                ("rev", "revenue_guidance_min", "revenue_guidance_max", "g_rev")):
+            want = it.get(gk + "_per") or it.get("g_per") or "0y"
+            want_fy = str(want).endswith("y")
+            d = next((x for x in rows
+                      if (str(x.get("period", "")).upper() == "FY") == want_fy
+                      and NUM(x.get(lo_k)) is not None), None) or rows[0]
+            per = "0y" if str(d.get("period", "")).upper() == "FY" else "0q"
+            base_k = {("eps", "0y"): "ey0", ("eps", "0q"): "eq0",
+                      ("rev", "0y"): "ry0", ("rev", "0q"): "rq0"}[(metric, per)]
+            it[gk + "_bzp"] = f"{d.get('period')}{d.get('period_year')}"
             lo, hi = NUM(d.get(lo_k)), NUM(d.get(hi_k))
             base = r.get(base_k)
             if lo is None or hi is None or not base:
                 continue
+            # (2026-08-10 수정) Benzinga 매출 가이던스는 **원 단위 달러**로 온다.
+            # 백만으로 착각해 ×1e6 했더니 화면 값이 1,337.50 vs 1,337,500,000 으로 어긋났다
+            # (실측 CECO). 컨센(base)도 원 단위이므로 갭은 그대로, 표시값만 백만으로 낮춘다.
             mid = (lo + hi) / 2
-            if metric == "rev":
-                mid *= 1e6                # 포털 매출은 백만 단위
             it[gk + "_p"] = round(mid / (1e6 if metric == "rev" else 1), 2)
             it[gk + "_gap_p"] = round((mid / base - 1) * 100, 1)
             it[gk + "_per_p"] = per
             got += 1
             mine = it.get(gk)
             if mine:
-                (same, diff) = (same + 1, diff) if abs(mid / (1e6 if metric == "rev" else 1) / mine - 1) <= 0.01 \
-                    else (same, diff + 1)
+                cmpv = mid / (1e6 if metric == "rev" else 1)
+                (same, diff) = (same + 1, diff) if abs(cmpv / mine - 1) <= 0.01 else (same, diff + 1)
         if (n + 1) % 20 == 0:
             _save(live)
             print(f"    [{n+1}/{len(todo)}] 값 {got} · 일치 {same} · 불일치 {diff}", flush=True)

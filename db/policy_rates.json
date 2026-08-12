@@ -1,41 +1,41 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-10",
+ "as_of": "2026-08-11",
  "data": [
   {
    "country": "미국",
    "rate": "3.50~3.75",
-   "asof": "2026-08-09",
+   "asof": "2026-08-10",
    "note": "FRED DFEDTARU/L(실측)"
   },
   {
    "country": "유로존",
    "rate": "2.25",
-   "asof": "2026-08-07",
+   "asof": "2026-08-10",
    "note": "FRED ECBDFR(예금금리·실측)"
   },
   {
    "country": "한국",
    "rate": "2.75",
-   "asof": "2026-08-07",
+   "asof": "2026-08-10",
    "note": "한국은행 ECOS 722Y001(실측)"
   },
   {
    "country": "일본",
    "rate": "1.00",
-   "asof": "2026-08-10",
+   "asof": "2026-08-11",
    "note": "global-rates(실측 스크랩)"
   },
   {
    "country": "중국",
    "rate": "3.00",
-   "asof": "2026-08-10",
+   "asof": "2026-08-11",
    "note": "global-rates(실측 스크랩)"
   },
   {
    "country": "영국",
    "rate": "3.75",
-   "asof": "2026-08-10",
+   "asof": "2026-08-11",
    "note": "global-rates(실측 스크랩)"
   }
  ]
