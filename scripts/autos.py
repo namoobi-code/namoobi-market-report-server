@@ -135,14 +135,17 @@ def newreg():
         ym = f"{y}{m+1:02d}"
         url = f"{EP}?serviceKey={key}&registYy={y}&registMt={m+1:02d}&numOfRows=999&pageNo=1"
         try:
-            raw = get(url, tries=1, timeout=40)
+            raw = get(url, tries=2, timeout=60)
         except Exception as e:
-            return {"err": f"호출 실패: {e}"}
+            return {"t": t, "total": total} if t else {"err": f"호출 실패: {e}"}
         txt = raw.decode("utf-8", "replace")
         if "SERVICE_KEY_IS_NOT_REGISTERED" in txt:
             return {"err": "활용신청 필요 — data.go.kr 15059401 에서 이 API 활용신청 후 자동 수집됩니다"}
+        if "SERVICETIMEOUT" in txt:               # 제공기관(교통안전공단) 응답 없음 — 흔한 야간 장애
+            return ({"t": t, "total": total} if t else
+                    {"err": "제공기관 응답 없음(SERVICETIMEOUT) — 활용신청은 완료됨, 매일 07:35 자동 재시도"})
         if "SERVICE ERROR" in txt or "LIMITED_NUMBER" in txt:
-            return {"err": txt[:160]}
+            return {"t": t, "total": total} if t else {"err": txt[:160]}
         try:
             root = ET.fromstring(txt)
         except Exception:
