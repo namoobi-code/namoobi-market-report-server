@@ -2610,8 +2610,65 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     run();
   }
 
+  /* ── (2026-08-12) 🚗 공공데이터 API 예시 — 자동차 통계 4종 (autos.json · scripts/autos.py)
+     같은 '자동차' 주제를 4가지 경로로 얻는 데모: ① KOSIS REST ② data.go.kr REST(활용신청)
+     ③④ data.go.kr 파일CSV(키 불필요). 상용차 판매 급감 기사(한경 2026-08-10) 검증용. ── */
+  let _auDone=false;
+  function initAutos(){
+    if(_auDone||!$('au_reg')) return; _auDone=true;
+    fetch('/api/db/autos').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d){ $('au_reg_n').textContent='autos.json 없음 — 서버에서 scripts/autos.py 실행 필요'; return; }
+      {const e=$('au_asof'); if(e) e.textContent=`(수집 ${d.asof||''} · 주 1회 자동 갱신 — 같은 주제를 4가지 공공 데이터 경로로 얻는 데모)`;}
+      const pct=(y,dec=1)=>y!=null?`<b class="${y>0?'up':'dn'}">${y>0?'+':''}${y.toFixed(dec)}%</b>`:'—';
+      /* ① KOSIS 등록대수 — 승용(우축) vs 화물·승합(좌축·만대). 누적이라 완만하지만
+         화물이 2022년부터 사실상 멈춘 게 보인다(신규등록 부진 = 기사 내용의 재고 버전). */
+      {const R=d.reg||{};
+       if(R.t&&R.series){
+         const M=a=>(a||[]).map(v=>v==null?null:v/10000);
+         line('au_reg',[{t:R.t,v:M(R.series['승용']),label:'승용(만대)',color:'#2f6fed'}],
+              {r2:[{t:R.t,v:M(R.series['화물']),label:'화물(만대·좌축)',color:'#d9534f'},
+                   {t:R.t,v:M(R.series['승합']),label:'승합',color:'#27ae60'}]});
+         const yc=yoy(R.t,R.series['화물']||[]), yp=yoy(R.t,R.series['승용']||[]), yb=yoy(R.t,R.series['승합']||[]);
+         $('au_reg_n').innerHTML=`최신 <b>${fm(R.t[R.t.length-1])}</b> · YoY 승용 ${pct(yp)} · 화물 ${pct(yc)} · 승합 ${pct(yb)}`
+           +` — 누적 등록대수(재고)라 변화가 완만하지만, <b>화물·승합 증가세가 꺾인 것</b>이 신차 수요 부진의 흔적.`
+           +`<br><span class="note">KOSIS 공유서비스: <code>statisticsParameterData.do?orgId=116&tblId=DT_MLTM_5498</code> — 통계표ID·분류코드로 조회하는 정식 REST(JSON). 시도 17개 합=전국.</span>`;
+       } else $('au_reg_n').textContent='KOSIS 수집 실패: '+(R.err||'');}
+      /* ② 신규등록 — 활용신청 전이면 안내만 */
+      {const N=d.newreg||{};
+       if(N.t&&N.total){
+         line('au_new',[{t:N.t,v:N.total,label:'신규등록(건)',color:'#7c3aed'}]);
+         $('au_new_n').innerHTML=`최신 <b>${fm(N.t[N.t.length-1])} = ${(N.total[N.total.length-1]??0).toLocaleString()}건</b> · YoY ${pct(yoy(N.t,N.total))} — 월별 신규등록은 기사의 '판매량'과 가장 가까운 흐름(등록 기준이라 KAMA 출고 기준과 수치는 다름).`;
+       } else {
+         const cv=$('au_new'); if(cv){ const x=cv.getContext('2d'); const W=cv.clientWidth||700; cv.width=W; cv.height=cv.clientHeight||220;
+           x.font='12px sans-serif'; x.fillStyle='#98a2ad'; x.textAlign='center';
+           x.fillText('⏳ 아직 데이터 없음 — 아래 안내대로 활용신청하면 자동으로 채워집니다', W/2, 100); }
+         $('au_new_n').innerHTML=`<b style="color:#b45309">${N.err||'데이터 없음'}</b><br><span class="note">이 API는 인증키만으론 안 되고 <a href="https://www.data.go.kr/data/15059401/openapi.do" target="_blank">data.go.kr 15059401</a> 페이지에서 <b>활용신청</b>(로그인 필요·자동승인)을 해야 호출된다 — 승인되면 다음 수집 때 자동 표시.</span>`;
+       }}
+      /* ③ KAMA 내수 vs 수출 — 기사(상용차 28년 최저)의 원본에 가장 가까운 집계 */
+      {const K=d.kama||{};
+       if(K.t&&K.t.length){
+         line('au_kama',[{t:K.t,v:K.domestic,label:'내수판매(국산차)',color:'#2f6fed'},
+                         {t:K.t,v:K.export,label:'수출량',color:'#d9534f'}]);
+         const yd=yoy(K.t,K.domestic), yx=yoy(K.t,K.export);
+         $('au_kama_n').innerHTML=`최신 <b>${fm(K.t[K.t.length-1])}</b> 내수 <b>${(K.domestic[K.domestic.length-1]??0).toLocaleString()}대</b>(YoY ${pct(yd)}) · 수출 <b>${(K.export[K.export.length-1]??0).toLocaleString()}대</b>(YoY ${pct(yx)})`
+           +` — 내수(국산차)는 2020년 161만대 정점 이후 추세 하락(2025년 137만대), 수출이 실적을 지탱하는 구조가 그대로 보인다.`
+           +`<br><span class="note">파일데이터는 API 아님 — CSV 직다운로드(<code>fileDownload.do?atchFileId=…</code>), 인증키 불필요, 연 1회 갱신(현재 ~2025.12).</span>`;
+       } else $('au_kama_n').textContent='CSV 수집 실패';}
+      /* ④ 국내 vs 세계 생산량 — 세계(우축) vs 한국(좌축), 백만대 */
+      {const W=d.world||{};
+       if(W.t&&W.t.length){
+         const M=a=>(a||[]).map(v=>v==null?null:v/1000);
+         line('au_world',[{t:W.t,v:M(W.world),label:'세계(백만대)',color:'#666'}],
+              {r2:[{t:W.t,v:M(W.kr),label:'한국(백만대·좌축)',color:'#2f6fed'}]});
+         const k0=W.kr[W.kr.length-1], w0=W.world[W.world.length-1];
+         $('au_world_n').innerHTML=`최신 <b>${W.t[W.t.length-1]}년</b> 한국 <b>${(k0/1000).toFixed(2)}백만대</b> · 세계 <b>${(w0/1000).toFixed(1)}백만대</b> (점유율 ${(k0/w0*100).toFixed(1)}%)`
+           +` — 한국 생산은 2011년 466만대 정점 이후 410만대 안팎 정체, 세계는 코로나 후 회복.`;
+       } else $('au_world_n').textContent='CSV 수집 실패';}
+    }).catch(()=>{ $('au_reg_n').textContent='autos 로드 실패'; });
+  }
+
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank();
+    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initAutos();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};

@@ -942,6 +942,32 @@
           </div>
         </div>
       </div>
+      <!-- (2026-08-12) 🚗 공공 API 예시 — 자동차 통계 4종 (KOSIS·data.go.kr) · scripts/autos.py 주1회 -->
+      <div class="box" style="padding:12px 14px;grid-column:1/-1">
+        <b style="font-size:13px">🚗 공공데이터 API 예시 — 자동차 통계 4종 <span class="note" id="au_asof">(같은 주제를 4가지 공공 데이터 경로로 얻는 데모 — 상용차 판매 급감 기사 검증용)</span></b>
+        <div class="grid g2" style="margin-top:8px">
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>① 자동차 등록대수(만대·차종별)</b> — KOSIS 공유서비스 <b>REST·인증키</b> (국토부 월간 보고)</div>
+            <canvas id="au_reg" style="width:100%;height:220px"></canvas>
+            <div class="note" id="au_reg_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>② 신규등록 통계(월간)</b> — data.go.kr 15059401 <b>REST·인증키+활용신청</b> (교통안전공단)</div>
+            <canvas id="au_new" style="width:100%;height:220px"></canvas>
+            <div class="note" id="au_new_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>③ 내수판매 vs 수출(월간·대)</b> — data.go.kr 15051118 <b>파일 CSV·키 불필요</b> (산업통상부·KAMA 집계)</div>
+            <canvas id="au_kama" style="width:100%;height:220px"></canvas>
+            <div class="note" id="au_kama_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+          <div>
+            <div class="note" style="margin-bottom:3px"><b>④ 국내 vs 세계 자동차 생산량(연간·백만대)</b> — data.go.kr 15051116 <b>파일 CSV·키 불필요</b></div>
+            <canvas id="au_world" style="width:100%;height:220px"></canvas>
+            <div class="note" id="au_world_n" style="margin-top:4px;line-height:1.6"></div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="note" style="margin-top:10px;line-height:1.7">
       📖 <b>읽는 법</b> — <b>전망CSI</b>는 심리 선행지표: 100선 위로 반등하면 몇 달 뒤 실제 가격지수·거래량이 따라오는 경향.
@@ -1646,7 +1672,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260810hl"></script>
+<script src="/app.js?v=20260812au"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}

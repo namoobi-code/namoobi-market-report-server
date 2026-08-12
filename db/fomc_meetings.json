@@ -1,11 +1,11 @@
 {
  "marker": "2026-10-27|19",
- "as_of": "2026-08-11",
+ "as_of": "2026-08-12",
  "data": [
   {
    "date": "2025-09-16~17",
    "stance": "인하",
-   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran은 50bp 인하 주장 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
+   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran 50bp 인하 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
   },
   {
    "date": "2025-09-17",
@@ -35,7 +35,7 @@
   {
    "date": "2026-01-27~28",
    "stance": "동결",
-   "note": "3.50~3.75% 동결. 10-2 가결(Miran·Waller 25bp 인하 주장 소수의견). Powell '정책이 크게 제약적이라 보기 어렵다' 발언. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-01-28)"
+   "note": "3.50~3.75% 동결. 10-2 가결(Miran·Waller 25bp 인하 소수의견). Powell '정책이 크게 제약적이라 보기 어렵다' 발언. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-01-28)"
   },
   {
    "date": "2026-01-28",
@@ -45,7 +45,7 @@
   {
    "date": "2026-03-17~18",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(2연속). 11-1 가결(Miran 25bp 인하 주장 소수의견). SEP 실시 — 2026년말 중간값 3.4%(추가 1회 인하 시사), 2027·2028년 3.1%, 장기중립 3.1%. (출처: federalreserve.gov FOMC statement·SEP 2026-03-18)"
+   "note": "3.50~3.75% 동결(2연속). 11-1 가결(Miran 25bp 인하 소수의견). SEP 실시 — 2026년말 중간값 3.4%(추가 1회 인하 시사), 2027·2028년 3.1%, 장기중립 3.1%. (출처: federalreserve.gov FOMC statement·SEP 2026-03-18)"
   },
   {
    "date": "2026-03-18",
@@ -65,7 +65,7 @@
   {
    "date": "2026-06-16~17",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(4연속). 12-0 만장일치(Kevin Warsh 신임 의장 첫 회의). SEP 실시 — 2026년말 중간값 3월 3.4%→6월 3.8%로 매파적 급선회(18명 중 9명 연내 1회+ 인상 전망), 2027년말 3.6%, 2028년말 3.4%, 장기중립 3.1% 유지. (출처: federalreserve.gov FOMC statement·SEP 2026-06-17)"
+   "note": "3.50~3.75% 동결(4연속). 12-0 만장일치(Kevin Warsh 신임 의장 첫 회의). SEP 실시 — 2026년말 중간값 3월 3.4%→6월 3.8%로 매파적 상향(18명 중 9명 연내 1회+ 인상 전망), 2027년말 3.6%, 2028년말 3.4%, 장기중립 3.1% 유지. (출처: federalreserve.gov FOMC statement·SEP 2026-06-17)"
   },
   {
    "date": "2026-06-17",
@@ -75,7 +75,7 @@
   {
    "date": "2026-07-28~29",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(5회 연속). 9-3 가결 — Hammack·Kashkari·Logan 3인이 25bp 인상을 주장하며 반대(2016년 9월 이후 처음 3인 동일방향 소수의견). 물가는 공급충격 영향으로 2% 목표 대비 여전히 높다고 평가. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-07-29; CNBC 2026-07-29)"
+   "note": "3.50~3.75% 동결(5회 연속). 9-3 가결 — Hammack·Kashkari·Logan 3인이 25bp 인상을 주장하며 반대(2016년 9월 이후 처음 3인 동일방향 소수의견). 물가는 공급충격 영향으로 2% 목표 대비 여전히 높다고 평가. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-07-29)"
   },
   {
    "date": "2026-07-29",
