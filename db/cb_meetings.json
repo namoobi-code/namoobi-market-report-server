@@ -1,0 +1,10 @@
+{"rows": [
+  {"date": "2026-07-21", "region": "중국", "event": "LPR 고시(1년·5년)", "importance": "★★", "source": "PBOC 고시 일정(직전 보고서 확인분)"},
+  {"date": "2026-07-23", "region": "유로존", "event": "ECB 통화정책회의", "importance": "★★★", "source": "ECB 공식 일정(직전 보고서 확인분)"},
+  {"date": "2026-07-30", "region": "영국", "event": "BOE MPC(통화정책보고서 동시 발표)", "importance": "★★", "source": "BOE 공식 일정(직전 보고서 확인분)"},
+  {"date": "2026-07-31", "region": "일본", "event": "BOJ 금융정책결정회의(7/30~31)", "importance": "★★★", "source": "BOJ 공식 일정(직전 보고서 확인분)"},
+  {"date": "2026-08-27", "region": "한국", "event": "한국은행 금통위", "importance": "★★★", "source": "한은 공식 일정(직전 보고서 확인분)"},
+  {"date": "2026-09-10", "region": "유로존", "event": "ECB 통화정책회의", "importance": "★★★", "source": "ECB 공식 일정(직전 보고서 확인분)"}
+],
+"desc": "중앙은행 회의 일정 시드 — 보고서 실행(NewsAgent 확인분)·수동 갱신으로 유지. FOMC는 db/fomc_meetings.json이 담당.",
+"as_of": "2026-07-19"}

@@ -126,7 +126,10 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
 
 (async()=>{
   const [b,rd,pr,rs,h] = await Promise.all([
-    fetch('/api/bundle').then(r=>r.json()),
+    /* (2026-08-14) cache:'no-cache' — 브라우저가 디스크 캐시본을 조용히 재사용해
+       한 달 전 CPI 가 표시된 사고가 있었다. 서버 재검증을 강제하되 304 는 그대로 살려
+       변경 없으면 40MB 를 다시 받지 않는다. */
+    fetch('/api/bundle',{cache:'no-cache'}).then(r=>r.json()),
     fetch('/api/report').then(r=>r.ok?r.json():null).catch(()=>null),
     fetch('/api/policyrates').then(r=>r.ok?r.json():null).catch(()=>null),
     fetch('/api/reports').then(r=>r.json()),
@@ -211,6 +214,9 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
    if(eu&&s10!=null) eu.innerHTML=`10년물 <b>${s10.toFixed(2)}%</b> · 2년물 <b>${s2!=null?s2.toFixed(2):'—'}%</b>`;}
 
   /* ── 3.1.2 물가 ── (2차 req5 2026-07-18) docx 표와 동일 컬럼: 지표·YoY·MoM·기준월·발표날짜·의미·시장영향·예상영향 */
+  /* (2026-08-14) 표 옆에 데이터 기준일(as_of) 표시 — 화면이 옛 값을 들고 있으면
+     여기서 바로 드러난다. 값만 보고는 언제 것인지 알 수 없었다. */
+  {const _ia=$('infl_asof'); if(_ia) _ia.textContent=b.inflation?.as_of?`데이터 기준 ${b.inflation.as_of}`:'';}
   $('infl').innerHTML=`<tr><th>지표</th><th style="text-align:right">최신값 YoY</th><th style="text-align:right">최신값 MoM</th>
     <th>기준월</th><th>발표날짜</th><th>의미</th><th>시장영향</th><th>예상영향</th></tr>`+(b.inflation?.data||[]).map(r=>`<tr>
     <td><b>${esc(r.name)}</b></td><td class="num up">${r.yoy!=null?(r.yoy>0?'+':'')+r.yoy+'%':'—'}</td>
