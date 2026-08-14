@@ -47,8 +47,11 @@ _CORP_W = {"total", "net", "consolidated", "company", "companywide", "overall", 
            "guidance", "outlook", "estimates", "estimate", "s", "is", "to", "be", "we",
            "a", "for", "with", "at", "approximately", "about", "around", "range", "revenues"}
 # 라벨(매출·EPS)과 금액 사이에 이런 말이 끼면, 그 금액은 **다른 항목**의 것이다.
+# (2026-08-14) ebitda\d* — 보도자료의 각주 번호가 단어에 바로 붙는다("Adjusted EBITDA2",
+# "EBITDA1"). \bebitda\b 는 숫자 앞에서 경계가 성립하지 않아 통과됐고, EBITDA 범위가
+# 매출·EPS 로 오채택됐다(실측 VSTS 312.5(-88%) · HLF 680(-87%) — 둘 다 EBITDA 값).
 _OTHER = (r"\b(?:expense|expenditures?|capex|capital expenditure|interest|tax|"
-          r"ebitda|ebit|operating income|net income|cash flow|free cash|"
+          r"ebitda\d*|ebit\b|operating income|net income|cash flow|free cash|"
           r"amortization|depreciation|debt|buyback|repurchase|dividend|"
           r"headcount|margin|share count|shares outstanding)\b")
 
@@ -65,7 +68,9 @@ _GAAP = r"(?<!non-)(?<!non )\bgaap\b"
 # second quarter**" → 연간 가이던스인데 '2분기'로 잡혀 분기 컨센과 비교돼 +396% 오판정.
 _QPAST = (r"(?:through|results through|through the|reported|ended|completed|"
           r"in the|during the|versus the|vs\.? the)\s+$")
-_QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|quarter (?:of|ending)|"
+# (2026-08-14) [1-4]Q 표기 추가 — "3Q 2026 Full Year 2026" 같은 표 머리글(실측 OPRT)에서
+# 분기 열을 인식하지 못해 분기 값이 연간으로 분류됐다.
+_QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|\b[1-4]Q\b|quarter (?:of|ending)|"
         r"for the (?:first|second|third|fourth) quarter|next quarter|current quarter")
 # (2026-08-10) 연간 표시에 **"연도 + Outlook/전망"** 형태를 추가한다. 실측 오분류:
 #   AGCO "Outlook … 2026" · NFLX "Our 2026 outlook" · XRAY "2026 Outlook … net sales"
@@ -212,10 +217,17 @@ def _period(txt, start, end):
         # 처럼 앞 문구가 지난 분기 실적이고 뒤가 연간 전망인 문장이 흔하다.
         # 분기 낱말이 연도에 **바로 붙어 있을 때만**(사이에 of/the/fiscal/공백뿐) 그 연도를
         # 분기 소속으로 본다 — "Second Quarter Fiscal Year 2027"(FLEX) · "third quarter of fiscal 2026"(NET).
+        # (2026-08-14 4차) 분기와 연도 사이에 **날짜**가 끼는 표기를 허용한다.
+        # "for the third quarter ending September 30, 2026 as follows:"(실측 DOCN·ALIT 계열)
+        # 에서 'September 30,' 이 종전 패턴(of/the/ended… 2개)에 안 맞아 연도 '2026' 이
+        # 연간 표지로 살아남았고, 값에 더 가깝다는 이유로 분기 가이던스가 연간으로 분류됐다
+        # (연간 컨센과 비교돼 −74% 대 갭). 월 이름+일자를 낀 형태까지 분기 소속으로 본다.
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)
-             if not re.search(r"(?:\bquarter\b|\bQ[1-4]\b)"
-                              r"(?:\s+(?:of|the|ended|ending|for)){0,2}\s*(?:fiscal\s+|calendar\s+)?"
-                              r"(?:year\s+)?$", seg[:m.start()][-40:], re.I)]
+             if not re.search(r"(?:\bquarter\b|\bQ[1-4]\b|\b[1-4]Q\b)"
+                              r"(?:\s+(?:of|the|ended|ending|for|fiscal|calendar|year))*"
+                              r"\s*(?:(?:january|february|march|april|may|june|july|august|"
+                              r"september|october|november|december)\s+\d{1,2}\s*,?\s*)?"
+                              r"(?:fiscal\s+|calendar\s+)?(?:year\s+)?$", seg[:m.start()][-60:], re.I)]
         if not q and not y:
             return None
         if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)
@@ -304,19 +316,27 @@ def parse_guidance(txt):
     def add(metric, per, lo, hi, ctx, basis=None):
         pre = "" if per == "Q" else "fy_"
         if pre + metric + "_lo" in out:
-            return
-        # (2026-08-10) 같은 수치가 이미 **다른 기간**으로 등록돼 있으면 무시한다.
-        # 한 회사의 같은 숫자가 분기이면서 동시에 연간일 수는 없다 — 같은 문장이 본문에
-        # 두 번 나오는데 한쪽에만 연도가 붙은 경우다(실측 IDXX: "Increases 2026 EPS
-        # outlook to $14.69"(연간) 와 "updated its EPS outlook range to $14.69"(연도 없음)
-        # → 뒤엣것이 분기로 잡혀 분기 컨센 대비 +340%). 값 기반 '교정'이 아니라 중복 제거다.
-        # 값이 완전히 같지 않아도 ±5% 안이면 같은 항목이다(실측 COR: 연간 17.70~17.90 과
-        # 17.75~17.95 — 표와 헤드라인의 반올림 차이). 분기 EPS 가 연간 EPS 와 5% 이내로
-        # 붙는 일은 실무상 없으므로, 이 경우 뒤늦게 잡힌 쪽을 버린다.
-        other = ("fy_" if pre == "" else "") + metric
-        ol, oh = out.get(other + "_lo"), out.get(other + "_hi")
-        if ol and oh and lo and hi and abs(lo / ol - 1) <= 0.05 and abs(hi / oh - 1) <= 0.05:
-            return
+            # (2026-08-14) 같은 기간에 이미 값이 있어도, 기존이 기준 미명시(unspec)이고
+            # 새 후보가 명시적 **조정(adj)** 기준이면 교체한다. 보도자료가 "diluted EPS
+            # $A–$B, and adjusted EPS $C–$D" 로 나란히 쓰면 먼저 나온 GAAP-성격 값이
+            # 선점해 조정 컨센과 비교돼 갭이 틀어졌다(실측 ROK 12.87→13.15 정답 ·
+            # INGR 9.45→10.6 · TKR 3.90→6.20 · DORM 8.08→8.65 — 전부 조정 쪽이 정답).
+            if not (metric == "eps" and basis == "adj"
+                    and out.get(pre + "eps_basis") != "adj"):
+                return
+        else:
+            # (2026-08-10) 같은 수치가 이미 **다른 기간**으로 등록돼 있으면 무시한다.
+            # 한 회사의 같은 숫자가 분기이면서 동시에 연간일 수는 없다 — 같은 문장이 본문에
+            # 두 번 나오는데 한쪽에만 연도가 붙은 경우다(실측 IDXX: "Increases 2026 EPS
+            # outlook to $14.69"(연간) 와 "updated its EPS outlook range to $14.69"(연도 없음)
+            # → 뒤엣것이 분기로 잡혀 분기 컨센 대비 +340%). 값 기반 '교정'이 아니라 중복 제거다.
+            # 값이 완전히 같지 않아도 ±5% 안이면 같은 항목이다(실측 COR: 연간 17.70~17.90 과
+            # 17.75~17.95 — 표와 헤드라인의 반올림 차이). 분기 EPS 가 연간 EPS 와 5% 이내로
+            # 붙는 일은 실무상 없으므로, 이 경우 뒤늦게 잡힌 쪽을 버린다.
+            other = ("fy_" if pre == "" else "") + metric
+            ol, oh = out.get(other + "_lo"), out.get(other + "_hi")
+            if ol and oh and lo and hi and abs(lo / ol - 1) <= 0.05 and abs(hi / oh - 1) <= 0.05:
+                return
         out[pre + metric + "_lo"], out[pre + metric + "_hi"] = (
             (lo, hi) if metric == "rev" else (round(lo, 2), round(hi, 2)))
         if basis:
@@ -370,6 +390,80 @@ def parse_guidance(txt):
                    re.search(r"estimated impact|impact on", ctx, re.I):
                     skip.append(f"{metric}: 증분·기여분 표현(수준 아님) · {ctx[:110]}")
                     continue
+                # (2026-08-14) 장기 목표(long-term outlook/target)는 올해·다음 분기 가이던스가
+                # 아니다 — 컨센과 비교하면 반드시 어긋난다(실측 EOLS "Reaffirms 2028 Long-Term
+                # Financial Outlook … $450-500M" 을 올해 매출로 채택 → +42%).
+                if re.search(r"long[-\s]term\s+(?:financial\s+)?(?:outlook|guidance|target|model|goal)",
+                             ctx, re.I):
+                    skip.append(f"{metric}: 장기 목표(당기 가이던스 아님) · {ctx[:110]}")
+                    continue
+                # (2026-08-14) 라벨과 숫자 사이에 **반대편 지표**가 끼면 그 숫자는 그쪽 것이다.
+                # 실측 LINC: "(… except … diluted EPS) Low High Revenue $590.0 - $600.0" 에서
+                # 괄호 속 'EPS' 라벨이 매출 590~600 을 EPS 로 채택(595.00 — 자릿수부터 불가능).
+                if metric == "eps" and re.search(r"\brevenues?\b|\bnet sales\b|\bexcept\b", lead, re.I):
+                    skip.append(f"eps: 라벨~숫자 사이에 매출 표현 → 매출 값 · {ctx[:110]}")
+                    continue
+                if metric == "rev" and re.search(r"\beps\b|earnings per share|per[-\s]share", lead, re.I):
+                    skip.append(f"rev: 라벨~숫자 사이에 EPS 표현 → EPS 값 · {ctx[:110]}")
+                    continue
+                # (2026-08-14) 'Prior/Previous … Updated/Revised …' 두 열 표 — 라벨 뒤 첫 범위는
+                # **직전(구) 가이던스**다. 머리글에 prior 가 updated 보다 먼저 나오고 범위가
+                # 연달아 두 개면 뒤(개정) 범위를 쓴다(실측 KTB 5.20→5.30 정답 · CTEV 992.5→1,010 ·
+                # ELF 1,850→1,953 · INDV 1,250→1,330 · FBIN 3.15→3.37 — 전부 개정 열이 정답).
+                # SUPN 처럼 'Current … Previous …' 순서(개정이 먼저)면 첫 범위가 맞으므로 그대로 둔다.
+                if kind == "range":
+                    hdr = txt[max(0, m.start() - 300):m.start()]
+                    pm_ = re.search(r"\b(?:prior|previous)\b[^.•●]{0,80}?(?:guidance|outlook)", hdr, re.I)
+                    # (2026-08-14 2차) updated-마커는 **prior 마커 뒤에서만** 찾는다 — 표 제목의
+                    # "Full Year 2026 Outlook Update …" 같은 문구가 updated 로 먼저 잡히면
+                    # 순서 판정(prior 먼저)이 뒤집혀 규칙이 통째로 무시된다(실측 KTB).
+                    um_ = pm_ and re.search(r"\b(?:updated?|revised?|current|new)\b[^.•●]{0,80}?(?:guidance|outlook)",
+                                            hdr[pm_.end():], re.I)
+                    if pm_ and um_:
+                        n2 = _NUM_D if metric == "eps" else _NUM
+                        m2 = re.match(r"[^$\d%]{0,30}?" + n2 + r"\s*(?:to|through|-|and)\s*" + n2,
+                                      txt[m.end():m.end() + 90], re.I)
+                        if m2:
+                            h2 = (m2.group(4) or m2.group(2) or "").lower() if metric != "eps" else None
+                            lo2 = _num(m2.group(1), None if metric == "eps" else m2.group(2), h2)
+                            hi2 = _num(m2.group(3), None if metric == "eps" else m2.group(4), h2)
+                            if lo2 is not None and hi2 is not None:
+                                lo, hi = lo2, hi2
+                                ctx += " [개정 열 채택: %s~%s]" % (m2.group(1), m2.group(3))
+                # (2026-08-14) '가이던스를 A에서 B로 상향/하향' — "raising … guidance from $A to $B"
+                # 의 from~to 는 범위가 아니라 **개정**(A=구, B=신)이다(실측 HYLN "Increasing …
+                # guidance from $10 million to $15 million" 을 범위 10~15 로 읽어 12.5 표시 —
+                # 정답은 새 가이던스 15). "from 구범위 to 신범위" 꼴(실측 CTOS)이면 신범위를 쓴다.
+                if kind == "range" and re.search(r"\bfrom\s*$", lead[-12:], re.I) and \
+                   re.search(r"\b(?:increas\w+|rais\w+|lower\w+|updat\w+|revis\w+|narrow\w+|cut\w+)\b",
+                             back + lead, re.I):
+                    n2 = _NUM_D if metric == "eps" else _NUM
+                    m2 = re.match(r"\s*to\s*" + n2 + r"(?:\s*(?:to|through|-|and)\s*" + n2 + r")?",
+                                  txt[m.end():m.end() + 90], re.I)
+                    if m2:                                   # from [구범위] to [신범위/값]
+                        if metric == "eps":
+                            a, b = _num(m2.group(1), None), (_num(m2.group(3), None)
+                                                             if m2.group(3) else None)
+                        else:
+                            h2 = (m2.group(4) or m2.group(2) or "").lower()
+                            a = _num(m2.group(1), m2.group(2), h2)
+                            b = _num(m2.group(3), m2.group(4), h2) if m2.group(3) else None
+                        if a is not None:
+                            lo, hi = (a, b) if b is not None else (a, a)
+                            ctx += " [from→to 개정: 신 가이던스 채택]"
+                    else:                                    # from A to B 자체가 매치된 경우 → B
+                        lo = hi
+                        ctx += " [from→to 개정: 새 값(B)만 채택]"
+                # (2026-08-14) '범위의 상단/하단' 명시 — "at the high-end of the range of $8.4-$8.6"
+                # 은 중간값이 아니라 상단이다(실측 GPK 8,500→8,600 정답 · AIRS 154→151 정답).
+                em_ = re.search(r"\b(?:at|toward|towards|near)\s+the\s+"
+                                r"(high(?:er)?|upper|top|low(?:er)?|bottom)[-\s]end\b",
+                                back + lead, re.I)
+                if em_:
+                    if em_.group(1).lower()[0] in ("h", "u", "t"):
+                        lo = hi
+                    else:
+                        hi = lo
                 per = _period(txt, m.start(), m.end())
                 if not per:
                     skip.append(f"{metric}: 기간 미명시(분기/연간 확정 불가) · {ctx[:130]}")
@@ -412,11 +506,20 @@ def parse_guidance(txt):
                         g = bool(re.search(_GAAP, seg, re.I))
                         return "adj" if (a and not g) else ("gaap" if (g and not a) else None)
                     bas = _basis(near) or _basis(back) or _basis(ctx)
+                    # (2026-08-14) "reported (diluted) EPS" 는 GAAP 기준이다 — 보도자료가
+                    # "reported EPS $A–$B and adjusted EPS $C–$D" 로 나란히 쓸 때 reported 쪽이
+                    # 기준 미명시로 통과돼 조정 컨센과 비교됐다(실측 INGR 9.45(GAAP) vs 조정 10.6 ·
+                    # DGX 10.07(reported) vs 조정 11.15).
+                    if bas is None and re.search(r"\breported\s+(?:diluted\s+)?$", near, re.I):
+                        bas = "gaap"
                     if bas == "gaap":
                         skip.append(f"eps: GAAP 기준 → 조정 컨센과 비교 불가 · {ctx[:130]}")
                         continue
                     adj = bas == "adj"
-                    if not (-100 < lo <= hi < 1000):
+                    # (2026-08-14) 상한 1000→150 — 미국 상장사에 EPS 가이던스 150달러 이상은
+                    # 실존하지 않는다. 자릿수 오인(매출을 EPS 로 읽는 사고, 실측 LINC 595.00)의
+                    # 마지막 방어선.
+                    if not (-100 < lo <= hi < 150):
                         skip.append(f"eps: 값 범위 비정상({lo}~{hi}) · {ctx[:120]}")
                         continue
                     add("eps", per, lo, hi, ctx, "adj" if adj else "unspec")

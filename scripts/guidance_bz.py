@@ -97,38 +97,68 @@ def main():
             if r.get("c")}
     live = json.loads(LIVE.read_text(encoding="utf-8"))
     cut = (datetime.now() - timedelta(days=DAYS)).strftime("%Y%m%d")
-    todo = [it for d8 in sorted(live.get("days") or {}, reverse=True) if d8 >= cut
+    todo = [(d8, it) for d8 in sorted(live.get("days") or {}, reverse=True) if d8 >= cut
             for it in live["days"][d8]
             if it.get("c") in pool and (FORCE or it.get("g_bz_date") is None)]  # 이미 받은 건 건너뛴다(--force 면 재계산)
     if LIMIT:
         todo = todo[:LIMIT]
     print(f"[bz] 대상 {len(todo)}건 (최근 {DAYS}일 · 간격 {GAP}초 · 예상 {len(todo)*GAP//60}분)", flush=True)
     got = same = diff = 0
-    for n, it in enumerate(todo):
+    for n, (d8, it) in enumerate(todo):
         rows, blocked = fetch(it["c"])
         if blocked:
             print(f"[bz] 429 — {n}건까지 받고 중단(다음 실행에서 이어받는다)", flush=True)
             break
         if not OFFLINE:
             time.sleep(GAP)
+        if FORCE:
+            for k in P_FIELDS:                # 재계산 — 옛 비교값을 반드시 지우고 시작한다
+                it.pop(k, None)
         if not rows:
             continue
+        # (2026-08-14) **같은 발표의 레코드만** 비교한다. Benzinga 는 과거 발표 레코드를
+        # 전부 쌓아두는데, 종전엔 '가장 최근의 분기(또는 연간) 레코드'를 골라서
+        # 반년 전 발표의 값과 비교하는 오탐이 다수였다(실측 ONDS: 8월 발표 Q3 가이던스를
+        # 3월 발표의 Q1 레코드 39.0 과 비교 → 값불일치 오탐 · AVEX·ARRY·PTRN 동일).
+        # 발표일(d8) ±10일 밖의 레코드는 다른 발표의 것이다 — 비교 대상에서 제외하고,
+        # 같은 발표 레코드가 하나도 없으면 그 항목은 대조 불가로 둔다(억지로 비교하지 않는다).
+        ref = datetime.strptime(d8, "%Y%m%d").date()
+        def _near(x):
+            try:
+                dt_ = datetime.strptime(str(x.get("date"))[:10], "%Y-%m-%d").date()
+                return abs((dt_ - ref).days) <= 10
+            except Exception:
+                return False
+        rows_n = [x for x in rows if _near(x)]
+        if not rows_n:
+            continue
         r = pool[it["c"]]
-        it["g_bz_date"] = rows[0].get("date")
-        it["g_bz_period"] = f"{rows[0].get('period')}{rows[0].get('period_year')}"
-        it["g_bz_type"] = rows[0].get("eps_type")
+        it["g_bz_date"] = rows_n[0].get("date")
+        it["g_bz_period"] = f"{rows_n[0].get('period')}{rows_n[0].get('period_year')}"
+        it["g_bz_type"] = rows_n[0].get("eps_type")
         # (2026-08-11 수정) Benzinga 는 같은 발표에서 **연간과 분기 가이던스를 모두** 싣는다.
         # 무조건 최신 1건만 보면 우리가 연간을 뽑았는데 포털의 분기 레코드와 비교하게 돼
         # '기간 불일치'로 오인된다(실측 NFLX 우리 FY 51,200 / 포털 Q3 12,860 — 둘 다 맞다).
         # → 항목별로 **우리가 확정한 기간과 같은 기간의 레코드**를 골라 견준다.
+        # (2026-08-14) 같은 발표·같은 기간에 레코드가 여럿이면(실측 TDUP: 8/5 발표에 Q3·Q4
+        # 둘 다) **우리 값에 가장 가까운 것**을 고른다 — 검증의 질문은 "회사가 실제로 이
+        # 숫자를 말했는가"이므로, 여러 레코드 중 아무거나 집어 오탐을 만들 이유가 없다.
         for metric, lo_k, hi_k, gk in (
                 ("eps", "eps_guidance_min", "eps_guidance_max", "g_eps"),
                 ("rev", "revenue_guidance_min", "revenue_guidance_max", "g_rev")):
             want = it.get(gk + "_per") or it.get("g_per") or "0y"
             want_fy = str(want).endswith("y")
-            d = next((x for x in rows
-                      if (str(x.get("period", "")).upper() == "FY") == want_fy
-                      and NUM(x.get(lo_k)) is not None), None) or rows[0]
+            cands = [x for x in rows_n
+                     if (str(x.get("period", "")).upper() == "FY") == want_fy
+                     and NUM(x.get(lo_k)) is not None]
+            if not cands:                     # 같은 발표에 같은 기간 레코드 없음 → 대조 불가
+                continue
+            mine_v = it.get(gk)
+            if mine_v and len(cands) > 1:
+                unit = 1e6 if metric == "rev" else 1
+                cands.sort(key=lambda x: abs((NUM(x.get(lo_k)) + (NUM(x.get(hi_k)) or NUM(x.get(lo_k)))) / 2
+                                             / unit - mine_v))
+            d = cands[0]
             per = "0y" if str(d.get("period", "")).upper() == "FY" else "0q"
             base_k = {("eps", "0y"): "ey0", ("eps", "0q"): "eq0",
                       ("rev", "0y"): "ry0", ("rev", "0q"): "rq0"}[(metric, per)]
@@ -172,6 +202,11 @@ def _save(live):
             for k in P_FIELDS:
                 if src.get(k) is not None:
                     it[k] = src[k]
+                elif FORCE:
+                    # (2026-08-14) --force 재계산에서 값이 비면 **지운 것**이다 — 안 지우면
+                    # 새 규칙(발표일 매칭)이 '대조 불가'로 판단한 항목의 옛 비교값이
+                    # 디스크에 그대로 남아 오탐이 유지된다.
+                    it.pop(k, None)
     tmp = LIVE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
     tmp.replace(LIVE)
