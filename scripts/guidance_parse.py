@@ -350,8 +350,14 @@ def _period(txt, start, end):
     return pick(txt[end:end + 90])
 
 
-def parse_guidance(txt):
-    """보도자료 평문 → {rev_lo,rev_hi,eps_lo,eps_hi, fy_*} + _ev(근거) + _skip(기각 사유)."""
+def parse_guidance(txt, per_hint=None):
+    """보도자료 평문 → {rev_lo,rev_hi,eps_lo,eps_hi, fy_*} + _ev(근거) + _skip(기각 사유).
+
+    per_hint ('Y'|'Q'|None): **회사별 프로필 힌트** (2026-08-15). Benzinga 이력(2022~)에서
+    이 회사가 한 종류 기간만 제시해 왔음이 확인되면(예: 연간만 90%+, 4회 이상),
+    문맥에서 기간을 확정하지 못해 버리던 후보를 그 기간으로 구제한다.
+    다중 열 표 기각에는 적용하지 않는다(열 구조가 있으면 두 기간이 공존한다는 뜻).
+    """
     out, ev, skip = {}, {}, []
     if not txt:
         return out
@@ -556,6 +562,10 @@ def parse_guidance(txt):
                     else:
                         hi = lo
                 per = _period(txt, m.start(), m.end())
+                if not per and per_hint:
+                    # (2026-08-15) 회사 프로필 구제 — 이 회사는 이력상 한 종류 기간만 제시
+                    per = per_hint
+                    ctx += " [기간: 회사 프로필(이력상 %s만 제시)]" % ("연간" if per_hint == "Y" else "분기")
                 if not per:
                     skip.append(f"{metric}: 기간 미명시(분기/연간 확정 불가) · {ctx[:130]}")
                     continue

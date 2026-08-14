@@ -3914,7 +3914,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       gapE:{label:'EPS 가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
       /* (2026-08-10) 포털 가이던스 갭 — **파싱 검증 전용**.
-         우리가 8-K 보도자료에서 직접 파싱한 값(gap·gapE) 옆에 포털(MarketBeat) 값을 나란히 두어
+         우리가 8-K 보도자료에서 직접 파싱한 값(gap·gapE) 옆에 포털(Benzinga) 값을 나란히 두어
          "우리 파싱이 맞는지"를 눈으로 대조하기 위한 것이다.
          비트/미스 판정·전략 버튼·종합 점수에는 이 값을 절대 쓰지 않는다. */
       gapP:{label:'매출 가이던스 갭(포털)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
@@ -4599,7 +4599,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'gapP': case 'gapEP': {
         const mine=key==='gapP'?r.gapR:r.gapE, nm=key==='gapP'?'매출':'EPS';
         const d=(mine!=null)?(Math.abs(v-mine)<=1?' · 파싱값과 일치':` · 파싱값 ${mine>0?'+':''}${mine.toFixed(1)}% 와 차이 ${Math.abs(v-mine).toFixed(1)}%p`):' · 파싱값 없음';
-        return `<span class="note" title="포털(MarketBeat) ${nm} 가이던스 vs 컨센 — 우리 8-K 파싱값 검증용${d} · 비트/미스 판정에는 사용하지 않음">⤴${v>0?'+':''}${v.toFixed(1)}%</span>`; }
+        return `<span class="note" title="포털(Benzinga) ${nm} 가이던스 vs 컨센 — 우리 8-K 파싱값 검증용${d} · 비트/미스 판정에는 사용하지 않음">⤴${v>0?'+':''}${v.toFixed(1)}%</span>`; }
       case 'r1': case 'r20': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="발표 직전 종가 대비 ${key==='r1'?'다음 거래일':'20거래일 뒤'}${r.edl?' · 발표 '+r.edl.slice(4,6)+'/'+r.edl.slice(6):''}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'fnb20': case 'onb20': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;
       case 'fst': case 'ost': return v>0?`<span class="up">${v.toFixed(0)}일</span>`:'<span class="note">0</span>';
@@ -6141,6 +6141,9 @@ await _canvasFlow(c);
     const el=$('sd_fin'); if(!el) return;
     _USFIN=null;
     el.style.display=''; el.innerHTML='<span class="note">실적·전망 로드 중…</span>';
+    /* (2026-08-15) 가이던스 개정 습관 — Benzinga 캐시에서 뽑은 2022~ 이력 요약(guidance_history.py).
+       184KB 1회 로드 후 전역 캐시. 판정에는 쓰지 않는 참고 지표. */
+    if(!window._TENDJ){ try{ window._TENDJ=await (await fetch('/api/db/guidance_tendency')).json(); }catch(e){ window._TENDJ={}; } }
     let J=null;
     try{ J=await (await fetch('/api/us_fin/'+encodeURIComponent(c))).json(); }catch(e){}
     if(dcode!==c) return;
@@ -6289,12 +6292,12 @@ await _canvasFlow(c);
           /* (2026-08-10) 교차검증 배지 — 포털 값과 대조한 결과만 표시한다.
              표시·판정에 쓰는 값은 언제나 우리 8-K 파싱값이며, 포털 값으로 교체하지 않는다
              (사용자 지시: "단, 판정에 사용은 하지 말것"). */
-          const SB=(src,own)=>src==='verified'?' <b style="color:#1f9d55" title="MarketBeat 포털 값과 일치 — 교차검증 완료">✓</b>':'';
+          const SB=(src,own)=>src==='verified'?' <b style="color:#1f9d55" title="포털(Benzinga) 값과 일치 — 교차검증 완료">✓</b>':'';
           /* 포털 갭 셀 — 색 없이(note) 표시해 '판정에 쓰는 값이 아님'을 시각적으로 구분 */
           const GP=(v,mine,nm)=>{
             if(v==null) return '<span class="note" title="포털에 같은 기간 가이던스가 없거나 컨센 역매칭 실패 — 대조 불가">—</span>';
             const d=(mine!=null)?(Math.abs(v-mine)<=1?'파싱값과 일치':`파싱값과 ${Math.abs(v-mine).toFixed(1)}%p 차이`):'파싱값 없음';
-            return `<span class="note" title="포털(MarketBeat) ${nm} 가이던스 갭 — 파싱 검증용 대조값 · ${d} · 판정에는 사용하지 않음">⤴${v>0?'+':''}${(+v).toFixed(1)}%</span>`; };
+            return `<span class="note" title="포털(Benzinga) ${nm} 가이던스 갭 — 파싱 검증용 대조값 · ${d} · 판정에는 사용하지 않음">⤴${v>0?'+':''}${(+v).toFixed(1)}%</span>`; };
           /* (2026-08-10) 설비투자 3열 — 회사가 CapEx 가이던스를 준 기간 행에만 채운다.
              애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다.
              FCF(E) 는 추정(≈) — 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E)
@@ -6319,7 +6322,14 @@ await _canvasFlow(c);
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td>
             <td style="text-align:right">${(gd2&&per===((gd2.epsPerP||gep)))?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td>
             ${CXC(per,e3)}</tr>`; }).join('')+
-        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(MarketBeat)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
+        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
+      /* (2026-08-15) 가이던스 개정 습관 한 줄 — Benzinga 이력(2022~) 기반 자체 파생 신호.
+         상향/하향 습관은 다음 가이던스의 방향 기대치를 잡는 데 쓰인다(판정 미사용). */
+      { const td=(window._TENDJ&&window._TENDJ.sym)?window._TENDJ.sym[c]:null;
+        if(td&&td.n>=3){
+          const cls=td.up>=td.dn*1.5+1?'up':(td.dn>=td.up*1.5+1?'dn':'note');
+          const lab=cls==='up'?'상향 성향':(cls==='dn'?'하향 성향':'중립');
+          t1+=`<div class="note" style="margin-top:4px">가이던스 개정 습관 <b>(${E(td.first)}~${E(td.last)} · 이력 ${td.n}건)</b> — 개정 시 상향 ${td.up} · 유지 ${td.same} · 하향 ${td.dn} → <b class="${cls==='note'?'':cls}">${lab}</b> · 제시 구성: 연간 ${td.fy}% / 분기 ${td.q}% <span class="note">(출처 Benzinga 이력 — 참고용, 판정 미사용)</span></div>`; } }
       t1+=`<div style="margin-top:8px"><b style="font-size:12px">컨센서스 추정</b> <span class="note">(애널리스트 · 매출 백만$ · EPS $ · 영업이익률은 컨센 미제공 — 실적 마진은 위 분기표 참조)</span>
         <table style="width:100%;font-size:11.5px;border-collapse:collapse;margin-top:2px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:3px 4px">구분</th><th>기간</th>

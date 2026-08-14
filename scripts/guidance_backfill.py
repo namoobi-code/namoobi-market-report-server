@@ -26,6 +26,7 @@ from guidance_table import parse_tables
 BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "earnings_live_us.json"
 POOL = BASE / "data" / "db" / "screener_pool.json"
+TEND = BASE / "data" / "db" / "guidance_tendency.json"    # 회사별 이력 프로필(guidance_history.py)
 H = {"User-Agent": "namoobi research namoobi@gmail.com"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
 DAYS, WORKERS, LIMIT = ARG("--days", 45), ARG("--workers", 4), ARG("--limit", 0)
@@ -130,7 +131,24 @@ def main():
     if LIMIT:
         syms = syms[:LIMIT]
     mp = cik_map()
-    print(f"[gbf] 대상 {len(syms)}종목 (최근 {DAYS}일 · 컨센 보유분)", flush=True)
+    # (2026-08-15) 회사별 프로필 — Benzinga 이력상 한 종류 기간만 제시해 온 회사(n≥4 ·
+    # 90% 이상 단일)는 기간 미명시 후보를 그 기간으로 구제한다(파서 per_hint).
+    tend = {}
+    try:
+        tend = (json.loads(TEND.read_text(encoding="utf-8")) or {}).get("sym") or {}
+    except Exception:
+        pass
+
+    def _hint(sym):
+        td = tend.get(sym)
+        if not td or td.get("n", 0) < 4:
+            return None
+        if td.get("fy", 0) >= 90:
+            return "Y"
+        if td.get("q", 0) >= 90:
+            return "Q"
+        return None
+    print(f"[gbf] 대상 {len(syms)}종목 (최근 {DAYS}일 · 컨센 보유분 · 프로필 {sum(1 for s in syms if _hint(s))}종)", flush=True)
 
     def one(sym):
         cik = mp.get(sym.upper())
@@ -151,14 +169,14 @@ def main():
             if not txt:                      # 받아오기 실패 — 값 없음이 아니다
                 FETCH_FAIL.add(sym)
                 return sym, {}
-            g = parse_guidance(txt)
+            g = parse_guidance(txt, _hint(sym))
             # (2026-08-15) 주 첨부에서 가이던스를 하나도 못 찾으면 **보조 첨부**(Exhibit 99.2
             # 프레젠테이션·prepared remarks)를 추가로 읽는다 — 가이던스를 99.2 에만 싣는
             # 회사가 실재('원문에 없음' 감사에서 확인). 못 찾은 경우에만 추가 SEC 호출이
             # 발생하고, 파일별 캐시라 재실행 시 0회.
             if not any(k in g for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
                 for t2 in exhibit_texts_extra(cik, acc):
-                    g2 = parse_guidance(t2)
+                    g2 = parse_guidance(t2, _hint(sym))
                     if any(k in g2 for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
                         g = g2
                         break
