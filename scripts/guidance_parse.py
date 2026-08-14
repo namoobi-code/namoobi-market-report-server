@@ -191,6 +191,15 @@ def _pair(kind, m):
 
 _FWD = r"guidance|outlook|expect|anticipat|forecast|project|estimat|to be in the range"
 
+# (2026-08-15) '분기에 붙은 연도' 제외 패턴 — pick()과 다중 열 가드가 공유한다.
+# "Q1 FY 2027"·"third quarter 2026"·"quarter ending September 30, 2026" 의 연도는
+# 분기 소속이지 연간 표지가 아니다.
+_YEXCL = (r"(?:\bquarter\b|\bQ[1-4]\b|\b[1-4]Q\b)"
+          r"(?:\s+(?:of|the|ended|ending|for|fiscal|calendar|year))*"
+          r"\s*(?:(?:january|february|march|april|may|june|july|august|"
+          r"september|october|november|december)\s+\d{1,2}\s*,?\s*)?"
+          r"(?:fiscal\s+|calendar\s+)?(?:year\s+)?$")
+
 
 def _fwd_q(seg):
     """이 구간의 분기 표현이 **전망**을 가리키는가.
@@ -250,11 +259,7 @@ def _period(txt, start, end):
         # 연간 표지로 살아남았고, 값에 더 가깝다는 이유로 분기 가이던스가 연간으로 분류됐다
         # (연간 컨센과 비교돼 −74% 대 갭). 월 이름+일자를 낀 형태까지 분기 소속으로 본다.
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)
-             if not re.search(r"(?:\bquarter\b|\bQ[1-4]\b|\b[1-4]Q\b)"
-                              r"(?:\s+(?:of|the|ended|ending|for|fiscal|calendar|year))*"
-                              r"\s*(?:(?:january|february|march|april|may|june|july|august|"
-                              r"september|october|november|december)\s+\d{1,2}\s*,?\s*)?"
-                              r"(?:fiscal\s+|calendar\s+)?(?:year\s+)?$", seg[:m.start()][-60:], re.I)]
+             if not re.search(_YEXCL, seg[:m.start()][-60:], re.I)]
         if not q and not y:
             return None
         if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)
@@ -292,7 +297,11 @@ def _period(txt, start, end):
     # (2026-08-10) 오른쪽 경계도 **다음 불릿**에서 끊는다. 예전엔 다음 마침표까지만 봐서
     # 불릿 목록이 통째로 한 문장이 됐고, 값 뒤 항목의 분기 표현이 근거로 채택돼
     # 연간 가이던스가 분기로 분류됐다(실측 ILMN·LIFE·BFLY·EW·HLT).
-    rs = min([p for p in ([txt.find(". ", end)] +
+    # (2026-08-15) " The following " 도 오른쪽 경계로 자른다 — 보도자료가 마침표 없이
+    # "…range of $0.35 to $0.49 The following revised guidance is provided for … fiscal year 2026:"
+    # 처럼 다음 블록 머리글을 이어붙이면, 그 머리글의 연간 표지가 현재 행의 근거로 오인돼
+    # 분기 가이던스가 연간으로 분류된다(실측 VECO Q3 Non-GAAP 0.35~0.49 가 fy_ 로 태그).
+    rs = min([p for p in ([txt.find(". ", end), txt.find(" The following ", end)] +
                           [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
@@ -307,9 +316,11 @@ def _period(txt, start, end):
     #    앞 400자를 무작정 훑으면 문서 여기저기의 "Second quarter 2026 results" 같은
     #    **다른 블록 머리글**을 집어 연간 가이던스가 분기로 떨어진다(실측 ILMN·LIFE·BFLY·EW).
     #    → 값 바로 위의 머리글(콜론으로 끝나는 전망 문구)을 먼저 본다.
+    #    (2026-08-15) 머리글 허용 길이 40→60자 — "guidance is provided for Veeco's third
+    #    quarter 2026:"(43자) 같은 실제 머리글이 40자에 걸려 인식되지 않았다(실측 VECO).
     hs, h0 = None, max(0, start - 800)
     for hm in re.finditer(r"(?:guidance|outlook|expects?|expectations|anticipates?)"
-                          r"[^.•●▪:]{0,40}:", txt[h0:start], re.I):
+                          r"[^.•●▪:]{0,60}:", txt[h0:start], re.I):
         hs = hm                                   # 가장 가까운(=마지막) 머리글
     if hs:
         seg = txt[max(0, h0 + hs.start() - 130):h0 + hs.end()]
@@ -445,8 +456,13 @@ def parse_guidance(txt):
                 # 규칙으로는 확정할 수 없다. 추측하면 반드시 틀린다(실측 MIDD·ATI·AKAM·ASTH·
                 # AIP·CGNX: 분기 열 값이 연간으로 태그돼 연간 컨센과 비교 → −60~−75% 갭).
                 # 정밀도 원칙대로 기각한다 — 이런 표는 추후 표 파서(guidance_table)의 몫.
-                if kind in ("range", "lowhigh") and \
-                   re.search(_QRE, back300, re.I) and re.search(_YRE, back300, re.I) and \
+                # (2026-08-15 3차) 연간 마커는 '분기에 붙은 연도'(Q1 FY 2027 등)를 제외하고 센다
+                # — 안 그러면 단일 분기 표("Q1 FY 2027 Guidance")까지 다중 열로 오인해
+                # 정상 후보를 죽인다(실측 CSCO Non-GAAP EPS 기각 → GAAP 값이 대신 채택).
+                _ys = [mm.start() for mm in re.finditer(_YRE, back300, re.I)
+                       if not re.search(_YEXCL, back300[:mm.start()][-60:], re.I)]
+                if kind in ("range", "lowhigh") and _ys and \
+                   re.search(_QRE, back300, re.I) and \
                    re.search(r"^[^.•●%]{0,45}?(?:\$\s?[\d,]+|[\d,]+(?:\.\d+)?\s*(?:billion|million|bn|mm)\b)",
                              txt[m.end():m.end() + 55], re.I):
                     skip.append(f"{metric}: 분기|연간 다중 열 표(열 확정 불가) · {ctx[:110]}")
