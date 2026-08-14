@@ -33,6 +33,9 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
 DAYS, LIMIT, GAP = ARG("--days", 45), ARG("--limit", 0), ARG("--gap", 5)
+# --offline = 캐시에 있는 것만 쓰고 **네트워크를 아예 안 탄다**.
+# 판정 규칙을 고친 뒤 전건 재판정할 때 쓴다(429 걱정 없이 몇 분이면 끝난다).
+OFFLINE = "--offline" in sys.argv
 P_FIELDS = ("g_rev_p", "g_rev_gap_p", "g_rev_per_p", "g_eps_p", "g_eps_gap_p", "g_eps_per_p",
             "g_rev_bzp", "g_eps_bzp",
             "g_bz_period", "g_bz_type", "g_bz_date")
@@ -48,6 +51,8 @@ def fetch(sym, use_cache=True):
             return json.loads(cp.read_text(encoding="utf-8")), False
         except Exception:
             pass
+    if OFFLINE:
+        return [], False
     try:
         h = urllib.request.urlopen(urllib.request.Request(
             f"https://www.benzinga.com/quote/{sym.upper()}/earnings-forecasts",
@@ -67,10 +72,15 @@ def fetch(sym, use_cache=True):
             continue
         out.append(d)
     out.sort(key=lambda d: str(d.get("date") or ""), reverse=True)
-    try:
-        cp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    except Exception:
-        pass
+    # (2026-08-14) **레코드가 있을 때만** 저장한다. 빈 결과를 캐시하면 429·일시 오류로
+    # 못 받은 것이 "이 종목은 가이던스 없음"으로 굳어 재시도가 영영 안 된다
+    # (실측: 캐시 2,812개 중 1,199개가 빈 파일 — 대조 가능분이 절반으로 줄었다).
+    # 빈 결과는 '없다'가 아니라 '못 받았다'다 — SEC FETCH_FAIL 과 같은 원칙.
+    if out:
+        try:
+            cp.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
     return out, False
 
 
@@ -91,7 +101,8 @@ def main():
         if blocked:
             print(f"[bz] 429 — {n}건까지 받고 중단(다음 실행에서 이어받는다)", flush=True)
             break
-        time.sleep(GAP)
+        if not OFFLINE:
+            time.sleep(GAP)
         if not rows:
             continue
         r = pool[it["c"]]
