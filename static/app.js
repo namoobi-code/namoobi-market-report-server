@@ -4004,19 +4004,17 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       row('커버일수(Days to Cover)', cell(r,'scov'), R.scov)+
       row('기관보유비중', cell(r,'inst'), R.inst);
   }
-  /* (2026-08-14, 2차 수정) 기저가 작으면 cr7/cr30/cr90(%변화율) 자체를 **주가 대비 %p**로
-     바꿔 표시한다 — 처음엔 배지(⚠저기저)만 달았는데, 사용자 피드백으로 배지 대신 실제
-     대체 수치를 바로 보여주는 쪽으로 변경("저기저라고 표시하던 주가대비로 표시하던"→
-     "주가대비로 표시하는게 좋을것 같다"). 정확한 그때 기저값은 저장하지 않으므로
-     현재 컨센(eq0·eq1) 크기로 근사 판정(order-of-magnitude, 필터·정렬 기준에는 미사용). */
+  /* (2026-08-14, 3차 수정) cr7/cr30/cr90(%변화율) 컬럼을 **항상 주가 대비 %p**로 표시한다.
+     처음엔 "기저(현재 eq0·eq1)가 작을 때만" 조건부로 바꿨는데, 그 근사 조건이 정작 문제의
+     원인 사례(ZIM: 그때 기저 0.09→현재 eq0 1.38 로 이미 커져서 조건에 안 걸림, +1214.4%
+     그대로 노출)를 못 잡았다. 사용자 재지적("주가대비로 표시하라니깐") 반영 — 조건 없이
+     pr7/pr30/pr90 값이 있으면 무조건 그걸 보여주고, 원래 %는 툴팁에서만 확인한다. */
   function _crDisplay(r,prKey,v){
-    const bs=[r.eq0,r.eq1].filter(x=>x!=null).map(Math.abs);
-    if(!bs.length||Math.min(...bs)>=0.5) return null;
     const pv=prKey?r[prKey]:null;
     if(pv==null) return null;
     const p=pv*100, z=Math.abs(p)<0.05;
     return {cls:z?'':(p>0?'up':'dn'), text:(p>0?'+':'')+p.toFixed(2)+'%p',
-      title:`기저 EPS 추정치가 작아(약 ${Math.min(...bs).toFixed(2)}) 변화율(${v>0?'+':''}${v.toFixed(1)}%)이 과장될 수 있어 주가 대비 %p(=ΔEPS÷현재가)로 대체 표시`};
+      title:`주가 대비 EPS 컨센 변화(=ΔEPS÷현재가) · 참고: 변화율(%) 원값 ${v>0?'+':''}${v.toFixed(1)}%`};
   }
   function _drvjVal(r){
     const d=DRVSC&&DRVSC[r.c];
