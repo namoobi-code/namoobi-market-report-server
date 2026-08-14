@@ -236,7 +236,11 @@ def policyrates():
     return json.loads(p.read_text(encoding="utf-8"))
 
 # 대시보드가 참조하지 않는 대용량 DB — 번들 제외(필요 시 /api/db/<name> 로 개별 조회)
-BUNDLE_SKIP = {"screener_pool", "tp_history", "us_krname", "etf_holdings"}
+# (2026-08-14) 번들 비대화 차단 — 38.9MB/6.4초까지 커져 대시보드 6장(크립토) 등이 로딩 전 빈칸으로 보였다.
+#   아래 대형 DB 는 화면에서 /api/db/<name> 개별 조회로만 쓰이므로 번들에서 제외한다(기능 손실 없음).
+BUNDLE_SKIP = {"screener_pool", "tp_history", "us_krname", "etf_holdings",
+               "global_hist", "kr_seg_db", "rtms", "rtms_etc", "stock_deriv", "etf_pool",
+               "earnings_live_us", "frgn_hist", "appe_series", "ta_state_us", "ta_state_kr"}
 _bundle_cache = {"sig": None, "body": None, "etag": None}
 
 def _db_sig(files):
