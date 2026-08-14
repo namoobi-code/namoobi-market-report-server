@@ -36,6 +36,14 @@ DAYS, LIMIT, GAP = ARG("--days", 45), ARG("--limit", 0), ARG("--gap", 5)
 # --offline = 캐시에 있는 것만 쓰고 **네트워크를 아예 안 탄다**.
 # 판정 규칙을 고친 뒤 전건 재판정할 때 쓴다(429 걱정 없이 몇 분이면 끝난다).
 OFFLINE = "--offline" in sys.argv
+# (2026-08-14) --force = **이미 g_bz_date 가 있는 종목도 재처리**한다.
+# 기간 매칭 로직(want_fy 로 같은 기간 레코드 고르기)을 세션 중간에 고쳤는데,
+# "이미 받은 건 건너뛴다"(아래 todo 필터) 때문에 고치기 전에 처리된 종목은
+# 영영 재계산되지 않아 옛날(버그 있던) 비교값이 화면에 그대로 남아 있었다
+# (실측 VRNS: 캐시엔 분기 레코드가 멀쩡히 있는데 저장된 g_rev_p 는 옛 로직이 고른
+# 연간값 737 — 재수집이 아니라 **재계산**만 하면 되는 문제였다).
+# 캐시가 이미 있으니(fetch 의 use_cache) 네트워크 호출 없이 몇 초면 끝난다.
+FORCE = "--force" in sys.argv
 P_FIELDS = ("g_rev_p", "g_rev_gap_p", "g_rev_per_p", "g_eps_p", "g_eps_gap_p", "g_eps_per_p",
             "g_rev_bzp", "g_eps_bzp",
             "g_bz_period", "g_bz_type", "g_bz_date")
@@ -91,7 +99,7 @@ def main():
     cut = (datetime.now() - timedelta(days=DAYS)).strftime("%Y%m%d")
     todo = [it for d8 in sorted(live.get("days") or {}, reverse=True) if d8 >= cut
             for it in live["days"][d8]
-            if it.get("c") in pool and it.get("g_bz_date") is None]      # 이미 받은 건 건너뛴다
+            if it.get("c") in pool and (FORCE or it.get("g_bz_date") is None)]  # 이미 받은 건 건너뛴다(--force 면 재계산)
     if LIMIT:
         todo = todo[:LIMIT]
     print(f"[bz] 대상 {len(todo)}건 (최근 {DAYS}일 · 간격 {GAP}초 · 예상 {len(todo)*GAP//60}분)", flush=True)

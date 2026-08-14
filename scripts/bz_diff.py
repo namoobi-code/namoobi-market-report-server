@@ -33,16 +33,22 @@ def main():
         for it in live["days"][d8]:
             if not it.get("g_bz_date"):
                 continue                      # Benzinga 미수집 — 대조 불가
-            bzp = str(it.get("g_bz_period") or "")          # 예: FY2026 · Q32026
-            bz_is_fy = bzp.upper().startswith("FY")
+            bzp_sym = str(it.get("g_bz_period") or "")      # 예: FY2026 · Q32026 (종목의 '최신' 레코드일 뿐)
             for metric, gk, ko in (("rev", "g_rev", "매출"), ("eps", "g_eps", "EPS")):
                 mine, mper = it.get(gk), it.get(gk + "_per")
                 port = it.get(gk + "_p")
+                # (2026-08-14) g_bz_period 는 종목당 1개(가장 최근 레코드)뿐이라, 매출·EPS 가
+                # 각각 다른 기간의 Benzinga 레코드와 매칭됐어도 항상 같은 값으로 비교했다
+                # → 매출은 분기로 정확히 맞았는데 종목 레벨 라벨이 연간이라 '기간불일치'로
+                # 오판정되는 사례가 다수(실측 VRNS: 분기값 186.5로 정확히 일치했는데도 오탐).
+                # gk+'_bzp' 가 그 지표가 실제로 매칭된 레코드의 기간이므로 이걸 써야 한다.
+                bzp = str(it.get(gk + "_bzp") or bzp_sym)
+                bz_is_fy = bzp.upper().startswith("FY")
                 if mine is None and port is None:
                     continue
                 if mine is None:
                     stat["누락"] += 1
-                    rows.append(("누락", it["c"], ko, f"우리 없음 / 포털 {port:,.2f} ({bzp})", ""))
+                    rows.append(("누락", it["c"], ko, f"우리 없음 / 포털 {port:,.2f} ({bzp_sym})", ""))
                     continue
                 if port is None:
                     stat["단독"] += 1
