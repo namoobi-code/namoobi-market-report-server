@@ -98,6 +98,20 @@ def main():
                         print(f"    skip: {s[:150]}")
                     if not sk:
                         print("    skip: (사유 기록 없음 — 후보 자체가 안 잡힘)")
+                    # --snips 모드: BZ 값 주변 원문을 함께 출력 — 어떤 표기를 놓치는지 본다
+                    if "--snips" in sys.argv:
+                        for v in (lo, hi):
+                            if v is None:
+                                continue
+                            pats = ([f"${v:.2f}".rstrip("0").rstrip("."), f"{v:.2f}"] if metric == "eps"
+                                    else [f"{v/1e9:.2f}".rstrip("0").rstrip("."),
+                                          f"{v/1e6:,.0f}", f"{v/1e6:,.1f}".rstrip("0").rstrip(".")])
+                            for pt in pats:
+                                i = t.find(pt)
+                                if i > 0:
+                                    print(f"    원문: …{t[max(0,i-200):i+120]}…")
+                                    break
+                            break
     print()
     print("[집계]", stat)
 

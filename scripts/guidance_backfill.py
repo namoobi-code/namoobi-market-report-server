@@ -19,7 +19,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from earnings_8k_watch import cik_map, exhibit_text, parse_guidance, guidance_gap, RAW_CACHE
+from earnings_8k_watch import (cik_map, exhibit_text, exhibit_texts_extra,
+                               parse_guidance, guidance_gap, RAW_CACHE)
 from guidance_table import parse_tables
 
 BASE = Path(__file__).resolve().parent.parent
@@ -151,6 +152,16 @@ def main():
                 FETCH_FAIL.add(sym)
                 return sym, {}
             g = parse_guidance(txt)
+            # (2026-08-15) 주 첨부에서 가이던스를 하나도 못 찾으면 **보조 첨부**(Exhibit 99.2
+            # 프레젠테이션·prepared remarks)를 추가로 읽는다 — 가이던스를 99.2 에만 싣는
+            # 회사가 실재('원문에 없음' 감사에서 확인). 못 찾은 경우에만 추가 SEC 호출이
+            # 발생하고, 파일별 캐시라 재실행 시 0회.
+            if not any(k in g for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
+                for t2 in exhibit_texts_extra(cik, acc):
+                    g2 = parse_guidance(t2)
+                    if any(k in g2 for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
+                        g = g2
+                        break
             try:
                 gt = parse_tables(RAW_CACHE.get((str(cik), acc)) or "")
             except Exception:

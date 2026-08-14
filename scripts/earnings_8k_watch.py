@@ -12,7 +12,7 @@
       이후 야후 수집기가 EPS 수치를 채우면 태그는 유지된다.
 cron: * 5-8 * * 2-6 · * 19-22 * * 1-5 (flock)
 """
-import gzip, html as _html, json, re, urllib.request
+import gzip, html as _html, json, re, time, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -86,9 +86,53 @@ RAW_CACHE = {}
 EXC_DIR = Path(__file__).resolve().parent.parent / "data" / "cache" / "exhibit"
 
 
-def _exc_path(accno):
+def _exc_path(accno, suffix=""):
     EXC_DIR.mkdir(parents=True, exist_ok=True)
-    return EXC_DIR / f"{accno}.html.gz"
+    return EXC_DIR / f"{accno}{suffix}.html.gz"
+
+
+def exhibit_texts_extra(cik, accno, max_n=2):
+    """같은 8-K 의 **보조 첨부**(Exhibit 99.2 프레젠테이션·prepared remarks 등) 평문 목록.
+
+    (2026-08-15) exhibit_text() 는 첨부 1개(가장 큰 ex99)만 읽는다 — 원래 SEC 호출을
+    아끼려던 선택인데, 가이던스를 99.2 에 싣는 회사가 실재해(실측 '원문에 없음' 57건 분석)
+    주 첨부에서 가이던스를 못 찾았을 때만 나머지 ex99 첨부를 추가로 읽는다.
+    파일별 캐시(_2·_3 접미사)로 재실행 시 SEC 호출 없음.
+    """
+    an = accno.replace("-", "")
+    outs = []
+    # 캐시 우선 — 인덱스 조회도 생략
+    cached = [_exc_path(accno, f"_{i}") for i in range(2, 2 + max_n)]
+    if any(p.exists() for p in cached):
+        for p in cached:
+            if p.exists():
+                try:
+                    outs.append(_strip(gzip.decompress(p.read_bytes()).decode("utf-8", "ignore")))
+                except Exception:
+                    pass
+        return outs
+    try:
+        idx = json.loads(get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/index.json"))
+        items = idx.get("directory", {}).get("item", [])
+    except Exception:
+        return []
+    ex = sorted([i for i in items
+                 if re.search(r"ex-?99", str(i.get("name", "")), re.I)
+                 and str(i.get("name", "")).lower().endswith((".htm", ".html"))],
+                key=lambda i: -int(i.get("size") or 0))
+    for n, i in enumerate(ex[1:1 + max_n]):     # [0]=주 첨부(exhibit_text 가 이미 읽음)
+        try:
+            raw = get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/{i['name']}", timeout=30)
+            t = raw.decode("utf-8", "ignore")
+            p = _exc_path(accno, f"_{n + 2}")
+            tmp = p.with_suffix(".tmp")
+            tmp.write_bytes(gzip.compress(t.encode("utf-8"), 6))
+            tmp.replace(p)
+            outs.append(_strip(t))
+            time.sleep(0.15)
+        except Exception:
+            pass
+    return outs
 
 
 def _strip(t):
@@ -295,16 +339,22 @@ def main():
             continue                                   # 전 종목 6-K 는 수시보고 소음 — 핵심만
         its = items_of(cik, ac.group(1)) if ft == "8-K" else ""
         is_ern = "2.02" in its
-        if ft == "8-K" and not is_core and not is_ern:
-            continue                                   # 비핵심은 실적(2.02) 8-K 만 기록
-        tag = f"📄 {ft}{'(실적)' if is_ern else ''} 접수 {et.strftime('%H:%M')}ET"
+        # (2026-08-15) Item 7.01(Reg FD) 도 본다 — **분기 중 가이던스 상향/하향·인베스터데이
+        # 자료는 실적일이 아니라 7.01 로 나온다**(사용자 지적: 놓치는 채널). 소음 방지:
+        # 비핵심 종목의 7.01 은 첨부에서 가이던스가 실제로 파싱될 때만 기록한다.
+        is_fd = (not is_ern) and ("7.01" in its)
+        if ft == "8-K" and not is_core and not is_ern and not is_fd:
+            continue                                   # 비핵심은 실적(2.02)·RegFD(7.01) 만 후보
+        tag = f"📄 {ft}{'(실적)' if is_ern else ('(RegFD)' if is_fd else '')} 접수 {et.strftime('%H:%M')}ET"
         gd = {}
-        if is_ern:                                   # 실적 8-K 만 보도자료를 열어 가이던스 확인
+        if is_ern or is_fd:                          # 실적·RegFD 8-K 는 보도자료를 열어 가이던스 확인
             try:
                 gd = guidance_gap(sym, parse_guidance(exhibit_text(cik, ac.group(1))), pool_us,
                                   et.strftime("%Y-%m-%d"))     # 발표일 → 기준 분기 판정
             except Exception:
                 gd = {}
+            if is_fd and not is_core and not gd:
+                continue                             # 가이던스 없는 수시보고(7.01) — 기록하지 않는다
             if gd.get("g_rev_gap") is not None:
                 tag += f" · 가이던스 매출 컨센 대비 {gd['g_rev_gap']:+.1f}%"
             elif gd.get("g_eps_gap") is not None:

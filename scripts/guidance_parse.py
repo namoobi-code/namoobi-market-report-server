@@ -41,11 +41,19 @@ _PART = (r"segment|product line|service revenue|subscription|recurring|licen[cs]
          r"organic|acquired business|supplemental|divisional|by region|geograph|"
          r"drug discovery|software revenue|hardware|instrument|QCT|QTL|QSI")
 # 전사 매출임을 확인해 주는 수식어(바로 앞 단어)
+# (2026-08-15) 오탐으로 확인된 무해 수식어 추가 — "expects to **report** revenue"(실측 TRMB) ·
+# "**its** revenue" · "FY27 revenue"(연도 표기) · 불릿 기호 "o Revenue" · "record revenue"(사상 최대)
+# · "updating its **full-year** 2026 guidance … Total Revenue"(실측 JBI) 등 — 전부 전사 매출이었다.
 _CORP_W = {"total", "net", "consolidated", "company", "companywide", "overall", "projected",
            "reported", "gaap", "quarterly", "annual", "full", "year", "fiscal", "our", "the",
            "of", "in", "and", "expects", "expect", "expected", "anticipates", "projects",
            "guidance", "outlook", "estimates", "estimate", "s", "is", "to", "be", "we",
-           "a", "for", "with", "at", "approximately", "about", "around", "range", "revenues"}
+           "a", "for", "with", "at", "approximately", "about", "around", "range", "revenues",
+           "report", "reports", "record", "records", "deliver", "delivers", "generate",
+           "generates", "achieve", "achieves", "its", "their", "o", "fy", "fullyear",
+           "now", "raised", "raises", "raising", "updated", "updates", "updating",
+           "increased", "increases", "increasing", "lowered", "lowers", "lowering",
+           "revised", "revises", "revising", "reaffirms", "reaffirmed", "maintains", "high", "low"}
 # 라벨(매출·EPS)과 금액 사이에 이런 말이 끼면, 그 금액은 **다른 항목**의 것이다.
 # (2026-08-14) ebitda\d* — 보도자료의 각주 번호가 단어에 바로 붙는다("Adjusted EBITDA2",
 # "EBITDA1"). \bebitda\b 는 숫자 앞에서 경계가 성립하지 않아 통과됐고, EBITDA 범위가
@@ -70,7 +78,9 @@ _QPAST = (r"(?:through|results through|through the|reported|ended|completed|"
           r"in the|during the|versus the|vs\.? the)\s+$")
 # (2026-08-14) [1-4]Q 표기 추가 — "3Q 2026 Full Year 2026" 같은 표 머리글(실측 OPRT)에서
 # 분기 열을 인식하지 못해 분기 값이 연간으로 분류됐다.
+# (2026-08-15) '3rd Qtr' 축약(실측 MIDD)도 추가.
 _QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|\b[1-4]Q\b|quarter (?:of|ending)|"
+        r"\b[1-4](?:st|nd|rd|th)[-\s](?:qtr|quarter)\b|three months (?:ended|ending)|"
         r"for the (?:first|second|third|fourth) quarter|next quarter|current quarter")
 # (2026-08-10) 연간 표시에 **"연도 + Outlook/전망"** 형태를 추가한다. 실측 오분류:
 #   AGCO "Outlook … 2026" · NFLX "Our 2026 outlook" · XRAY "2026 Outlook … net sales"
@@ -120,11 +130,25 @@ _NUM_C = r"([\d,]+(?:\.\d+)?)(?!\d)(?!\.\d)\s*(cents?)"    # 60 cents → 0.60
 
 
 def _forms(label, metric):
-    """실측된 표기 4종 — 범위형·±금액·±퍼센트·근사형. EPS 는 금액 표기만."""
+    """실측된 표기들 — 범위형·±금액·±퍼센트·근사형·표(Low/High)·괄호병기. EPS 는 금액 표기만.
+
+    (2026-08-15) **치명 버그 수정**: label 을 괄호 없이 이어붙여 `A|B` 알터네이션이
+    패턴 전체를 갈랐다 — "…earnings per share…" 표기는 라벨만 매칭되고 숫자 그룹이
+    비어 조용히 버려졌다(약어 EPS 만 동작). 재현율 손실의 최대 단일 원인
+    (실측 WWW·EAT·TRMB·YETI 등 'earnings per share' 문장 전멸).
+    """
+    label = r"(?:" + label + r")"
     if metric == "eps":
         return [
             ("range", label + r"[^$%]{0,60}?" + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D),
             ("rangec", label + r"[^$%]{0,60}?" + _NUM_C + r"\s*(?:to|through|-|and)\s*" + _NUM_C),
+            # (2026-08-15) 괄호 병기 — "EPS guidance of 13% to 15% growth ($12.40 to $12.60)"
+            # (실측 CAH). 성장률(%) 뒤 괄호 안에 금액 범위가 온다 — $ 필수라 성장률 오인 없음.
+            ("prange", label + r"[^$]{0,70}?\(\s*" + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D + r"\s*\)"),
+            # (2026-08-15) Low/High 두 열 표 — "Net income per share $ 0.67 $ 0.75"(실측 LFTO).
+            # 구분자 없이 $ 금액 두 개가 나란히. 오탐 방지: 루프에서 back 에 'Low … High'
+            # 열 머리글이 있을 때만 채택한다.
+            ("lowhigh", label + r"[^$%]{0,25}?" + _NUM_D + r"\s+" + _NUM_D),
             ("approx", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM_D),
             ("approxc", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM_C),
         ]
@@ -132,6 +156,9 @@ def _forms(label, metric):
         ("range", label + r"[^$%]{0,60}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM),
         ("pm", label + r"[^$%]{0,60}?" + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM),
         ("pmpct", label + r"[^$]{0,60}?" + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%"),
+        # (2026-08-15) Low/High 두 열 표 — "Revenue $ 2,115 $ 2,175"(실측 MH·GMRS·EQPT).
+        # 단위는 표 머리의 '($ in millions)' 선언에서 가져온다(루프에서 처리).
+        ("lowhigh", label + r"[^$%]{0,25}?\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*()\$\s?([\d,]+(?:\.\d+)?)(?!\d)()"),
         ("approx", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM),
     ]
 
@@ -144,7 +171,7 @@ def _pair(kind, m):
         a = _num(m.group(1), None)
         a = a / 100 if a is not None else None
         return a, a
-    if kind == "range":
+    if kind in ("range", "prange", "lowhigh"):     # (2026-08-15) 신설 2종은 그룹 구조가 같다
         h = (m.group(4) or m.group(2) or "").lower()
         return _num(m.group(1), m.group(2), h), _num(m.group(3), m.group(4), h)
     if kind == "pm":
@@ -346,21 +373,40 @@ def parse_guidance(txt):
     # (2026-08-10) 설비투자(CapEx) 가이던스 추가 — 회사가 제시할 때만 채운다.
     # 애널리스트 CapEx 컨센서스는 무료로 구할 수 없어(FMP·Yahoo·Massive 모두 없음),
     # 회사 발표가 유일한 근거다. 없으면 화면에 '미제시'로 둔다(추정하지 않는다).
+    # (2026-08-15) EPS 라벨 확장 — "Net income per (diluted|common) share" 표기(실측 LFTO·KLC·EAT).
+    # 보통주 주당 순이익 = EPS 다. 'loss per share' 는 제외(음수 전용 표기, 컨센 비교 부적합).
     for metric, label in (("rev", r"(?:revenues?|net sales)"),
-                          ("eps", r"(?:diluted\s+)?earnings per share|\beps\b"),
+                          ("eps", r"(?:diluted\s+)?earnings per share|\beps\b|"
+                                  r"net income per (?:diluted\s+|common\s+)?share(?:s)?(?:\s*,\s*diluted)?"),
                           ("capex", r"(?:capital expenditures?|\bcapex\b)")):
         for kind, pat in _forms(label, metric):
             for m in re.finditer(pat, txt, re.I):
                 lo, hi = _pair(kind, m)
                 if lo is None or hi is None:
                     continue
+                # (2026-08-15) Low/High 두 열 표 형식은 **열 머리글이 실제로 있을 때만** 믿는다
+                # — 구분자 없는 숫자 나열은 다른 표(실적 비교 등)에서도 흔해 오탐 위험이 크다.
+                back300 = txt[max(0, m.start() - 300):m.start()]
+                if kind == "lowhigh" and not re.search(r"\blow\b[\s\S]{0,40}?\bhigh\b", back300, re.I):
+                    continue
+                # (2026-08-15) Low·Midpoint·High **3열** 표(실측 CCSI) — 앞 두 값(하단·중간)이
+                # 아니라 첫·셋째 값(하단·상단)이 범위다.
+                if kind == "lowhigh" and re.search(r"\blow\b[\s\S]{0,25}?\bmid", back300, re.I):
+                    m5 = re.match(r"\s*\$?\s?([\d,]+(?:\.\d+)?)(?!\d)", txt[m.end():m.end() + 20])
+                    v5 = _num(m5.group(1), None) if m5 else None
+                    if v5 is not None:
+                        hi = v5
                 # 앞 문맥은 용도별로 길이를 달리한다 — 기간·기준은 넓게(130자), 지표 수식어는
                 # 좁게(60자) 봐야 한다. 넓게 보면 **직전 문장**의 'organic·acquired' 같은 단어가
                 # 딸려 들어와 멀쩡한 전사 매출까지 기각된다(실측 WAT 'Total Company reported revenue').
                 back = txt[max(0, m.start() - 130):m.start()]     # 기간·기준 판정용
                 near = txt[max(0, m.start() - 60):m.start()]      # 지표 수식어 판정용
                 ctx = txt[max(0, m.start() - 130):min(len(txt), m.end() + 40)]
-                if not re.search(_FORE, ctx, re.I):
+                # (2026-08-15) 전망 문맥 창 130→300자 — 불릿 목록은 guidance/outlook 이 목록
+                # **머리글**에 한 번만 나오고 각 항목엔 없다. 130자로는 머리글에 못 미쳐
+                # 정당한 가이던스가 통째로 조용히 버려졌다(실측 UPWK "guidance for … is: •
+                # Revenue: $730-750M" — 머리글이 135자 앞 · YETI "Update on 2026 Outlook" 블록).
+                if not re.search(_FORE, back300 + txt[m.start():min(len(txt), m.end() + 40)], re.I):
                     continue                                       # 전망 문맥 아님 → 조용히 통과
                 # (2026-08-10) 라벨과 숫자 사이에 **다른 항목**이 끼어 있으면 그 숫자는
                 # 그 항목의 것이다. 실측:
@@ -368,7 +414,11 @@ def parse_guidance(txt):
                 #         expense of approximately $11.3 million" → 이자비용을 매출로 채택(−99%)
                 #   PWR  "…$1.2 billion - $1.4 billion of revenues and approximately $120 million
                 #         to $140 million of adjusted EBITDA" → EBITDA 를 매출로 채택(−99.7%)
-                lead = re.split(r"\$", txt[m.start():m.end()], 1)[0]   # 라벨~첫 금액 사이
+                # (2026-08-15) lead 는 **라벨 끝**부터 잰다 — 라벨 자체에 든 단어가 _OTHER 에
+                # 걸리면 안 된다(실측 KLC·LFTO: 라벨 'net income per share' 의 'net income' 이
+                # _OTHER 의 net income 과 충돌해 정당한 EPS 가이던스가 전부 기각됐다).
+                lm_ = re.match(r"(?:" + label + r")", txt[m.start():], re.I)
+                lead = re.split(r"\$", txt[m.start() + (lm_.end() if lm_ else 0):m.end()], 1)[0]
                 # 금액 뒤 60자도 본다 — "…$120 million to $140 million **of adjusted EBITDA**"
                 # 처럼 범위 뒤에 항목명이 오는 표기가 흔하다(실측 PWR).
                 tail = txt[m.end():m.end() + 60]
@@ -389,6 +439,17 @@ def parse_guidance(txt):
                              txt[max(0, m.start()):m.start() + lead.__len__()][-45:], re.I) or \
                    re.search(r"estimated impact|impact on", ctx, re.I):
                     skip.append(f"{metric}: 증분·기여분 표현(수준 아님) · {ctx[:110]}")
+                    continue
+                # (2026-08-15 2차) **분기|연간 다중 열 표** — 머리글에 분기·연간이 나란히 있고
+                # 라벨 뒤에 금액 범위가 연달아 오면, 각 범위가 어느 열(기간) 것인지 문장
+                # 규칙으로는 확정할 수 없다. 추측하면 반드시 틀린다(실측 MIDD·ATI·AKAM·ASTH·
+                # AIP·CGNX: 분기 열 값이 연간으로 태그돼 연간 컨센과 비교 → −60~−75% 갭).
+                # 정밀도 원칙대로 기각한다 — 이런 표는 추후 표 파서(guidance_table)의 몫.
+                if kind in ("range", "lowhigh") and \
+                   re.search(_QRE, back300, re.I) and re.search(_YRE, back300, re.I) and \
+                   re.search(r"^[^.•●%]{0,45}?(?:\$\s?[\d,]+|[\d,]+(?:\.\d+)?\s*(?:billion|million|bn|mm)\b)",
+                             txt[m.end():m.end() + 55], re.I):
+                    skip.append(f"{metric}: 분기|연간 다중 열 표(열 확정 불가) · {ctx[:110]}")
                     continue
                 # (2026-08-14) 장기 목표(long-term outlook/target)는 올해·다음 분기 가이던스가
                 # 아니다 — 컨센과 비교하면 반드시 어긋난다(실측 EOLS "Reaffirms 2028 Long-Term
@@ -413,12 +474,15 @@ def parse_guidance(txt):
                 # SUPN 처럼 'Current … Previous …' 순서(개정이 먼저)면 첫 범위가 맞으므로 그대로 둔다.
                 if kind == "range":
                     hdr = txt[max(0, m.start() - 300):m.start()]
-                    pm_ = re.search(r"\b(?:prior|previous)\b[^.•●]{0,80}?(?:guidance|outlook)", hdr, re.I)
+                    # (2026-08-15) 'Initial … Outlook / Current … Outlook'(실측 PBH)도 구→신 표기다.
+                    pm_ = re.search(r"\b(?:prior|previous|initial)\b[^.•●]{0,80}?(?:guidance|outlook)", hdr, re.I)
                     # (2026-08-14 2차) updated-마커는 **prior 마커 뒤에서만** 찾는다 — 표 제목의
                     # "Full Year 2026 Outlook Update …" 같은 문구가 updated 로 먼저 잡히면
                     # 순서 판정(prior 먼저)이 뒤집혀 규칙이 통째로 무시된다(실측 KTB).
-                    um_ = pm_ and re.search(r"\b(?:updated?|revised?|current|new)\b[^.•●]{0,80}?(?:guidance|outlook)",
-                                            hdr[pm_.end():], re.I)
+                    # (2026-08-15 2차) 'Guidance - Previous | Guidance - Updated'(실측 STLN)처럼
+                    # 한정어가 guidance 뒤에 붙는 표기는 prior 뒤의 updated/revised/current
+                    # 낱말만으로 인정한다(guidance 낱말 재요구 시 놓침).
+                    um_ = pm_ and re.search(r"\b(?:updated?|revised?|current)\b", hdr[pm_.end():], re.I)
                     if pm_ and um_:
                         n2 = _NUM_D if metric == "eps" else _NUM
                         m2 = re.match(r"[^$\d%]{0,30}?" + n2 + r"\s*(?:to|through|-|and)\s*" + n2,
@@ -434,11 +498,13 @@ def parse_guidance(txt):
                 # 의 from~to 는 범위가 아니라 **개정**(A=구, B=신)이다(실측 HYLN "Increasing …
                 # guidance from $10 million to $15 million" 을 범위 10~15 로 읽어 12.5 표시 —
                 # 정답은 새 가이던스 15). "from 구범위 to 신범위" 꼴(실측 CTOS)이면 신범위를 쓴다.
-                if kind == "range" and re.search(r"\bfrom\s*$", lead[-12:], re.I) and \
+                if kind == "range" and re.search(r"\bfrom\s+(?:a\s+range\s+of\s+)?$", lead[-22:], re.I) and \
                    re.search(r"\b(?:increas\w+|rais\w+|lower\w+|updat\w+|revis\w+|narrow\w+|cut\w+)\b",
                              back + lead, re.I):
                     n2 = _NUM_D if metric == "eps" else _NUM
-                    m2 = re.match(r"\s*to\s*" + n2 + r"(?:\s*(?:to|through|-|and)\s*" + n2 + r")?",
+                    # (2026-08-15) "from a range of A to B **to a range of** C to D"(실측 ICUI)
+                    m2 = re.match(r"\s*to\s*(?:a\s+range\s+of\s+)?" + n2 +
+                                  r"(?:\s*(?:to|through|-|and)\s*" + n2 + r")?",
                                   txt[m.end():m.end() + 90], re.I)
                     if m2:                                   # from [구범위] to [신범위/값]
                         if metric == "eps":
@@ -481,15 +547,27 @@ def parse_guidance(txt):
                     if re.search(_PART, near, re.I):
                         skip.append(f"rev: 전사 아님(부분 지표) · {ctx[:130]}")
                         continue
+                    # (2026-08-15) "Revenue **from sales of Captisol**"(실측 LGND) — 라벨 뒤에
+                    # 제품·원천 한정이 붙으면 전사 매출이 아니다.
+                    if re.search(r"\bfrom\s+(?:the\s+)?(?:sales?\s+of|royalt)", lead, re.I):
+                        skip.append(f"rev: 제품·원천 한정(from sales of …) → 전사 아님 · {ctx[:110]}")
+                        continue
                     mw = None
                     for mw in re.finditer(r"([A-Za-z][\w\-]*)\s+(?:revenues?|net sales)", near + " revenue", re.I):
                         pass
                     if mw and re.sub(r"[^a-z]", "", mw.group(1).lower()) not in _CORP_W:
                         skip.append(f"rev: 수식어 '{mw.group(1)}' → 전사 아님 · {ctx[:120]}")
                         continue
-                    if not re.search(r"(billion|million|bn|mm)\b|\$\s?[\d,.]+\s*[BM]\b", ctx):
+                    # (2026-08-15) 표 머리의 '($ in millions)' 선언 인정 — 표 형식은 단위를
+                    # 머리에 한 번만 쓰고 숫자는 맨몸("3,870 - 3,970")으로 나열한다(실측
+                    # MWH·OCTV·AEBI·MH·GMRS·EQPT). 숫자별 단위를 요구하면 전부 기각됐다.
+                    tblu = re.search(r"\(\s*(?:\$\s*)?in\s+(million|billion)s?\b", back300 + ctx, re.I)
+                    if not re.search(r"(billion|million|bn|mm)\b|\$\s?[\d,.]+\s*[BM]\b", ctx) and not tblu:
                         skip.append(f"rev: 단위 미표기 → 자릿수 확정 불가 · {ctx[:120]}")
                         continue
+                    if tblu and lo < 1e5:                  # 맨몸 숫자 → 머리 선언 단위로 환산
+                        mult = 1e9 if tblu.group(1).lower() == "billion" else 1e6
+                        lo, hi = lo * mult, hi * mult
                     if not (0 < lo <= hi and lo > 1e5 and hi / lo < 1.6):
                         skip.append(f"rev: 범위 비정상({lo:.0f}~{hi:.0f}) · {ctx[:120]}")
                         continue
@@ -505,7 +583,32 @@ def parse_guidance(txt):
                         a = bool(re.search(_ADJ, seg, re.I))
                         g = bool(re.search(_GAAP, seg, re.I))
                         return "adj" if (a and not g) else ("gaap" if (g and not a) else None)
-                    bas = _basis(near) or _basis(back) or _basis(ctx)
+                    # (2026-08-15) REIT 가드 — FFO 를 쓰는 리츠의 'net income per share' 가이던스는
+                    # FFO 기반 컨센서스와 비교할 수 없다(실측 O 1.60 vs 컨센 FFO 4.45 ·
+                    # PK 0.40 vs 1.95 · UE 0.59 vs 1.52 — 전부 리츠).
+                    if re.search(r"\bFFO\b|funds from operations", back300 + ctx, re.I):
+                        skip.append(f"eps: REIT(FFO 기반) — EPS 는 FFO 컨센과 비교 불가 · {ctx[:110]}")
+                        continue
+                    # (2026-08-15) ctx(값 **뒤** 40자 포함)로 기준을 판정하지 않는다 —
+                    # "diluted EPS $1.48-$1.58 and **adjusted** diluted EPS $1.55-$1.65" 에서
+                    # 앞(GAAP성) 값이 뒤 항목의 'adjusted' 를 끌어와 adj 로 오인, 진짜 조정
+                    # 값의 교체(add 오버라이드)까지 막았다(실측 WWW). 기준은 값 **앞** 문맥만.
+                    # lead(라벨~숫자 사이)가 가장 가깝다 — "Earnings per Share: GAAP: $1.08"(실측
+                    # CSCO)의 GAAP 표기는 lead 에만 있다.
+                    bas = _basis(lead) or _basis(near) or _basis(back)
+                    # (2026-08-15) "…$30.00 to $31.00, **or $34.25 to $35.25 on an adjusted basis**"
+                    # (실측 PH) · "GAAP: $1.08-$1.10; **Non-GAAP: $1.32-$1.34**"(실측 CSCO) —
+                    # 조정 값이 바로 뒤에 병기되면 그쪽이 컨센 비교 대상이다.
+                    t0 = txt[m.end():m.end() + 100]
+                    m3 = (re.match(r"\s*,?\s*or\s*" + _NUM_D + r"\s*(?:to|-|and)\s*" + _NUM_D +
+                                   r"\s*on an adjusted basis", t0, re.I) or
+                          re.match(r"\s*[;,]?\s*Non-GAAP:?\s*" + _NUM_D + r"\s*(?:to|-|and)\s*" + _NUM_D,
+                                   t0, re.I))
+                    if m3:
+                        a3, b3 = _num(m3.group(1), None), _num(m3.group(3), None)
+                        if a3 is not None and b3 is not None:
+                            lo, hi, bas = a3, b3, "adj"
+                            ctx += " [병기된 조정 값 채택]"
                     # (2026-08-14) "reported (diluted) EPS" 는 GAAP 기준이다 — 보도자료가
                     # "reported EPS $A–$B and adjusted EPS $C–$D" 로 나란히 쓸 때 reported 쪽이
                     # 기준 미명시로 통과돼 조정 컨센과 비교됐다(실측 INGR 9.45(GAAP) vs 조정 10.6 ·
