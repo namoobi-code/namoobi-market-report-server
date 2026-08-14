@@ -3159,8 +3159,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       <div class="s">${E(FS.blog.summary||'')}${bullets(FS.blog.points)}</div>
       <div class="f note">${E(FS.blog.date||'')}</div></div>`:''}
     ${FS.report?`<div class="nw"><div class="h">${LK(FS.report.title||'Earnings Insight report',FS.report.url)}</div>
-      <div class="s">${(FS.report.full_summary||[]).map(x=>
-        `<div style="margin-top:8px"><b>${E(x.section||'')}</b>${bullets(x.points)}</div>`).join('')}</div>
+      <div class="s">${(function(fs){   // (2026-08-14) 스키마 드리프트 흡수 — 배열/{sections:[]}/문자열 모두 허용(.map 예외로 탭 전체가 죽던 버그)
+        const arr = Array.isArray(fs) ? fs
+          : (fs && Array.isArray(fs.sections)) ? fs.sections
+          : (fs && typeof fs==='object') ? Object.entries(fs).map(([k,v])=>({section:k,points:Array.isArray(v)?v:[v]}))
+          : (fs ? [{section:'',points:[String(fs)]}] : []);
+        return arr.map(x=>`<div style="margin-top:8px"><b>${E(x.section||x.name||'')}</b>${bullets(x.points)}</div>`).join('');
+      })(FS.report.full_summary)}</div>
       <div class="f note">${E(FS.report.date||'')} · 다음 발행 ${E(FS.report.next_date||'—')}</div></div>`:''}
     <div class="src">${LK('insight.factset.com/topic/earnings',FS.topic_url)} · 기준 ${E(FS.as_of||'—')}</div>`
     : '<div class="note">데이터 없음</div>';
