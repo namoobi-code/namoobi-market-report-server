@@ -1,14 +1,14 @@
 {
- "marker": "2026-08-14",
- "as_of": "2026-08-14",
+ "marker": "2026-08-15",
+ "as_of": "2026-08-15",
  "data": {
-  "asof": "2026-08-14",
-  "fetched_at": "2026-08-14T16:23:10+09:00",
+  "asof": "2026-08-15",
+  "fetched_at": "2026-08-15T06:11:12+09:00",
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
     "unit": "USD",
-    "last_update": "2026-08-14 14:40",
+    "last_update": "2026-08-14 18:10",
     "rows": [
      {
       "item": "DDR5 16Gb (2Gx8) 4800/5600",
@@ -169,6 +169,18 @@
      "share_pct": 58.0,
      "revenue_bn": 40.6,
      "note": "NVIDIA Dominance & HBM4 Lead"
+    },
+    {
+     "vendor": "Samsung",
+     "share_pct": 28.0,
+     "revenue_bn": 19.6,
+     "note": "AMD/Google Volume"
+    },
+    {
+     "vendor": "Micron",
+     "share_pct": 14.0,
+     "revenue_bn": 9.8,
+     "note": "Capacity Constrained"
     }
    ],
    "asp": [
@@ -179,22 +191,6 @@
      "trend": "up",
      "change": "+5%",
      "driver": "Capacity cut for HBM3E"
-    },
-    {
-     "product": "HBM3E 8-Hi",
-     "price": "$1,800 - $2,000",
-     "price_mid": 1800.0,
-     "trend": "up",
-     "change": "+10%",
-     "driver": "Standard B200 Supply Tightness"
-    },
-    {
-     "product": "HBM4 12-Hi (contract est.)",
-     "price": "$500 - $600+/stack (36GB)",
-     "price_mid": 500.0,
-     "trend": "up",
-     "change": "+55-70% vs HBM3E",
-     "driver": "2026 ramp for NVIDIA Vera Rubin; TSMC/foundry base-die cost floor; suppliers seeking multi-fold 2027 increases"
     }
    ],
    "specs": [
@@ -240,17 +236,59 @@
      "units_m": 3.5,
      "hbm_gb": 192.0,
      "hbm_price_k": 18.5,
-     "revenue_bn": 20.1
+     "revenue_bn": 28.2
+    },
+    {
+     "platform": "NVIDIA Blackwell Ultra (B300)",
+     "units_m": 0.8,
+     "hbm_gb": 288.0,
+     "hbm_price_k": 22.0,
+     "revenue_bn": 11.6
+    },
+    {
+     "platform": "NVIDIA Rubin (R100)",
+     "units_m": 0.3,
+     "hbm_gb": 288.0,
+     "hbm_price_k": 28.0,
+     "revenue_bn": 5.5
+    },
+    {
+     "platform": "AMD Instinct (MI325X/350)",
+     "units_m": 0.6,
+     "hbm_gb": 272.0,
+     "hbm_price_k": 16.5,
+     "revenue_bn": 6.2
+    },
+    {
+     "platform": "AMD Instinct (MI400)",
+     "units_m": 0.1,
+     "hbm_gb": 432.0,
+     "hbm_price_k": 28.0,
+     "revenue_bn": 2.7
+    },
+    {
+     "platform": "Google TPU (v6e/v7)",
+     "units_m": 3.3,
+     "hbm_gb": 106.0,
+     "hbm_price_k": 16.0,
+     "revenue_bn": 12.6
+    },
+    {
+     "platform": "Other (AWS/ASIC)",
+     "units_m": 1.0,
+     "hbm_gb": 96.0,
+     "hbm_price_k": 16.0,
+     "revenue_bn": 3.2
     }
    ],
    "source": "https://siliconanalysts.com/api/v1/hbm",
    "ddr5_gap": {
-    "hbm_per_gb": 50.0,
+    "hbm_per_gb": 33.33,
     "ddr5_per_gb": 14.38,
-    "ratio": 3.5,
+    "ratio": 2.3,
     "ddr5_spot_per_gb": 26.37,
-    "ratio_spot": 1.9,
-    "basis": "HBM3E 36GB 스택 ASP $1,800 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $115.00 ÷ 8GB (환산 추정)",
+    "ratio_spot": 1.3,
+    "basis": "HBM3E 36GB 스택 ASP $1,200 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $115.00 ÷ 8GB (환산 추정)",
     "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"
    }
   },
@@ -259,14 +297,10 @@
     "ticker": "^SOX",
     "label": "필라델피아 반도체지수",
     "why": "반도체 업황 종합 체온계",
-    "price": 12455.998,
-    "chg_1y_pct": 111.6,
-    "chg_1m_pct": 0.5,
+    "price": 12417.05,
+    "chg_1y_pct": 115.8,
+    "chg_1m_pct": 4.6,
     "series_1y": [
-     [
-      "2025-08-14",
-      5885.49
-     ],
      [
       "2025-08-15",
       5752.74
@@ -1266,6 +1300,10 @@
      [
       "2026-08-13",
       12456.0
+     ],
+     [
+      "2026-08-14",
+      12417.05
      ]
     ]
    },
@@ -1273,14 +1311,10 @@
     "ticker": "NVDA",
     "label": "엔비디아",
     "why": "HBM 최대 수요처",
-    "price": 225.3,
-    "chg_1y_pct": 23.8,
-    "chg_1m_pct": 6.0,
+    "price": 225.16,
+    "chg_1y_pct": 24.8,
+    "chg_1m_pct": 8.6,
     "series_1y": [
-     [
-      "2025-08-14",
-      182.02
-     ],
      [
       "2025-08-15",
       180.45
@@ -2280,6 +2314,10 @@
      [
       "2026-08-13",
       225.3
+     ],
+     [
+      "2026-08-14",
+      225.16
      ]
     ]
    },
@@ -2287,14 +2325,10 @@
     "ticker": "AMD",
     "label": "AMD",
     "why": "HBM 2번째 수요처",
-    "price": 483.01,
-    "chg_1y_pct": 166.9,
-    "chg_1m_pct": -8.7,
+    "price": 514.39,
+    "chg_1y_pct": 189.8,
+    "chg_1m_pct": 2.7,
     "series_1y": [
-     [
-      "2025-08-14",
-      180.95
-     ],
      [
       "2025-08-15",
       177.51
@@ -3294,6 +3328,10 @@
      [
       "2026-08-13",
       483.01
+     ],
+     [
+      "2026-08-14",
+      514.39
      ]
     ]
    },
@@ -3301,14 +3339,10 @@
     "ticker": "TSM",
     "label": "TSMC",
     "why": "CoWoS 패키징 = HBM 출하의 물리적 상한",
-    "price": 430.49,
-    "chg_1y_pct": 78.6,
-    "chg_1m_pct": 2.6,
+    "price": 426.35,
+    "chg_1y_pct": 78.5,
+    "chg_1m_pct": 4.1,
     "series_1y": [
-     [
-      "2025-08-14",
-      241.0
-     ],
      [
       "2025-08-15",
       238.88
@@ -4308,6 +4342,10 @@
      [
       "2026-08-13",
       430.49
+     ],
+     [
+      "2026-08-14",
+      426.35
      ]
     ]
    },
@@ -4316,8 +4354,8 @@
     "label": "코스피",
     "why": "삼성+SK 시총 55~60% — 메모리 사이클이 곧 지수",
     "price": 6977.94,
-    "chg_1y_pct": 116.3,
-    "chg_1m_pct": -4.2,
+    "chg_1y_pct": 111.2,
+    "chg_1m_pct": -0.6,
     "series_1y": [
      [
       "2025-08-14",
@@ -5290,10 +5328,6 @@
      [
       "2026-08-13",
       6813.34
-     ],
-     [
-      "2026-08-14",
-      6977.94
      ]
     ]
    },
@@ -5301,14 +5335,10 @@
     "ticker": "MU",
     "label": "마이크론",
     "why": "메모리 공급자 대표",
-    "price": 949.83,
-    "chg_1y_pct": 658.1,
-    "chg_1m_pct": 5.0,
+    "price": 971.66,
+    "chg_1y_pct": 703.9,
+    "chg_1m_pct": 13.9,
     "series_1y": [
-     [
-      "2025-08-14",
-      125.29
-     ],
      [
       "2025-08-15",
       120.87
@@ -6308,13 +6338,17 @@
      [
       "2026-08-13",
       949.83
+     ],
+     [
+      "2026-08-14",
+      971.66
      ]
     ]
    },
    "MEM_VS_GPU": {
     "label": "메모리/GPU 상대강도 (MU ÷ NVDA, 1년)",
     "why": "1 초과 = 가치가 수요처(GPU)에서 공급자(메모리)로 이동 = 공급부족 심화",
-    "value": 6.12,
+    "value": 6.44,
     "signal": "공급자 우위"
    }
   },
@@ -6398,9 +6432,9 @@
       "opm": 77.11,
       "roe": 101.7,
       "eps": 349595.0,
-      "per": 4.56,
+      "per": 4.71,
       "bps": 518268.0,
-      "pbr": 3.07
+      "pbr": 3.17
      },
      "2027": {
       "is_consensus": true,
@@ -6409,9 +6443,9 @@
       "opm": 78.35,
       "roe": 60.0,
       "eps": 436188.0,
-      "per": 3.65,
+      "per": 3.77,
       "bps": 944571.0,
-      "pbr": 1.69
+      "pbr": 1.74
      },
      "2028": {
       "is_consensus": true,
@@ -6420,9 +6454,9 @@
       "opm": 73.89,
       "roe": 39.12,
       "eps": 450129.0,
-      "per": 3.54,
+      "per": 3.65,
       "bps": 1370769.0,
-      "pbr": 1.16
+      "pbr": 1.2
      }
     },
     "consensus_live": {
@@ -6430,7 +6464,7 @@
      "fwd_per": 4.71,
      "eps_ttm": 103521.0,
      "per_ttm": 15.89,
-     "asof": "2026-08-14",
+     "asof": "2026-08-15",
      "target": 3317917.0,
      "recomm": "4.00",
      "target_asof": "2026-08-13"
@@ -6518,9 +6552,9 @@
       "opm": 52.93,
       "roe": 55.83,
       "eps": 47821.0,
-      "per": 5.6,
+      "per": 5.74,
       "bps": 109367.0,
-      "pbr": 2.45
+      "pbr": 2.51
      },
      "2027": {
       "is_consensus": true,
@@ -6529,9 +6563,9 @@
       "opm": 57.71,
       "roe": 48.32,
       "eps": 66500.0,
-      "per": 4.03,
+      "per": 4.13,
       "bps": 169255.0,
-      "pbr": 1.58
+      "pbr": 1.62
      },
      "2028": {
       "is_consensus": true,
@@ -6540,9 +6574,9 @@
       "opm": 54.37,
       "roe": 33.98,
       "eps": 67197.0,
-      "per": 3.99,
+      "per": 4.09,
       "bps": 231058.0,
-      "pbr": 1.16
+      "pbr": 1.19
      }
     },
     "consensus_live": {
@@ -6550,7 +6584,7 @@
      "fwd_per": 5.74,
      "eps_ttm": 12372.0,
      "per_ttm": 22.19,
-     "asof": "2026-08-14",
+     "asof": "2026-08-15",
      "target": 491875.0,
      "recomm": "4.04",
      "target_asof": "2026-08-13"
@@ -6562,13 +6596,13 @@
     "name": "Micron",
     "ticker": "MU",
     "currency": "USD",
-    "price": 949.83,
+    "price": 971.66,
     "eps_ttm": null,
     "eps_2026E": 73.4,
     "eps_2027E": 155.06,
     "per_ttm": null,
-    "per_2026E": 12.94,
-    "per_2027E": 6.13,
+    "per_2026E": 13.24,
+    "per_2027E": 6.27,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다"
    }
   ],

@@ -140,6 +140,10 @@ def _strip(t):
     t = re.sub(r"<[^>]+>", " ", t)
     t = _html.unescape(t)                       # &#177;→± &#8217;→' 등 일괄 해제
     t = t.replace("–", "-").replace("—", "-")
+    # (2026-08-15) 제로폭 공백(U+200B)·BOM — Word 기반 8-K 표의 셀 사이에 끼는데
+    # 정규식 \s 에 안 잡혀 "Net revenue ​ $ 5,890 ​ $ 6,180" 같은 표 행이 통째로
+    # 매칭 실패했다(실측 GMRS — Low/High 표가 있는데도 후보 미매칭).
+    t = t.replace("​", " ").replace("﻿", " ")
     return re.sub(r"\s+", " ", t)
 
 

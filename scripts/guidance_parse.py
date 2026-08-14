@@ -161,7 +161,9 @@ def _forms(label, metric):
         ("pmpct", label + r"[^$]{0,60}?" + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%"),
         # (2026-08-15) Low/High 두 열 표 — "Revenue $ 2,115 $ 2,175"(실측 MH·GMRS·EQPT).
         # 단위는 표 머리의 '($ in millions)' 선언에서 가져온다(루프에서 처리).
-        ("lowhigh", label + r"[^$%]{0,25}?\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*()\$\s?([\d,]+(?:\.\d+)?)(?!\d)()"),
+        # (2차) 숫자별 단위 병기형 "$925 million $945 million"(실측 JBI — Range 헤더 표)도 커버.
+        ("lowhigh", label + r"[^$%]{0,25}?\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*(billion|million|bn|mm)?\s+"
+                            r"\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*(billion|million|bn|mm)?(?![\w%])"),
         ("approx", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM),
     ]
 
@@ -397,8 +399,9 @@ def parse_guidance(txt, per_hint=None):
     # 회사 발표가 유일한 근거다. 없으면 화면에 '미제시'로 둔다(추정하지 않는다).
     # (2026-08-15) EPS 라벨 확장 — "Net income per (diluted|common) share" 표기(실측 LFTO·KLC·EAT).
     # 보통주 주당 순이익 = EPS 다. 'loss per share' 는 제외(음수 전용 표기, 컨센 비교 부적합).
+    # (2차) "Earnings per **diluted** share"(실측 미매칭 표본) — 어순이 바뀐 표기도 흔하다.
     for metric, label in (("rev", r"(?:revenues?|net sales)"),
-                          ("eps", r"(?:diluted\s+)?earnings per share|\beps\b|"
+                          ("eps", r"(?:diluted\s+)?earnings per (?:diluted\s+|common\s+)?share|\beps\b|"
                                   r"net income per (?:diluted\s+|common\s+)?share(?:s)?(?:\s*,\s*diluted)?"),
                           ("capex", r"(?:capital expenditures?|\bcapex\b)")):
         for kind, pat in _forms(label, metric):
@@ -409,8 +412,15 @@ def parse_guidance(txt, per_hint=None):
                 # (2026-08-15) Low/High 두 열 표 형식은 **열 머리글이 실제로 있을 때만** 믿는다
                 # — 구분자 없는 숫자 나열은 다른 표(실적 비교 등)에서도 흔해 오탐 위험이 크다.
                 back300 = txt[max(0, m.start() - 300):m.start()]
-                if kind == "lowhigh" and not re.search(r"\blow\b[\s\S]{0,40}?\bhigh\b", back300, re.I):
-                    continue
+                if kind == "lowhigh":
+                    _lh = re.search(r"\blow\b[\s\S]{0,40}?\bhigh\b", back300, re.I)
+                    # (2026-08-15 2차) 숫자마다 단위가 병기된 형태("$925 million $945 million")는
+                    # Low/High 머리글이 없어도 back 에 'Range' 표기가 있으면 범위로 인정한다
+                    # (실측 JBI — 'Range Year-Over-Year Growth' 머리글 표). 단위 없는 맨몸 숫자는
+                    # 실적 비교 표(당기|전기)와 구별이 안 되므로 Low/High 머리글을 계속 요구한다.
+                    _units = bool((m.group(2) or "") and (m.group(4) or ""))
+                    if not _lh and not (_units and re.search(r"\brange\b", back300, re.I)):
+                        continue
                 # (2026-08-15) Low·Midpoint·High **3열** 표(실측 CCSI) — 앞 두 값(하단·중간)이
                 # 아니라 첫·셋째 값(하단·상단)이 범위다.
                 if kind == "lowhigh" and re.search(r"\blow\b[\s\S]{0,25}?\bmid", back300, re.I):
