@@ -3895,6 +3895,13 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         presets:[['전체',null,null],['상향 +1%↑',1,null],['상향 +3%↑',3,null],['하향 −1%↓',null,-1]],def:[null,null]},
       cr30:{label:'EPS 컨센 리비전 변화율 (30일)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상향 +2%↑',2,null],['상향 +5%↑',5,null],['하향 −2%↓',null,-2]],def:[null,null]},
+      /* (2026-08-14) 주가 대비 리비전 — cr7·cr30 과 같은 원자료지만 기저(EPS 추정치)가
+         아니라 **주가**로 나눈다. 기저가 0 근처일 때 cr 이 폭주하는 문제(ZIM +1452% 사례)를
+         측정 방식 자체에서 회피 — 종목간 비교·정렬은 이 값을 우선 참고. */
+      pr7:{label:'EPS 리비전 (주가대비,7일)',fmt:v=>(v>0?'+':'')+v.toFixed(2)+'%p',reqData:1,
+        presets:[['전체',null,null],['상향 +0.2%p↑',0.2,null],['상향 +0.5%p↑',0.5,null],['하향 −0.2%p↓',null,-0.2]],def:[null,null]},
+      pr30:{label:'EPS 리비전 (주가대비,30일)',fmt:v=>(v>0?'+':'')+v.toFixed(2)+'%p',reqData:1,
+        presets:[['전체',null,null],['상향 +0.3%p↑',0.3,null],['상향 +0.8%p↑',0.8,null],['하향 −0.3%p↓',null,-0.3]],def:[null,null]},
       gap:{label:'매출 가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
       gapE:{label:'EPS 가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
@@ -3996,6 +4003,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     return row('공매도잔량비율', cell(r,'srf'), R.srf)+
       row('커버일수(Days to Cover)', cell(r,'scov'), R.scov)+
       row('기관보유비중', cell(r,'inst'), R.inst);
+  }
+  /* (2026-08-14) 저기저 배지 — cr7/cr30/cr90(%변화율) 옆에 붙여 "이 %는 기저가 작아 과장될
+     수 있음"을 알린다. 정확한 그때 기저값은 저장하지 않으므로 현재 컨센(eq0·eq1) 크기로
+     근사 판정(order-of-magnitude, 필터·정렬에는 미사용) — 정확한 기저는 상세 페이지에서 확인. */
+  function _lowBaseBadge(r){
+    const bs=[r.eq0,r.eq1].filter(x=>x!=null).map(Math.abs);
+    if(!bs.length) return '';
+    return Math.min(...bs)<0.5?' <span class="note" title="기저 EPS 추정치가 작아(약 '+Math.min(...bs).toFixed(2)+') %가 과장돼 보일 수 있음 — 옆 pr7/pr30(주가대비, %p) 참고">⚠저기저</span>':'';
   }
   function _drvjVal(r){
     const d=DRVSC&&DRVSC[r.c];
@@ -4444,6 +4459,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'tprv90': return r.tprv90!=null?r.tprv90:(mkt==='kr'&&r.rev!=null?r.rev*100:null);
       case 'sprb': return r.sprb;                                   // 최근 4분기 중 컨센 상회 횟수
       case 'cr30': return r.cr30!=null?r.cr30*100:null;             // 컨센서스 30일 리비전%
+      /* (2026-08-14) 주가 대비 리비전 — 기저 EPS 대신 주가로 나눠 저기저 폭주를 피한 병행 지표 */
+      case 'pr7':  return r.pr7!=null?r.pr7*100:null;
+      case 'pr30': return r.pr30!=null?r.pr30*100:null;
       case 'gap':  return r.gapR!=null?r.gapR:null;                 // 매출 가이던스 vs 컨센 갭%(US)
       case 'gapE': return r.gapE!=null?r.gapE:null;                 // EPS 가이던스 vs 컨센 갭%(US)
       /* 포털 갭 — 8-K 직접 파싱값 검증용 대조 값. 판정에는 쓰지 않는다(사용자 지시). */
@@ -4540,9 +4558,14 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       /* (2026-08-09) 실적발표 6종 — 부호가 곧 의미라 색으로 즉시 구분 */
       case 'spr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'최근 분기 EPS':'잠정 영업이익'} 컨센서스 대비">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'sprb': return `<span class="${v>=3?'up':'note'}" title="최근 ${r.sprn||4}분기 중 컨센 상회 횟수">${v.toFixed(0)}/${r.sprn||4}</span>`;
-      case 'cr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 30일 변화 · 상향 ${r.cup??'—'}명 / 하향 ${r.cdn??'—'}명">${v>0?'+':''}${v.toFixed(1)}%</span>`;
-      case 'cr7': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 7일 변화">${v>0?'+':''}${v.toFixed(1)}%</span>`;
-      case 'cr90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 90일 변화">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      /* (2026-08-14) 저기저 배지 — 기저(ago) 자체는 저장 안 하지만 현재 컨센(eq0·eq1)이
+         작으면 그 시점 기저도 작았을 가능성이 높다(order-of-magnitude 근사, 판정용 아님).
+         정확한 값은 상세 페이지 리비전 표(lvl())에서 실제 기저로 표시된다. */
+      case 'cr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 30일 변화 · 상향 ${r.cup??'—'}명 / 하향 ${r.cdn??'—'}명">${v>0?'+':''}${v.toFixed(1)}%${_lowBaseBadge(r)}</span>`;
+      case 'cr7': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 7일 변화">${v>0?'+':''}${v.toFixed(1)}%${_lowBaseBadge(r)}</span>`;
+      case 'cr90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 90일 변화">${v>0?'+':''}${v.toFixed(1)}%${_lowBaseBadge(r)}</span>`;
+      case 'pr7': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p) — 기저 EPS 크기와 무관해 종목간 비교 가능. cr7 이 저기저로 과장돼 보일 때 참고">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
+      case 'pr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p, 30일) — 기저 EPS 크기와 무관해 종목간 비교 가능">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'sspr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'직전 발표 매출 vs 발표시점 컨센(Zacks)':'잠정 매출 vs 컨센서스'}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'tprv90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="목표주가 90일 변화(cTB24 우선 · 없으면 일별 백필)">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'tprv': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="최근 30일 증권사 목표주가 평균 변동률 · 리포트 ${r.tpn??'—'}건(상향 ${r.tpu??'—'}·하향 ${r.tpd??'—'})">${v>0?'+':''}${v.toFixed(1)}%</span>`;
@@ -6286,6 +6309,10 @@ await _canvasFlow(c);
     /* ② EPS 추정 리비전 — 표 + 4점 곡선 (즉시) */
     let t3='';
     const RV=(J.rev||[]).filter(z=>z.cur!=null);
+    /* (2026-08-14) 저기저 문제(ZIM 0.08→1.38 = +1452%처럼 기저가 작아 %가 과장되는 경우) 대응.
+       현재가 — %가 폭주할 때 참고할 '주가 대비 %p'(=Δ÷주가)의 분모. 차트가 이미 그렸으면 최신 종가,
+       아니면 스크리너 풀의 px(어제 종가)로 대체. */
+    const _pxRV=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):(((POOL.us||[]).find(z=>z.c===c)||{}).px);
     if(RV.length){
       /* (2026-08-09 3차) 사용자 확정 사양:
          · 표 = 각 시점 실제 EPS + (현재값 대비 몇 % 수준인지)
@@ -6337,19 +6364,32 @@ await _canvasFlow(c);
       /* (2026-08-14) 괄호 = **그 시점→현재 변화율** 로 통일 — 스크리너의
          'EPS 컨센 리비전 변화율' 필터와 같은 산식(현재÷그때−1)이라 두 화면 숫자가 맞아떨어진다.
          예전 '현재 대비 수준(%)' 표기는 ZIM 처럼 0.09→1.38 인 종목에서 필터 +1,214% 와
-         표 6.4% 가 서로 다른 수치처럼 보이게 했다(실은 같은 데이터의 다른 표현). */
-      const lvl=(v,cur)=>{ if(v==null||cur==null||v<=0) return '';
-        const p=(cur/v-1)*100, z=Math.abs(p)<0.05;
-        return ` <span class="${z?'':(p>0?'up':'dn')}" style="font-size:10.5px${z?';color:#3d454f':''}">(${p>0?'+':''}${p.toFixed(1)}%)</span>`; };
-      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(괄호 = 그 시점 → 현재 <b>변화율</b> — 스크리너 'EPS 컨센 리비전 변화율' 필터와 같은 산식. 필터 값은 진행분기·다음분기 평균)</span>
+         표 6.4% 가 서로 다른 수치처럼 보이게 했다(실은 같은 데이터의 다른 표현).
+         (2026-08-14 추가, 저기저 대응 1+2+3) 기저가 작아 %가 과장되는 문제(ZIM +1452%)를
+         숨기지 않고 함께 보여준다: ① 절대변화(Δ) 병기 ② 기저<0.5 면 ⚠저기저 배지
+         ③ 주가 대비 %p(=Δ÷현재가) — 기저 크기와 무관해 종목간 비교엔 이 값이 더 적절하다. */
+      const lvl=(v,cur,px)=>{ if(v==null||cur==null) return '';
+        const delta=cur-v, dS=(delta>0?'+':'')+delta.toFixed(2);
+        let pctHtml;
+        if(v>0){
+          const p=(cur/v-1)*100, z=Math.abs(p)<0.05;
+          pctHtml=`<span class="${z?'':(p>0?'up':'dn')}"${z?' style="color:#3d454f"':''}>${p>0?'+':''}${p.toFixed(1)}%</span>`;
+        } else {
+          pctHtml='<span class="note">기저≤0(%무의미)</span>';
+        }
+        const pxp=(px&&px>0)?(delta/px*100):null;
+        const pxHtml=pxp!=null?`, <span class="note">주가대비${pxp>0?'+':''}${pxp.toFixed(2)}%p</span>`:'';
+        const warnHtml=Math.abs(v)<0.5?` <span class="note" title="기저 EPS ${v.toFixed(2)} — 값이 작아 %가 과장돼 보일 수 있음. 주가대비%p 를 함께 참고">⚠저기저</span>`:'';
+        return ` <span style="font-size:10.5px">(${pctHtml}, Δ${dS}${pxHtml})</span>${warnHtml}`; };
+      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(괄호 = 그 시점 → 현재 <b>변화율, Δ절대변화, 주가대비%p</b> — 변화율은 스크리너 'EPS 컨센 리비전 변화율' 필터와 같은 산식. ⚠저기저 = 기저 EPS&lt;0.5 로 %가 과장될 수 있음. 필터 값은 진행분기·다음분기 평균)</span>
         <table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전</th><th>60일 전</th><th>30일 전</th><th>7일 전</th><th>현재<span class="note">(=100%)</span></th></tr>`+
         RV.map(z=>
           `<tr style="border-bottom:1px solid #f4f6f8"><td style="padding:2px 4px"><b style="color:${COLS[z.per]||'#888'}">${LBL[z.per]||z.per}</b></td>
-            <td style="text-align:right">${f2(z.d90)}${lvl(z.d90,z.cur)}</td>
-            <td style="text-align:right">${f2(z.d60)}${lvl(z.d60,z.cur)}</td>
-            <td style="text-align:right">${f2(z.d30)}${lvl(z.d30,z.cur)}</td>
-            <td style="text-align:right">${f2(z.d7)}${lvl(z.d7,z.cur)}</td>
+            <td style="text-align:right">${f2(z.d90)}${lvl(z.d90,z.cur,_pxRV)}</td>
+            <td style="text-align:right">${f2(z.d60)}${lvl(z.d60,z.cur,_pxRV)}</td>
+            <td style="text-align:right">${f2(z.d30)}${lvl(z.d30,z.cur,_pxRV)}</td>
+            <td style="text-align:right">${f2(z.d7)}${lvl(z.d7,z.cur,_pxRV)}</td>
             <td style="text-align:right"><b>${f2(z.cur)}</b></td></tr>`).join('')+'</table>'+
         `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${panels}</div>
           <div class="note" style="margin-top:2px">${leg}</div></div>`;

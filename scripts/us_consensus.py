@@ -15,6 +15,9 @@ screener_pool.py 가 이 값들을 함께 받지만, 풀 전체 빌드는 30분~
   spra  4분기 서프라이즈 중위값        (평균은 흑자전환 분기 하나에 폭주 — 실측 INTC +1361%)
   cr30  다음분기·당분기 EPS 컨센 30일 리비전 (Yahoo 가 과거값을 함께 줘 즉시 산출)
   cr7 · cr90 · cup(30일 상향 애널수) · cdn(하향)
+  pr7 · pr30 · pr90  cr 과 같은 변화를 **주가 대비 %p** 로 표시 (=(cur-ago)/px, 2026-08-14 신설)
+        cr 은 기저(ago)가 0 근처면 폭주한다(실측 ZIM 0.08→1.38 = +1452%, 실제 영향은 작음).
+        pr 은 기저 크기와 무관해 종목간 비교·정렬 기준으로 쓴다. cr 은 그대로 유지(병행 표시).
   eq1   다음분기 EPS 컨센 · rq1 다음분기 매출 컨센  ← 8-K 가이던스 갭 계산의 기준
 
 사용: us_consensus.py [--limit N] [--workers N]
@@ -28,7 +31,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pool_merge import save_pool_merged
 # (2026-08-10) 이 스크립트가 책임지는 필드만 병합 저장 — 다른 수집기 결과를 덮지 않는다
-CONS_FIELDS = ("spr","sprb","sprn","spra","cr7","cr30","cr90","cup","cdn","eq0","rq0","eq1","rq1","nan1","q0e","q1e","ey0","ey1","ry0","ry1","tprv","tprv90")
+CONS_FIELDS = ("spr","sprb","sprn","spra","cr7","cr30","cr90","pr7","pr30","pr90","cup","cdn","eq0","rq0","eq1","rq1","nan1","q0e","q1e","ey0","ey1","ry0","ry1","tprv","tprv90")
 
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
@@ -56,27 +59,41 @@ def _raw(x):
     return (x or {}).get("raw") if isinstance(x, dict) else None
 
 
-def parse(fd):
+def parse(fd, px=None):
     out = {}
     et = (fd.get("earningsTrend") or {}).get("trend", []) or []
 
-    def rv(days):
-        vs = []
+    def _pairs(days):
+        ps = []
         for per in ("0q", "+1q"):
             t = next((x for x in et if x.get("period") == per), None)
             if not t:
                 continue
             tr = t.get("epsTrend") or {}
             cur, ago = _raw(tr.get("current")), _raw(tr.get(days))
-            # 추정치가 음수·0 근처면 비율이 폭주한다 → 양수만
-            if cur is not None and ago and ago > 0:
-                vs.append(cur / ago - 1.0)
+            if cur is not None and ago is not None:
+                ps.append((cur, ago))
+        return ps
+
+    def rv(days):
+        # 추정치가 음수·0 근처면 비율이 폭주한다 → 양수만
+        vs = [c / a - 1.0 for c, a in _pairs(days) if a > 0]
         return round(sum(vs) / len(vs), 4) if vs else None
 
-    for lab, d in (("cr7", "7daysAgo"), ("cr30", "30daysAgo"), ("cr90", "90daysAgo")):
+    def rv_px(days):
+        # 주가 대비 %p — 기저(a)가 0 근처거나 음수여도 폭주하지 않는다
+        if not px or px <= 0:
+            return None
+        vs = [(c - a) / px for c, a in _pairs(days)]
+        return round(sum(vs) / len(vs), 4) if vs else None
+
+    for lab, prlab, d in (("cr7", "pr7", "7daysAgo"), ("cr30", "pr30", "30daysAgo"), ("cr90", "pr90", "90daysAgo")):
         v = rv(d)
         if v is not None:
             out[lab] = v
+        pv = rv_px(d)
+        if pv is not None:
+            out[prlab] = pv
     # (2026-08-09) 분기 종료일 — 가이던스가 어느 분기를 가리키는지 판정하는 기준.
     # 회사가 말하는 '다음 분기' = 발표 시점에 진행 중인 분기(0q) 이므로 종료일 비교가 필요하다.
     for lab, per in (("q0e", "0q"), ("q1e", "+1q")):
@@ -139,6 +156,8 @@ def main():
         syms = syms[:LIMIT]
     op, crumb = opener()
     print(f"[uscons] 대상 {len(syms)}종목", flush=True)
+    # (2026-08-14) pr7/30/90(주가대비 리비전) 계산용 — 풀에 이미 있는 어제자 종가.
+    pxmap = {r["c"]: r.get("px") for r in us if r.get("c")}
 
     def one(sym):
         for att in range(2):
@@ -146,7 +165,7 @@ def main():
                 u = (f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{sym}"
                      f"?modules=earningsTrend,earningsHistory&crumb={urllib.parse.quote(crumb)}")
                 j = json.loads(op.open(u, timeout=15).read())
-                return sym, parse((j["quoteSummary"]["result"] or [{}])[0])
+                return sym, parse((j["quoteSummary"]["result"] or [{}])[0], pxmap.get(sym))
             except Exception:
                 time.sleep(0.4 * (att + 1))
         return sym, {}

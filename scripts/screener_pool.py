@@ -314,24 +314,36 @@ def _enrich_us(us):
             cur=(tr.get("current") or {}).get("raw"); ago=(tr.get("90daysAgo") or {}).get("raw")
             if cur is not None and ago and ago>0: revs.append(cur/ago-1.0)
         return (sum(revs)/len(revs)) if revs else None
-    def _cons(fd):
+    def _cons(fd,px=None):
         """(2026-08-09) 컨센서스 리비전 — '실적발표 후 애널리스트가 전망을 어떻게 바꿨나'.
 
         Yahoo earningsTrend 는 epsTrend 에 **현재·7일전·30일전·90일전 추정치를 한꺼번에** 준다
         (실측 SNDK: 0q 46.17 / 7d 44.29 / 30d 42.93 / 90d 39.29). 별도 일별 스냅샷을
         몇 주 쌓을 필요 없이 즉시 리비전을 계산할 수 있다.
         기간은 **0q(당분기)·+1q(다음분기)** — 연간(0y)보다 실적발표 반응이 빠르다.
+
+        cr7/30/90 은 변화율(cur/ago-1) — 기저(ago)가 0 근처면 값이 폭주한다
+        (실측 ZIM 0.08→1.38 = +1452%, 실제 임팩트는 작음). pr7/30/90 은 같은 변화를
+        **주가 대비 %p**로 표시(=(cur-ago)/px) — 기저 크기와 무관해 종목간 비교가 가능하다.
+        cr 은 그대로 두고(정직한 원래 값) pr 을 병행 지표로 추가한다(2026-08-14).
         """
         et=(fd.get("earningsTrend") or {}).get("trend",[]) or []
-        def rv(days):
-            out=[]
+        def _pairs(days):
+            ps=[]
             for per in ("0q","+1q"):
                 t=next((x for x in et if x.get("period")==per),None)
                 if not t: continue
                 tr=t.get("epsTrend") or {}
                 cur=(tr.get("current") or {}).get("raw"); ago=(tr.get(days) or {}).get("raw")
-                # 추정치가 음수거나 0 근처면 비율이 폭주한다 → 양수만 사용
-                if cur is not None and ago and ago>0: out.append(cur/ago-1.0)
+                if cur is not None and ago is not None: ps.append((cur,ago))
+            return ps
+        def rv(days):
+            # 추정치가 음수거나 0 근처면 비율이 폭주한다 → 양수만 사용
+            out=[c/a-1.0 for c,a in _pairs(days) if a>0]
+            return (sum(out)/len(out)) if out else None
+        def rv_px(days):
+            if not px or px<=0: return None
+            out=[(c-a)/px for c,a in _pairs(days)]
             return (sum(out)/len(out)) if out else None
         up=dn=0; eq1=rq1=nan1=None
         t1=next((x for x in et if x.get("period")=="+1q"),None)
@@ -343,6 +355,7 @@ def _enrich_us(us):
             eq1=(ee.get("avg") or {}).get("raw"); nan1=(ee.get("numberOfAnalysts") or {}).get("raw")
             rq1=(re_.get("avg") or {}).get("raw")
         return {"cr30":rv("30daysAgo"),"cr7":rv("7daysAgo"),"cr90":rv("90daysAgo"),
+                "pr30":rv_px("30daysAgo"),"pr7":rv_px("7daysAgo"),"pr90":rv_px("90daysAgo"),
                 "cup":up,"cdn":dn,"eq1":eq1,"rq1":rq1,"nan1":nan1}
 
     def _spr(fd):
@@ -386,7 +399,7 @@ def _enrich_us(us):
                         "tp":v(fdd.get("targetMeanPrice")),"tphi":v(fdd.get("targetHighPrice")),
                         "tplo":v(fdd.get("targetLowPrice")),"rec":v(fdd.get("recommendationMean")),
                         "nan":v(fdd.get("numberOfAnalystOpinions")),"oploss":_op3neg_us(r["c"]),
-                        "eps_rev":_eps_rev(fd),**_cons(fd),**_spr(fd)}
+                        "eps_rev":_eps_rev(fd),**_cons(fd,r.get("px")),**_spr(fd)}
             except Exception:
                 time.sleep(0.5*(att+1))
         return r
@@ -402,7 +415,7 @@ def _enrich_us(us):
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
     CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev","opm","psr",
-        "cr30","cr7","cr90","cup","cdn","eq1","rq1","nan1","spr","sprb","sprn","spra")
+        "cr30","cr7","cr90","pr30","pr7","pr90","cup","cdn","eq1","rq1","nan1","spr","sprb","sprn","spra")
     cf=0
     for c in by:
         if "sector" not in by[c] and c in prev:
