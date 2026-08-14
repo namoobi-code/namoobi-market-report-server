@@ -96,3 +96,7 @@
 # ── [부록E] 피지컬 AI(휴머노이드) 밸류체인 54종 수집 (1일 2회 — 미국 종가 후 06:50 · 한국 종가 후 15:50) ──
 50 6  * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_appe.py data/db appe >> /home/ubuntu/namoobi/appe.log 2>&1
 50 15 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_appe.py data/db appe >> /home/ubuntu/namoobi/appe.log 2>&1
+
+# ── [부록A] 버크셔 13F — EDGAR 공시 감지·자동 갱신 (마감일 2/14·5/15·8/14·11/14, 변동 없으면 즉시 종료) ──
+20 6  * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_13f.py data/db >> /home/ubuntu/namoobi/berk13f.log 2>&1
+20 12 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_13f.py data/db >> /home/ubuntu/namoobi/berk13f.log 2>&1
