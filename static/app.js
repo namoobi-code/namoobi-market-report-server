@@ -4004,13 +4004,19 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       row('커버일수(Days to Cover)', cell(r,'scov'), R.scov)+
       row('기관보유비중', cell(r,'inst'), R.inst);
   }
-  /* (2026-08-14) 저기저 배지 — cr7/cr30/cr90(%변화율) 옆에 붙여 "이 %는 기저가 작아 과장될
-     수 있음"을 알린다. 정확한 그때 기저값은 저장하지 않으므로 현재 컨센(eq0·eq1) 크기로
-     근사 판정(order-of-magnitude, 필터·정렬에는 미사용) — 정확한 기저는 상세 페이지에서 확인. */
-  function _lowBaseBadge(r){
+  /* (2026-08-14, 2차 수정) 기저가 작으면 cr7/cr30/cr90(%변화율) 자체를 **주가 대비 %p**로
+     바꿔 표시한다 — 처음엔 배지(⚠저기저)만 달았는데, 사용자 피드백으로 배지 대신 실제
+     대체 수치를 바로 보여주는 쪽으로 변경("저기저라고 표시하던 주가대비로 표시하던"→
+     "주가대비로 표시하는게 좋을것 같다"). 정확한 그때 기저값은 저장하지 않으므로
+     현재 컨센(eq0·eq1) 크기로 근사 판정(order-of-magnitude, 필터·정렬 기준에는 미사용). */
+  function _crDisplay(r,prKey,v){
     const bs=[r.eq0,r.eq1].filter(x=>x!=null).map(Math.abs);
-    if(!bs.length) return '';
-    return Math.min(...bs)<0.5?' <span class="note" title="기저 EPS 추정치가 작아(약 '+Math.min(...bs).toFixed(2)+') %가 과장돼 보일 수 있음 — 옆 pr7/pr30(주가대비, %p) 참고">⚠저기저</span>':'';
+    if(!bs.length||Math.min(...bs)>=0.5) return null;
+    const pv=prKey?r[prKey]:null;
+    if(pv==null) return null;
+    const p=pv*100, z=Math.abs(p)<0.05;
+    return {cls:z?'':(p>0?'up':'dn'), text:(p>0?'+':'')+p.toFixed(2)+'%p',
+      title:`기저 EPS 추정치가 작아(약 ${Math.min(...bs).toFixed(2)}) 변화율(${v>0?'+':''}${v.toFixed(1)}%)이 과장될 수 있어 주가 대비 %p(=ΔEPS÷현재가)로 대체 표시`};
   }
   function _drvjVal(r){
     const d=DRVSC&&DRVSC[r.c];
@@ -4558,12 +4564,18 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       /* (2026-08-09) 실적발표 6종 — 부호가 곧 의미라 색으로 즉시 구분 */
       case 'spr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'최근 분기 EPS':'잠정 영업이익'} 컨센서스 대비">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'sprb': return `<span class="${v>=3?'up':'note'}" title="최근 ${r.sprn||4}분기 중 컨센 상회 횟수">${v.toFixed(0)}/${r.sprn||4}</span>`;
-      /* (2026-08-14) 저기저 배지 — 기저(ago) 자체는 저장 안 하지만 현재 컨센(eq0·eq1)이
-         작으면 그 시점 기저도 작았을 가능성이 높다(order-of-magnitude 근사, 판정용 아님).
-         정확한 값은 상세 페이지 리비전 표(lvl())에서 실제 기저로 표시된다. */
-      case 'cr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 30일 변화 · 상향 ${r.cup??'—'}명 / 하향 ${r.cdn??'—'}명">${v>0?'+':''}${v.toFixed(1)}%${_lowBaseBadge(r)}</span>`;
-      case 'cr7': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 7일 변화">${v>0?'+':''}${v.toFixed(1)}%${_lowBaseBadge(r)}</span>`;
-      case 'cr90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 90일 변화">${v>0?'+':''}${v.toFixed(1)}%${_lowBaseBadge(r)}</span>`;
+      /* (2026-08-14, 2차) 기저가 작으면 %가 폭주해 의미가 없다(ZIM +1452% 사례) — 그 경우
+         원래 %가 아니라 **주가 대비 %p**로 바꿔서 보여준다(_crDisplay). 기저가 정상이면
+         평소대로 %. */
+      case 'cr30': { const sw=_crDisplay(r,'pr30',v);
+        if(sw) return `<span class="${sw.cls}" title="${sw.title}">${sw.text}</span>`;
+        return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 30일 변화 · 상향 ${r.cup??'—'}명 / 하향 ${r.cdn??'—'}명">${v>0?'+':''}${v.toFixed(1)}%</span>`; }
+      case 'cr7': { const sw=_crDisplay(r,'pr7',v);
+        if(sw) return `<span class="${sw.cls}" title="${sw.title}">${sw.text}</span>`;
+        return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 7일 변화">${v>0?'+':''}${v.toFixed(1)}%</span>`; }
+      case 'cr90': { const sw=_crDisplay(r,'pr90',v);
+        if(sw) return `<span class="${sw.cls}" title="${sw.title}">${sw.text}</span>`;
+        return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 90일 변화">${v>0?'+':''}${v.toFixed(1)}%</span>`; }
       case 'pr7': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p) — 기저 EPS 크기와 무관해 종목간 비교 가능. cr7 이 저기저로 과장돼 보일 때 참고">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'pr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p, 30일) — 기저 EPS 크기와 무관해 종목간 비교 가능">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'sspr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'직전 발표 매출 vs 발표시점 컨센(Zacks)':'잠정 매출 vs 컨센서스'}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
