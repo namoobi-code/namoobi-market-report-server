@@ -3895,13 +3895,20 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         presets:[['전체',null,null],['상향 +1%↑',1,null],['상향 +3%↑',3,null],['하향 −1%↓',null,-1]],def:[null,null]},
       cr30:{label:'EPS 컨센 리비전 변화율 (30일)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상향 +2%↑',2,null],['상향 +5%↑',5,null],['하향 −2%↓',null,-2]],def:[null,null]},
-      /* (2026-08-14) 주가 대비 리비전 — cr7·cr30 과 같은 원자료지만 기저(EPS 추정치)가
+      /* (2026-08-14, 2차) cr90 이 필터 정의가 없어 컬럼 헤더가 CDEF 의 짧은 이름('추정90일')
+         으로 남아있었다(자동 동기화는 DEF[mkt] 에 정의가 있어야 동작) — cr7/cr30 과 짝 맞춤. */
+      cr90:{label:'EPS 컨센 리비전 변화율 (90일)',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
+        presets:[['전체',null,null],['상향 +5%↑',5,null],['상향 +10%↑',10,null],['하향 −5%↓',null,-5]],def:[null,null]},
+      /* (2026-08-14) 주가 대비 리비전 — cr7·cr30·cr90 과 같은 원자료지만 기저(EPS 추정치)가
          아니라 **주가**로 나눈다. 기저가 0 근처일 때 cr 이 폭주하는 문제(ZIM +1452% 사례)를
-         측정 방식 자체에서 회피 — 종목간 비교·정렬은 이 값을 우선 참고. */
+         측정 방식 자체에서 회피 — 종목간 비교·정렬은 이 값을 우선 참고. cr7/30/90 컬럼은
+         이제 화면에 조건 없이 이 값(%p)으로 표시된다(위 셀 렌더링 참고). */
       pr7:{label:'EPS 리비전 (주가대비,7일)',fmt:v=>(v>0?'+':'')+v.toFixed(2)+'%p',reqData:1,
         presets:[['전체',null,null],['상향 +0.2%p↑',0.2,null],['상향 +0.5%p↑',0.5,null],['하향 −0.2%p↓',null,-0.2]],def:[null,null]},
       pr30:{label:'EPS 리비전 (주가대비,30일)',fmt:v=>(v>0?'+':'')+v.toFixed(2)+'%p',reqData:1,
         presets:[['전체',null,null],['상향 +0.3%p↑',0.3,null],['상향 +0.8%p↑',0.8,null],['하향 −0.3%p↓',null,-0.3]],def:[null,null]},
+      pr90:{label:'EPS 리비전 (주가대비,90일)',fmt:v=>(v>0?'+':'')+v.toFixed(2)+'%p',reqData:1,
+        presets:[['전체',null,null],['상향 +0.5%p↑',0.5,null],['상향 +1%p↑',1,null],['하향 −0.5%p↓',null,-0.5]],def:[null,null]},
       gap:{label:'매출 가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
         presets:[['전체',null,null],['상회 +2%↑',2,null],['하회 −2%↓',null,-2],['크게 하회 −5%↓',null,-5]],def:[null,null]},
       gapE:{label:'EPS 가이던스 갭',fmt:v=>(v>0?'+':'')+v.toFixed(1)+'%',reqData:1,
@@ -3940,7 +3947,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               'ern','cov','upside','rec','rev','nan',
               /* (2026-08-09) 실적발표 이벤트 — 실적(서프)·전망(리비전·가이던스)·주가(반응) 순
                  (2026-08-10) cr7 · gapE 추가 — 리비전 7일 / 가이던스 갭 매출·EPS 분리 */
-              'edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20',
+              'edld','spr','sspr','sprb','cr7','cr30','cr90','pr7','pr30','pr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20',
               'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
      파생 z 3종(베이시스·풋콜(OI)·IV스큐 — 방향지표만, GEX·OI 제외):
@@ -4331,7 +4338,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     recn:{l:'투자의견',n:1,m:'both'}, rev:{l:'리비전',n:1,m:'both'}, nan:{l:'애널수',n:1,m:'us'},
     /* (2026-08-09) 실적발표 — 필터 6종과 1:1 대응. 필터가 있으면 컬럼도 있어야 표에서 값을 확인할 수 있다. */
     edld:{l:'실적발표일',n:1,m:'both'}, spr:{l:'실적서프%',n:1,m:'both'}, sspr:{l:'매출서프%',n:1,m:'both'}, sprb:{l:'비트4Q',n:1,m:'us'}, cr7:{l:'컨센7일',n:1,m:'us'}, cr30:{l:'컨센30일',n:1,m:'both'},
-    cr90:{l:'추정90일',n:1,m:'both'}, tprv:{l:'목표가30일',n:1,m:'both'}, tprv90:{l:'목표가90일',n:1,m:'both'}, gap:{l:'매출 가이던스 갭',n:1,m:'us'}, gapP:{l:'매출 가이던스 갭(포털)',n:1,m:'us'},
+    cr90:{l:'추정90일',n:1,m:'both'},
+    /* (2026-08-14) 주가 대비 리비전 컬럼 — cr7/30/90 은 화면에서 이미 이 값(%p)으로 표시되지만
+       필터·컬럼 목록에도 독립적으로 노출해 정렬·필터링에 직접 쓸 수 있게 한다. */
+    pr7:{l:'리비전 주가대비7일',n:1,m:'us'}, pr30:{l:'리비전 주가대비30일',n:1,m:'us'}, pr90:{l:'리비전 주가대비90일',n:1,m:'us'},
+    tprv:{l:'목표가30일',n:1,m:'both'}, tprv90:{l:'목표가90일',n:1,m:'both'}, gap:{l:'매출 가이던스 갭',n:1,m:'us'}, gapP:{l:'매출 가이던스 갭(포털)',n:1,m:'us'},
     gapE:{l:'EPS 가이던스 갭',n:1,m:'us'}, gapEP:{l:'EPS 가이던스 갭(포털)',n:1,m:'us'},
     r1:{l:'발표D+1',n:1,m:'both'}, r20:{l:'발표D+20',n:1,m:'both'},
     grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
@@ -4466,6 +4477,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       /* (2026-08-14) 주가 대비 리비전 — 기저 EPS 대신 주가로 나눠 저기저 폭주를 피한 병행 지표 */
       case 'pr7':  return r.pr7!=null?r.pr7*100:null;
       case 'pr30': return r.pr30!=null?r.pr30*100:null;
+      case 'pr90': return r.pr90!=null?r.pr90*100:null;
       case 'gap':  return r.gapR!=null?r.gapR:null;                 // 매출 가이던스 vs 컨센 갭%(US)
       case 'gapE': return r.gapE!=null?r.gapE:null;                 // EPS 가이던스 vs 컨센 갭%(US)
       /* 포털 갭 — 8-K 직접 파싱값 검증용 대조 값. 판정에는 쓰지 않는다(사용자 지시). */
@@ -4576,6 +4588,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'EPS':'영업이익'} 컨센서스 90일 변화">${v>0?'+':''}${v.toFixed(1)}%</span>`; }
       case 'pr7': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p) — 기저 EPS 크기와 무관해 종목간 비교 가능. cr7 이 저기저로 과장돼 보일 때 참고">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'pr30': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p, 30일) — 기저 EPS 크기와 무관해 종목간 비교 가능">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
+      case 'pr90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="EPS 컨센서스 리비전을 주가로 나눈 값(%p, 90일) — 기저 EPS 크기와 무관해 종목간 비교 가능">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
       case 'sspr': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="${mkt==='us'?'직전 발표 매출 vs 발표시점 컨센(Zacks)':'잠정 매출 vs 컨센서스'}">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'tprv90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="목표주가 90일 변화(cTB24 우선 · 없으면 일별 백필)">${v>0?'+':''}${v.toFixed(1)}%</span>`;
       case 'tprv': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="최근 30일 증권사 목표주가 평균 변동률 · 리포트 ${r.tpn??'—'}건(상향 ${r.tpu??'—'}·하향 ${r.tpd??'—'})">${v>0?'+':''}${v.toFixed(1)}%</span>`;
@@ -4729,7 +4742,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['발표 후 경과일','<b>실제 실적발표를 감지한 날</b>로부터 며칠 지났나. 위쪽 <b>어닝일(D±)</b>은 Yahoo·네이버 IR 의 <b>예정일</b>이라 실제 발표일과 다를 수 있는데, 서프라이즈·발표 후 반응 값은 전부 이 실제 발표일 기준이다. 최근 45일치만 추적한다'],
         ['실적 서프라이즈','실제 실적이 증권사 컨센서스를 몇 % 웃돌았나. <b>미국=EPS · 한국=영업이익</b>(잠정공시 vs 컨센). <b>함정</b>: 발표 직전 컨센이 낮아졌다면 쉬운 허들을 넘은 것 — 반드시 <b>컨센30일</b>과 같이 볼 것'],
         ['연속 비트(4Q중)','최근 4분기 중 컨센 상회 횟수. 꾸준히 이기는 회사는 다음 분기도 이길 확률이 높다(서프라이즈 지속성). 평균 대신 중위값 사용 — 적자→흑자 분기 하나가 평균을 왜곡한다(실측 INTC 평균 +1,361%)'],
-        ['컨센 30일 리비전','다음 분기 컨센서스 추정치의 30일 전 대비 변화율. <b>가이던스가 시장에 어떻게 소화됐나</b>의 결과다. +5%↑=애널리스트가 전망 상향. 미국은 즉시 산출, <b>한국은 스냅샷 30일 누적 후(2026-09-08~)</b>'],
+        ['컨센 7·30·90일 리비전','진행분기·다음분기 EPS 컨센서스 추정치의 그 시점 대비 변화율(평균). <b>가이던스가 시장에 어떻게 소화됐나</b>의 결과다. +5%↑=애널리스트가 전망 상향. 미국은 즉시 산출, <b>한국(컨센30일=영업이익 리비전)은 스냅샷 30일 누적 후(2026-09-08~)</b>. <b>주의</b>: 기저(그 시점 EPS 추정치)가 0 근처인 종목은 %가 크게 부풀 수 있어(예: 0.09→1.38 = +1452%, 실제 영향은 작음) 그런 경우 화면 값이 자동으로 <b>주가 대비 %p</b>로 바뀐다(아래 항목 참고) — 값은 정확하고, 표시 방식만 바뀌는 것'],
+        ['리비전 주가대비 7·30·90일','위 컨센 리비전과 같은 원자료를 <b>주가로 나눈 값</b>(=ΔEPS÷현재가, %p) — 기저 EPS 크기와 무관해 종목간 비교·정렬에 더 적합하다. 컨센 리비전 컬럼이 기저가 작아 %가 과장될 때 화면에 자동으로 이 값이 대신 표시되며, 독립 필터·컬럼으로도 선택 가능'],
         ['가이던스 갭','회사가 제시한 다음 분기 전망 중간값 vs 애널리스트 컨센서스. <b>주가보다 빠른 유일한 신호</b>(SEC 8-K 보도자료 실시간 파싱). 실측 정확도 9/12 — 못 잡으면 빈칸(틀린 값보다 낫다). 애플처럼 숫자 가이던스를 안 주는 회사도 있다. <b>한국은 가이던스 공시 관행 없음</b>'],
         ['발표 후 1일','발표 <b>직전</b> 종가 대비 다음 거래일 등락률(장 마감 후 발표가 많아 당일 종가 기준이면 반응이 잘린다). <b>서프 + 인데 여기가 − 면 가이던스 쇼크</b> — 샌디스크 케이스'],
         ['발표 후 20일(PEAD)','발표 후 20거래일 수익률. PEAD(발표후 표류) = 서프라이즈 방향으로 주가가 수 주간 계속 흐르는 현상. 발표 다음 날 진입해도 남은 구간이 있다는 뜻'],
@@ -4841,7 +4855,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   const GCAT=[['시세',['px','chg','cap','tv','turn']],['기간수익률',['r1m','r3m','r6m','mom']],
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
+      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','pr7','pr30','pr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
     ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
     ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
@@ -5053,7 +5067,7 @@ await _canvasFlow(c);
              ['기간수익률',['r1m','r3m','r6m','mom']],
              ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
              ['컨센서스',['ern','tp','upside','recn','rev','nan']],
-      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
+      ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','pr7','pr30','pr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
              ['밸류·수익성',['per','peg','pbr','psr','divy','payout','roe','opm']],
              ['성장',['grw','revg','opg','tob']],
              ['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
