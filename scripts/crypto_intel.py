@@ -23,10 +23,18 @@ DB   = BASE / "data" / "db"
 SYMS = ["BTC", "ETH", "XRP", "SOL"]
 UA   = {"User-Agent": "Mozilla/5.0"}
 
-def jget(url, timeout=15, headers=None):
-    req = urllib.request.Request(url, headers=headers or UA)
-    with urllib.request.urlopen(req, timeout=timeout) as r:
-        return json.loads(r.read().decode())
+def jget(url, timeout=25, headers=None, tries=3):
+    # (2026-08-14) CoinGecko global 응답 지연으로 overview 가 8시간 정지한 사고 → 타임아웃 상향 + 3회 재시도
+    import time as _t
+    last = None
+    for i in range(tries):
+        try:
+            req = urllib.request.Request(url, headers=headers or UA)
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode())
+        except Exception as e:
+            last = e; _t.sleep(1.5 * (i + 1))
+    raise last
 
 def load(name):
     p = DB / f"{name}.json"

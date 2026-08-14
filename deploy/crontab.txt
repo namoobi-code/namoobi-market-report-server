@@ -103,3 +103,7 @@
 # 10-Q(분기보고서) 자금흐름 — 13F보다 약 5일 먼저 나온다
 25 6  * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_10q.py data/db >> /home/ubuntu/namoobi/berk10q.log 2>&1
 25 12 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_10q.py data/db >> /home/ubuntu/namoobi/berk10q.log 2>&1
+
+# ── 자가진단 (2시간마다 점검 · 매일 08:05 경보 메일) — 번들 비대·스키마 드리프트·수집 정지·자원 부족 감시 ──
+5 */2 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py >> /home/ubuntu/namoobi/health.log 2>&1
+5 8 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py --mail >> /home/ubuntu/namoobi/health.log 2>&1

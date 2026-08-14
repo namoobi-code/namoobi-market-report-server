@@ -815,10 +815,11 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     ta_verdict:'TradingAgents 최종 판정 — 리스크 심사 결과·승인 종목·가격 스냅샷 (스킬 실행 시 기록)',
     ta_perf:'TradingAgents 5단계 성과추적 — 판정 종목 경과 수익률·벤치마크 α (탈락 포함, 생존편향 방지)',
     ta_status:'TradingAgents 스크리닝 파이프라인 실행 상태·회차 로그',
+    health:'서버 자가진단 — 번들 크기·API 응답·스키마 드리프트·DB 신선도·자원 (2시간마다, 헤더 배지)',
     ta_flag:'TradingAgents 스크리닝 완료 플래그 — 거래일·완료 여부'};
   // (2026-07-17) 수집 주체 — 🖥 서버 cron 자체 수집(리포트 실행과 무관하게 최신) vs 📄 리포트 실행 시 수집
   const SRV={customs:'06:35·15:35',leading:'06:35·15:35',series_leading:'06:35·15:35',krx_brief:'06:35·15:35',
-    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',kr_liquidity:'06:35·14:10·16:10',appe:'06:50·15:50',berkshire:'06:20·12:20(13F·10-Q 공시 감지)',
+    series_hy_oas:'06:35·15:35',memory:'06:45·15:45',kr_liquidity:'06:35·14:10·16:10',appe:'06:50·15:50',berkshire:'06:20·12:20(13F·10-Q 공시 감지)',health:'2시간마다',
     // (2026-07-19 서버화 2차) market_prefetch2(05:45·16:05)·report_prefetch·개별 크론
     policy_rates:'05:45·16:05',events_calendar:'05:45·16:05',cb_meetings:'05:45·16:05',brokers3:'05:45·16:05',
     ism_pmi:'05:45·16:05',ib_insights:'05:45·16:05',rebalance_news:'05:45·16:05',factset_insight:'05:45·16:05',
@@ -7462,6 +7463,22 @@ await _canvasFlow(c);
   {const gb=$('scr_glsbtn'), gp=$('scr_glspanel'), gx=$('gls_close');
    if(gb&&gp) gb.onclick=()=>{ const opening=gp.style.display==='none'; gp.style.display=opening?'':'none'; if(opening) renderLegend(); };  // START 전에도 설명 렌더
    if(gx&&gp) gx.onclick=()=>{ gp.style.display='none'; };}
+  /* (2026-08-14) 서버 자가진단 배지 — health.json(2시간마다 갱신) 경보를 헤더에 노출 */
+  (async function health(){
+    try{
+      const h=await (await fetch('/api/db/health',{cache:'no-cache'})).json();
+      const hdr=document.querySelector('.hdr-r'); if(!hdr||!h) return;
+      const el=document.createElement('button');
+      el.className='hbtn'; el.style.cursor='help';
+      el.style.color = h.ok ? '#1e9e6a' : '#d64545';
+      el.style.borderColor = h.ok ? '#bfe6d4' : '#f0c2c2';
+      el.textContent = h.ok ? '● 정상' : `▲ 경보 ${h.alerts.length}`;
+      const c=h.checks||{}, r=c.resource||{};
+      el.title = (h.ok?'서버 자가진단 정상':'경보:\n- '+h.alerts.join('\n- '))
+        + `\n\n번들 ${c.bundle_mb}MB · 가용메모리 ${r.mem_avail_mb}MB · 디스크 ${r.disk_used_pct}%\n점검 ${h.as_of}`;
+      hdr.insertBefore(el, hdr.firstChild);
+    }catch(e){}
+  })();
   /* 우측 자료 서랍(보고서·APK·DB 인벤토리) 토글 */
   {const t=document.getElementById('side_tgl'), sd=document.querySelector('aside.side'), x=document.getElementById('side_x');
    const sync=()=>document.body.classList.toggle('side-open', sd.classList.contains('open')); // 본문 동적 축소 연동
