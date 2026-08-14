@@ -79,8 +79,11 @@ _QPAST = (r"(?:through|results through|through the|reported|ended|completed|"
 # (2026-08-14) [1-4]Q 표기 추가 — "3Q 2026 Full Year 2026" 같은 표 머리글(실측 OPRT)에서
 # 분기 열을 인식하지 못해 분기 값이 연간으로 분류됐다.
 # (2026-08-15) '3rd Qtr' 축약(실측 MIDD)도 추가.
+# (2026-08-15 3차) 반기(2H'26E·second half) 표기 추가 — 반기|연간 두 열 표(실측 DD)에서
+# 반기 열을 인식 못 해 반기 값이 연간으로 태그됐다. 반기도 '연간이 아닌 기간'으로 취급.
 _QRE = (r"(first|second|third|fourth)[-\s]quarter|\bQ[1-4]\b|\b[1-4]Q\b|quarter (?:of|ending)|"
         r"\b[1-4](?:st|nd|rd|th)[-\s](?:qtr|quarter)\b|three months (?:ended|ending)|"
+        r"\b[12]H\s?'?\d{2}|\b(?:first|second)[-\s]half\b|"
         r"for the (?:first|second|third|fourth) quarter|next quarter|current quarter")
 # (2026-08-10) 연간 표시에 **"연도 + Outlook/전망"** 형태를 추가한다. 실측 오분류:
 #   AGCO "Outlook … 2026" · NFLX "Our 2026 outlook" · XRAY "2026 Outlook … net sales"
@@ -301,7 +304,9 @@ def _period(txt, start, end):
     # "…range of $0.35 to $0.49 The following revised guidance is provided for … fiscal year 2026:"
     # 처럼 다음 블록 머리글을 이어붙이면, 그 머리글의 연간 표지가 현재 행의 근거로 오인돼
     # 분기 가이던스가 연간으로 분류된다(실측 VECO Q3 Non-GAAP 0.35~0.49 가 fy_ 로 태그).
-    rs = min([p for p in ([txt.find(". ", end), txt.find(" The following ", end)] +
+    rs = min([p for p in ([txt.find(". ", end)] +
+                          [txt.find(ph, end) for ph in (" The following ", " The Company ",
+                                                        " In addition", " Additionally,", " Separately,")] +
                           [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
@@ -444,10 +449,14 @@ def parse_guidance(txt):
                 # 증분·기여분은 수준(level)이 아니다 — 가이던스 값으로 쓰면 안 된다. 실측:
                 #   WEX "increased 2026 revenue and EPS guidance **by** approximately $32 million"
                 #   INCY "Estimated **impact** on … net sales from improved GTN $40 - $50 million"
+                # (2026-08-15 3차) 검사 창을 lead 자체로 교정 — lead 정의를 '라벨 끝부터'로
+                # 바꾸면서 옛 슬라이스(m.start()+len(lead))가 엉뚱한 위치를 가리켜 증분/영향
+                # 표현이 통째로 새기 시작했다(실측 PRGO 'EPS impact of ~$0.60' · TXT 'impacted
+                # by $0.20-0.30' · WEX 'increasing revenue by ~$17M' 재발).
                 if re.search(r"\b(?:by|impact(?:ed|s)? (?:on|of)|contribut\w*|incremental|"
                              r"headwind|tailwind|benefit of|reduc\w* by|increas\w* by)\b\s*"
                              r"(?:approximately\s+|about\s+|around\s+)?$",
-                             txt[max(0, m.start()):m.start() + lead.__len__()][-45:], re.I) or \
+                             lead[-45:], re.I) or \
                    re.search(r"estimated impact|impact on", ctx, re.I):
                     skip.append(f"{metric}: 증분·기여분 표현(수준 아님) · {ctx[:110]}")
                     continue
@@ -565,8 +574,10 @@ def parse_guidance(txt):
                         continue
                     # (2026-08-15) "Revenue **from sales of Captisol**"(실측 LGND) — 라벨 뒤에
                     # 제품·원천 한정이 붙으면 전사 매출이 아니다.
-                    if re.search(r"\bfrom\s+(?:the\s+)?(?:sales?\s+of|royalt)", lead, re.I):
-                        skip.append(f"rev: 제품·원천 한정(from sales of …) → 전사 아님 · {ctx[:110]}")
+                    # (3차) "revenue expectation **for our COVID-19 products**, down to ~$4B"
+                    # (실측 PFE — 제품군 매출 40억을 전사 615억과 비교해 −93%) 도 같은 부류.
+                    if re.search(r"\bfrom\s+(?:the\s+)?(?:sales?\s+of|royalt)|\bproducts?\b", lead, re.I):
+                        skip.append(f"rev: 제품·원천 한정 → 전사 아님 · {ctx[:110]}")
                         continue
                     mw = None
                     for mw in re.finditer(r"([A-Za-z][\w\-]*)\s+(?:revenues?|net sales)", near + " revenue", re.I):
