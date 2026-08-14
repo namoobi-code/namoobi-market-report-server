@@ -6322,7 +6322,8 @@ await _canvasFlow(c);
     /* (2026-08-14) 저기저 문제(ZIM 0.08→1.38 = +1452%처럼 기저가 작아 %가 과장되는 경우) 대응.
        현재가 — %가 폭주할 때 참고할 '주가 대비 %p'(=Δ÷주가)의 분모. 차트가 이미 그렸으면 최신 종가,
        아니면 스크리너 풀의 px(어제 종가)로 대체. */
-    const _pxRV=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):(((POOL.us||[]).find(z=>z.c===c)||{}).px);
+    const _polRV=(POOL.us||[]).find(z=>z.c===c)||{};
+    const _pxRV=(_CD&&_CD.c)?[..._CD.c].reverse().find(v=>v!=null):_polRV.px;
     if(RV.length){
       /* (2026-08-09 3차) 사용자 확정 사양:
          · 표 = 각 시점 실제 EPS + (현재값 대비 몇 % 수준인지)
@@ -6401,6 +6402,14 @@ await _canvasFlow(c);
             <td style="text-align:right">${f2(z.d30)}${lvl(z.d30,z.cur,_pxRV)}</td>
             <td style="text-align:right">${f2(z.d7)}${lvl(z.d7,z.cur,_pxRV)}</td>
             <td style="text-align:right"><b>${f2(z.cur)}</b></td></tr>`).join('')+'</table>'+
+        /* (2026-08-14) 스크리너 필터·컬럼에 뜨는 cr7/cr30(→화면엔 pr7/pr30, %p) 값은
+           위 표의 진행분기(0q)·다음분기(+1q) 두 행을 **평균**한 것이라, 표에 그 숫자 자체가
+           별도 행으로 없으면 "필터값이 표랑 안 맞는 거 아니냐"는 오해가 생긴다(실측 확인됨).
+           풀에 이미 저장된 값(_polRV)을 그대로 보여줘 같은 수치임을 눈으로 확인시킨다. */
+        (()=>{ const parts=[];
+          if(_polRV.pr7!=null) parts.push(`7일 <b>${_polRV.pr7>0?'+':''}${(_polRV.pr7*100).toFixed(2)}%p</b>${_polRV.cr7!=null?`(원래 ${_polRV.cr7>0?'+':''}${(_polRV.cr7*100).toFixed(1)}%)`:''}`);
+          if(_polRV.pr30!=null) parts.push(`30일 <b>${_polRV.pr30>0?'+':''}${(_polRV.pr30*100).toFixed(2)}%p</b>${_polRV.cr30!=null?`(원래 ${_polRV.cr30>0?'+':''}${(_polRV.cr30*100).toFixed(1)}%)`:''}`);
+          return parts.length?`<div class="note" style="margin-top:3px">스크리너 필터·컬럼 표시값(진행분기·다음분기 평균) = ${parts.join(' · ')} — 위 표의 진행분기·다음분기 두 행을 평균한 수치와 같습니다</div>`:''; })()+
         `<div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${panels}</div>
           <div class="note" style="margin-top:2px">${leg}</div></div>`;
     }
