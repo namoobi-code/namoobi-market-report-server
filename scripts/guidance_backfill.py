@@ -41,19 +41,41 @@ USE_TABLE = "--table" in sys.argv
 FETCH_FAIL = set()
 
 
-def recent_earn_8k(cik):
-    """해당 CIK 의 가장 최근 실적(Item 2.02) 8-K 접수번호."""
+def recent_earn_8k(cik, d8=None):
+    """해당 CIK 의 실적 공시 접수번호 **후보 목록**(우선순위순).
+
+    ① Item 2.02 가 붙은 8-K(미국계 표준).
+    ② (2026-08-15) **6-K 폴백** — 외국계(foreign private issuer)는 실적을 6-K 로 내는데
+       6-K 에는 item 코드가 없어 ①로는 영영 안 잡힌다(실측: BZ 가이던스는 있는데 우리가
+       acc 조차 없는 항목 450건이 전부 이 부류 — NOMD·CLBT·SSYS·GLOB 등 391종목).
+       발표일(d8) ±5일에 접수된 6-K 를 날짜 근접순으로 최대 3건 후보로 돌려준다
+       (같은 날 6-K 가 여러 건이면 어느 쪽이 보도자료인지 알 수 없어 차례로 파싱해 본다).
+    """
     try:
         j = json.loads(urllib.request.urlopen(urllib.request.Request(
             f"https://data.sec.gov/submissions/CIK{int(cik):010d}.json", headers=H), timeout=25).read())
     except Exception:
-        return None
+        return []
     r = j.get("filings", {}).get("recent", {})
     forms, items, accs = r.get("form", []), r.get("items", []), r.get("accessionNumber", [])
+    dates = r.get("filingDate", [])
     for i in range(len(accs)):
         if forms[i] in ("8-K", "6-K") and "2.02" in (items[i] if i < len(items) else "" or ""):
-            return accs[i]
-    return None
+            return [accs[i]]
+    if d8:
+        cands = []
+        for i in range(len(accs)):
+            if forms[i] != "6-K" or i >= len(dates):
+                continue
+            try:
+                gap = abs(int(dates[i].replace("-", "")) - int(d8))
+            except Exception:
+                continue
+            if gap <= 5:
+                cands.append((gap, accs[i]))
+        cands.sort()
+        return [a for _, a in cands[:3]]
+    return []
 
 
 G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_own",
@@ -155,21 +177,32 @@ def main():
         if not cik:
             return sym, {}
         # 이미 접수번호를 아는 항목은 EDGAR 조회를 건너뛴다(호출 절약)
-        acc = (todo[sym].get("acc")) or recent_earn_8k(cik)
-        if not acc:
+        acc0 = todo[sym].get("acc")
+        acc_cands = [acc0] if acc0 else recent_earn_8k(cik, todo[sym].get("_d8"))
+        if not acc_cands:
             return sym, {}
-        time.sleep(0.15)
+        # (2026-08-15) 후보가 여럿(같은 날 6-K 복수)이면 가이던스가 나올 때까지 차례로 판다.
+        acc, best = acc_cands[0], None
+        for a in acc_cands:
+            time.sleep(0.15)
+            try:
+                t_ = exhibit_text(cik, a)
+            except Exception:
+                continue
+            if not t_:
+                continue
+            g_ = parse_guidance(t_, _hint(sym))
+            if any(k in g_ for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
+                acc, best = a, (t_, g_)
+                break
+            if best is None:
+                acc, best = a, (t_, g_)
+        if best is None:
+            FETCH_FAIL.add(sym)
+            return sym, {}
         try:
-            # (2026-08-10) **표 우선 → 문장 폴백.**
-            # 가이던스가 표로 제시되면 열 머리글에 기간·기준이 그대로 적혀 있어
-            # 문장 규칙으로 추측할 필요가 없다(실측 PTC: 문장에선 Q4 열과 헷갈려 FY 값
-            # 8.46 을 분기로 분류 → 표에선 'FY’26 Guidance' 열로 정확히 확정).
-            # 표에서 못 찾은 항목만 문장 파서 결과로 채운다.
-            txt = exhibit_text(cik, acc)
-            if not txt:                      # 받아오기 실패 — 값 없음이 아니다
-                FETCH_FAIL.add(sym)
-                return sym, {}
-            g = parse_guidance(txt, _hint(sym))
+            txt, g = best                    # 후보 순회에서 이미 받아 파싱한 본문·결과 재사용
+            todo[sym]["acc"] = acc           # 확정한 접수번호를 기록(다음 재파싱은 캐시 직행)
             # (2026-08-15) 주 첨부에서 가이던스를 하나도 못 찾으면 **보조 첨부**(Exhibit 99.2
             # 프레젠테이션·prepared remarks)를 추가로 읽는다 — 가이던스를 99.2 에만 싣는
             # 회사가 실재('원문에 없음' 감사에서 확인). 못 찾은 경우에만 추가 SEC 호출이
