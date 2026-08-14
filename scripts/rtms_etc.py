@@ -63,9 +63,17 @@ KINDS = {
     "offi_r": ("RTMSDataSvcOffiRent", "getRTMSDataSvcOffiRent", None, "excluUseAr"),
     "rh":     ("RTMSDataSvcRHTrade", "getRTMSDataSvcRHTrade", "dealAmount", "excluUseAr"),
     "sh":     ("RTMSDataSvcSHTrade", "getRTMSDataSvcSHTrade", "dealAmount", "totalFloorAr"),
-    "land":   ("RTMSDataSvcLandTrade", "getRTMSDataSvcLandTrade", "dealAmount", "dealArea"),
     "nrg":    ("RTMSDataSvcNrgTrade", "getRTMSDataSvcNrgTrade", "dealAmount", "buildingAr"),
+    # (2026-08-14) 토지는 **맨 마지막**. 이유 두 가지 —
+    #   ① 한 실행의 --budget(호출 예산)은 6종이 함께 쓴다. 토지는 (시군구·월)당 거래건수가
+    #      많아 페이지가 여러 장 나오므로 다른 5종보다 호출을 훨씬 많이 먹는다.
+    #      실측 2026-08-14: 토지 9.2% vs 나머지 5종 90.6~90.9% — 같은 예산을 토지가 삼켰다.
+    #   ② 대시보드가 실제로 쓰는 건 주거·상업용이고 토지는 참고 지표다.
+    # dict 순서가 곧 수집 순서라 여기 위치가 우선순위다. + LAND_LAST 로 아예 미룬다.
+    "land":   ("RTMSDataSvcLandTrade", "getRTMSDataSvcLandTrade", "dealAmount", "dealArea"),
 }
+# 나머지 5종이 사실상 끝나기 전에는 토지를 건드리지 않는다(--land-now 로 무시 가능).
+LAND_LAST = "--land-now" not in sys.argv
 LABEL = {"offi_s": "오피스텔 매매", "offi_r": "오피스텔 전월세", "rh": "연립다세대",
          "sh": "단독다가구", "land": "토지", "nrg": "상업업무용"}
 # 전월세전환율 주의: 전세 평균보증금과 월세 평균보증금이 '서로 다른 매물군'의 평균이라
@@ -279,10 +287,26 @@ def main():
     #   → 수도권(서울·경기·인천)을 앞으로 당긴다. done 표식 기반이라 순서를 바꿔도 안전하다.
     PRIOR = {"11": 0, "41": 1, "28": 2, "26": 3}
     order = sorted(REGIONS.items(), key=lambda kv: (PRIOR.get(kv[0][:2], 9), kv[0]))
+    # (2026-08-14) 토지 보류 판정 — 나머지 5종이 목표의 99% 를 넘어야 토지를 시작한다.
+    skip_land = False
+    if LAND_LAST:
+        tgt = len(REGIONS) * len(yms)
+        cnt = {k: cx.execute("SELECT COUNT(*) FROM done WHERE kind=?", (k,)).fetchone()[0]
+               for k in KINDS}
+        others = {k: v for k, v in cnt.items() if k != "land"}
+        lo = min(others.values()) if others else 0
+        if lo < tgt * 0.99:
+            skip_land = True
+            worst = min(others, key=others.get)
+            print(f"  ⏸ 토지 보류 — 나머지 5종 중 '{LABEL[worst]}' 가 {lo:,}/{tgt:,}"
+                  f"({100*lo/tgt:.1f}%) 라 예산을 먼저 쓴다. 5종이 99% 넘으면 자동으로 시작한다"
+                  f" (지금 바로 받으려면 --land-now). 토지 현재 {cnt['land']:,}/{tgt:,}", flush=True)
     try:
         for i, (code, name) in enumerate(order):
             got = 0
             for kind, (svc, op, _, _) in KINDS.items():
+                if kind == "land" and skip_land:
+                    continue
                 if svc in DEAD:
                     continue
                 try:
