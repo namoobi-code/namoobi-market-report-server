@@ -100,3 +100,6 @@
 # ── [부록A] 버크셔 13F — EDGAR 공시 감지·자동 갱신 (마감일 2/14·5/15·8/14·11/14, 변동 없으면 즉시 종료) ──
 20 6  * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_13f.py data/db >> /home/ubuntu/namoobi/berk13f.log 2>&1
 20 12 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_13f.py data/db >> /home/ubuntu/namoobi/berk13f.log 2>&1
+# 10-Q(분기보고서) 자금흐름 — 13F보다 약 5일 먼저 나온다
+25 6  * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_10q.py data/db >> /home/ubuntu/namoobi/berk10q.log 2>&1
+25 12 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_berk_10q.py data/db >> /home/ubuntu/namoobi/berk10q.log 2>&1
