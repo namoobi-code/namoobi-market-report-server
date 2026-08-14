@@ -6334,10 +6334,14 @@ await _canvasFlow(c);
          100% 초과(파랑) = 그때 추정이 지금보다 높았다 = 이후 하향
          100% 미만(빨강) = 그때가 더 낮았다 = 이후 상향 */
       const f2=v=>v==null?'—':v.toFixed(2);
-      const lvl=(v,cur)=>{ if(v==null||cur==null||Math.abs(cur)<1e-9) return '';
-        const p=v/cur*100, z=Math.abs(p-100)<0.05;
-        return ` <span class="${z?'':(p<100?'up':'dn')}" style="font-size:10.5px${z?';color:#3d454f':''}">(${p.toFixed(1)}%)</span>`; };
-      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(괄호 = 현재값 대비 수준 · 현재=100% — 100% 미만이면 그 뒤 상향됐다는 뜻)</span>
+      /* (2026-08-14) 괄호 = **그 시점→현재 변화율** 로 통일 — 스크리너의
+         'EPS 컨센 리비전 변화율' 필터와 같은 산식(현재÷그때−1)이라 두 화면 숫자가 맞아떨어진다.
+         예전 '현재 대비 수준(%)' 표기는 ZIM 처럼 0.09→1.38 인 종목에서 필터 +1,214% 와
+         표 6.4% 가 서로 다른 수치처럼 보이게 했다(실은 같은 데이터의 다른 표현). */
+      const lvl=(v,cur)=>{ if(v==null||cur==null||v<=0) return '';
+        const p=(cur/v-1)*100, z=Math.abs(p)<0.05;
+        return ` <span class="${z?'':(p>0?'up':'dn')}" style="font-size:10.5px${z?';color:#3d454f':''}">(${p>0?'+':''}${p.toFixed(1)}%)</span>`; };
+      t3=`<div style="margin-top:10px"><b style="font-size:12px">EPS 컨센서스 리비전 (90일)</b> <span class="note">(괄호 = 그 시점 → 현재 <b>변화율</b> — 스크리너 'EPS 컨센 리비전 변화율' 필터와 같은 산식. 필터 값은 진행분기·다음분기 평균)</span>
         <table style="width:100%;font-size:11px;border-collapse:collapse;margin-top:3px">
         <tr style="border-bottom:1px solid var(--line)"><th style="text-align:left;padding:2px 4px">구분</th><th>90일 전</th><th>60일 전</th><th>30일 전</th><th>7일 전</th><th>현재<span class="note">(=100%)</span></th></tr>`+
         RV.map(z=>
