@@ -107,3 +107,6 @@
 # ── 자가진단 (2시간마다 점검 · 매일 08:05 경보 메일) — 번들 비대·스키마 드리프트·수집 정지·자원 부족 감시 ──
 5 */2 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py >> /home/ubuntu/namoobi/health.log 2>&1
 5 8 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py --mail >> /home/ubuntu/namoobi/health.log 2>&1
+
+# ── A1 무료 인스턴스 헌터 (10분 간격 · 성공 시 자기해제) — 성공 후 이 줄은 삭제해도 무방 ──
+*/10 * * * * cd /home/ubuntu/namoobi && python3 scripts/a1_hunter.py >> /home/ubuntu/namoobi/a1_hunter.log 2>&1
