@@ -3340,16 +3340,28 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     const t=$$('ffpi_t'); if(t) t.innerHTML='<tr><th>구성</th><th style="text-align:right">지수</th><th style="text-align:right">MoM(pt)</th><th style="text-align:right">YoY</th></tr>'+
       f.snap.map(x=>`<tr><td><b>${E(x.name)}</b></td><td class="num">${x.value}</td>
         <td class="num">${x.mom==null?'—':(x.mom>0?'+':'')+x.mom}</td><td class="num">${PN(x.yoy)}</td></tr>`).join('');
-    /* 최근 10년 종합·곡물·유지류·설탕 4선 SVG */
+    /* 최근 10년 — 구성 6종 전부 + X(연도)·Y(지수) 눈금. 레전드는 SVG 밖(HTML)에 둔다
+       (tspan 을 text 안에 넣었더니 렌더가 깨져 육류·유제품이 안 보이는 것처럼 보였다). */
     const ch=$$('ffpi_ch'); if(!ch) return;
-    const sr=(f.series||[]).slice(-120), W=Math.max(560,(ch.clientWidth||620)-10), H=180;
-    const picks=[[1,'종합','#16191d'],[4,'곡물','#e08c1a'],[5,'유지류','#1e9e6a'],[6,'설탕','#8358c4']];
+    const sr=(f.series||[]).slice(-120), W=Math.max(560,(ch.clientWidth||620)-10), H=220, L=44, Bm=22;
+    const picks=[[1,'종합','#16191d'],[2,'육류','#d64545'],[3,'유제품','#2f6fd0'],
+                 [4,'곡물','#e08c1a'],[5,'유지류','#1e9e6a'],[6,'설탕','#8358c4']];
     const all=sr.flatMap(r=>picks.map(p=>r[p[0]])).filter(v=>v!=null);
-    const lo=Math.min(...all)*0.95, hi=Math.max(...all)*1.02;
-    const X=i=>10+i/(sr.length-1)*(W-20), Y=v=>H-16-(v-lo)/(hi-lo)*(H-32);
-    ch.innerHTML=`<svg width="${W}" height="${H}" style="display:block">`+
-      picks.map(p=>`<polyline fill="none" stroke="${p[2]}" stroke-width="1.6" points="${sr.map((r,i)=>X(i).toFixed(1)+','+Y(r[p[0]]).toFixed(1)).join(' ')}"/>`).join('')+
-      `<text x="10" y="12" font-size="10" fill="#667085">${E(sr[0]?.[0]||'')} ~ ${E(sr[sr.length-1]?.[0]||'')} · ${picks.map(p=>`<tspan fill="${p[2]}">●${p[1]}</tspan>`).join(' ')}</text></svg>`;
+    const lo=Math.floor(Math.min(...all)/20)*20, hi=Math.ceil(Math.max(...all)/20)*20;
+    const X=i=>L+i/(sr.length-1)*(W-L-8), Y=v=>H-Bm-(v-lo)/(hi-lo)*(H-Bm-10);
+    let g='';
+    for(let v=lo;v<=hi;v+=20)                      /* Y 눈금 — 20pt 간격 */
+      g+=`<line x1="${L}" y1="${Y(v)}" x2="${W-8}" y2="${Y(v)}" stroke="#eef0f3"/>`+
+         `<text x="${L-5}" y="${Y(v)+3}" font-size="9.5" fill="#98a1ab" text-anchor="end">${v}</text>`;
+    sr.forEach((r,i)=>{ if(/-01$/.test(r[0])&&+r[0].slice(0,4)%2===0)   /* X 눈금 — 짝수해 1월 */
+      g+=`<line x1="${X(i)}" y1="${H-Bm}" x2="${X(i)}" y2="${H-Bm+3}" stroke="#c6ccd3"/>`+
+         `<text x="${X(i)}" y="${H-6}" font-size="9.5" fill="#98a1ab" text-anchor="middle">${r[0].slice(0,4)}</text>`; });
+    ch.innerHTML='<div style="font-size:11px;color:#667085;margin-bottom:3px">'+
+      picks.map(p=>`<span style="color:${p[2]};font-weight:600">● ${p[1]}</span>`).join(' &nbsp;')+
+      ` <span class="note">(${E(sr[0]?.[0]||'')} ~ ${E(sr[sr.length-1]?.[0]||'')} · 지수, 2014-2016=100)</span></div>`+
+      `<svg width="${W}" height="${H}" style="display:block">${g}`+
+      picks.map(p=>`<polyline fill="none" stroke="${p[2]}" stroke-width="${p[0]===1?2.2:1.4}" points="${sr.map((r,i)=>X(i).toFixed(1)+','+Y(r[p[0]]).toFixed(1)).join(' ')}"/>`).join('')+
+      '</svg>';
   }).catch(()=>{});
 
   const NF=C.nonferrous||{};
