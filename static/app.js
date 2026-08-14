@@ -3331,6 +3331,26 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   T('d_c_en',CH,crow(C.energy));                    $$('d_c_en_c').innerHTML=E(C.energy_comment||'');
   T('d_c_me',CH,crow(C.metals,['rare_earth']));     $$('d_c_me_c').innerHTML=E(C.metals_comment||'');
   T('d_c_ag',CH,crow(C.agriculture));               $$('d_c_ag_c').innerHTML=E(C.agri_comment||'');
+  /* (2026-08-14) FAO 세계 식량가격지수 — 종합+5개 구성. report_data 가 아니라 자체 수집분
+     (fao_ffpi.json · 매월 첫째 주 갱신)이라 별도 fetch 로 그린다. */
+  fetch('/api/db/fao_ffpi',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(f=>{
+    if(!f||!f.snap) return;
+    const el=$$('ffpi_asof'); if(el) el.textContent=`(${f.asof} 기준 · ${f.base})`;
+    const PN=v=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v}${'%'}</span>`;
+    const t=$$('ffpi_t'); if(t) t.innerHTML='<tr><th>구성</th><th style="text-align:right">지수</th><th style="text-align:right">MoM(pt)</th><th style="text-align:right">YoY</th></tr>'+
+      f.snap.map(x=>`<tr><td><b>${E(x.name)}</b></td><td class="num">${x.value}</td>
+        <td class="num">${x.mom==null?'—':(x.mom>0?'+':'')+x.mom}</td><td class="num">${PN(x.yoy)}</td></tr>`).join('');
+    /* 최근 10년 종합·곡물·유지류·설탕 4선 SVG */
+    const ch=$$('ffpi_ch'); if(!ch) return;
+    const sr=(f.series||[]).slice(-120), W=Math.max(560,(ch.clientWidth||620)-10), H=180;
+    const picks=[[1,'종합','#16191d'],[4,'곡물','#e08c1a'],[5,'유지류','#1e9e6a'],[6,'설탕','#8358c4']];
+    const all=sr.flatMap(r=>picks.map(p=>r[p[0]])).filter(v=>v!=null);
+    const lo=Math.min(...all)*0.95, hi=Math.max(...all)*1.02;
+    const X=i=>10+i/(sr.length-1)*(W-20), Y=v=>H-16-(v-lo)/(hi-lo)*(H-32);
+    ch.innerHTML=`<svg width="${W}" height="${H}" style="display:block">`+
+      picks.map(p=>`<polyline fill="none" stroke="${p[2]}" stroke-width="1.6" points="${sr.map((r,i)=>X(i).toFixed(1)+','+Y(r[p[0]]).toFixed(1)).join(' ')}"/>`).join('')+
+      `<text x="10" y="12" font-size="10" fill="#667085">${E(sr[0]?.[0]||'')} ~ ${E(sr[sr.length-1]?.[0]||'')} · ${picks.map(p=>`<tspan fill="${p[2]}">●${p[1]}</tspan>`).join(' ')}</text></svg>`;
+  }).catch(()=>{});
 
   const NF=C.nonferrous||{};
   $$('d_c_nf').innerHTML=(NF.groups||[]).map(g=>`
