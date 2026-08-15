@@ -213,10 +213,16 @@ def main():
                     if any(k in g2 for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
                         g = g2
                         break
-            try:
-                gt = parse_tables(RAW_CACHE.get((str(cik), acc)) or "")
-            except Exception:
-                gt = {}
+            # (2026-08-15) 표 파서는 **문장 파서가 못 채운 키가 있을 때만** 돌린다 —
+            # bs4 구조 파싱은 무겁다(전 종목 상시 실행 시 재파싱이 2시간대로 늘어남 실측).
+            gt = {}
+            need_tb = USE_TABLE or not ("rev_lo" in g or "fy_rev_lo" in g) \
+                or not ("eps_lo" in g or "fy_eps_lo" in g)
+            if need_tb:
+                try:
+                    gt = parse_tables(RAW_CACHE.get((str(cik), acc)) or "")
+                except Exception:
+                    gt = {}
             # (2026-08-10 되돌림) 표 값을 문장 값보다 **우선**시켰더니 전체 이상치가
             # 매출 6.2%→12.3% 로 늘었다(실측 USNA +26,655% · PSKY +13,160% · MEC +4,869%).
             # 표 인식은 PTC·QCOM 같은 정형 표에서는 정확하지만, 회사마다 표 모양이 제각각이라

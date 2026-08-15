@@ -158,38 +158,36 @@ def _pick_cols(meta, vals, per):
 
 
 def parse_tables(html, txt_hint=""):
-    """8-K 원문 HTML → 가이던스 dict (parse_guidance 와 같은 키). 확정 못 하면 비운다."""
+    """8-K 원문 HTML → 가이던스 dict (parse_guidance 와 같은 키). 확정 못 하면 비운다.
+
+    (2026-08-15 성능) 전체 문서를 bs4 로 파싱하지 않는다 — 보도자료에는 재무제표
+    수십 개 표가 붙어 있어 전 종목 상시 실행 시 재파싱이 시간대 단위로 늘어난다(실측).
+    정규식으로 <table> 블록을 끊고, **직전 문맥 250자 + 표 앞부분에 전망 키워드가
+    있는 블록만** bs4 로 파싱한다(재무제표·비교 표는 bs4 진입 전에 걸러진다).
+    """
     out, ev = {}, {}
     if not html:
         return out
-    try:
-        soup = BeautifulSoup(html, "html.parser")
-    except Exception:
-        return out
-    for tb in soup.find_all("table"):
+    cands = []
+    for tm in re.finditer(r"<table[\s\S]*?</table>", html, re.I):
+        pre = _clean(re.sub(r"<[^>]+>", " ", html[max(0, tm.start() - 1500):tm.start()]))[-250:]
+        if re.search(_FORE, pre + " " + _clean(re.sub(r"<[^>]+>", " ", tm.group(0)[:4000])), re.I):
+            cands.append((pre, tm.group(0)))
+    for cap, seg in cands[:15]:
+        try:
+            tb = BeautifulSoup(seg, "html.parser").find("table")
+        except Exception:
+            continue
+        if tb is None:
+            continue
         grid = _grid(tb)
         if len(grid) < 2:
             continue
         ncol = max(len(r) for r in grid)
-        # 표 앞 문맥(캡션) — 전망 표인지, 단위 선언, 표 전체 기간.
-        # (수정) 빈 문자열 노드가 홉을 소진해 캡션의 'OUTLOOK' 을 못 보던 문제 —
-        # 비어 있지 않은 노드만 세고 범위를 넓힌다(실측 AKAM: 캡션 '2026 FINANCIAL
-        # OUTLOOK' 이 바로 위에 있는데 표 전체가 비전망으로 기각).
-        cap = ""
-        node, hops = tb, 0
-        while node is not None and hops < 25 and len(cap) < 800:
-            node = node.find_previous(string=True)
-            if node is None:
-                break
-            s = _clean(str(node))
-            if s:
-                cap = s + " " + cap
-                hops += 1
         head_txt = cap + " " + " ".join(" ".join(r) for r in grid[:3])
-        # (수정) 전망 판정은 **캡션 말미 250자 + 표 머리글**로만 — 캡션을 800자나 보면
-        # 몇 문단 앞의 'guidance' 단어가 지난 분기 **실적 표**까지 전망으로 만든다
-        # (실측 HLIT: Q2 실적 표의 133.5 를 Q3 가이던스 130 대신 채택).
-        near_txt = cap[-250:] + " " + " ".join(" ".join(r) for r in grid[:3])
+        # 전망 판정 — 캡션 말미 250자 + 표 머리글(멀리 있는 guidance 단어에 실적 표가
+        # 낚이지 않게, 실측 HLIT).
+        near_txt = cap + " " + " ".join(" ".join(r) for r in grid[:3])
         if not re.search(_FORE, near_txt, re.I):
             continue                                   # 전망 표가 아니다(실적 비교 표 등)
         # 비교 표 가드 — 서로 다른 분기·연도 조합이 2개 이상인데 Low/High·Prior/Updated
