@@ -302,8 +302,20 @@ def _period(txt, start, end):
 
     # ① 매칭 구절 안 — 여기서도 '값에 가까운 표현'이 이겨야 한다
     r0 = pick(txt[start:end], 0)
+    # (2026-08-16) 반환값에 **근거 강도**를 함께 싣는다 — (기간, 강함 여부).
+    # ①구절 안·②같은 문장은 회사가 그 값 옆에 직접 쓴 기간이므로 '강함'(회사 프로필로도
+    # 교정하지 않는다 — 실측 SILC: "raising our full-year revenue guidance to $93 to $95
+    # million" 명시를 이력상 분기만 제시한다는 프로필이 뒤집어 +263% 갭).
+    # ②-b/②-c 머리글·③앞 400자·④뒤 90자는 떨어진 문맥에서의 추정이므로 '약함'.
+    # 단, **반기 토큰만으로 나온 Q 는 강하지 않다** — 반기는 분기를 지목하는 명시가
+    # 아니다(실측 IR "1H 46% | 2H 54%" 페이징 주석 · XOS "for the second half of the
+    # year" 사유 구절 — 둘 다 FY 100% 회사의 연간 값이라 프로필 교정이 맞다).
+    def _nonhalf_q(seg):
+        return any(not re.match(r"[12]H\b|(?:first|second)[-\s]half", m_.group(0), re.I)
+                   for m_ in re.finditer(_QRE, seg, re.I)
+                   if not re.match(_QRES, seg[m_.end():], re.I))
     if r0:
-        return r0
+        return r0, (r0 != "Q" or _nonhalf_q(txt[start:end]))
     # ② 같은 문장 안 (마침표·불릿 경계)
     # (2026-08-10) 세미콜론은 경계에서 뺀다 — 세미콜론은 한 문장 안의 나열이라
     # 앞부분의 기간 표시가 뒤 항목에도 그대로 걸린다. 실측 DGX:
@@ -344,7 +356,7 @@ def _period(txt, start, end):
     if r1 == "Q" and not _fwd_q(sent):
         r1 = None                       # 지난 실적을 말하는 분기 표현이면 근거로 쓰지 않는다
     if r1:
-        return r1
+        return r1, (r1 != "Q" or _nonhalf_q(sent))
     # ②-b **블록 머리글** — 보도자료는 "Fiscal year 2026 guidance … we now expect:" ·
     #    "Second Quarter Fiscal Year 2027 Guidance:" 처럼 머리글을 두고 그 아래에 불릿으로
     #    항목을 나열한다. 값이 속한 블록의 머리글이 곧 그 값의 기간이다.
@@ -388,7 +400,7 @@ def _period(txt, start, end):
             else:                                  # 분기 머리글 — 뒤 불릿이 전망 문맥일 때만
                 r15 = "Q" if _fwd_q(txt[h0 + hm.start():h0 + hm.end() + 120]) else None
         if r15:
-            return r15
+            return r15, False
     # ③ 앞 문맥 400자 — 가장 가까운 표현.
     #    단, 여기서 나온 **분기 표시는 전망 문맥일 때만** 인정한다. 문단 머리의
     #    "Outlook for the third quarter of fiscal 2027 is as follows:" 는 정당하지만,
@@ -400,9 +412,9 @@ def _period(txt, start, end):
     if r2 == "Q" and not _fwd_q(seg3):
         r2 = None
     if r2:
-        return r2
+        return r2, False
     # ④ 뒤 90자
-    return pick(txt[end:end + 90])
+    return pick(txt[end:end + 90]), False
 
 
 def parse_guidance(txt, per_hint=None):
@@ -630,12 +642,12 @@ def parse_guidance(txt, per_hint=None):
                         lo = hi
                     else:
                         hi = lo
-                per = _period(txt, m.start(), m.end())
+                per, per_strong = _period(txt, m.start(), m.end())
                 if not per and per_hint:
                     # (2026-08-15) 회사 프로필 구제 — 이 회사는 이력상 한 종류 기간만 제시
                     per = per_hint
                     ctx += " [기간: 회사 프로필(이력상 %s만 제시)]" % ("연간" if per_hint == "Y" else "분기")
-                elif per and per_hint and per != per_hint:
+                elif per and per_hint and per != per_hint and not per_strong:
                     # (2026-08-15 5차) 회사 프로필 **교정** — 이력상(BZ 2022~) 한 종류 기간만
                     # 제시해 온 회사(90%+·n≥4)에서 문맥 판정이 반대로 나오면, 그 판정은 이웃
                     # 불릿의 다른 지표 기간이 새어 들어온 것이다. 실측: VZ·IR·TEX·SNDR·XOS 는
@@ -643,6 +655,10 @@ def parse_guidance(txt, per_hint=None):
                     # 분기 컨센 대비 +180~365% 갭을 만들었다(VZ 는 옆 불릿의 "third-quarter
                     # 2026" 매출 성장률 문구, IR 은 "1H 48% | 2H 52%" 페이징 주석이 근거로
                     # 오채택). 분기 가이던스를 한 번도 낸 적 없는 회사다 — 프로필로 교정한다.
+                    # (2026-08-16) 단, **약한 근거**(머리글·앞 400자·뒤 90자 추정)일 때만 —
+                    # 값 옆에 회사가 직접 쓴 기간(①구절 안·②같은 문장)은 프로필보다 우선한다
+                    # (실측 SILC: "raising our full-year revenue guidance to $93 to $95 million"
+                    # 명시를 '이력상 분기만' 프로필이 뒤집어 +263% 갭 — 명시가 이긴다).
                     per = per_hint
                     ctx += " [기간: 회사 프로필로 교정(이력상 %s만 제시)]" % ("연간" if per_hint == "Y" else "분기")
                 if not per:
