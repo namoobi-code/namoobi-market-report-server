@@ -228,19 +228,13 @@ def main():
                     if not k.startswith("_"):
                         g[k] = v
                 g["_ev"] = ev
-            # (2026-08-15) **표적 회수** — 문장 파서가 '분기|연간 다중 열 표'라서 기각한
-            # 항목만 표 파서 값으로 보충한다. 전면 우선(위 USE_TABLE)과 달리, 열 구조가
-            # 실재함을 문장 파서가 확인한 경우에 한정하므로 오탐 위험이 낮다.
-            # 문장 파서가 이미 뽑은 값은 절대 덮지 않는다(빈 키만 채움).
-            elif gt and any("다중 열" in s for s in (g.get("_skip") or [])):
-                ev = dict(g.get("_ev") or {})
-                for k, v in gt.items():
-                    if k.startswith("_") or k in g:
-                        continue
-                    g[k] = v
-                    if (gt.get("_ev") or {}).get(k.rsplit("_", 1)[0]):
-                        ev[k.rsplit("_", 1)[0]] = gt["_ev"][k.rsplit("_", 1)[0]]
-                g["_ev"] = ev
+            # (2026-08-15 롤백) '다중 열 기각분만 표 파서로 보충'하던 표적 회수를 **폐기**한다.
+            # 화면 정렬로 드러난 실측: MEC 매출 갭 +4,869%(과거 표 파서 전면 적용 실패의
+            # 바로 그 사례 재발) · HLIT EPS +93,543% · REIT(ESS +11,002%) — 표 파서 값은
+            # 문장 파서의 안전장치(REIT FFO·GAAP·전사·증분 검증)를 전부 우회해 들어오고,
+            # Benzinga 대조는 BZ 미커버 종목을 못 재서 검증 사각에서 오염이 쌓였다.
+            # 표 파서는 열·행 구조를 실제로 읽는 정식 개편 + BZ 일치 검증을 통과하기
+            # 전까지 판정 경로에 다시 넣지 않는다(USE_TABLE 수동 플래그만 유지).
             d8 = todo[sym].get("_d8")                    # 그 항목의 발표일(기준 분기 판정용)
             ann = f"{d8[:4]}-{d8[4:6]}-{d8[6:8]}" if d8 else None
             return sym, guidance_gap(sym, g, pool_us, ann)
