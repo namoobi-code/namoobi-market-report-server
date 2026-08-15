@@ -298,7 +298,14 @@ def _period(txt, start, end):
     # "Full year 2026 reported diluted EPS … $9.97 and $10.17; and adjusted diluted EPS
     #  expected to be between $11.05 and $11.25" — 세미콜론에서 자르면 뒤 항목이
     # 'Full year 2026' 을 못 봐 연간 11.05 가 분기로 분류된다(+300%대).
-    ls = max(txt.rfind(". ", 0, start), *(txt.rfind(b, 0, start) for b in ("• ", "● ", "▪ ", "· ")))
+    # (2026-08-15) " - - " 도 문장 경계다 — 대시 불릿 보도자료를 _strip 하면 불릿 끝과
+    # 다음 불릿 시작이 "…$310 million - - Q2 2026 LINZESS…" 처럼 이어붙는다. 이걸 안 자르면
+    # 다음 불릿의 지난 분기 실적("Q2 2026 … net sales were")이 기간 근거로 새어 들어오고,
+    # 직전 절의 'guidance' 가 ±60자 창에 걸려 _fwd_q 까지 통과한다(실측 IRWD: 연간
+    # 총매출 460~485M 이 0q 로 태그돼 분기 컨센 대비 +289%). 값 범위의 단일 대시
+    # ("$460 - $485")와 달리 이중 대시는 불릿 이음에서만 나온다.
+    ls = max(txt.rfind(". ", 0, start), txt.rfind(" - - ", 0, start),
+             *(txt.rfind(b, 0, start) for b in ("• ", "● ", "▪ ", "· ")))
     # (2026-08-10) 오른쪽 경계도 **다음 불릿**에서 끊는다. 예전엔 다음 마침표까지만 봐서
     # 불릿 목록이 통째로 한 문장이 됐고, 값 뒤 항목의 분기 표현이 근거로 채택돼
     # 연간 가이던스가 분기로 분류됐다(실측 ILMN·LIFE·BFLY·EW·HLT).
@@ -306,7 +313,7 @@ def _period(txt, start, end):
     # "…range of $0.35 to $0.49 The following revised guidance is provided for … fiscal year 2026:"
     # 처럼 다음 블록 머리글을 이어붙이면, 그 머리글의 연간 표지가 현재 행의 근거로 오인돼
     # 분기 가이던스가 연간으로 분류된다(실측 VECO Q3 Non-GAAP 0.35~0.49 가 fy_ 로 태그).
-    rs = min([p for p in ([txt.find(". ", end)] +
+    rs = min([p for p in ([txt.find(". ", end), txt.find(" - - ", end)] +
                           [txt.find(ph, end) for ph in (" The following ", " The Company ",
                                                         " In addition", " Additionally,", " Separately,")] +
                           [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])

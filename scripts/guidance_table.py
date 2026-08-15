@@ -217,19 +217,39 @@ def parse_tables(html, txt_hint=""):
             # (2026-08-15 3차) 캡션에 실적 분기 문구와 연간 가이던스 문구가 **공존**하면
             # (예: "…third quarter results … full year 2026 guidance:") Q 를 무조건
             # 우선하던 종전 로직이 연간 표를 분기로 분류했다(실측 GRDN 연간 매출 1.43B 이
-            # 0q 로 +294% · PIII +286%). **표에 가장 가까운(마지막) 기간 토큰**이 표의
-            # 기간이다 — 캡션은 위→아래로 흐르고 머리글 직전 문구가 표를 수식한다.
-            qlast = ylast = -1
-            for qm in re.finditer(_QRE, head_txt, re.I):
-                seg = head_txt[max(0, qm.start() - 60):qm.start() + 60]
-                if _fwd_q(seg) and not re.search(r"(?:months|quarter|year)\s+ended\b", seg, re.I):
-                    qlast = qm.start()
-            for ym in re.finditer(_YRE, head_txt, re.I):
-                if not re.search(_YEXCL, head_txt[:ym.start()][-60:], re.I):
-                    ylast = ym.start()
+            # 0q 로 +294% · PIII +286%).
+            # (2026-08-15 4차) '마지막 기간 토큰' 규칙도 부족했다 — 실측 PIII 캡션
+            # "Revised Fiscal 2026 Guidance • Full-year revised guidance reflects the impact
+            #  of underlying first half performance … recognized in the quarter." 에서
+            # 마지막 토큰은 과거 실적을 서술하는 'first half/quarter' 라 다시 Q 로 떨어졌다.
+            # 보도자료에서 표를 명명하는 것은 **Guidance/Outlook 머리글**이고 기간 수식어는
+            # 그 어구에 붙는다("Revised Fiscal 2026 Guidance"). 따라서:
+            #   ① 캡션의 **마지막** guidance/outlook 어구 앞 80자에서 기간 토큰을 찾아 채택
+            #   ② 머리글에 기간이 없으면, 마지막 유효 기간 토큰(전망 문맥의 Q 또는 연간)
             cper = None
-            if qlast >= 0 or ylast >= 0:
-                cper = "Q" if qlast > ylast else "Y"
+            golast = None
+            for gm in re.finditer(r"\b(?:guidance|outlook)\b", head_txt, re.I):
+                golast = gm
+            if golast:
+                seg = head_txt[max(0, golast.start() - 80):golast.start()]
+                qp = [m.start() for m in re.finditer(_QRE, seg, re.I)
+                      if not re.search(r"(?:months|quarter|year)\s+ended\b",
+                                       seg[max(0, m.start() - 40):m.start() + 40], re.I)]
+                yp = [m.start() for m in re.finditer(_YRE, seg, re.I)
+                      if not re.search(_YEXCL, seg[:m.start()][-60:], re.I)]
+                if qp or yp:
+                    cper = "Q" if max(qp, default=-1) > max(yp, default=-1) else "Y"
+            if not cper:
+                qlast = ylast = -1
+                for qm in re.finditer(_QRE, head_txt, re.I):
+                    seg = head_txt[max(0, qm.start() - 60):qm.start() + 60]
+                    if _fwd_q(seg) and not re.search(r"(?:months|quarter|year)\s+ended\b", seg, re.I):
+                        qlast = qm.start()
+                for ym in re.finditer(_YRE, head_txt, re.I):
+                    if not re.search(_YEXCL, head_txt[:ym.start()][-60:], re.I):
+                        ylast = ym.start()
+                if qlast >= 0 or ylast >= 0:
+                    cper = "Q" if qlast > ylast else "Y"
             if not cper:
                 continue                               # 기간을 알 수 없는 표 — 버린다
             for mt in meta:
