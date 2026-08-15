@@ -279,9 +279,11 @@ def guidance_gap(sym, g, pool_us, ann=None):
     # (진짜 가이던스 갭은 수십% 를 넘지 않는다. 실측 오류: VZ·HLT·TDC 연간 EPS 가
     # 분기로 태그돼 분기 컨센과 비교 → +280~360% · CXW 표 오독 +793% · IRWD +866%).
     # 원칙대로 추측 값을 표시하느니 그 지표를 통째로 비운다(미제시 처리).
+    # 하한도 둔다 — 하회 −90% 이하는 비현실(회사가 매출·이익 9할 증발을 가이드하는 일은
+    # 없다). 실측 CXW −97.2% = 분기 값이 연간 컨센과 비교된 오류.
     for mk in ("rev", "eps"):
         gk = f"g_{mk}_gap"
-        if out.get(gk) is not None and abs(out[gk]) > 150:
+        if out.get(gk) is not None and (abs(out[gk]) > 150 or out[gk] < -90):
             for suf in ("", "_gap", "_per", "_ev", "_src", "_own"):
                 out.pop(f"g_{mk}{suf}", None)
     if out:
