@@ -27,7 +27,7 @@ import re
 
 from bs4 import BeautifulSoup
 
-from guidance_parse import _QRE, _YRE, _YEXCL, _OTHER, _ADJ, _GAAP
+from guidance_parse import _QRE, _YRE, _YEXCL, _OTHER, _ADJ, _GAAP, _fwd_q
 
 _MULT = {"billion": 1e9, "bn": 1e9, "million": 1e6, "mm": 1e6, "thousand": 1e3}
 _FORE = r"guidance|outlook|expect|anticipat|forecast|project|estimat"
@@ -208,10 +208,15 @@ def parse_tables(html, txt_hint=""):
         if not head_rows:
             continue
         meta = _col_meta(head_rows, ncol)
-        # 표 전체가 한 기간이면(캡션 명시) 기간 없는 열에 부여
+        # 표 전체가 한 기간이면(캡션 명시) 기간 없는 열에 부여.
+        # (2026-08-15 2차) 캡션의 분기 토큰은 **전망 문맥일 때만** 인정 — "reported second
+        # quarter results" 같은 실적 문구의 분기가 표 기간으로 오인돼 연간 표가 분기로
+        # 분류됐다(실측 CNMD 연간 매출 1,358 이 0q 로 +304% · PIII +286%). 과거 표기
+        # ('months ended')가 낀 캡션의 분기도 제외한다. 문장 파서의 _fwd_q 를 공유한다.
         if not any(mt["per"] for mt in meta):
             cper = None
-            if re.search(_QRE, head_txt, re.I):
+            if re.search(_QRE, head_txt, re.I) and _fwd_q(head_txt) \
+               and not re.search(r"(?:months|quarter|year)\s+ended\b", head_txt, re.I):
                 cper = "Q"
             else:
                 ym = re.search(_YRE, head_txt, re.I)

@@ -233,6 +233,13 @@ def guidance_gap(sym, g, pool_us, ann=None):
     """
     r = pool_us.get(sym) or {}
     out = {}
+    # (2026-08-15) REIT 는 **종목 섹터 속성**으로 판정해 EPS 갭을 만들지 않는다.
+    # 리츠의 컨센서스는 FFO 기준이라 회사의 net income per share 가이던스와 비교하면
+    # 반드시 어긋난다(실측 CSR +967% · LTC +292% · O +64%). 종전엔 파서가 문맥 300자
+    # 안의 'FFO' 단어로 판정했는데 단어가 창 밖이면 놓쳤다 — 섹터가 근본 판정 기준이다.
+    is_reit = "real estate" in str(r.get("sector") or "").lower()
+    if is_reit:
+        g = {k: v for k, v in g.items() if "eps" not in k}
     # 분기 기준 선택: 발표일(ann, YYYY-MM-DD) 이후에 끝나는 첫 컨센 분기
     q_eps, q_rev, q_per = r.get("eq0"), r.get("rq0"), "0q"
     if ann:
@@ -275,17 +282,8 @@ def guidance_gap(sym, g, pool_us, ann=None):
             if _ev.get(evk):
                 out["g_eps_ev"] = _ev[evk][:300]
             break
-    # (2026-08-15) **갭 새니티 가드** — |갭| > 150% 는 실측상 전부 파싱·기간 오류였다
-    # (진짜 가이던스 갭은 수십% 를 넘지 않는다. 실측 오류: VZ·HLT·TDC 연간 EPS 가
-    # 분기로 태그돼 분기 컨센과 비교 → +280~360% · CXW 표 오독 +793% · IRWD +866%).
-    # 원칙대로 추측 값을 표시하느니 그 지표를 통째로 비운다(미제시 처리).
-    # 하한도 둔다 — 하회 −90% 이하는 비현실(회사가 매출·이익 9할 증발을 가이드하는 일은
-    # 없다). 실측 CXW −97.2% = 분기 값이 연간 컨센과 비교된 오류.
-    for mk in ("rev", "eps"):
-        gk = f"g_{mk}_gap"
-        if out.get(gk) is not None and (abs(out[gk]) > 150 or out[gk] < -90):
-            for suf in ("", "_gap", "_per", "_ev", "_src", "_own"):
-                out.pop(f"g_{mk}{suf}", None)
+    # (2026-08-15 제거) 갭 크기 기반 차단 가드를 뒀었으나 사용자 지시로 제거 —
+    # 값 필터링은 땜빵이다. 극단 갭을 만드는 원인(기간 오분류 등)은 파서에서 고친다.
     if out:
         # 대표 기간(구버전 호환) — 매출 기준 우선, 없으면 EPS 기준
         out["g_per"] = out.get("g_rev_per") or out.get("g_eps_per") or q_per
