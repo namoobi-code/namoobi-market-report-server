@@ -39,7 +39,11 @@ _FORE = r"expect|guidance|outlook|anticipat|forecast|project|estimat"
 # 부분 지표 — 전사 매출이 아님
 _PART = (r"segment|product line|service revenue|subscription|recurring|licen[cs]|advertis|"
          r"organic|acquired business|supplemental|divisional|by region|geograph|"
-         r"drug discovery|software revenue|hardware|instrument|QCT|QTL|QSI")
+         r"drug discovery|software revenue|hardware|instrument|QCT|QTL|QSI|"
+         # (2026-08-15 5차) 개별 시설·자산 매출 — "we expect **this facility** to generate
+         # total annual revenue of approximately $75 million"(실측 CXW: 신규 수용시설 1곳의
+         # 매출 75M 이 전사 연간 매출로 채택돼 컨센 2B 대비 −97%).
+         r"facilit(?:y|ies)|this property|per location")
 # 전사 매출임을 확인해 주는 수식어(바로 앞 단어)
 # (2026-08-15) 오탐으로 확인된 무해 수식어 추가 — "expects to **report** revenue"(실측 TRMB) ·
 # "**its** revenue" · "FY27 revenue"(연도 표기) · 불릿 기호 "o Revenue" · "record revenue"(사상 최대)
@@ -76,6 +80,12 @@ _GAAP = r"(?<!non-)(?<!non )\bgaap\b"
 # second quarter**" → 연간 가이던스인데 '2분기'로 잡혀 분기 컨센과 비교돼 +396% 오판정.
 _QPAST = (r"(?:through|results through|through the|reported|ended|completed|"
           r"in the|during the|versus the|vs\.? the)\s+$")
+# (2026-08-15 5차) 분기 어구 **바로 뒤에 results/earnings** 가 붙으면 지난 실적 제목이다
+# ("Second Quarter 2026 Financial Results" · "Second quarter results"). 기간 근거로도,
+# 전망 판정(_fwd_q)의 씨앗으로도 쓰지 않는다. 실측 ILMN: 연간 가이던스 불릿 뒤에 이어지는
+# 섹션 제목 "Second quarter results" 가 기간 근거로 채택돼 연간 EPS 5.35 가 0q 로 태그
+# (분기 컨센 대비 +294%). CXW 도 표 앞 "Second Quarter 2026 Financial Results" 가 같은 역할.
+_QRES = r"\s*(?:of\s+)?(?:fiscal\s+)?(?:20\d\d\s+)?(?:financial\s+|fiscal\s+)?(?:results|earnings|highlights)\b"
 # (2026-08-14) [1-4]Q 표기 추가 — "3Q 2026 Full Year 2026" 같은 표 머리글(실측 OPRT)에서
 # 분기 열을 인식하지 못해 분기 값이 연간으로 분류됐다.
 # (2026-08-15) '3rd Qtr' 축약(실측 MIDD)도 추가.
@@ -216,7 +226,8 @@ def _fwd_q(seg):
     전망을 뜻하는 말이 없으면 그 분기 표현은 근거로 쓰지 않는다.
     """
     return any(re.search(_FWD, seg[max(0, m.start() - 60):m.start() + 60], re.I)
-               for m in re.finditer(_QRE, seg, re.I))
+               for m in re.finditer(_QRE, seg, re.I)
+               if not re.match(_QRES, seg[m.end():], re.I))   # '«분기» results' 제목은 제외
 
 
 def _period(txt, start, end):
@@ -246,7 +257,8 @@ def _period(txt, start, end):
         앞쪽 표현을 우선하고(뒤쪽은 거리 3배 페널티), 그중 가장 가까운 것을 쓴다.
         """
         q = [m.start() for m in re.finditer(_QRE, seg, re.I)
-             if not re.search(_QPAST, seg[:m.start()][-30:], re.I)]
+             if not re.search(_QPAST, seg[:m.start()][-30:], re.I)
+             and not re.match(_QRES, seg[m.end():], re.I)]     # '«분기» results' 제목 제외
         # 연도 앞에 분기 표시가 붙어 있으면(“third quarter 2026” · “Q3 2026”) 그건 분기다.
         # 연도만 보고 연간으로 세면 분기 가이던스를 연간 컨센과 비교하게 된다.
         # (2026-08-10 2차) 범위를 40자로 넓힌다. "Second Quarter **Fiscal Year 2027** Guidance"
@@ -313,9 +325,18 @@ def _period(txt, start, end):
     # "…range of $0.35 to $0.49 The following revised guidance is provided for … fiscal year 2026:"
     # 처럼 다음 블록 머리글을 이어붙이면, 그 머리글의 연간 표지가 현재 행의 근거로 오인돼
     # 분기 가이던스가 연간으로 분류된다(실측 VECO Q3 Non-GAAP 0.35~0.49 가 fy_ 로 태그).
+    # (2026-08-15 5차) "For the full year 2026, …" · "For the third quarter of 2026:" 같은
+    # **다음 블록 머리글**도 오른쪽 경계다 — 실측 TDC: 분기 블록 마지막 불릿(Non-GAAP EPS
+    # $0.55~0.59) 뒤에 마침표 없이 연간 블록 머리글이 이어져, 그 머리글의 'full year 2026'
+    # 이 분기 값의 근거로 잡혀 Q3 값이 연간으로(그리고 연간 값이 분기로) 서로 뒤바뀌었다.
     rs = min([p for p in ([txt.find(". ", end), txt.find(" - - ", end)] +
                           [txt.find(ph, end) for ph in (" The following ", " The Company ",
-                                                        " In addition", " Additionally,", " Separately,")] +
+                                                        " In addition", " Additionally,", " Separately,",
+                                                        " For the full year", " For the fiscal year",
+                                                        " For fiscal", " For the first quarter",
+                                                        " For the second quarter", " For the third quarter",
+                                                        " For the fourth quarter", " For full-year",
+                                                        " For full year")] +
                           [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
@@ -332,15 +353,40 @@ def _period(txt, start, end):
     #    → 값 바로 위의 머리글(콜론으로 끝나는 전망 문구)을 먼저 본다.
     #    (2026-08-15) 머리글 허용 길이 40→60자 — "guidance is provided for Veeco's third
     #    quarter 2026:"(43자) 같은 실제 머리글이 40자에 걸려 인식되지 않았다(실측 VECO).
+    # (2026-08-15 5차) 머리글 낱말 확장 — "For the full year 2026, Teradata increases the
+    # following ranges:"(실측 TDC)처럼 guidance/outlook 낱말 없이 여는 머리글이 있다.
+    # 종전엔 이 머리글을 지나쳐 **더 먼** "Outlook For the third quarter of 2026:" 을 집어
+    # 연간 EPS 2.65~2.73 이 0q 로 태그됐다(분기 컨센 대비 +365%).
     hs, h0 = None, max(0, start - 800)
-    for hm in re.finditer(r"(?:guidance|outlook|expects?|expectations|anticipates?)"
+    for hm in re.finditer(r"(?:guidance|outlook|expects?|expectations|anticipates?|"
+                          r"following\s+(?:ranges|updates)|as\s+follows)"
                           r"[^.•●▪:]{0,60}:", txt[h0:start], re.I):
         hs = hm                                   # 가장 가까운(=마지막) 머리글
-    if hs:
-        seg = txt[max(0, h0 + hs.start() - 130):h0 + hs.end()]
-        r15 = pick(seg, len(seg))                 # 머리글 끝(콜론)에 가장 가까운 표현
-        if r15 == "Q" and not _fwd_q(seg):
-            r15 = None
+    # (2026-08-15 5차) ②-c **맨몸 기간 머리글** — 실측 HLT: "Full Year 2026 • System-wide …"
+    # 처럼 콜론도 키워드도 없이 기간 어구만으로 불릿 목록을 여는 형식. 기간 어구가 불릿
+    # 기호 바로 앞에 오면 그 목록의 기간이다. "Second Quarter 2026 Results • …" 같은 실적
+    # 헤드라인은 Results 가 사이에 끼므로 매치되지 않는다.
+    hc = None
+    for hm in re.finditer(r"(?:(?:full[\s-]?year|fiscal\s+year|FY)\s*(?:of\s+)?20\d\d|"
+                          r"(?:first|second|third|fourth)\s+quarter\s+(?:of\s+)?"
+                          r"(?:fiscal\s+(?:year\s+)?)?20\d\d)\s*[::]?\s*(?=[•●▪◦])",
+                          txt[h0:start], re.I):
+        hc = hm
+    # 값에 더 가까운 머리글이 그 값을 지배한다
+    for knd, hm in sorted([("kw", hs), ("bare", hc)],
+                          key=lambda x: -(x[1].start() if x[1] else -1)):
+        if not hm:
+            continue
+        if knd == "kw":
+            seg = txt[max(0, h0 + hm.start() - 130):h0 + hm.end()]
+            r15 = pick(seg, len(seg))             # 머리글 끝(콜론)에 가장 가까운 표현
+            if r15 == "Q" and not _fwd_q(seg):
+                r15 = None
+        else:
+            if re.search(r"full[\s-]?year|fiscal\s+year|\bFY\b", hm.group(0), re.I):
+                r15 = "Y"
+            else:                                  # 분기 머리글 — 뒤 불릿이 전망 문맥일 때만
+                r15 = "Q" if _fwd_q(txt[h0 + hm.start():h0 + hm.end() + 120]) else None
         if r15:
             return r15
     # ③ 앞 문맥 400자 — 가장 가까운 표현.
@@ -493,8 +539,14 @@ def parse_guidance(txt, per_hint=None):
                 # 정상 후보를 죽인다(실측 CSCO Non-GAAP EPS 기각 → GAAP 값이 대신 채택).
                 _ys = [mm.start() for mm in re.finditer(_YRE, back300, re.I)
                        if not re.search(_YEXCL, back300[:mm.start()][-60:], re.I)]
+                # (2026-08-15 5차) 다중 열 판정의 분기 마커에서도 '«분기» results' 실적 제목은
+                # 뺀다 — 실측 CXW: Updated|Prior 두 열(같은 연간 기간) 표인데 표 앞의
+                # "Second Quarter 2026 Financial Results" 가 분기 마커로 집계돼 다중 열로
+                # 오인, Adjusted Diluted EPS 1.62~1.70 이 기각되고 본문 오기(15.00~15.20)가
+                # 살아남았다(+793%).
                 if kind in ("range", "lowhigh") and _ys and \
-                   re.search(_QRE, back300, re.I) and \
+                   any(not re.match(_QRES, back300[mm.end():], re.I)
+                       for mm in re.finditer(_QRE, back300, re.I)) and \
                    re.search(r"^[^.•●%]{0,45}?(?:\$\s?[\d,]+|[\d,]+(?:\.\d+)?\s*(?:billion|million|bn|mm)\b)",
                              txt[m.end():m.end() + 55], re.I):
                     skip.append(f"{metric}: 분기|연간 다중 열 표(열 확정 불가) · {ctx[:110]}")
@@ -583,6 +635,16 @@ def parse_guidance(txt, per_hint=None):
                     # (2026-08-15) 회사 프로필 구제 — 이 회사는 이력상 한 종류 기간만 제시
                     per = per_hint
                     ctx += " [기간: 회사 프로필(이력상 %s만 제시)]" % ("연간" if per_hint == "Y" else "분기")
+                elif per and per_hint and per != per_hint:
+                    # (2026-08-15 5차) 회사 프로필 **교정** — 이력상(BZ 2022~) 한 종류 기간만
+                    # 제시해 온 회사(90%+·n≥4)에서 문맥 판정이 반대로 나오면, 그 판정은 이웃
+                    # 불릿의 다른 지표 기간이 새어 들어온 것이다. 실측: VZ·IR·TEX·SNDR·XOS 는
+                    # 전부 이력 FY 100%(n 15~19) 회사인데 연간 EPS·매출이 0q/+1q 로 태그돼
+                    # 분기 컨센 대비 +180~365% 갭을 만들었다(VZ 는 옆 불릿의 "third-quarter
+                    # 2026" 매출 성장률 문구, IR 은 "1H 48% | 2H 52%" 페이징 주석이 근거로
+                    # 오채택). 분기 가이던스를 한 번도 낸 적 없는 회사다 — 프로필로 교정한다.
+                    per = per_hint
+                    ctx += " [기간: 회사 프로필로 교정(이력상 %s만 제시)]" % ("연간" if per_hint == "Y" else "분기")
                 if not per:
                     skip.append(f"{metric}: 기간 미명시(분기/연간 확정 불가) · {ctx[:130]}")
                     continue
@@ -648,7 +710,14 @@ def parse_guidance(txt, per_hint=None):
                     # (2026-08-15) REIT 가드 — FFO 를 쓰는 리츠의 'net income per share' 가이던스는
                     # FFO 기반 컨센서스와 비교할 수 없다(실측 O 1.60 vs 컨센 FFO 4.45 ·
                     # PK 0.40 vs 1.95 · UE 0.59 vs 1.52 — 전부 리츠).
-                    if re.search(r"\bFFO\b|funds from operations", back300 + ctx, re.I):
+                    # (2026-08-15 5차) 검사 범위를 back300+ctx → **라벨 인접(lead+near)** 으로
+                    # 좁힌다 — 표에서 EPS 행과 FFO 행을 **별도 항목으로 나란히** 제시하는
+                    # 회사(실측 CXW: Diluted EPS·Adjusted Diluted EPS·FFO per share 가 각각
+                    # 한 행)는 EPS 가 진짜 EPS 인데, 이웃 행의 FFO 가 back300 에 걸려 정상
+                    # EPS 후보가 통째로 기각됐다. 리츠 자체는 종목 sector 속성(guidance_gap 의
+                    # Real Estate 판정)이 하류에서 걸러 주므로, 파스 단계 가드는 라벨에 FFO 가
+                    # 직접 붙은 경우만 막으면 된다.
+                    if re.search(r"\bFFO\b|funds from operations", lead + near, re.I):
                         skip.append(f"eps: REIT(FFO 기반) — EPS 는 FFO 컨센과 비교 불가 · {ctx[:110]}")
                         continue
                     # (2026-08-15) ctx(값 **뒤** 40자 포함)로 기준을 판정하지 않는다 —
@@ -657,7 +726,18 @@ def parse_guidance(txt, per_hint=None):
                     # 값의 교체(add 오버라이드)까지 막았다(실측 WWW). 기준은 값 **앞** 문맥만.
                     # lead(라벨~숫자 사이)가 가장 가깝다 — "Earnings per Share: GAAP: $1.08"(실측
                     # CSCO)의 GAAP 표기는 lead 에만 있다.
-                    bas = _basis(lead) or _basis(near) or _basis(back)
+                    # (2026-08-15 5차) **다른 지표에 붙은 adjusted 는 기준 근거가 아니다** —
+                    # 표에서 "➣ Adjusted Net Income … ➣ Diluted EPS $…" 처럼 이웃 행 라벨의
+                    # 'Adjusted' 가 near/back 에 걸리면 GAAP 성 EPS 가 adj 로 등록되고, 그러면
+                    # 뒤따르는 진짜 Adjusted Diluted EPS 의 교체(add 오버라이드)가 "같은 기준
+                    # 이미 있음"으로 막힌다(실측 CXW: 오기값 15.00~15.20 이 adj 로 굳어
+                    # 1.62~1.70 교체 불발 → +793%). 지표명이 따라붙은 adjusted 는 지우고 판정한다.
+                    _oadj = (r"adjusted\s+(?:net\s+income|ebitda\w*|free\s+cash(?:\s+flow)?|"
+                             r"operating\s+(?:income|margin|earnings)|revenu\w+|gross\s+(?:margin|profit)|"
+                             r"net\s+leverage)")
+                    bas = (_basis(lead) or
+                           _basis(re.sub(_oadj, " ", near, flags=re.I)) or
+                           _basis(re.sub(_oadj, " ", back, flags=re.I)))
                     # (2026-08-15) "…$30.00 to $31.00, **or $34.25 to $35.25 on an adjusted basis**"
                     # (실측 PH) · "GAAP: $1.08-$1.10; **Non-GAAP: $1.32-$1.34**"(실측 CSCO) —
                     # 조정 값이 바로 뒤에 병기되면 그쪽이 컨센 비교 대상이다.
