@@ -348,7 +348,13 @@ def _period(txt, start, end):
                                                         " For fiscal", " For the first quarter",
                                                         " For the second quarter", " For the third quarter",
                                                         " For the fourth quarter", " For full-year",
-                                                        " For full year")] +
+                                                        " For full year",
+                                                        # (2026-08-16) 표 캡션은 항상 새 블록이다 —
+                                                        # 실측 CGNX: Q3 표 마지막 행(Adj. EPS $0.50-$0.54)
+                                                        # 뒤에 "Table 2: Full-Year 2026 Guidance" 캡션이
+                                                        # 이어져 Y 가 근거로 채택(3배 페널티로도 역전),
+                                                        # 분기 값이 연간으로·연간 값이 분기로 뒤바뀜(+221%).
+                                                        " Table ")] +
                           [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
