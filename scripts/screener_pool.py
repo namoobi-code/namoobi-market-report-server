@@ -424,6 +424,25 @@ def _enrich_us(us):
                 if p.get(k) is not None: by[c][k]=p.get(k)
             if "sector" in by[c]: by[c]["_cf"]=True; cf+=1
     if cf: print(f"[pool] US carry-forward {cf}종(직전 풀 값 이월)")
+    # (2026-08-15) 컨센 패치 필드는 **전 종목** 이월한다 — us_consensus.py(아침 08:00, 화~토)가
+    # 풀에 얹는 ry0·rq0·ey0·eq0 등은 풀 자체 빌드(06:52·15:52)가 만들지 않는 필드라,
+    # 15:52 재생성마다 통째로 사라져 다음 날 08:00까지 풀에 컨센 기준값이 없었다.
+    # 실측 사고(08-15): 저녁에 돌린 가이던스 체인이 기준값 없는 풀을 만나
+    # 가이던스 갭 938→482종목·BZ 대조 1,591→0건으로 무너졌다. 빌드가 만들지 않는
+    # 패치 필드는 빌드가 지울 자격도 없다 — 직전 풀 값을 그대로 물려받는다.
+    USCONS_CARRY=("eq0","rq0","eq1","rq1","ey0","ey1","ry0","ry1","q0e","q1e","nan1",
+                  "spr","sprb","sprn","spra","cr7","cr30","cr90","pr7","pr30","pr90",
+                  "cup","cdn","tprv","tprv90")
+    cc=0
+    for c in by:
+        p=prev.get(c)
+        if not p: continue
+        hit=False
+        for k in USCONS_CARRY:
+            if by[c].get(k) is None and p.get(k) is not None:
+                by[c][k]=p[k]; hit=True
+        if hit: cc+=1
+    if cc: print(f"[pool] US 컨센 패치 이월 {cc}종(ry0·eq0 등 — 빌드 미생성 필드)")
     us2=[by[r["c"]] for r in us]
     for i,r in enumerate(us2):
         gg=[min(x,3.0) for x in (r.get("revg"),r.get("epsg")) if x is not None]
