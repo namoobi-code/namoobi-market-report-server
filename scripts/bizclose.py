@@ -23,9 +23,14 @@
 사용: bizclose.py            (연 1회 갱신이면 충분 — cron 은 매일 07:25)
 cron: 25 7 * * *
 """
-import json, sys, time, urllib.request, urllib.parse
+import json, socket, sys, time, urllib.request, urllib.parse
 from datetime import datetime
 from pathlib import Path
+
+# (2026-08-16) urlopen(timeout=) 은 소켓이 조금씩이라도 데이터를 흘리면 안 끊긴다.
+# 실측: 32개 코드×3측정을 빠르게 던지자 KOSIS 가 한 요청을 15분 넘게 붙잡고 놔주지 않았다.
+# → 전역 기본 타임아웃을 걸어 확실히 끊고, 호출 간격도 넉넉히 준다.
+socket.setdefaulttimeout(35)
 
 BASE = Path(__file__).resolve().parent.parent
 DB   = BASE / "data" / "db"
@@ -95,7 +100,7 @@ def get(**q):
     url = API + "?" + urllib.parse.urlencode(q)
     for k in range(3):
         try:
-            d = json.loads(urllib.request.urlopen(url, timeout=90).read())
+            d = json.loads(urllib.request.urlopen(url, timeout=30).read())
             if isinstance(d, dict):
                 return []                      # err 30 = 해당 조합 없음 — 정상 흐름
             return d
@@ -103,7 +108,7 @@ def get(**q):
             if k == 2:
                 print(f"    ⚠ 실패: {e}")
                 return []
-            time.sleep(2 * (k + 1))
+            time.sleep(3 * (k + 1))
     return []
 
 
@@ -127,7 +132,7 @@ def main():
             d = {r["PRD_DE"]: num(r.get("DT")) for r in rows if r.get("PRD_DE")}
             data[m][name] = d
             got.append(len(d))
-            time.sleep(0.25)
+            time.sleep(0.6)
         print(f"    {name:<14} 가동 {got[0]:>2} · 신규 {got[1]:>2} · 폐업 {got[2]:>2}개년")
 
     years = sorted({y for m in data for n in data[m] for y in data[m][n]})
@@ -171,7 +176,7 @@ def main():
             if late_y is None or y > late_y:
                 late_y = y
             late[name] = d.get(y)
-        time.sleep(0.25)
+        time.sleep(0.6)
 
     names = [n for _, n in DIMS] + ["소상공인 밀집업종"]
     out = {

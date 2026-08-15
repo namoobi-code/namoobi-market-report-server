@@ -2686,8 +2686,75 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     }).catch(()=>{ $('au_reg_n').textContent='autos 로드 실패'; });
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     (2026-08-16) 🏪 사업자 폐업률 — bizclose.json (KOSIS 국세청 · 매일 07:25)
+
+     폐업률 = 폐업 ÷ (가동 + 폐업). '폐업 ÷ 가동'으로 계산하면 같은 해 값이
+     1%p 가까이 커진다 — 신문 그래픽마다 숫자가 다른 이유가 대개 이 정의 차이다.
+     '소상공인 밀집업종'은 임의로 고른 묶음이므로 어느 업태를 넣었는지 화면에 적는다.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const BCPAL=['#1f2937','#d9534f','#2f6fed','#e08e3c','#27ae60','#7c3aed','#0e9aa7','#c2185b',
+               '#5d4037','#9e9d24','#455a64','#00838f','#3f51b5','#8bc34a','#795548','#ad1457'];
+  let _bcInit=false, _bcMode='rate', _bcSel=['전체','소상공인 밀집업종','음식업','소매업'];
+  function initBizClose(){
+    if(_bcInit) return; _bcInit=true;
+    fetch('/api/db/bizclose').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!(d.t||[]).length){ const e=$('bc_main_n');
+        if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:25)부터 표시됩니다.'; return; }
+      const T=d.t, ALL=Object.keys(d.rate||{});
+      const IND=['소매업','음식업','서비스업','숙박업','대리·중개·도급업','부동산임대업','도매업',
+                 '제조업','건설업','운수·창고·통신업','부동산매매업','농·임·어업','광업','전기·가스·수도업'];
+      const SIDO=['서울','인천','경기','강원','대전','충북','충남','세종','광주','전북','전남',
+                  '대구','경북','부산','울산','경남','제주'];
+      {const e=$('bc_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
+      const E5=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      const PRESET=[
+        ['전체 vs 소상공인', ()=>['전체','소상공인 밀집업종']],
+        ['업태 전부',       ()=>['전체'].concat(IND)],
+        ['자영업 4종',      ()=>['전체','음식업','소매업','숙박업','서비스업']],
+        ['시도별',          ()=>['전체'].concat(SIDO)],
+      ];
+      const bar=()=>{
+        segbar('bc_mode',[['rate','폐업률(%)'],['close','폐업자 수(명)'],['new','신규 사업자(명)'],
+                          ['active','가동 사업자(명)']],()=>_bcMode,v=>_bcMode=v,redraw);
+        $('bc_preset').innerHTML=PRESET.map(([l],i)=>
+          `<button data-p="${i}" style="padding:3px 9px;font-size:11.5px;border:1px solid #b45309;color:#b45309;background:#fff;border-radius:6px;cursor:pointer">${l}</button>`).join('');
+        $('bc_preset').querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{
+          _bcSel=PRESET[+b.dataset.p][1]().filter(k=>ALL.includes(k)); redraw(); });
+        $('bc_chips').innerHTML=_bcSel.map((k,i)=>
+          `<span style="display:inline-flex;align-items:center;gap:3px;padding:2px 7px;font-size:12px;border-radius:10px;background:${BCPAL[i%BCPAL.length]}18;border:1px solid ${BCPAL[i%BCPAL.length]};color:#333">`
+          +`<b style="color:${BCPAL[i%BCPAL.length]}">●</b>${E5(k)}<b data-rm="${E5(k)}" style="cursor:pointer;color:#888">✕</b></span>`).join('');
+        $('bc_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{
+          _bcSel=_bcSel.filter(k=>k!==x.dataset.rm); redraw(); });
+      };
+      const redraw=()=>{ bar(); draw(); };
+      function draw(){
+        const S=d[_bcMode]||{};
+        const arr=_bcSel.map((k,i)=>({t:T, v:(S[k]||[]).slice(), label:k, color:BCPAL[i%BCPAL.length]}))
+                        .filter(a=>a.v.some(v=>v!=null));
+        line('bc_main', arr);
+        const last=a=>{ for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [a[i],T[i]]; return [null,null]; };
+        const [rv,ry]=last(d.rate['전체']||[]), [sv]=last(d.rate['소상공인 밀집업종']||[]);
+        const L=d.close_latest||{};
+        const unit=_bcMode==='rate'?'%':'명';
+        const rows=_bcSel.map(k=>{const [v]=last((d[_bcMode]||{})[k]||[]);
+          return v==null?null:`${E5(k)} <b>${_bcMode==='rate'?v+'%':Math.round(v).toLocaleString()+'명'}</b>`;}).filter(Boolean);
+        $('bc_main_n').innerHTML=`<b>${ry||''}년</b> — ${rows.join(' · ')}`
+          +(rv!=null&&sv!=null?`<br>전체 <b>${rv}%</b> vs 소상공인 밀집업종 <b class="${sv>rv?'up':'dn'}">${sv}%</b>`
+             +` — 격차 <b>${(sv-rv).toFixed(2)}%p</b>`:'')
+          +`<br><span class="note"><b>폐업률 = 폐업 ÷ (가동 + 폐업)</b>. '폐업 ÷ 가동'으로 계산하면 같은 해 값이 1%p 가까이 커진다 — `
+          +`신문·보고서마다 숫자가 다른 건 대개 이 정의 차이다.<br>`
+          +`'소상공인 밀집업종'은 <b>${(d.soho||[]).map(E5).join(' · ')}</b> 를 합쳐 다시 폐업률로 환산한 값이다(공식 분류가 아니라 이 화면의 정의).<br>`
+          +(L.year&&L.v&&L.v['전체']?`폐업자 수는 <b>${L.year}년 ${L.v['전체'].toLocaleString()}명</b>까지 공표됐지만 `
+             +`가동 사업자가 아직 안 나와 폐업률은 ${T[T.length-1]}년까지만 계산된다.<br>`:'')
+          +`${E5(d.note||'')}</span>`;
+      }
+      redraw();
+    }).catch(()=>{});
+  }
+
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initAutos();
+    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initBizClose(); initAutos();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};

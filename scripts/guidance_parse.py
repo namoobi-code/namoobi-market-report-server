@@ -575,11 +575,16 @@ def parse_guidance(txt, per_hint=None):
                 # "Second Quarter 2026 Financial Results" 가 분기 마커로 집계돼 다중 열로
                 # 오인, Adjusted Diluted EPS 1.62~1.70 이 기각되고 본문 오기(15.00~15.20)가
                 # 살아남았다(+793%).
+                # (2026-08-16) 뒤따르는 금액 검사에서 % 배제를 푼다 — "Total Revenue
+                # $7,940-$8,010 **~16%** $7,825-$7,925 ~$1,980"(실측 IRM: FY|Y/Y%|Prior|Q3
+                # 5열 표)처럼 값 열 사이에 증감률(%) 열이 끼면 % 문자가 검사를 끊어
+                # 다중 열 가드가 통과됐고, FY 값 7,975 가 0q 로 태그돼 Q3 컨센 1,980
+                # 대비 +300%. %를 건너뛰고도 금액이 이어지면 다중 열이다.
                 if kind in ("range", "lowhigh") and _ys and \
                    any(not re.match(_QRES, back300[mm.end():], re.I)
                        for mm in re.finditer(_QRE, back300, re.I)) and \
-                   re.search(r"^[^.•●%]{0,45}?(?:\$\s?[\d,]+|[\d,]+(?:\.\d+)?\s*(?:billion|million|bn|mm)\b)",
-                             txt[m.end():m.end() + 55], re.I):
+                   re.search(r"^[^.•●]{0,55}?(?:\$\s?[\d,]+|[\d,]+(?:\.\d+)?\s*(?:billion|million|bn|mm)\b)",
+                             txt[m.end():m.end() + 65], re.I):
                     skip.append(f"{metric}: 분기|연간 다중 열 표(열 확정 불가) · {ctx[:110]}")
                     continue
                 # (2026-08-14) 장기 목표(long-term outlook/target)는 올해·다음 분기 가이던스가
