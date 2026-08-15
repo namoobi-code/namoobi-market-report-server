@@ -592,10 +592,12 @@ def parse_guidance(txt, per_hint=None):
                     if re.search(_PART, near, re.I):
                         skip.append(f"rev: 전사 아님(부분 지표) · {ctx[:130]}")
                         continue
-                    # (2026-08-15) 라벨 직전에 ®·™ 상표 표기가 붙으면 **제품 매출**이다
-                    # (실측 IRWD "LINZESS® revenue guidance" — 제품 매출을 전사 컨센과
-                    # 비교해 +866%). 전사 매출 앞에 상표 기호가 오는 경우는 없다.
-                    if re.search(r"[®™]\s*(?:\([^)]{0,20}\))?\s*$", near):
+                    # (2026-08-15) 라벨 앞 60자에 ®·™ 상표 표기가 있으면 **제품 매출**이다
+                    # (실측 IRWD "LINZESS ® (linaclotide) U.S. net sales guidance" — 제품
+                    # 매출을 전사 컨센과 비교해 +866%. 상표 뒤에 성분명·지역 수식이 붙어
+                    # '직전' 패턴으로는 놓쳤다). 전사 매출 문맥 60자 안에 상표 기호가
+                    # 등장하는 경우는 실무상 없다.
+                    if re.search(r"[®™]", near):
                         skip.append(f"rev: 상표(®·™) 제품 매출 → 전사 아님 · {ctx[:110]}")
                         continue
                     # (2026-08-15) "Revenue **from sales of Captisol**"(실측 LGND) — 라벨 뒤에

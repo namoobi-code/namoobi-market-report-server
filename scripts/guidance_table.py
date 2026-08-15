@@ -214,14 +214,22 @@ def parse_tables(html, txt_hint=""):
         # 분류됐다(실측 CNMD 연간 매출 1,358 이 0q 로 +304% · PIII +286%). 과거 표기
         # ('months ended')가 낀 캡션의 분기도 제외한다. 문장 파서의 _fwd_q 를 공유한다.
         if not any(mt["per"] for mt in meta):
+            # (2026-08-15 3차) 캡션에 실적 분기 문구와 연간 가이던스 문구가 **공존**하면
+            # (예: "…third quarter results … full year 2026 guidance:") Q 를 무조건
+            # 우선하던 종전 로직이 연간 표를 분기로 분류했다(실측 GRDN 연간 매출 1.43B 이
+            # 0q 로 +294% · PIII +286%). **표에 가장 가까운(마지막) 기간 토큰**이 표의
+            # 기간이다 — 캡션은 위→아래로 흐르고 머리글 직전 문구가 표를 수식한다.
+            qlast = ylast = -1
+            for qm in re.finditer(_QRE, head_txt, re.I):
+                seg = head_txt[max(0, qm.start() - 60):qm.start() + 60]
+                if _fwd_q(seg) and not re.search(r"(?:months|quarter|year)\s+ended\b", seg, re.I):
+                    qlast = qm.start()
+            for ym in re.finditer(_YRE, head_txt, re.I):
+                if not re.search(_YEXCL, head_txt[:ym.start()][-60:], re.I):
+                    ylast = ym.start()
             cper = None
-            if re.search(_QRE, head_txt, re.I) and _fwd_q(head_txt) \
-               and not re.search(r"(?:months|quarter|year)\s+ended\b", head_txt, re.I):
-                cper = "Q"
-            else:
-                ym = re.search(_YRE, head_txt, re.I)
-                if ym and not re.search(_YEXCL, head_txt[:ym.start()][-60:], re.I):
-                    cper = "Y"
+            if qlast >= 0 or ylast >= 0:
+                cper = "Q" if qlast > ylast else "Y"
             if not cper:
                 continue                               # 기간을 알 수 없는 표 — 버린다
             for mt in meta:
