@@ -254,6 +254,12 @@ def parse_tables(html, txt_hint=""):
                 continue                               # 기간을 알 수 없는 표 — 버린다
             for mt in meta:
                 mt["per"] = cper
+        # (2026-08-16) **민감도 표** 가드 — "Effect on Adjusted EPS of a 10% change in fuel
+        # prices"(실측 NCLH: 유가 민감도 0.02 가 Q3 EPS 로 채택돼 BZ 0.90 대비 −98%) 같은
+        # 표는 가이던스가 아니라 변수 민감도다. 캡션·머리글에 민감도 문구가 있으면 표 전체 기각.
+        if re.search(r"sensitivit|effect\s+o[fn]\s|impact\s+of\s+a\s|\b10%\s+change|"
+                     r"change\s+in\s+(?:fuel|currency|fx|foreign|interest)", head_txt, re.I):
+            continue
         table_has_ffo = any(re.search(_L_FFO, _clean(r[0]), re.I) for r in grid if r)
         for row in grid[data_start:]:
             if not row:
@@ -263,6 +269,14 @@ def parse_tables(html, txt_hint=""):
                 continue
             # 지표 판정 + 행 단위 안전장치(문장 파서와 동일 원칙)
             if re.search(_L_FFO, label, re.I):
+                continue
+            # (2026-08-16) **증분·영향·비경상 행** 가드 — "Diluted EPS impact"(실측 BOOT:
+            # 관세 영향 0.38~0.06 이 연간 EPS 로 채택돼 BZ 9.02 대비 −95%) ·
+            # "Revenue from contract termination"(실측 THC: 계약해지 매출이 전사 매출로
+            # 채택돼 BZ 22,200 대비 −93%). 라벨에 영향·증분·해지 수식이 붙은 행은
+            # 지표의 수준(level)이 아니다.
+            if re.search(r"impact|effect|sensitiv|headwind|tailwind|contribution|"
+                         r"termination|incremental|dilution\s+from|benefit\s+from", label, re.I):
                 continue
             metric = None
             if re.search(_L_REV, label, re.I) and not re.search(
@@ -290,6 +304,14 @@ def parse_tables(html, txt_hint=""):
             if lm:
                 rmult = _MULT[lm.group(1).lower()]
             vals = {i: _cell_val(row[i], rmult) for i in range(1, min(len(row), ncol))}
+            # (2026-08-16) **단위 미확정 기각** — 캡션·라벨에 단위 선언이 없고 셀에도 단위
+            # 접미(billion/million/[BM])가 없으면 자릿수를 확정할 수 없다(문장 파서의
+            # '단위 미표기 기각'과 동일 원칙). 실측 FSTR: 천단위 관례 표("Net sales $540,000",
+            # 단위 주석 없음)를 원화폐 달러로 읽어 매출 0.54M 채택 → 컨센 560M 대비 −99.9%.
+            if metric in ("rev", "capex") and mult == 1.0 and rmult == 1.0 and \
+               not re.search(r"billion|million|\bbn\b|\bmm\b|[\d.]\s*[BM]\b",
+                             " ".join(row[1:]), re.I):
+                continue
             for per, pre in (("Q", ""), ("Y", "fy_")):
                 lo, hi = _pick_cols(meta, vals, per)
                 if lo is None or hi is None:

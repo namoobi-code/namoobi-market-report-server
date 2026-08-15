@@ -328,7 +328,10 @@ def _period(txt, start, end):
     # 직전 절의 'guidance' 가 ±60자 창에 걸려 _fwd_q 까지 통과한다(실측 IRWD: 연간
     # 총매출 460~485M 이 0q 로 태그돼 분기 컨센 대비 +289%). 값 범위의 단일 대시
     # ("$460 - $485")와 달리 이중 대시는 불릿 이음에서만 나온다.
-    ls = max(txt.rfind(". ", 0, start), txt.rfind(" - - ", 0, start),
+    # (2026-08-16) 여는 인용부호(“)도 문장 경계다 — 표·불릿 뒤에 마침표 없이 경영진
+    # 인용문이 이어지면("…$350 - $400 “Second quarter benefitted from…", 실측 SNDR)
+    # 인용문 속 지난 분기 언급이 값의 기간 근거로 새어 들어온다. 인용문은 항상 새 발화다.
+    ls = max(txt.rfind(". ", 0, start), txt.rfind(" - - ", 0, start), txt.rfind(" “", 0, start),
              *(txt.rfind(b, 0, start) for b in ("• ", "● ", "▪ ", "· ")))
     # (2026-08-10) 오른쪽 경계도 **다음 불릿**에서 끊는다. 예전엔 다음 마침표까지만 봐서
     # 불릿 목록이 통째로 한 문장이 됐고, 값 뒤 항목의 분기 표현이 근거로 채택돼
@@ -341,7 +344,7 @@ def _period(txt, start, end):
     # **다음 블록 머리글**도 오른쪽 경계다 — 실측 TDC: 분기 블록 마지막 불릿(Non-GAAP EPS
     # $0.55~0.59) 뒤에 마침표 없이 연간 블록 머리글이 이어져, 그 머리글의 'full year 2026'
     # 이 분기 값의 근거로 잡혀 Q3 값이 연간으로(그리고 연간 값이 분기로) 서로 뒤바뀌었다.
-    rs = min([p for p in ([txt.find(". ", end), txt.find(" - - ", end)] +
+    rs = min([p for p in ([txt.find(". ", end), txt.find(" - - ", end), txt.find(" “", end)] +
                           [txt.find(ph, end) for ph in (" The following ", " The Company ",
                                                         " In addition", " Additionally,", " Separately,",
                                                         " For the full year", " For the fiscal year",
@@ -359,7 +362,13 @@ def _period(txt, start, end):
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
     r1 = pick(sent, start - s0)
-    if r1 == "Q" and not _fwd_q(sent):
+    # (2026-08-16) ②는 이미 한 문장으로 경계 지어져 있으므로, 문장 앞머리에 전망 동사가
+    # 있으면 그 문장의 분기 표현은 전망 기간이다 — 토큰 ±60자 창만 보면 "expects net sales
+    # in the range of $14.5 billion and $15.5 billion for the first quarter …"(실측 SMCI)
+    # 처럼 값 범위가 길 때 동사가 창 밖으로 2자 벗어나 정당한 Q 가 버려지고, ③에서
+    # 대차대조표 날짜("As of June 30, 2026")가 연간 표지로 오채택됐다(Q1 15B 가 0y →
+    # FY 컨센 68.5B 대비 −78%).
+    if r1 == "Q" and not (_fwd_q(sent) or re.search(_FORE, sent[:max(0, start - s0)], re.I)):
         r1 = None                       # 지난 실적을 말하는 분기 표현이면 근거로 쓰지 않는다
     if r1:
         return r1, (r1 != "Q" or _nonhalf_q(sent))
@@ -544,7 +553,11 @@ def parse_guidance(txt, per_hint=None):
                              r"headwind|tailwind|benefit of|reduc\w* by|increas\w* by)\b\s*"
                              r"(?:approximately\s+|about\s+|around\s+)?$",
                              lead[-45:], re.I) or \
-                   re.search(r"estimated impact|impact on", ctx, re.I):
+                   re.search(r"estimated impact|impact on", ctx, re.I) or \
+                   re.search(r"\bcontribut\w+\s*:", back, re.I):
+                    # (2026-08-16) "…is expected to contribute: • Revenue: $24-26M"(실측 GLBE:
+                    # 인수한 Passport 사업부의 **기여분** 블록 — 콜론 뒤 불릿 나열이라 lead 창을
+                    # 벗어남) — back 에 'contribute:' 머리글이 있으면 그 아래 값은 기여분이다.
                     skip.append(f"{metric}: 증분·기여분 표현(수준 아님) · {ctx[:110]}")
                     continue
                 # (2026-08-15 2차) **분기|연간 다중 열 표** — 머리글에 분기·연간이 나란히 있고
@@ -573,7 +586,11 @@ def parse_guidance(txt, per_hint=None):
                 # 아니다 — 컨센과 비교하면 반드시 어긋난다(실측 EOLS "Reaffirms 2028 Long-Term
                 # Financial Outlook … $450-500M" 을 올해 매출로 채택 → +42%).
                 if re.search(r"long[-\s]term\s+(?:financial\s+)?(?:outlook|guidance|target|model|goal)",
-                             ctx, re.I):
+                             ctx, re.I) or \
+                   re.search(r"run[-\s]rate", back + lead, re.I):
+                    # (2026-08-16) run-rate 도 장기 목표다 — "by year-end 2028 … total annual
+                    # revenues … run rate is expected to reach $2.2 to $2.3 billion"(실측 ENLT:
+                    # 2028년 도달 목표 런레이트 2.25B 가 올해 매출로 채택돼 컨센 805M 대비 +180%).
                     skip.append(f"{metric}: 장기 목표(당기 가이던스 아님) · {ctx[:110]}")
                     continue
                 # (2026-08-14) 라벨과 숫자 사이에 **반대편 지표**가 끼면 그 숫자는 그쪽 것이다.
@@ -680,7 +697,11 @@ def parse_guidance(txt, per_hint=None):
                         continue
                     add("capex", per, lo, hi, ctx)
                 elif metric == "rev":
-                    if re.search(_PART, near, re.I):
+                    # (2026-08-16) lead(라벨~숫자 사이)도 함께 검사한다 — "recognize annual
+                    # revenue **related to the license agreement** between $200-$225 million"
+                    # (실측 AMCX: 라이선스 계약 관련 부분 매출 212.5M 이 전사 연간 매출로
+                    # 채택돼 컨센 2,425M 대비 −91%). 부분 지표 수식이 라벨 뒤에 오는 형태.
+                    if re.search(_PART, near + " " + lead, re.I):
                         skip.append(f"rev: 전사 아님(부분 지표) · {ctx[:130]}")
                         continue
                     # (2026-08-15) 라벨 앞 60자에 ®·™ 상표 표기가 있으면 **제품 매출**이다
