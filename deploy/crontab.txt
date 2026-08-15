@@ -109,4 +109,4 @@
 5 8 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py --mail >> /home/ubuntu/namoobi/health.log 2>&1
 
 # ── A1 무료 인스턴스 헌터 (10분 간격 · 성공 시 자기해제) — 성공 후 이 줄은 삭제해도 무방 ──
-*/10 * * * * cd /home/ubuntu/namoobi && python3 scripts/a1_hunter.py >> /home/ubuntu/namoobi/a1_hunter.log 2>&1
+*/30 * * * * cd /home/ubuntu/namoobi && python3 scripts/a1_hunter.py >> /home/ubuntu/namoobi/a1_hunter.log 2>&1
