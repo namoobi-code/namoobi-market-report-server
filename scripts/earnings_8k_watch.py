@@ -275,6 +275,15 @@ def guidance_gap(sym, g, pool_us, ann=None):
             if _ev.get(evk):
                 out["g_eps_ev"] = _ev[evk][:300]
             break
+    # (2026-08-15) **갭 새니티 가드** — |갭| > 150% 는 실측상 전부 파싱·기간 오류였다
+    # (진짜 가이던스 갭은 수십% 를 넘지 않는다. 실측 오류: VZ·HLT·TDC 연간 EPS 가
+    # 분기로 태그돼 분기 컨센과 비교 → +280~360% · CXW 표 오독 +793% · IRWD +866%).
+    # 원칙대로 추측 값을 표시하느니 그 지표를 통째로 비운다(미제시 처리).
+    for mk in ("rev", "eps"):
+        gk = f"g_{mk}_gap"
+        if out.get(gk) is not None and abs(out[gk]) > 150:
+            for suf in ("", "_gap", "_per", "_ev", "_src", "_own"):
+                out.pop(f"g_{mk}{suf}", None)
     if out:
         # 대표 기간(구버전 호환) — 매출 기준 우선, 없으면 EPS 기준
         out["g_per"] = out.get("g_rev_per") or out.get("g_eps_per") or q_per
