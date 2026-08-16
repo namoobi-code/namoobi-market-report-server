@@ -24,7 +24,6 @@ MarketBeat 'Company Guidance' 열은 회사마다 매출인지 EPS인지·단위
 사용: guidance_portal.py [--days 30] [--limit N]
 cron: 매일 08:40 (guidance_backfill·earnings_join 뒤)
 """
-import os
 import json, re, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -138,7 +137,7 @@ def _save(live):
             for k in P_FIELDS:
                 if src.get(k) is not None:
                     it[k] = src[k]
-    tmp = LIVE.with_suffix(f".json.tmp.{os.getpid()}")   # (2026-08-16) 동시 실행 시 tmp 이름 충돌 방지
+    tmp = LIVE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
     tmp.replace(LIVE)
 

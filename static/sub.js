@@ -89,6 +89,9 @@
             <th style="text-align:right">특공계</th>
             <th style="text-align:right" title="각 특공 유형: 배정세대 (경쟁률 = 신청건수÷배정세대) · 특공은 전부 무주택세대 요건">신혼 <span class="note">(경쟁률)</span></th>
             <th style="text-align:right">신생아</th><th style="text-align:right">생애최초</th><th style="text-align:right">다자녀</th><th style="text-align:right">청년</th><th style="text-align:right">노부모</th>
+            <th style="text-align:right" title="기관추천 — 국가유공자·장애인·중소기업 근로자 등, 해당 기관 추천을 받아야 신청 가능(일반 청약자는 대상 아님)">기관추천</th>
+            <th style="text-align:right" title="이전기관 종사자 — 혁신도시 등 이전 공공기관 직원 대상">이전기관</th>
+            <th style="text-align:right" title="위 유형에 잡히지 않은 잔여 특공 물량(합계를 특공계와 맞춘 값)">기타</th>
             <th style="text-align:right">가점(최저/평균/최고)</th></tr></thead><tbody>${
           (i.ty||[]).map(t=>{
             const sp=(n,r)=>n?`${n}${r!=null?` <span class="note">(${fr1(r)})</span>`:''}`:'—';
@@ -111,6 +114,7 @@
             <td class="num">${sp(t.nw,t.nwr)}${t.nwlot?` <span class="note">추첨${t.nwlot}</span>`:''}</td>
             <td class="num">${sp(t.nb,t.nbr)}</td><td class="num">${sp(t.lf,t.lfr)}</td>
             <td class="num">${sp(t.my,t.myr)}</td><td class="num">${sp(t.yg,t.ygr)}</td><td class="num">${sp(t.op,t.opr)}</td>
+            <td class="num">${sp(t.ir,t.irr)}</td><td class="num">${sp(t.tr,t.trr)}</td><td class="num">${t.ec?t.ec:'—'}</td>
             <td class="num">${t.sc?t.sc.join(' / '):'—'}</td></tr>`;}).join('')}</tbody></table>
           <div class="note" style="margin-top:4px">💡 <b>예상시세*</b>는 같은 시군구 최근 6개월 국토부 실거래 ㎡당가의 <b>거래건수 가중 평균</b>(최고값·중간값 아님 · 준공 15년 이내·유사면적 ±5㎡ 우선, †=전 연식) × 전용면적.
           <b>분양가 최저~최고(평균)</b>의 최저·평균은 공고문 PDF 층별 가격표를 자동 파싱한 값(API 최고가와 ±3% 일치 시에만 표시·근사치) — <b>차익*은 평균 분양가 기준</b>(동·호수 추첨이라 기대값, '평균가 기준' 표기), 평균이 없으면 최고가 기준(보수적). 최고가만 표시되면 PDF 형식이 달라 미파싱, 원문(🔗) 확인. <b>차익*</b> = 예상시세 − 최고분양가 — 분양가가 최고가(최상층) 기준이라 실제 차익은 이보다 클 수 있고, 옵션비·발코니 확장비·층향 차이는 미반영. 신축 프리미엄으로 실제 신축 시세는 주변 평균보다 높게 형성되는 경향도 참고. 실거래DB 수집 지역(서울·경기·광역시 등)만 표시.

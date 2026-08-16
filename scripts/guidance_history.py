@@ -19,7 +19,6 @@ EPS 가 있으면 EPS 기준, 없으면 매출 기준. **회사가 가이던스�
 
 cron: 매일 09:40 (guidance_bz 09:10 뒤). 네트워크 호출 없음, 수 초면 끝난다.
 """
-import os
 import json
 from datetime import datetime
 from pathlib import Path
@@ -88,7 +87,7 @@ def main():
     meta = {"asof": datetime.now().strftime("%Y-%m-%d %H:%M"), "n_sym": len(hist),
             "src": "Benzinga 캐시(2022~) — 검증·참고용, 판정 미사용"}
     for path, obj in ((HIST, {**meta, "sym": hist}), (TEND, {**meta, "sym": tend})):
-        tmp = path.with_suffix(f".json.tmp.{os.getpid()}")   # (2026-08-16) tmp 이름 충돌 방지
+        tmp = path.with_suffix(".json.tmp")
         tmp.write_text(json.dumps(obj, ensure_ascii=False), encoding="utf-8")
         tmp.replace(path)
     tot = sum(len(v) for v in hist.values())

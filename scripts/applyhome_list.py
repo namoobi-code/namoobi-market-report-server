@@ -324,6 +324,10 @@ def main():
             x["my"] += ival(r.get(f"{pre}_MNYCH_CNT"))       # 다자녀
             x["yg"] += ival(r.get(f"{pre}_YGMN_CNT"))        # 청년
             x["op"] += ival(r.get(f"{pre}_OPS_CNT"))         # 노부모부양
+        # 기관추천·이전기관은 거주지역 구분이 없는 단일 필드다(청약홈 화면도 지역행이 비어 있다).
+        # 이 둘을 빼면 유형별 배정 합이 특공계와 안 맞는다(실측: 쌍용 서대문 84A 25 vs 특공계 30 = 기관추천 5).
+        x["ir"] += ival(r.get("INSTT_RECOMEND_DCSN_CNT"))    # 기관추천 확정
+        x["tr"] += ival(r.get("TRANSR_INSTT_ENFSN_CNT"))     # 이전기관 종사자
     score = {}
     for r in sc:
         if str(r.get("RESIDE_SECD") or "") != "01":      # 해당지역 1순위 기준
@@ -397,6 +401,10 @@ def main():
                  "lf": ival(m.get("LFE_FRST_HSHLDCO")), "my": ival(m.get("MNYCH_HSHLDCO")),
                  "yg": ival(m.get("YGMN_HSHLDCO")),
                  "op": ival(m.get("OLD_PARNTS_SUPORT_HSHLDCO")),
+                 # (2026-08-16) 특공계 합계를 맞추는 나머지 3종 — 기관추천·이전기관·기타
+                 "ir": ival(m.get("INSTT_RECOMEND_HSHLDCO")),
+                 "tr": ival(m.get("TRANSR_INSTT_ENFSN_HSHLDCO")),
+                 "ec": ival(m.get("ETC_HSHLDCO")),
                  "lot": lot, "nwlot": nwlot}
             k = (no, ht)
             c = cmpet.get(k)
@@ -408,12 +416,18 @@ def main():
             q = spq.get(k)
             if q:  # 특공 유형별 경쟁률 = 유형 신청건수 ÷ 유형 배정세대 (해당+기타지역 합)
                 for f, rk in (("nw", "nwr"), ("nb", "nbr"), ("lf", "lfr"),
-                              ("my", "myr"), ("yg", "ygr"), ("op", "opr")):
+                              ("my", "myr"), ("yg", "ygr"), ("op", "opr"),
+                              ("ir", "irr"), ("tr", "trr")):
                     if t[f] and q[f]:
                         t[rk] = round(q[f] / t[f], 2)
             if k in score:
                 t["sc"] = score[k]
-            for f in ("gen", "spc", "nw", "nb", "lf", "my", "yg", "op", "lot", "nwlot"):
+            # 유형 합이 특공계(spc)와 어긋나면 '기타'로 흡수 — 화면 합계가 항상 맞게 한다
+            _sum = sum(t[f] for f in ("nw", "nb", "lf", "my", "yg", "op", "ir", "tr", "ec"))
+            if t["spc"] and t["spc"] != _sum:
+                t["ec"] += t["spc"] - _sum
+            for f in ("gen", "spc", "nw", "nb", "lf", "my", "yg", "op",
+                      "ir", "tr", "ec", "lot", "nwlot"):
                 ag[f] += t[f]
             tys.append({k2: v for k2, v in t.items() if v not in (None, 0, [])})
         sido.add(reg)

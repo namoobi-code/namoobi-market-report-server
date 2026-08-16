@@ -20,7 +20,6 @@
 사용: guidance_bz.py [--days 45] [--limit N] [--gap 5]
 cron: 매일 09:10 (백필·join 뒤). 오래 걸리므로 flock 으로 중복 실행을 막는다.
 """
-import os
 import json, re, sys, time, urllib.request
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -208,7 +207,7 @@ def _save(live):
                     # 새 규칙(발표일 매칭)이 '대조 불가'로 판단한 항목의 옛 비교값이
                     # 디스크에 그대로 남아 오탐이 유지된다.
                     it.pop(k, None)
-    tmp = LIVE.with_suffix(f".json.tmp.{os.getpid()}")   # (2026-08-16) 동시 실행 시 tmp 이름 충돌 방지
+    tmp = LIVE.with_suffix(".json.tmp")
     tmp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
     tmp.replace(LIVE)
 
