@@ -113,3 +113,5 @@
 
 # ── (2026-08-16) 🏗️ 청약 리스트 — 공고·주택형별 추첨제 추정 + 경쟁률·가점 (청약 탭 · applyhome.py 07:55 뒤) ──
 58 7 * * * cd /home/ubuntu/namoobi && python3 scripts/applyhome_list.py >> /home/ubuntu/namoobi/applyhome.log 2>&1
+# ── (2026-08-16) 공고문 PDF 층별 가격 파싱(최저·평균 분양가) → 리스트 재생성으로 병합 ──
+10 8 * * * cd /home/ubuntu/namoobi && python3 scripts/applyhome_pdf.py >> /home/ubuntu/namoobi/logs/applyhome.log 2>&1 && python3 scripts/applyhome_list.py >> /home/ubuntu/namoobi/logs/applyhome.log 2>&1

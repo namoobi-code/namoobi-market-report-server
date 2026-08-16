@@ -249,6 +249,12 @@ def main():
         mdl[str(r.get("HOUSE_MANAGE_NO") or "").strip()].append(r)
 
     REG, PPSM = load_ppsm()                       # (2026-08-16) 예상시세용 실거래 ㎡당가
+    # (2026-08-16) 공고문 PDF 층별 가격 캐시(applyhome_pdf.py) — 주택형별 최저·평균 분양가
+    PDFP = {}
+    pdf_f = BASE / "data" / "db" / "applyhome_pdf.json"
+    if pdf_f.exists():
+        PDFP = json.loads(pdf_f.read_text(encoding="utf-8"))
+    from applyhome_pdf import short_ty
 
     # ── 공고 단위 조립 ──
     items, sido = [], set()
@@ -275,7 +281,9 @@ def main():
             if pr:
                 prs.append(pr)
             est, estb = (est_price(PPSM, codes, ar) if pr else (None, 0))
+            pp = PDFP.get(no, {}).get(short_ty(ht)) if pr else None
             t = {"t": ht, "ar": ar, "pr": pr, "pct": pct,
+                 "prmn": (pp or {}).get("mn"), "prav": (pp or {}).get("av"),
                  "est": est, "estb": estb,
                  "gen": gen, "spc": ival(m.get("SPSPLY_HSHLDCO")),
                  "nw": nw, "nb": ival(m.get("NWBB_HSHLDCO")),

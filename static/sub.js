@@ -80,7 +80,7 @@
           <div class="note" style="margin-bottom:5px">${E(i.addr||'')} · 시행 ${E(i.biz||'—')} · 시공 ${E(i.cons||'—')} · 접수 ${E(i.r1_bg||'')}~${E(i.rc_ed||'')} · 계약해당 발표 ${E(i.prz||'—')}
             ${i.hmpg?` · <a href="${E(i.hmpg)}" target="_blank" rel="noopener">분양 홈페이지</a>`:''} · <a href="${E(i.url||'#')}" target="_blank" rel="noopener">청약홈 공고 원문 ↗</a></div>
           <table style="font-size:11.5px"><thead><tr><th>주택형</th><th style="text-align:right">전용㎡</th>
-            <th style="text-align:right" title="청약홈 API는 주택형별 최고공급금액(최상층 기준) 하나만 제공 — 층별 최저·평균 분양가는 공고 원문(🔗) PDF의 층별 가격표에서만 확인 가능. 저층은 이 값보다 수천만원 낮은 게 보통">최고분양가(억)</th>
+            <th style="text-align:right" title="최저~최고 (평균) — 최저·평균은 공고문 PDF의 층별 가격표를 자동 파싱한 값(파싱 최고가가 API 최고공급금액과 ±3% 일치할 때만 표시 · 병합표 특성상 근사치). 최고가만 있으면 PDF 미파싱(형식 상이·스캔본 등) — 원문(🔗) 확인">분양가(억)<br><span style="font-weight:400">최저~최고 (평균)</span></th>
             <th style="text-align:right" title="같은 시군구 최근 6개월 실거래 ㎡당가의 거래건수 가중 평균 × 전용 (최고값·중간값 아닌 평균값) — 준공 15년 이내·유사면적(±5㎡) 우선, † = 신축 표본 부족으로 전 연식 사용(보수적)">예상시세*(억)</th>
             <th style="text-align:right" title="예상시세 − 최고분양가. 분양가가 최고가 기준이라 실제 차익은 이보다 클 수 있음. 옵션비·층향 미반영">차익*</th>
             <th style="text-align:right">일반</th><th style="text-align:right" title="일반공급 추첨 비율(추정) — 규제지역·수도권은 추첨물량의 75% 무주택 우선, 25%에 1주택자 참여">추첨*</th>
@@ -99,7 +99,8 @@
             const has75=i.spec==='Y'||i.mdat==='Y'||['서울','경기','인천','부산','대구','광주','대전','울산'].includes(i.reg);
             const conv1=(has75&&conv!=null&&t.r1*t.gen>0.75*t.lot)?(t.r1*t.gen-0.75*t.lot)/(0.25*t.lot):null;
             const gv=(t.est!=null&&t.pr!=null)?+(t.est-t.pr).toFixed(2):null;
-            return `<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td><td class="num">${F(t.pr)}</td>
+            return `<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td>
+            <td class="num">${t.prmn!=null?`${t.prmn}~${F(t.pr)}<br><span class="note">평균 ${t.prav}</span>`:F(t.pr)}</td>
             <td class="num">${t.est!=null?F(t.est)+(t.estb?'<span title="신축 표본 부족 — 전 연식 실거래 ㎡당가 사용(보수적 추정)">†</span>':''):'—'}</td>
             <td class="num" style="font-weight:700;color:${gv>=0?'#0f766e':'#b91c1c'}">${gv!=null?(gv>0?'+':'')+gv+` <span class="note">(${Math.round(gv/t.pr*100)>0?'+':''}${Math.round(gv/t.pr*100)}%)</span>`:'—'}</td>
             <td class="num">${F(t.gen)}</td><td class="num" style="color:#0f766e;font-weight:700">${t.lot?`${t.lot} <span class="note">(${t.pct}%)</span>`:'—'}</td>
@@ -111,7 +112,7 @@
             <td class="num">${sp(t.my,t.myr)}</td><td class="num">${sp(t.yg,t.ygr)}</td><td class="num">${sp(t.op,t.opr)}</td>
             <td class="num">${t.sc?t.sc.join(' / '):'—'}</td></tr>`;}).join('')}</tbody></table>
           <div class="note" style="margin-top:4px">💡 <b>예상시세*</b>는 같은 시군구 최근 6개월 국토부 실거래 ㎡당가의 <b>거래건수 가중 평균</b>(최고값·중간값 아님 · 준공 15년 이내·유사면적 ±5㎡ 우선, †=전 연식) × 전용면적.
-          <b>분양가는 청약홈 API 제공값이 주택형별 최고공급금액(최상층) 하나뿐</b> — 층별 최저·평균가는 공고 원문(🔗) PDF에서 확인. <b>차익*</b> = 예상시세 − 최고분양가 — 분양가가 최고가(최상층) 기준이라 실제 차익은 이보다 클 수 있고, 옵션비·발코니 확장비·층향 차이는 미반영. 신축 프리미엄으로 실제 신축 시세는 주변 평균보다 높게 형성되는 경향도 참고. 실거래DB 수집 지역(서울·경기·광역시 등)만 표시.
+          <b>분양가 최저~최고(평균)</b>의 최저·평균은 공고문 PDF 층별 가격표를 자동 파싱한 값(API 최고가와 ±3% 일치 시에만 표시·근사치, 차익* 계산은 여전히 최고가 기준) — 최고가만 표시되면 PDF 형식이 달라 미파싱, 원문(🔗) 확인. <b>차익*</b> = 예상시세 − 최고분양가 — 분양가가 최고가(최상층) 기준이라 실제 차익은 이보다 클 수 있고, 옵션비·발코니 확장비·층향 차이는 미반영. 신축 프리미엄으로 실제 신축 시세는 주변 평균보다 높게 형성되는 경향도 참고. 실거래DB 수집 지역(서울·경기·광역시 등)만 표시.
           1순위 경쟁률 분모는 <b>일반공급 전체</b>(가점+추첨)다. 접수는 하나로 받고 가점제 배정 → 낙첨자 포함 추첨 순서라 '추첨제만의 공식 경쟁률'은 없다.
           <b>추첨환산*</b>(접수÷추첨물량)은 무주택·1주택 구분 없는 <b>전체 평균</b> — 무주택자는 75% 우선+25% 재도전이라 이보다 유리, <b>1주택자는 아래 '1주택' 환산</b>(25%물량÷(접수−75%물량))이 체감에 가깝다.
           특공 경쟁률은 유형별 신청건수÷배정세대(청약홈 신청현황). 특공·무주택우선 75%는 무주택세대 전용 — 1주택자는 일반 추첨 25% 몫에만 참여.</div></td></tr>`;
