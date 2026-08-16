@@ -2478,17 +2478,24 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
   /* (2026-08-16) 급매 압력 — firesale.json (실거래로 만든 대리지표 · 매일 07:30)
      '연체율이 오르면 급매가 늘어난다'는 카드 설명을 말로만 두지 않고 같은 차트에 겹친다.
      연체율은 0.1~1.2% 대, 급매 비중은 5~50% 대라 축을 나눠야 한다(line 의 r2). */
-  let _fsRaw=null, _fsP=null, _fsMode='off';
+  let _fsRaw=null, _fsP=null, _fsMode='off', _auRaw=null, _auP=null;
   const firesale=()=>{ if(!_fsP) _fsP=fetch('/api/db/firesale').then(r=>r.ok?r.json():null)
       .then(f=>{ if(f&&f.t&&f.t.length) _fsRaw=f; return _fsRaw; }).catch(()=>null);
     return _fsP; };
-  /* 연체율 t 배열(YYYYMM)에 급매 시계열을 맞춘다. 없는 달은 null. */
-  function _fsAlign(t, kind, reg){
-    if(!_fsRaw) return null;
-    const a=(_fsRaw[kind]||{})[reg]; if(!a) return null;
-    const idx={}; _fsRaw.t.forEach((ym,i)=>idx[ym]=i);
+  /* (2026-08-16) 경매 물량 — auction.json (대법원 등기정보광장 · 매일 07:35)
+     '연체율↑ → 급매↑ → 경매↑' 세 단계를 한 차트에서 잇는다. 경매 개시는 건수(수천~만),
+     연체율은 %(0.1~1.2) 라 축을 나눠야 한다. */
+  const auction=()=>{ if(!_auP) _auP=fetch('/api/db/auction').then(r=>r.ok?r.json():null)
+      .then(a=>{ if(a&&a.t&&a.t.length) _auRaw=a; return _auRaw; }).catch(()=>null);
+    return _auP; };
+  /* 연체율 t 배열(YYYYMM)에 겹칠 시계열을 맞춘다. 없는 달은 null. */
+  function _ovAlign(src, t, kind, reg){
+    if(!src) return null;
+    const a=(src[kind]||{})[reg]; if(!a) return null;
+    const idx={}; src.t.forEach((ym,i)=>idx[ym]=i);
     return t.map(ym=>{ const i=idx[ym]; return i==null?null:(a[i]==null?null:a[i]); });
   }
+  const _fsAlign=(t,kind,reg)=>_ovAlign(_fsRaw,t,kind,reg);
   function initDelq(){
     if(_dqInit) return; _dqInit=true;
     fetch('/api/db/hcredit').then(r=>r.ok?r.json():null).then(d=>{
@@ -2525,16 +2532,31 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           segbar('dq_kind', BANKS.map(k=>[k,k]), ()=>_dqBank, v=>_dqBank=v, redraw);
           $('dq_regwrap').style.display='none';
         }
-        segbar('dq_fs', [['off','끄기'],['deep','급매 체결'],['down','하락거래']],
+        segbar('dq_fs', [['off','끄기'],['deep','급매 체결'],['down','하락거래'],
+                         ['open_all','경매 개시'],['open_v','임의경매 개시'],['sold_v','경매 매각']],
                ()=>_fsMode, v=>_fsMode=v, redraw);
       };
       const redraw=()=>{ bar(); draw(); };
       firesale().then(f=>{ if(f) redraw(); });
+      auction().then(a=>{ if(a) redraw(); });
 
       /* 급매 지표 각주 — 자체 계산 지표라 '무엇을 어떻게 셌는지'를 반드시 같이 적는다.
          공식 통계가 아닌 값을 근거처럼 보이게 두면 안 된다. */
+      const _isAuc=()=>['open_all','open_v','sold_v','sold_f','open_f'].includes(_fsMode);
       function _fsNote(){
-        if(_fsMode==='off'||!_fsRaw) return '';
+        if(_fsMode==='off') return '';
+        if(_isAuc()){
+          if(!_auRaw) return '';
+          const t=_auRaw.t||[], a=(_auRaw[_fsMode]||{})['전국']||[];
+          let li=-1; for(let i=a.length-1;i>=0;i--) if(a[i]!=null){li=i;break;}
+          const nm=(_auRaw.labels||{})[_fsMode]||_fsMode;
+          return `<br><span class="note">🔵 <b>${nm}</b>(좌축·건) — 대법원 등기정보광장. `
+            +`<b>개시</b>는 경매가 시작된 물건 수라 물량 유입을 가장 앞에서 보여주고, <b>매각</b>은 낙찰돼 실제 소유권이 넘어간 건수다. `
+            +`임의경매는 담보권 실행(대출 연체가 원인)이라 이 카드의 연체율과 직접 이어진다.`
+            +(li>=0?` 최신 ${fm(t[li])} <b>${Math.round(a[li]).toLocaleString()}건</b>`:'')
+            +`. API 가 <b>최근 3년치만</b> 제공하고, 이번 달은 집계 중이라 낮게 보인다.</span>`;
+        }
+        if(!_fsRaw) return '';
         const P=_fsRaw.params||{}, t=_fsRaw.t||[], a=(_fsRaw[_fsMode]||{})['전국']||[];
         let li=-1; for(let i=a.length-1;i>=0;i--) if(a[i]!=null){li=i;break;}
         const peak=(()=>{let bi=-1;for(let i=0;i<a.length;i++) if(a[i]!=null&&(bi<0||a[i]>a[bi])) bi=i; return bi;})();
@@ -2551,11 +2573,15 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       }
       /* 겹칠 급매 계열 — 지역별 뷰에서 고른 지역 중 급매 데이터가 있는 것만(최대 4개) */
       function fsSeries(T){
-        if(_fsMode==='off'||!_fsRaw) return null;
-        const cand=(_dqView==='reg'?_dqRegs:['전국']).filter(r=>(_fsRaw[_fsMode]||{})[r]).slice(0,4);
-        const lab=_fsMode==='deep'?'급매':'하락거래';
-        return cand.map((r,i)=>({v:_fsAlign(T,_fsMode,r), color:'#0ea5e9',
-                                 label:`${r} ${lab}%(좌축)`})).filter(s=>s.v&&s.v.some(v=>v!=null));
+        if(_fsMode==='off') return null;
+        const auc=_isAuc(), src=auc?_auRaw:_fsRaw;
+        if(!src) return null;
+        const cand=(_dqView==='reg'?_dqRegs:['전국']).filter(r=>(src[_fsMode]||{})[r]).slice(0,4);
+        const lab=auc?((src.labels||{})[_fsMode]||'경매')
+                    :(_fsMode==='deep'?'급매':'하락거래');
+        const unit=auc?'건':'%';
+        return cand.map(r=>({v:_ovAlign(src,T,_fsMode,r), color:'#0ea5e9',
+                             label:`${r} ${lab}(${unit}·좌축)`})).filter(s=>s.v&&s.v.some(v=>v!=null));
       }
 
       function draw(){
