@@ -3,8 +3,9 @@
 `namoobi-market-report` 플러그인이 생성하는 데이터를 **공개 대시보드**로 서빙하는 서버 코드.
 서버가 사라져도 **이 저장소만 있으면 30분 안에 완전 복구**된다.
 
-**운영 주소**: http://namoobi.duckdns.org · http://161.33.190.254 (도메인 차단 망에서는 IP 직접)
-**호스팅**: Oracle Cloud Always Free (도쿄 · VM.Standard.E2.1.Micro · 월 0원)
+**운영 주소**: http://161.33.190.254 (2026-08-16 신규 서버로 이관)
+※ `namoobi.duckdns.org` 는 아직 구서버를 가리킨다 — DNS 전환 전까지 도메인 접속은 구 데이터다.
+**호스팅**: Oracle Cloud Always Free (Ampere A1 · 2 OCPU/12GB · ARM aarch64 · 월 0원)
 
 ---
 

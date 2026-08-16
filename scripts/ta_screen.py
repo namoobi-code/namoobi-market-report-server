@@ -54,7 +54,7 @@ def krx_day_back(target,mkt,max_back=10):
         if os.path.exists(cache):
             rows=json.load(open(cache))
             if rows: return dd,rows
-            continue
+            # (2026-08-03 fix) 빈 캐시는 과거 API 장애 잔재일 수 있다 - 건너뛰지 말고 재시도
         try: rows=krx(f"{mkt}_bydd_trd",dd)
         except Exception: rows=[]
         json.dump(rows,open(cache,"w"))
