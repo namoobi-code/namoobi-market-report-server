@@ -40,6 +40,13 @@ _R_MID = r"\bmid(?:point)?\b"
 _R_PCT = r"%|\bpercent\b|growth|change|vs\.?|versus|yoy|y/y"
 # 'Months **Ended**'(과거분사)=이미 끝난 기간의 실적 열. 'Ending'(진행형)=전망 열이라 제외.
 _R_ACT = r"\bactuals?\b|\bactual\b|\breported\b|\bytd\b|\b(?:months|year)\s+ended\b"
+# (2026-08-16) **반기 열은 쓰지 않는다** — 반기는 분기도 연간도 아니라서 어느 컨센과도
+# 비교할 수 없다. 문장 파서에서는 '연간이 아님' 판정에만 쓰지만, 표에서는 그 열의 값이
+# 곧 반기 실적이라 채택하면 반드시 틀린다(실측 DD: "2H'26E $3,660-$3,690 | Full Year
+# 2026E $7,160-$7,190" 에서 반기 3,675 가 Q3 컨센 1,835 와 비교돼 +100%).
+#   끝에 \b 를 두면 안 된다 — 실측 표기가 "2H'26**E**"(Estimate 접미)라 단어경계가
+#   성립하지 않아 규칙이 통째로 불발됐다.
+_R_HALF = r"\b[12]H\s?['’]?\s?\d{2}|\b(?:first|second)[-\s]half\b|\bH[12]\b|\bhalf\s+year\b"
 # 행 라벨
 _L_REV = r"^(?:total\s+|net\s+|consolidated\s+)*(?:revenues?|net\s+sales|sales)\b"
 _L_EPS = (r"(?:earnings|net\s+income|income)\s+per\s+(?:diluted\s+|common\s+)?share|\beps\b")
@@ -107,6 +114,14 @@ def _cell_val(s, mult):
     return (lo, hi) if lo <= hi else (hi, lo)
 
 
+def _is_year_cell(s):
+    """셀이 **연도 하나**뿐인가 — 표 머리글의 기간 라벨이지 금액이 아니다.
+    (2026-08-16) 실측 REZI: 머리글 행 "($ in millions) | Q3 2026 | 2026" 의 '2026' 이
+    금액으로 인식돼 그 행이 데이터 행으로 판정 → 머리글이 통째로 유실되고 열 기간이
+    전부 미확정이 됐다(Revenue Q3 705~730 · FY 2,900~2,950 이 둘 다 버려짐)."""
+    return bool(re.match(r"^\s*(?:FY\s*)?(?:19|20)\d\d\s*$", _clean(s or "")))
+
+
 def _col_meta(head_rows, ncol):
     """머리글 행들 → 열별 {per: 'Q'|'Y'|None, role: set}. 위→아래로 덮어쓴다."""
     meta = [{"per": None, "role": set()} for _ in range(ncol)]
@@ -117,12 +132,18 @@ def _col_meta(head_rows, ncol):
                 continue
             if re.search(_QRE, c, re.I):
                 meta[i]["per"] = "Q"
+            elif _is_year_cell(c):
+                # (2026-08-16) 열 머리글의 **맨몸 연도**("2026")는 연간 열이다 — 문장에서라면
+                # 모호하지만 표 머리글에서는 그 열의 기간 라벨 외에 다른 뜻이 없다.
+                # 실측 REZI 머리글 "Q3 2026 | 2026" = 분기 열 | 연간 열.
+                meta[i]["per"] = "Y"
             else:
                 ym = re.search(_YRE, c, re.I)
                 if ym and not re.search(_YEXCL, c[:ym.start()][-60:], re.I):
                     meta[i]["per"] = "Y"
             for role, pat in (("prior", _R_PRIOR), ("cur", _R_CUR), ("lo", _R_LOW),
-                              ("hi", _R_HIGH), ("mid", _R_MID), ("pct", _R_PCT), ("act", _R_ACT)):
+                              ("hi", _R_HIGH), ("mid", _R_MID), ("pct", _R_PCT), ("act", _R_ACT),
+                              ("half", _R_HALF)):
                 if re.search(pat, c, re.I):
                     meta[i]["role"].add(role)
     # 두 단 머리글: 기간이 일부 열에만 붙으면(colspan 전개 후에도) 왼쪽 값을 상속하되,
@@ -140,7 +161,7 @@ def _pick_cols(meta, vals, per):
     """한 기간(per)의 값 열들에서 (lo, hi) 확정. 확정 못 하면 None(추측 금지)."""
     idx = [i for i, mt in enumerate(meta)
            if mt["per"] == per and vals.get(i) is not None
-           and not (mt["role"] & {"act", "pct", "mid"})]
+           and not (mt["role"] & {"act", "pct", "mid", "half"})]
     if not idx:
         return None, None
     cur = [i for i in idx if "cur" in meta[i]["role"]]
@@ -153,7 +174,16 @@ def _pick_cols(meta, vals, per):
         return vals[lo_c[0]][0], vals[hi_c[0]][1]
     if len(use) == 1:
         return vals[use[0]]
-    # 같은 자격의 열이 여럿인데 Low/High 구분도 없다 → 어느 열이 가이던스인지 모른다
+    # (2026-08-16) 같은 자격의 열이 여럿이어도 **값이 전부 같으면** colspan 전개로 한 셀이
+    # 여러 열에 복제된 것이다 — 모호성이 없으므로 그 값을 쓴다. 종전엔 이 경우까지
+    # '열 확정 불가'로 버려, 구조가 멀쩡한 표가 통째로 기각됐다(실측 GO: Previous 3열|
+    # Current 2열 복제 · REZI: Q3 3열|FY 2열 복제 — 둘 다 원문에 금액이 명시된 표).
+    vs = [vals[i] for i in use]
+    if all(v == vs[0] for v in vs) and use[-1] - use[0] == len(use) - 1:
+        # 값이 같고 열 인덱스가 **연속**이어야 colspan 복제다. 값만 같고 떨어져 있으면
+        # 우연히 일치한 별개 열일 수 있으므로 추측하지 않는다.
+        return vs[0]
+    # 값이 서로 다른 다중 열인데 Low/High 구분도 없다 → 어느 열이 가이던스인지 모른다
     return None, None
 
 
@@ -201,7 +231,8 @@ def parse_tables(html, txt_hint=""):
         # 머리글 행 = 숫자 셀이 없는 상위 행들(최대 4)
         head_rows, data_start = [], 0
         for ri, row in enumerate(grid[:4]):
-            if any(_cell_val(c, mult) for c in row[1:]):
+            # 연도 셀(기간 라벨)은 금액으로 치지 않는다 — 머리글이 끊기면 열 기간이 통째로 미확정
+            if any(_cell_val(c, mult) and not _is_year_cell(c) for c in row[1:]):
                 break
             head_rows.append(row)
             data_start = ri + 1

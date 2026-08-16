@@ -339,15 +339,16 @@ def main():
             pr = sane_pr(pr, ar)                          # 10배 단위오류 보정
             if pr:
                 prs.append(pr)
-            est, estb, nb = (est_price(PPSM, codes, ar, APTS, ASALE)
-                             if pr else (None, 0, 0))
+            # ⚠ 비교단지수 키는 "cmp" — "nb"는 신생아 특공 세대수로 이미 사용 중(충돌 주의)
+            est, estb, cmpn = (est_price(PPSM, codes, ar, APTS, ASALE)
+                               if pr else (None, 0, 0))
             act = (act_price(APTS, ASALE, codes, r.get("HOUSE_NM"),
                              r.get("MVN_PREARNGE_YM"), ar) if pr else None)
             if act:                               # 입주단지 실측이 있으면 추정 대신 사용
-                est, estb, nb = act, 0, 0
+                est, estb, cmpn = act, 0, 0
             pp = PDFP.get(no, {}).get(short_ty(ht)) if pr else None
             t = {"t": ht, "ar": ar, "pr": pr, "pct": pct,
-                 "act": 1 if act else 0, "nb": nb,
+                 "act": 1 if act else 0, "cmp": cmpn,
                  "prmn": (pp or {}).get("mn"), "prav": (pp or {}).get("av"),
                  "est": est, "estb": estb,
                  "gen": gen, "spc": ival(m.get("SPSPLY_HSHLDCO")),
