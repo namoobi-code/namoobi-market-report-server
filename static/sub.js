@@ -77,16 +77,27 @@
           <div class="note" style="margin-bottom:5px">${E(i.addr||'')} · 시행 ${E(i.biz||'—')} · 시공 ${E(i.cons||'—')} · 접수 ${E(i.r1_bg||'')}~${E(i.rc_ed||'')} · 계약해당 발표 ${E(i.prz||'—')}
             ${i.hmpg?` · <a href="${E(i.hmpg)}" target="_blank" rel="noopener">분양 홈페이지</a>`:''} · <a href="${E(i.url||'#')}" target="_blank" rel="noopener">청약홈 공고 원문 ↗</a></div>
           <table style="font-size:11.5px"><thead><tr><th>주택형</th><th style="text-align:right">전용㎡</th><th style="text-align:right">최고분양가(억)</th>
-            <th style="text-align:right">일반</th><th style="text-align:right" title="일반공급 추첨 비율(추정)">추첨*</th>
-            <th style="text-align:right">특공계</th><th style="text-align:right">신혼</th><th style="text-align:right">신생아</th><th style="text-align:right">생애최초</th><th style="text-align:right">다자녀</th><th style="text-align:right">청년</th>
-            <th style="text-align:right">1순위경쟁률</th><th style="text-align:right">신혼특공경쟁률</th><th style="text-align:right">가점(최저/평균/최고)</th></tr></thead><tbody>${
-          (i.ty||[]).map(t=>`<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td><td class="num">${F(t.pr)}</td>
+            <th style="text-align:right">일반</th><th style="text-align:right" title="일반공급 추첨 비율(추정) — 규제지역·수도권은 추첨물량의 75% 무주택 우선, 25%에 1주택자 참여">추첨*</th>
+            <th style="text-align:right" title="1순위 경쟁률(가점제 낙첨자 포함)">1순위경쟁률</th>
+            <th style="text-align:right" title="1순위 접수건수 ÷ 추첨제 추정물량 — 가점 낙첨자도 추첨에 들어가므로 추첨제 체감 경쟁률에 가까움 (1주택자 참고)">추첨환산*</th>
+            <th style="text-align:right">특공계</th>
+            <th style="text-align:right" title="각 특공 유형: 배정세대 (경쟁률 = 신청건수÷배정세대) · 특공은 전부 무주택세대 요건">신혼 <span class="note">(경쟁률)</span></th>
+            <th style="text-align:right">신생아</th><th style="text-align:right">생애최초</th><th style="text-align:right">다자녀</th><th style="text-align:right">청년</th><th style="text-align:right">노부모</th>
+            <th style="text-align:right">가점(최저/평균/최고)</th></tr></thead><tbody>${
+          (i.ty||[]).map(t=>{
+            const sp=(n,r)=>n?`${n}${r!=null?` <span class="note">(${fr1(r)})</span>`:''}`:'—';
+            const conv=(t.r1!=null&&t.lot)?t.r1*t.gen/t.lot:null;   // 추첨환산 = 1순위 접수 ÷ 추첨물량
+            return `<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td><td class="num">${F(t.pr)}</td>
             <td class="num">${F(t.gen)}</td><td class="num" style="color:#0f766e;font-weight:700">${t.lot?`${t.lot} <span class="note">(${t.pct}%)</span>`:'—'}</td>
-            <td class="num">${F(t.spc)}</td><td class="num">${F(t.nw)}${t.nwlot?` <span class="note">(추첨 ${t.nwlot})</span>`:''}</td>
-            <td class="num">${F(t.nb)}</td><td class="num">${F(t.lf)}</td><td class="num">${F(t.my)}</td><td class="num">${F(t.yg)}</td>
             <td class="num">${t.r1!=null?fr1(t.r1)+(t.short?' <span title="1순위 미달" style="color:#b91c1c">미달</span>':''):'—'}</td>
-            <td class="num">${t.nwr!=null?fr1(t.nwr):'—'}</td>
-            <td class="num">${t.sc?t.sc.join(' / '):'—'}</td></tr>`).join('')}</tbody></table></td></tr>`;
+            <td class="num" style="font-weight:700">${conv!=null?fr1(conv):'—'}</td>
+            <td class="num">${F(t.spc)}</td>
+            <td class="num">${sp(t.nw,t.nwr)}${t.nwlot?` <span class="note">추첨${t.nwlot}</span>`:''}</td>
+            <td class="num">${sp(t.nb,t.nbr)}</td><td class="num">${sp(t.lf,t.lfr)}</td>
+            <td class="num">${sp(t.my,t.myr)}</td><td class="num">${sp(t.yg,t.ygr)}</td><td class="num">${sp(t.op,t.opr)}</td>
+            <td class="num">${t.sc?t.sc.join(' / '):'—'}</td></tr>`;}).join('')}</tbody></table>
+          <div class="note" style="margin-top:4px">💡 1순위 경쟁률 분모는 <b>일반공급 전체</b>(가점+추첨)다. 접수는 하나로 받고 가점제 배정 → 낙첨자 포함 추첨 순서라 '추첨제만의 공식 경쟁률'은 없다.
+          <b>추첨환산*</b>(접수÷추첨물량)이 1주택자 체감에 가깝다. 특공 경쟁률은 유형별 신청건수÷배정세대(청약홈 신청현황). 특공·무주택우선 75%는 무주택세대 전용 — 1주택자는 일반 추첨 25% 몫에 참여.</div></td></tr>`;
         return main+det;
       }).join('')}</tbody></table>${
       rows.length>_n?`<div style="text-align:center;margin:8px 0"><button id="sub_more" style="padding:5px 16px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff">더 보기 (${_n}/${rows.length}건)</button></div>`:''}`;

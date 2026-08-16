@@ -138,6 +138,9 @@ def main():
             x["nw"] += ival(r.get(f"{pre}_NWWDS_NMTW_CNT"))
             x["nb"] += ival(r.get(f"{pre}_NWBB_NWBBSHR_CNT"))
             x["lf"] += ival(r.get(f"{pre}_LFE_FRST_CNT"))
+            x["my"] += ival(r.get(f"{pre}_MNYCH_CNT"))       # 다자녀
+            x["yg"] += ival(r.get(f"{pre}_YGMN_CNT"))        # 청년
+            x["op"] += ival(r.get(f"{pre}_OPS_CNT"))         # 노부모부양
     score = {}
     for r in sc:
         if str(r.get("RESIDE_SECD") or "") != "01":      # 해당지역 1순위 기준
@@ -174,7 +177,9 @@ def main():
                  "gen": gen, "spc": ival(m.get("SPSPLY_HSHLDCO")),
                  "nw": nw, "nb": ival(m.get("NWBB_HSHLDCO")),
                  "lf": ival(m.get("LFE_FRST_HSHLDCO")), "my": ival(m.get("MNYCH_HSHLDCO")),
-                 "yg": ival(m.get("YGMN_HSHLDCO")), "lot": lot, "nwlot": nwlot}
+                 "yg": ival(m.get("YGMN_HSHLDCO")),
+                 "op": ival(m.get("OLD_PARNTS_SUPORT_HSHLDCO")),
+                 "lot": lot, "nwlot": nwlot}
             k = (no, ht)
             c = cmpet.get(k)
             if c and c["tot"]:
@@ -183,16 +188,14 @@ def main():
                 if c["short"]:
                     t["short"] = 1
             q = spq.get(k)
-            if q:
-                if t["nw"] and q["nw"]:
-                    t["nwr"] = round(q["nw"] / t["nw"], 2)
-                if t["nb"] and q["nb"]:
-                    t["nbr"] = round(q["nb"] / t["nb"], 2)
-                if t["lf"] and q["lf"]:
-                    t["lfr"] = round(q["lf"] / t["lf"], 2)
+            if q:  # 특공 유형별 경쟁률 = 유형 신청건수 ÷ 유형 배정세대 (해당+기타지역 합)
+                for f, rk in (("nw", "nwr"), ("nb", "nbr"), ("lf", "lfr"),
+                              ("my", "myr"), ("yg", "ygr"), ("op", "opr")):
+                    if t[f] and q[f]:
+                        t[rk] = round(q[f] / t[f], 2)
             if k in score:
                 t["sc"] = score[k]
-            for f in ("gen", "spc", "nw", "nb", "lf", "my", "yg", "lot", "nwlot"):
+            for f in ("gen", "spc", "nw", "nb", "lf", "my", "yg", "op", "lot", "nwlot"):
                 ag[f] += t[f]
             tys.append({k2: v for k2, v in t.items() if v not in (None, 0, [])})
         reg = r.get("SUBSCRPT_AREA_CODE_NM") or ""
