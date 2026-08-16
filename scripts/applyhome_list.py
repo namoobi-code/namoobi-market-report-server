@@ -109,6 +109,22 @@ def parse_lvl2(addr):
     return g if g.endswith(("시", "군", "구")) else None
 
 
+def sane_pr(pr, ar):
+    """(2026-08-16) 분양가 단위 오류 보정 — 청약홈 LTTOT_TOP_AMOUNT 가 일부 공고
+    (신혼희망타운 잔여·추가모집 등)에서 만원이 아니라 천원 단위로 등록돼 10배로 나온다.
+    실측: 의왕월암 A-3 55㎡ 46.19억(A-1 동일면적은 4.6억) · 성남복정1 A2 55.97㎡ 69.38억.
+    평당가 2.0억(국내 최고 분양가 ~1.8억/평 상회) 초과면 10으로 나누고,
+    그래도 비정상(>2.0억 또는 <100만/평)이면 표시하지 않는다."""
+    if not pr or not ar:
+        return pr
+    py = lambda p: p * 10000 / (ar * 0.3025)      # 만원/평
+    if py(pr) > 20000:
+        pr = round(pr / 10, 2)
+    if py(pr) > 20000 or py(pr) < 100:
+        return None
+    return pr
+
+
 def gen_lot_pct(minyoung, spec, mdat, ar):
     """일반공급 추첨 비율(%) — 규칙은 파일 상단 docstring 참고"""
     if not minyoung:
@@ -255,6 +271,7 @@ def main():
             lot, nwlot = round(gen * pct / 100), round(nw * 0.3)
             pr = num(m.get("LTTOT_TOP_AMOUNT"))
             pr = round(pr / 10000, 2) if pr else None     # 만원 → 억
+            pr = sane_pr(pr, ar)                          # 10배 단위오류 보정
             if pr:
                 prs.append(pr)
             est, estb = (est_price(PPSM, codes, ar) if pr else (None, 0))
