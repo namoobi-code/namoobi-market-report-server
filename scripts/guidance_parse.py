@@ -57,7 +57,23 @@ _CORP_W = {"total", "net", "consolidated", "company", "companywide", "overall", 
            "generates", "achieve", "achieves", "its", "their", "o", "fy", "fullyear",
            "now", "raised", "raises", "raising", "updated", "updates", "updating",
            "increased", "increases", "increasing", "lowered", "lowers", "lowering",
-           "revised", "revises", "revising", "reaffirms", "reaffirmed", "maintains", "high", "low"}
+           "revised", "revises", "revising", "reaffirms", "reaffirmed", "maintains", "high", "low",
+           # (2026-08-16) 미확보 641건 감사에서 **정당한 전사 매출인데 기각**된 수식어들 —
+           # 전부 전망·개정 동사이거나 표시 기준 수식이라 '부분 지표'와 무관하다.
+           #   개정·유지 표현: FSLR "Unchanged" · PRCT "reiterates" · LII "reaffirming" ·
+           #     SWIM "Original" · HNST/LDOS "Prior" · SVV "Previous" · AD "Narrowed" ·
+           #     KOP "Actual"(전년 실적 열 머리글 뒤의 가이던스 열)
+           #   전망 동사: RSKD "anticipate" · RDW "forecasting" · INSP "announced" · CDNA "Quarter"
+           #   기준 수식: FIS "Adjusted" · BIO "currency-neutral" · FLYW "FX-Neutral" ·
+           #     CBRS "Core"(= core revenue 는 전사 기준 표기) · HIPO "M"(단위 접미)
+           # 판정 원칙은 그대로다 — 이 낱말들은 '전사 아님'의 근거가 못 될 뿐,
+           # 부분 지표 정규식(_PART)·다른항목(_OTHER)·기간 규칙은 변함없이 적용된다.
+           "unchanged", "reiterates", "reiterated", "reiterating", "reaffirming", "affirms",
+           "affirming", "affirmed", "original", "prior", "previous", "narrowed", "narrows",
+           "narrowing", "actual", "actuals", "anticipate", "anticipated", "forecasting",
+           "forecast", "forecasts", "announced", "announces", "quarter", "adjusted",
+           "currency-neutral", "currencyneutral", "fx-neutral", "constant", "core", "m", "b",
+           "midpoint", "including", "sees", "see", "believes", "targets", "target", "implies"}
 # 라벨(매출·EPS)과 금액 사이에 이런 말이 끼면, 그 금액은 **다른 항목**의 것이다.
 # (2026-08-14) ebitda\d* — 보도자료의 각주 번호가 단어에 바로 붙는다("Adjusted EBITDA2",
 # "EBITDA1"). \bebitda\b 는 숫자 앞에서 경계가 성립하지 않아 통과됐고, EBITDA 범위가
@@ -622,7 +638,14 @@ def parse_guidance(txt, per_hint=None):
                     # (2026-08-15 2차) 'Guidance - Previous | Guidance - Updated'(실측 STLN)처럼
                     # 한정어가 guidance 뒤에 붙는 표기는 prior 뒤의 updated/revised/current
                     # 낱말만으로 인정한다(guidance 낱말 재요구 시 놓침).
-                    um_ = pm_ and re.search(r"\b(?:updated?|revised?|current)\b", hdr[pm_.end():], re.I)
+                    # (2026-08-16) 신(新) 열에 한정어가 아예 없는 표기도 있다 — 실측 HIPO:
+                    # "Prior 2026 FY Guidance | 2026 FY Guidance" 처럼 앞 열만 Prior 로 표시하고
+                    # 뒤 열은 맨몸 'Guidance'. updated/revised/current 낱말만 찾으면 규칙이
+                    # 통째로 불발돼 구 가이던스(560~570)가 채택된다(BZ 신 580~585 대비 −3%).
+                    # prior 마커 뒤에 guidance/outlook 어구가 다시 나오면 그쪽이 신 열이다.
+                    _tail = hdr[pm_.end():] if pm_ else ""
+                    um_ = pm_ and (re.search(r"\b(?:updated?|revised?|current|new)\b", _tail, re.I)
+                                   or re.search(r"\b(?:guidance|outlook)\b", _tail, re.I))
                     if pm_ and um_:
                         n2 = _NUM_D if metric == "eps" else _NUM
                         m2 = re.match(r"[^$\d%]{0,30}?" + n2 + r"\s*(?:to|through|-|and)\s*" + n2,
