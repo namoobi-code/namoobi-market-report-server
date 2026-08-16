@@ -24,15 +24,21 @@ SPECLT_RDN_EARTH_AT(투기과열)·MDAT_TRGET_AREA_SECD(조정대상) 플래그�
   · 신혼부부 특별공급: 배정물량의 30% 추첨(소득 상관없이 자산요건만) — 민영·공공 공통
   ⚠ 어디까지나 **규칙 기반 추정**이다. 확정 배정은 입주자모집공고 원문(PBLANC_URL) 확인.
 
+(2026-08-16 추가) 당첨 시 예상시세·차익 — apt.sqlite(rtms.py 매일 수집)의 같은 시군구
+최근 6개월 실거래 ㎡당가(준공 15년 이내·유사면적 ±5㎡ 우선)로 주택형별 예상시세를 추정.
+분양가는 '최고공급금액' 기준이라 차익은 보수적(실제는 이보다 클 수 있음). DB 미수집
+지역(rtms REGIONS 밖)은 표시 안 함.
+
 산출: data/db/applyhome_sub.json {asof, note, sido, items[공고]}
 """
-import json, re, time, urllib.request
+import json, re, sqlite3, time, urllib.request
 from collections import defaultdict
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "applyhome_sub.json"
+APT_DB = BASE / "data" / "db" / "apt.sqlite"
 API = "https://api.odcloud.kr/api"
 PER = 1000
 BACK_DAYS = 600                       # 공고일 기준 ~20개월 (과거분은 경쟁률 참고용)
@@ -116,6 +122,69 @@ def gen_lot_pct(minyoung, spec, mdat, ar):
     return 60 if ar <= 85 else 100
 
 
+def load_ppsm():
+    """(2026-08-16) 시군구별 ㎡당 실거래가 집계 — 당첨 시 예상시세 계산용.
+    한 번의 GROUP BY 로 (시군구, 전용㎡, 신축여부)별 가중치를 만들어 두고
+    공고·주택형 루프에서는 메모리 조회만 한다(공고 수천 건 × 쿼리 방지)."""
+    if not APT_DB.exists():
+        print("[sub] apt.sqlite 없음 — 예상시세 생략")
+        return None, {}
+    try:
+        from rtms import REGIONS                  # 지역코드→이름 (단일 출처 유지)
+    except Exception as e:
+        print(f"[sub] rtms REGIONS 로드 실패({e}) — 예상시세 생략")
+        return None, {}
+    ym6 = (date.today().replace(day=1) - timedelta(days=183)).strftime("%Y%m")
+    cut = date.today().year - 15                  # '신축급' = 준공 15년 이내
+    cx = sqlite3.connect(APT_DB)
+    rows = cx.execute(
+        "SELECT a.sgg, s.ar, a.build_year>=?, SUM(s.avg/s.ar*s.n), SUM(s.n) "
+        "FROM sale s JOIN apt a ON a.id=s.apt_id "
+        "WHERE s.ym>=? AND s.ar>=20 AND s.avg>0 "
+        "GROUP BY a.sgg, s.ar, a.build_year>=?", (cut, ym6, cut)).fetchall()
+    cx.close()
+    db = defaultdict(list)
+    for sgg, ar, nf, wp, n in rows:
+        db[sgg].append((ar, nf, wp, n))
+    print(f"[sub] 예상시세 기준: {ym6}~ 실거래 · {len(db)}개 시군구")
+    return REGIONS, db
+
+
+def sgg_codes(regions, reg, sgg):
+    """공고의 (시도, 시군구명) → rtms 지역코드 목록.
+    REGIONS 이름 형식이 '서울 종로구'(광역) · '수원 장안구'(특례시 일반구) ·
+    '부천시'(단일시) · '광주시(경기)'(동명 구분) 로 섞여 있어 순서대로 매칭."""
+    if reg == "세종":
+        return ["36110"]
+    if not sgg:
+        return []
+    out = [c for c, nm in regions.items()
+           if nm in (f"{reg} {sgg}", sgg, f"{sgg}({reg})")]
+    if not out and sgg.endswith("시"):            # '수원시' → '수원 *' · '화성시' → '화성 *권'
+        p = sgg[:-1] + " "
+        out = [c for c, nm in regions.items() if nm.startswith(p)]
+    return out
+
+
+def est_price(db, codes, ar):
+    """유사 면적(±5㎡) ㎡당가 가중평균 × 전용 = 예상시세(억).
+    신축급 표본 5건 이상이면 신축만, 아니면 전 연식(표본 3건 이상). 반환 (시세, 전연식플래그)"""
+    if not codes or not ar:
+        return None, 0
+    for new_only in (1, 0):
+        wp = n = 0
+        for c in codes:
+            for a2, nf, w, k in db.get(c, ()):
+                if abs(a2 - ar) <= 5 and (nf == 1 or not new_only):
+                    wp += w
+                    n += k
+        if new_only and n >= 5:
+            return round(wp / n * ar, 2), 0
+        if not new_only and n >= 3:
+            return round(wp / n * ar, 2), 1
+    return None, 0
+
+
 def main():
     c_no = f"&cond%5BHOUSE_MANAGE_NO%3A%3AGTE%5D={SINCE_NO}"
     c_de = f"&cond%5BRCRIT_PBLANC_DE%3A%3AGTE%5D={SINCE_DE}"
@@ -163,6 +232,8 @@ def main():
     for r in md:
         mdl[str(r.get("HOUSE_MANAGE_NO") or "").strip()].append(r)
 
+    REG, PPSM = load_ppsm()                       # (2026-08-16) 예상시세용 실거래 ㎡당가
+
     # ── 공고 단위 조립 ──
     items, sido = [], set()
     for r in pb:
@@ -171,6 +242,9 @@ def main():
             continue
         miny = (r.get("HOUSE_DTL_SECD_NM") or "") == "민영"
         spec, mdat = r.get("SPECLT_RDN_EARTH_AT") or "N", r.get("MDAT_TRGET_AREA_SECD") or "N"
+        reg = r.get("SUBSCRPT_AREA_CODE_NM") or ""
+        sgg = parse_lvl2(r.get("HSSPLY_ADRES"))
+        codes = sgg_codes(REG, reg, sgg) if REG else []
         tys, ag = [], defaultdict(int)
         prs = []
         for m in sorted(mdl[no], key=lambda x: str(x.get("HOUSE_TY") or "")):
@@ -183,7 +257,9 @@ def main():
             pr = round(pr / 10000, 2) if pr else None     # 만원 → 억
             if pr:
                 prs.append(pr)
+            est, estb = (est_price(PPSM, codes, ar) if pr else (None, 0))
             t = {"t": ht, "ar": ar, "pr": pr, "pct": pct,
+                 "est": est, "estb": estb,
                  "gen": gen, "spc": ival(m.get("SPSPLY_HSHLDCO")),
                  "nw": nw, "nb": ival(m.get("NWBB_HSHLDCO")),
                  "lf": ival(m.get("LFE_FRST_HSHLDCO")), "my": ival(m.get("MNYCH_HSHLDCO")),
@@ -208,10 +284,18 @@ def main():
             for f in ("gen", "spc", "nw", "nb", "lf", "my", "yg", "op", "lot", "nwlot"):
                 ag[f] += t[f]
             tys.append({k2: v for k2, v in t.items() if v not in (None, 0, [])})
-        reg = r.get("SUBSCRPT_AREA_CODE_NM") or ""
         sido.add(reg)
+        # (2026-08-16) 공고 대표 예상차익 = 일반공급 세대수 가중평균 (est·pr 둘 다 있는 형만)
+        gv = [(t["est"] - t["pr"], t.get("gen") or 1, t["pr"])
+              for t in tys if t.get("est") and t.get("pr")]
+        gain = gpct = None
+        if gv:
+            W = sum(x[1] for x in gv)
+            gain = sum(x[0] * x[1] for x in gv) / W
+            base = sum(x[2] * x[1] for x in gv) / W
+            gain, gpct = round(gain, 1), (round(gain / base * 100) if base else None)
         it = {"no": no, "name": r.get("HOUSE_NM"), "reg": reg,
-              "sgg": parse_lvl2(r.get("HSSPLY_ADRES")),
+              "sgg": sgg, "gain": gain, "gpct": gpct,
               "addr": r.get("HSSPLY_ADRES"), "url": r.get("PBLANC_URL"),
               "hmpg": r.get("HMPG_ADRES"), "typ": r.get("HOUSE_DTL_SECD_NM"),
               "rent": r.get("RENT_SECD_NM"),
