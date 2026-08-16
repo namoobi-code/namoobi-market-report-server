@@ -73,7 +73,15 @@ _CORP_W = {"total", "net", "consolidated", "company", "companywide", "overall", 
            "narrowing", "actual", "actuals", "anticipate", "anticipated", "forecasting",
            "forecast", "forecasts", "announced", "announces", "quarter", "adjusted",
            "currency-neutral", "currencyneutral", "fx-neutral", "constant", "core", "m", "b",
-           "midpoint", "including", "sees", "see", "believes", "targets", "target", "implies"}
+           "midpoint", "including", "sees", "see", "believes", "targets", "target", "implies",
+           # (2026-08-16 2차) 미확보 재감사 —
+           #   "or": "growth … 0% to 4%, **or** revenue of $367 million to $382 million"
+           #         (실측 CERT: 성장률 뒤 병기된 절대금액이 접속사 때문에 기각, BZ 367~382 일치)
+           #   "tour": Lindblad 류 여행사는 'Tour revenues' 가 곧 전사 매출이다
+           #         (실측 LIND "● Tour revenues of $830 - $860 million" = BZ 830~860).
+           # 세그먼트명(shipbuilding·subsea 등)은 **넣지 않는다** — 그건 진짜 부분 매출이라
+           # 전사 합계로 쓰면 과소 계상된다(실측 HII·FTI 는 기각이 정답).
+           "or", "tour", "tours"}
 # 라벨(매출·EPS)과 금액 사이에 이런 말이 끼면, 그 금액은 **다른 항목**의 것이다.
 # (2026-08-14) ebitda\d* — 보도자료의 각주 번호가 단어에 바로 붙는다("Adjusted EBITDA2",
 # "EBITDA1"). \bebitda\b 는 숫자 앞에서 경계가 성립하지 않아 통과됐고, EBITDA 범위가
@@ -167,30 +175,42 @@ def _forms(label, metric):
     (실측 WWW·EAT·TRMB·YETI 등 'earnings per share' 문장 전멸).
     """
     label = r"(?:" + label + r")"
+    # (2026-08-16) 라벨~숫자 사이에 **같은 라벨이 다시 나오면 매칭하지 않는다**(negative
+    # lookahead). 정규식은 겹치지 않으므로, 앞쪽에 스쳐 지나간 라벨이 먼저 소비되면 뒤에
+    # 있는 진짜 라벨은 영영 후보가 되지 못한다. 실측 NE: "Backlog excludes mobilization and
+    # **demobilization revenue**. Outlook For the full year 2026, **Revenue guidance is
+    # reduced to $2,800-$2,900 million**" 에서 앞 'revenue' 가 라벨로 잡혀 '수식어
+    # demobilization → 전사 아님'으로 기각됐고, 명시된 전사 매출 2.8~2.9B(BZ 동일)은
+    # 후보 목록에조차 오르지 못했다. 사이에 라벨 재등장을 막으면 엔진이 뒤쪽 라벨에서
+    # 다시 시도해 올바른 매칭을 만든다.
+    gap = r"(?:(?!" + label + r")[^$%]){0,60}?"
+    gap25 = r"(?:(?!" + label + r")[^$%]){0,25}?"
+    gap70 = r"(?:(?!" + label + r")[^$]){0,70}?"
+    gap60d = r"(?:(?!" + label + r")[^$]){0,60}?"
     if metric == "eps":
         return [
-            ("range", label + r"[^$%]{0,60}?" + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D),
-            ("rangec", label + r"[^$%]{0,60}?" + _NUM_C + r"\s*(?:to|through|-|and)\s*" + _NUM_C),
+            ("range", label + gap + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D),
+            ("rangec", label + gap + _NUM_C + r"\s*(?:to|through|-|and)\s*" + _NUM_C),
             # (2026-08-15) 괄호 병기 — "EPS guidance of 13% to 15% growth ($12.40 to $12.60)"
             # (실측 CAH). 성장률(%) 뒤 괄호 안에 금액 범위가 온다 — $ 필수라 성장률 오인 없음.
-            ("prange", label + r"[^$]{0,70}?\(\s*" + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D + r"\s*\)"),
+            ("prange", label + gap70 + r"\(\s*" + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D + r"\s*\)"),
             # (2026-08-15) Low/High 두 열 표 — "Net income per share $ 0.67 $ 0.75"(실측 LFTO).
             # 구분자 없이 $ 금액 두 개가 나란히. 오탐 방지: 루프에서 back 에 'Low … High'
             # 열 머리글이 있을 때만 채택한다.
-            ("lowhigh", label + r"[^$%]{0,25}?" + _NUM_D + r"\s+" + _NUM_D),
-            ("approx", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM_D),
-            ("approxc", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM_C),
+            ("lowhigh", label + gap25 + _NUM_D + r"\s+" + _NUM_D),
+            ("approx", label + gap + r"(?:approximately|about|around)\s*" + _NUM_D),
+            ("approxc", label + gap + r"(?:approximately|about|around)\s*" + _NUM_C),
         ]
     return [
-        ("range", label + r"[^$%]{0,60}?" + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM),
-        ("pm", label + r"[^$%]{0,60}?" + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM),
-        ("pmpct", label + r"[^$]{0,60}?" + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%"),
+        ("range", label + gap + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM),
+        ("pm", label + gap + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM),
+        ("pmpct", label + gap60d + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%"),
         # (2026-08-15) Low/High 두 열 표 — "Revenue $ 2,115 $ 2,175"(실측 MH·GMRS·EQPT).
         # 단위는 표 머리의 '($ in millions)' 선언에서 가져온다(루프에서 처리).
         # (2차) 숫자별 단위 병기형 "$925 million $945 million"(실측 JBI — Range 헤더 표)도 커버.
-        ("lowhigh", label + r"[^$%]{0,25}?\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*(billion|million|bn|mm)?\s+"
+        ("lowhigh", label + gap25 + r"\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*(billion|million|bn|mm)?\s+"
                             r"\$\s?([\d,]+(?:\.\d+)?)(?!\d)\s*(billion|million|bn|mm)?(?![\w%])"),
-        ("approx", label + r"[^$%]{0,60}?(?:approximately|about|around)\s*" + _NUM),
+        ("approx", label + gap + r"(?:approximately|about|around)\s*" + _NUM),
     ]
 
 
@@ -596,11 +616,20 @@ def parse_guidance(txt, per_hint=None):
                 # 5열 표)처럼 값 열 사이에 증감률(%) 열이 끼면 % 문자가 검사를 끊어
                 # 다중 열 가드가 통과됐고, FY 값 7,975 가 0q 로 태그돼 Q3 컨센 1,980
                 # 대비 +300%. %를 건너뛰고도 금액이 이어지면 다중 열이다.
-                if kind in ("range", "lowhigh") and _ys and \
+                # (2026-08-16) 뒤 금액이 **비교 연결어** 뒤에 오면 다중 열 표가 아니라
+                # 한 문장 안의 신·구 가이던스 대조다 — "revenue to be in the range of
+                # $490 million to $500 million, **compared to** the $447 million to $465
+                # million range that was previously disclosed"(실측 CDNA: 명시된 신 가이던스
+                # 490~500M 이 통째로 기각됐다). 이 경우 앞 범위가 신 값이므로 그대로 쓴다.
+                _nx = txt[m.end():m.end() + 65]
+                _cmp = re.match(r"[^.•●]{0,28}?\b(?:compared\s+to|versus|vs\.?|up\s+from|"
+                                r"down\s+from|previously|prior\s+(?:guidance|range|outlook))\b",
+                                _nx, re.I)
+                if kind in ("range", "lowhigh") and _ys and not _cmp and \
                    any(not re.match(_QRES, back300[mm.end():], re.I)
                        for mm in re.finditer(_QRE, back300, re.I)) and \
                    re.search(r"^[^.•●]{0,55}?(?:\$\s?[\d,]+|[\d,]+(?:\.\d+)?\s*(?:billion|million|bn|mm)\b)",
-                             txt[m.end():m.end() + 65], re.I):
+                             _nx, re.I):
                     skip.append(f"{metric}: 분기|연간 다중 열 표(열 확정 불가) · {ctx[:110]}")
                     continue
                 # (2026-08-14) 장기 목표(long-term outlook/target)는 올해·다음 분기 가이던스가
@@ -747,9 +776,15 @@ def parse_guidance(txt, per_hint=None):
                     if re.search(r"\bfrom\s+(?:the\s+)?(?:sales?\s+of|royalt)|\bproducts?\b", lead, re.I):
                         skip.append(f"rev: 제품·원천 한정 → 전사 아님 · {ctx[:110]}")
                         continue
-                    mw = None
-                    for mw in re.finditer(r"([A-Za-z][\w\-]*)\s+(?:revenues?|net sales)", near + " revenue", re.I):
-                        pass
+                    # (2026-08-16) 수식어는 **라벨 직전 토큰**만 본다 — 종전엔 near(앞 60자)
+                    # 전체에서 마지막 'X revenue' 를 찾아, 다른 문장에 있던 낱말이 현재
+                    # 라벨의 수식어로 오인됐다. 실측 NE: "Backlog excludes mobilization and
+                    # **demobilization revenue**. Outlook For the full year 2026, Revenue
+                    # guidance is reduced to $2,800-$2,900 million" 에서 앞 문장의
+                    # 'demobilization' 이 근거가 돼 명시된 전사 매출 2.8~2.9B(BZ 동일)이 기각.
+                    # 라벨 앞이 숫자·문장부호로 끝나면(“…2026, Revenue”) 수식어가 없는 것이니
+                    # 검사를 건너뛴다. 진짜 부분 매출은 _PART 정규식이 별도로 막는다.
+                    mw = re.search(r"([A-Za-z][\w\-]*)\s*$", near)
                     if mw and re.sub(r"[^a-z]", "", mw.group(1).lower()) not in _CORP_W:
                         skip.append(f"rev: 수식어 '{mw.group(1)}' → 전사 아님 · {ctx[:120]}")
                         continue

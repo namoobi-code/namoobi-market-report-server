@@ -54,7 +54,7 @@
       <th style="text-align:right" title="일반공급 중 추첨제 추정 세대 (민영: 규제·면적별 20~100% · 국민: 20%)">일반추첨*</th>
       <th style="text-align:right" title="신혼부부 특공 배정 (괄호=30% 추첨 추정)">신혼특공*</th>
       <th style="text-align:right">분양가(억)</th>
-      <th style="text-align:right" title="당첨 시 예상차익* = 같은 시군구 최근 6개월 실거래 ㎡당가(준공 15년 이내·유사면적 ±5㎡ 우선) × 전용 − 최고분양가. 일반공급 세대수 가중평균. 분양가가 최고가 기준이라 실제 차익은 이보다 클 수 있음 · 옵션비·층향 미반영 추정 · 실거래DB 수집 지역만 표시">예상차익*</th>
+      <th style="text-align:right" title="당첨 시 예상차익* = 같은 시군구 최근 6개월 실거래 ㎡당가(준공 15년 이내·유사면적 ±5㎡ 우선) × 전용 − 분양가(PDF 파싱 평균가 우선, 없으면 최고가 기준·보수적). 일반공급 세대수 가중평균 · 옵션비·층향 미반영 추정 · 실거래DB 수집 지역만 표시">예상차익*</th>
       <th>특공접수</th><th>1순위</th><th>발표</th>
       <th style="text-align:right" title="1순위 경쟁률 (형별 가중평균) — 접수 마감 후 표시">경쟁률</th>
       <th style="text-align:right" title="당첨가점 최저~최고 (해당지역 1순위)">가점</th><th>입주</th></tr></thead><tbody>${
@@ -82,7 +82,7 @@
           <table style="font-size:11.5px"><thead><tr><th>주택형</th><th style="text-align:right">전용㎡</th>
             <th style="text-align:right" title="최저~최고 (평균) — 최저·평균은 공고문 PDF의 층별 가격표를 자동 파싱한 값(파싱 최고가가 API 최고공급금액과 ±3% 일치할 때만 표시 · 병합표 특성상 근사치). 최고가만 있으면 PDF 미파싱(형식 상이·스캔본 등) — 원문(🔗) 확인">분양가(억)<br><span style="font-weight:400">최저~최고 (평균)</span></th>
             <th style="text-align:right" title="같은 시군구 최근 6개월 실거래 ㎡당가의 거래건수 가중 평균 × 전용 (최고값·중간값 아닌 평균값) — 준공 15년 이내·유사면적(±5㎡) 우선, † = 신축 표본 부족으로 전 연식 사용(보수적)">예상시세*(억)</th>
-            <th style="text-align:right" title="예상시세 − 최고분양가. 분양가가 최고가 기준이라 실제 차익은 이보다 클 수 있음. 옵션비·층향 미반영">차익*</th>
+            <th style="text-align:right" title="예상시세 − 분양가. 기준: PDF 파싱 평균분양가가 있으면 평균(동·호수 추첨이라 기대값), 없으면 최고분양가(보수적 — 실제 차익은 이보다 클 수 있음). 옵션비·층향 미반영">차익*</th>
             <th style="text-align:right">일반</th><th style="text-align:right" title="일반공급 추첨 비율(추정) — 규제지역·수도권은 추첨물량의 75% 무주택 우선, 25%에 1주택자 참여">추첨*</th>
             <th style="text-align:right" title="1순위 경쟁률(가점제 낙첨자 포함)">1순위경쟁률</th>
             <th style="text-align:right" title="1순위 접수건수 ÷ 추첨제 추정물량 — 가점 낙첨자도 추첨에 들어가므로 추첨제 체감 경쟁률에 가까움 (1주택자 참고)">추첨환산*</th>
@@ -98,11 +98,12 @@
                확률 ≈ 0.25L ÷ (접수 − 0.75L)  (무주택 신청 ≥ 75%물량 가정 — 통상 참) */
             const has75=i.spec==='Y'||i.mdat==='Y'||['서울','경기','인천','부산','대구','광주','대전','울산'].includes(i.reg);
             const conv1=(has75&&conv!=null&&t.r1*t.gen>0.75*t.lot)?(t.r1*t.gen-0.75*t.lot)/(0.25*t.lot):null;
-            const gv=(t.est!=null&&t.pr!=null)?+(t.est-t.pr).toFixed(2):null;
+            const bp=t.prav!=null?t.prav:t.pr;   // 차익 기준: 평균 분양가(파싱 시) > 최고가
+            const gv=(t.est!=null&&bp!=null)?+(t.est-bp).toFixed(2):null;
             return `<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td>
             <td class="num">${t.prmn!=null?`${t.prmn}~${F(t.pr)}<br><span class="note">평균 ${t.prav}</span>`:F(t.pr)}</td>
             <td class="num">${t.est!=null?F(t.est)+(t.estb?'<span title="신축 표본 부족 — 전 연식 실거래 ㎡당가 사용(보수적 추정)">†</span>':''):'—'}</td>
-            <td class="num" style="font-weight:700;color:${gv>=0?'#0f766e':'#b91c1c'}">${gv!=null?(gv>0?'+':'')+gv+` <span class="note">(${Math.round(gv/t.pr*100)>0?'+':''}${Math.round(gv/t.pr*100)}%)</span>`:'—'}</td>
+            <td class="num" style="font-weight:700;color:${gv>=0?'#0f766e':'#b91c1c'}">${gv!=null?(gv>0?'+':'')+gv+` <span class="note">(${Math.round(gv/bp*100)>0?'+':''}${Math.round(gv/bp*100)}%${t.prav!=null?' 평균가 기준':''})</span>`:'—'}</td>
             <td class="num">${F(t.gen)}</td><td class="num" style="color:#0f766e;font-weight:700">${t.lot?`${t.lot} <span class="note">(${t.pct}%)</span>`:'—'}</td>
             <td class="num">${t.r1!=null?fr1(t.r1)+(t.short?' <span title="1순위 미달" style="color:#b91c1c">미달</span>':''):'—'}</td>
             <td class="num" style="font-weight:700">${conv!=null?fr1(conv):'—'}${conv1!=null?`<br><span class="note" title="1주택자 체감 환산 = 25%물량 ÷ (1순위 접수 − 75%물량). 무주택자는 75% 우선 + 25% 재도전이라 평균(추첨환산)보다 유리, 1주택자는 이 값에 가깝다">1주택 ${fr1(conv1)}</span>`:''}</td>
@@ -112,7 +113,7 @@
             <td class="num">${sp(t.my,t.myr)}</td><td class="num">${sp(t.yg,t.ygr)}</td><td class="num">${sp(t.op,t.opr)}</td>
             <td class="num">${t.sc?t.sc.join(' / '):'—'}</td></tr>`;}).join('')}</tbody></table>
           <div class="note" style="margin-top:4px">💡 <b>예상시세*</b>는 같은 시군구 최근 6개월 국토부 실거래 ㎡당가의 <b>거래건수 가중 평균</b>(최고값·중간값 아님 · 준공 15년 이내·유사면적 ±5㎡ 우선, †=전 연식) × 전용면적.
-          <b>분양가 최저~최고(평균)</b>의 최저·평균은 공고문 PDF 층별 가격표를 자동 파싱한 값(API 최고가와 ±3% 일치 시에만 표시·근사치, 차익* 계산은 여전히 최고가 기준) — 최고가만 표시되면 PDF 형식이 달라 미파싱, 원문(🔗) 확인. <b>차익*</b> = 예상시세 − 최고분양가 — 분양가가 최고가(최상층) 기준이라 실제 차익은 이보다 클 수 있고, 옵션비·발코니 확장비·층향 차이는 미반영. 신축 프리미엄으로 실제 신축 시세는 주변 평균보다 높게 형성되는 경향도 참고. 실거래DB 수집 지역(서울·경기·광역시 등)만 표시.
+          <b>분양가 최저~최고(평균)</b>의 최저·평균은 공고문 PDF 층별 가격표를 자동 파싱한 값(API 최고가와 ±3% 일치 시에만 표시·근사치) — <b>차익*은 평균 분양가 기준</b>(동·호수 추첨이라 기대값, '평균가 기준' 표기), 평균이 없으면 최고가 기준(보수적). 최고가만 표시되면 PDF 형식이 달라 미파싱, 원문(🔗) 확인. <b>차익*</b> = 예상시세 − 최고분양가 — 분양가가 최고가(최상층) 기준이라 실제 차익은 이보다 클 수 있고, 옵션비·발코니 확장비·층향 차이는 미반영. 신축 프리미엄으로 실제 신축 시세는 주변 평균보다 높게 형성되는 경향도 참고. 실거래DB 수집 지역(서울·경기·광역시 등)만 표시.
           1순위 경쟁률 분모는 <b>일반공급 전체</b>(가점+추첨)다. 접수는 하나로 받고 가점제 배정 → 낙첨자 포함 추첨 순서라 '추첨제만의 공식 경쟁률'은 없다.
           <b>추첨환산*</b>(접수÷추첨물량)은 무주택·1주택 구분 없는 <b>전체 평균</b> — 무주택자는 75% 우선+25% 재도전이라 이보다 유리, <b>1주택자는 아래 '1주택' 환산</b>(25%물량÷(접수−75%물량))이 체감에 가깝다.
           특공 경쟁률은 유형별 신청건수÷배정세대(청약홈 신청현황). 특공·무주택우선 75%는 무주택세대 전용 — 1주택자는 일반 추첨 25% 몫에만 참여.</div></td></tr>`;

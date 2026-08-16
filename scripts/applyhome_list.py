@@ -311,7 +311,10 @@ def main():
             tys.append({k2: v for k2, v in t.items() if v not in (None, 0, [])})
         sido.add(reg)
         # (2026-08-16) 공고 대표 예상차익 = 일반공급 세대수 가중평균 (est·pr 둘 다 있는 형만)
-        gv = [(t["est"] - t["pr"], t.get("gen") or 1, t["pr"])
+        # 기준 분양가: PDF 파싱 평균(prav)이 있으면 평균 — 동·호수는 추첨이라 기대값은 평균가.
+        # 없으면 최고가(pr) — 보수적.
+        gv = [(t["est"] - (t.get("prav") or t["pr"]), t.get("gen") or 1,
+               t.get("prav") or t["pr"])
               for t in tys if t.get("est") and t.get("pr")]
         gain = gpct = None
         if gv:
