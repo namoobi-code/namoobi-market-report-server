@@ -71,7 +71,7 @@
           <td class="num">${F(a.nw)}${a.nwlot?` <span class="note">(추첨 ${a.nwlot})</span>`:''}</td>
           <td class="num">${i.pr?(i.pr[0]===i.pr[1]?i.pr[0]:i.pr[0]+'~'+i.pr[1]):'—'}</td>
           <td>${F(i.sp_bg)}</td><td><b>${F(i.r1_bg)}</b></td><td>${F(i.prz)}</td>
-          <td class="num">${fr1(r1)}</td>
+          <td class="num">${r1!=null?fr1(r1):(s==='완료'?'<span class="note" style="cursor:help" title="청약홈 오픈API가 이 유형(신혼희망타운·공공 사전청약 등)의 경쟁률을 공표하지 않거나, 일반공급이 없는 공고 — 원문(🔗)에서 확인">미제공</span>':'—')}</td>
           <td class="num">${sc?sc[0]+'~'+sc[1]:'—'}</td><td>${i.mvn?String(i.mvn).slice(0,4)+'.'+String(i.mvn).slice(4):'—'}</td></tr>`;
         if(!_open[i.no]) return main;
         const det=`<tr><td colspan="14" style="background:#f8fafc;padding:8px 14px">
