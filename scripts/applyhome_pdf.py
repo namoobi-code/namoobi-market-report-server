@@ -47,6 +47,32 @@ def get(url, binary=False, tries=3):
             time.sleep(3 * (k + 1))
 
 
+def ocr_pdf(path, max_pages=20):
+    """(2026-08-16) 스캔본 PDF → tesseract(kor+eng) OCR 폴백.
+    텍스트 레이어가 없어 pdftotext 가 '공급금액'을 못 찾을 때만 호출.
+    공급금액 표는 통상 공고문 앞쪽이라 앞 20페이지만(페이지당 2~5초).
+    --psm 6 + 공백 보존으로 표의 행 구조(층·세대수·금액 나열)를 최대한 유지."""
+    out = []
+    with tempfile.TemporaryDirectory() as td:
+        try:
+            subprocess.run(["pdftoppm", "-r", "200", "-png", "-f", "1",
+                            "-l", str(max_pages), path, f"{td}/p"],
+                           capture_output=True, timeout=180)
+        except Exception:
+            return ""
+        import glob
+        for img in sorted(glob.glob(f"{td}/p*.png")):
+            try:
+                r = subprocess.run(
+                    ["tesseract", img, "-", "-l", "kor+eng", "--psm", "6",
+                     "-c", "preserve_interword_spaces=1"],
+                    capture_output=True, timeout=60)
+                out.append(r.stdout.decode("utf-8", "ignore"))
+            except Exception:
+                pass
+    return "\n".join(out)
+
+
 def parse_pdf(pdf_bytes):
     """PDF → {타입: [(가격원시값, 세대수)…]} — 스케일(원/천원/만원) 미적용 원시값.
 
@@ -61,7 +87,9 @@ def parse_pdf(pdf_bytes):
         f.flush()
         r = subprocess.run(["pdftotext", "-layout", f.name, "-"],
                            capture_output=True, timeout=120)
-    txt = r.stdout.decode("utf-8", "ignore")
+        txt = r.stdout.decode("utf-8", "ignore")
+        if "공급금액" not in txt:
+            txt = ocr_pdf(f.name)                 # (2026-08-16) 스캔본 → OCR 폴백
     if "공급금액" not in txt:
         return {}
     labels, rows = [], []
