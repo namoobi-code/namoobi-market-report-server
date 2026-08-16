@@ -42,6 +42,16 @@ sh /sessions/*/mnt/claudeCowork/gitsync.sh "커밋 메시지"
 5. 새 데이터 파일(`data/db/*.json`, sqlite)은 서버에서 생성되므로, 구서버에만 있으면 scp 로 이관한다
 6. `sh gitsync.sh "…"` 로 커밋·푸시
 
+### HTTPS (2026-08-16 적용)
+
+- `https://namoobi.duckdns.org` — Let's Encrypt(certbot 2.9.0 · nginx 플러그인), 만료 2026-11-14,
+  `certbot.timer` 가 자동 갱신하고 갱신 후 nginx 를 알아서 리로드한다(installer=nginx). 손댈 것 없음.
+- 도메인 접속은 80 → 443 **301 리다이렉트**. IP 직접 접속(`http://161.33.190.254`)은 리다이렉트 없이
+  그대로 열린다 — 인증서가 도메인용이라 IP 로는 HTTPS 경고가 뜨는 게 정상이다.
+- nginx 설정 사본: `deploy/nginx_default` (서버에서 회수한 실물). 재구축 시 이 파일을
+  `/etc/nginx/sites-enabled/default` 로 복사한 뒤 `certbot --nginx -d namoobi.duckdns.org` 재발급.
+- 로그인 비밀번호 평문 전송 문제는 이걸로 해소됐다 — 로그인은 **도메인으로** 접속해서 쓴다.
+
 ⚠ 장시간 스크립트는 `setsid nohup … > /tmp/x.log 2>&1 < /dev/null &` 로 띄우고 로그로 확인한다
 (ssh 세션에 물리면 툴 타임아웃에 같이 죽는다). `pkill -f` 는 자기 ssh 셸까지 죽이므로
 `pgrep -f … | xargs -r kill` 을 쓴다.
