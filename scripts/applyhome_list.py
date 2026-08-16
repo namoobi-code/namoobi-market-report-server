@@ -93,6 +93,16 @@ def ty_area(house_ty):
     return round(float(m.group(1)), 2) if m else None
 
 
+def parse_lvl2(addr):
+    """공급위치 주소 → 2단계 행정구역. 광역시·서울은 구/군('노원구'),
+    도는 시·군('진주시','가평군' — 특례시 일반구는 시 단위로 묶음)."""
+    t = (addr or "").split()
+    if len(t) < 2:
+        return None
+    g = t[1]
+    return g if g.endswith(("시", "군", "구")) else None
+
+
 def gen_lot_pct(minyoung, spec, mdat, ar):
     """일반공급 추첨 비율(%) — 규칙은 파일 상단 docstring 참고"""
     if not minyoung:
@@ -201,6 +211,7 @@ def main():
         reg = r.get("SUBSCRPT_AREA_CODE_NM") or ""
         sido.add(reg)
         it = {"no": no, "name": r.get("HOUSE_NM"), "reg": reg,
+              "sgg": parse_lvl2(r.get("HSSPLY_ADRES")),
               "addr": r.get("HSSPLY_ADRES"), "url": r.get("PBLANC_URL"),
               "hmpg": r.get("HMPG_ADRES"), "typ": r.get("HOUSE_DTL_SECD_NM"),
               "rent": r.get("RENT_SECD_NM"),

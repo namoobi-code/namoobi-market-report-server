@@ -11,7 +11,7 @@
     .then(d=>{ tab.style.display=(d&&d.ok)?'':'none'; }).catch(()=>{});
   chk(); window.addEventListener('focus',chk);
 
-  let _d=null,_reg='전체',_st='모집중',_typ='전체',_q='',_open={},_n=60;
+  let _d=null,_reg='전체',_sgg='전체',_st='모집중',_typ='전체',_q='',_open={},_n=60;
   const TODAY=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   const stat=i=>{
     const bg=i.sp_bg&&i.sp_bg<i.r1_bg?i.sp_bg:(i.r1_bg||i.sp_bg||'');
@@ -32,6 +32,7 @@
     const d=_d, root=$('sub_tbl'); if(!root) return;
     const rows=(d.items||[]).filter(i=>{
       if(_reg!=='전체'&&i.reg!==_reg) return false;
+      if(_sgg!=='전체'&&(i.sgg||'기타')!==_sgg) return false;
       if(_typ!=='전체'&&(i.typ||'')!==_typ) return false;
       const s=stat(i);
       if(_st==='모집중'&&s!=='접수예정'&&s!=='접수중') return false;
@@ -64,7 +65,7 @@
         const main=`<tr data-no="${E(i.no)}" style="cursor:pointer" title="${E(i.addr||'')} · ${E(i.cons||'')}">
           <td><b style="color:${SCOL[s]}">${s}</b></td>
           <td><b>${E(i.name)}</b> <a href="${E(i.url||'#')}" target="_blank" rel="noopener" title="청약홈 공고 원문" onclick="event.stopPropagation()">🔗</a></td>
-          <td>${E(i.reg)}${reg}</td><td>${E(i.typ||'—')}</td>
+          <td>${E(i.reg)}${i.sgg?' '+E(i.sgg):''}${reg}</td><td>${E(i.typ||'—')}</td>
           <td class="num">${F(i.sup)}</td>
           <td class="num" style="color:#0f766e;font-weight:700">${F(a.lot)}</td>
           <td class="num">${F(a.nw)}${a.nwlot?` <span class="note">(추첨 ${a.nwlot})</span>`:''}</td>
@@ -118,9 +119,20 @@
     el.querySelectorAll('button').forEach(b=>b.onclick=()=>fn(b.dataset.v));
   }
   function bars(){
-    bar($('sub_reg'),['전체'].concat(_d.sido||[]),_reg,v=>{_reg=v;_n=60;bars();render();});
+    bar($('sub_reg'),['전체'].concat(_d.sido||[]),_reg,v=>{_reg=v;_sgg='전체';_n=60;bars();render();});
     bar($('sub_st'),['모집중','발표대기','완료','전체'],_st,v=>{_st=v;_n=60;bars();render();});
     bar($('sub_typ'),['전체','민영','국민'],_typ,v=>{_typ=v;_n=60;bars();render();});
+    // 2단계: 시도를 고르면 그 안의 구(광역시)·시군(도) 칩 — 공고 수 많은 순
+    const el=$('sub_sgg');
+    if(_reg==='전체'){ el.innerHTML=''; el.style.display='none'; }
+    else{
+      const cnt={};
+      (_d.items||[]).forEach(i=>{ if(i.reg===_reg){ const g=i.sgg||'기타'; cnt[g]=(cnt[g]||0)+1; }});
+      const list=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
+      el.style.display='flex';
+      el.innerHTML=['전체'].concat(list).map(v=>`<button data-v="${E(v)}" style="padding:3px 9px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${v===_sgg?'#0f766e':'#fff'};color:${v===_sgg?'#fff':'#333'}">${E(v)}${v!=='전체'?` <span style="opacity:.65">${cnt[v]}</span>`:''}</button>`).join('');
+      el.querySelectorAll('button').forEach(b=>b.onclick=()=>{_sgg=b.dataset.v;_n=60;bars();render();});
+    }
   }
   let _init=false;
   function init(){
