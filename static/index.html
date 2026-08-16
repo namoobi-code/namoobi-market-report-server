@@ -527,6 +527,8 @@
       <button id="btn_calendar" class="tab" data-pane="p_cal" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 Calendar<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_global" style="background:#4338ca;border-color:#4338ca;color:#fff">🌐 Market<small style="color:#e0e7ff">지수·상품·환율·크립토</small></button>
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
+      <!-- (2026-08-16) 청약 탭 — namoobi 로그인 시에만 노출 (sub.js 가 /api/auth/me 로 표시) -->
+      <button class="tab" id="tab_sub" data-pane="p_sub" style="display:none;background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
       <button class="tab"    data-pane="p_daily">AI Daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB Server<small>누적·버전관리</small></button>
@@ -988,6 +990,21 @@
       <b>매매·전세지수</b>는 실제 가격의 확정치(월간·발표 지연 약 1개월) — 서울 아파트가 전국보다 먼저 움직이는 경향.
       전세지수 상승 + 매매 횡보는 갭 축소(매매 전환 압력) 신호로 참고. 리서치용이며 투자권유가 아님.
     </div>
+  </div>
+  <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
+  <div class="pane" id="p_sub" style="overflow:auto">
+    <h2>🏗️ 청약 (분양) <em id="sub_asof">불러오는 중…</em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      <b>일반추첨*·신혼특공 추첨*</b>은 규칙 기반 <b>추정</b>이다 — 민영 일반공급: 투기과열 60/30/20% · 조정대상 60/30/50% (전용 ≤60 / 60~85 / >85㎡) · 비규제 ≤85㎡ 60%, >85㎡ 100% · 국민(공공) 20% · 신혼특공 30%(민영·공공 공통, 소득 무관·자산요건).
+      규제지역 여부는 공고별 플래그(투=투기과열·조=조정대상·상=분양가상한)로 자동 반영. 확정 배정·자격은 <b>청약홈 공고 원문(🔗)</b>으로 확인. 리서치용이며 투자권유가 아님.</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+      <span id="sub_st" style="display:inline-flex;gap:3px"></span>
+      <span id="sub_typ" style="display:inline-flex;gap:3px"></span>
+      <input type="text" id="sub_q" placeholder="🔎 단지명·주소·시공사 검색" style="width:230px;padding:4px 8px;font-size:12px;border:1px solid #d7dce3;border-radius:6px">
+      <span class="note" id="sub_cnt"></span>
+    </div>
+    <div id="sub_reg" style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:8px"></div>
+    <div id="sub_tbl" style="overflow:auto"><div class="note">탭을 열면 불러옵니다…</div></div>
   </div>
   <div class="pane" id="p_cal" style="overflow:auto">
     <h2 style="margin:8px 0 3px">📅 주요 이벤트 캘린더 <span class="note" id="cal_asof" style="font-weight:400"></span></h2>
@@ -1689,8 +1706,9 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=20260815a"></script>
+<script src="/app.js?v=20260816a"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
+<script src="/sub.js?v=20260816a"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
