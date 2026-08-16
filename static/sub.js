@@ -102,7 +102,7 @@
             const gv=(t.est!=null&&bp!=null)?+(t.est-bp).toFixed(2):null;
             return `<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td>
             <td class="num">${t.prmn!=null?`${t.prmn}~${F(t.pr)}<br><span class="note">평균 ${t.prav}</span>`:F(t.pr)}</td>
-            <td class="num">${t.est!=null?F(t.est)+(t.act?' <b style="color:#0f766e" title="추정이 아니라 이 단지 자체의 입주 후 실거래(최근 12개월) ㎡당가 기반 실측 시세 — 단지명·준공년 매칭">실측</b>':'')+(t.cmp?` <span class="note" title="같은 시군구 준공 10년 이내 신축 ${t.cmp}개 단지의 실거래만으로 계산(구축 평균 왜곡 제거)">신축${t.cmp}</span>`:'')+(t.estb?'<span title="신축 표본 부족 — 전 연식 실거래 ㎡당가 사용(보수적 추정)">†</span>':''):'—'}</td>
+            <td class="num">${t.est!=null?F(t.est)+(t.act?' <b style="color:#0f766e" title="추정이 아니라 이 단지 자체의 입주 후 실거래(최근 12개월) ㎡당가 기반 실측 시세 — 단지명·준공년 매칭">실측</b>':'')+(t.slv?' <b style="color:#7c3aed" title="이 단지 분양권 전매 실거래(최근 6개월, 프리미엄 반영) 가중평균 — 단지명·전용 ±3㎡ 매칭 실측">분양권</b>':'')+(t.cmp?` <span class="note" title="${t.dg?'같은 법정동':'같은 시군구'} 준공 10년 이내 신축 ${t.cmp}개 단지의 실거래만으로 계산(구축 평균 왜곡 제거)">신축${t.cmp}${t.dg?'·동':''}</span>`:'')+(t.estb?'<span title="신축 표본 부족 — 전 연식 실거래 ㎡당가 사용(보수적 추정)">†</span>':''):'—'}</td>
             <td class="num" style="font-weight:700;color:${gv>=0?'#0f766e':'#b91c1c'}">${gv!=null?(gv>0?'+':'')+gv+` <span class="note">(${Math.round(gv/bp*100)>0?'+':''}${Math.round(gv/bp*100)}%${t.prav!=null?' 평균가 기준':''})</span>`:'—'}</td>
             <td class="num">${F(t.gen)}</td><td class="num" style="color:#0f766e;font-weight:700">${t.lot?`${t.lot} <span class="note">(${t.pct}%)</span>`:'—'}</td>
             <td class="num">${t.r1!=null?fr1(t.r1)+(t.short?' <span title="1순위 미달" style="color:#b91c1c">미달</span>':''):'—'}</td>

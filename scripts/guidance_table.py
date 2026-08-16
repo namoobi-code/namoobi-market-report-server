@@ -295,6 +295,19 @@ def parse_tables(html, txt_hint=""):
         for row in grid[data_start:]:
             if not row:
                 continue
+            # (2026-08-16) 한 <table> 안에 **블록이 여러 개** 오는 표가 있다 — 실측 NWL:
+            # 위쪽 "Q3 2026 Outlook" 블록 아래에 "Updated Full Year 2026 | Previous Full
+            # Year 2026" 블록이 이어진다. 첫 머리글만 붙들고 있으면 아래 블록의 연간 값이
+            # 분기로 채택된다(연간 EPS 0.75 가 Q3 컨센 0.19 대비 +196%).
+            # 데이터 도중 **금액 없는 기간·역할 머리글 행**을 만나면 그 행으로 열 의미를 갈아끼운다.
+            if not any(_cell_val(c, mult) and not _is_year_cell(c) for c in row[1:]):
+                if any(c and (re.search(_QRE, c, re.I) or _is_year_cell(c)
+                              or re.search(_YRE, c, re.I)
+                              or re.search(_R_PRIOR + "|" + _R_CUR + "|" + _R_LOW + "|" + _R_HIGH,
+                                           c, re.I))
+                       for c in row[1:]):
+                    meta = _col_meta([row], ncol)
+                    continue
             label = _clean(row[0])
             if not label or _cell_val(label, mult):
                 continue
