@@ -13,6 +13,7 @@ Exhibit 99.1 보도자료에서 가이던스를 뽑아 earnings_live_us.json 에
 사용: guidance_backfill.py [--days 45] [--workers 4] [--limit N]
       SEC 는 초당 10건 권고 → workers 4 + 0.15s 대기로 여유 있게 둔다.
 """
+import os
 import json, sys, time, urllib.request
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta
@@ -117,7 +118,7 @@ def _save(live):
                 else:
                     it.pop(k, None)
     disk["asof"] = live.get("asof") or disk.get("asof")
-    tmp = OUT.with_suffix(".json.tmp")
+    tmp = OUT.with_suffix(f".json.tmp.{os.getpid()}")   # (2026-08-16) 동시 실행 시 tmp 이름 충돌 방지
     tmp.write_text(json.dumps(disk, ensure_ascii=False), encoding="utf-8")
     tmp.replace(OUT)
 
