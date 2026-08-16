@@ -52,19 +52,43 @@ REG = {"서울특별시": "서울", "부산광역시": "부산", "대구광역�
        "경상북도": "경북", "경상남도": "경남", "제주특별자치도": "제주"}
 
 
-def _key():
+def _keys():
+    """인증키는 **데이터셋별로** 따로 발급된다(실측 2026-08-16).
+    키 파일은 한 줄에 하나씩 `설명 데이터셋ID : 키` 형태.
+        임의경매개시결정등기 신청 부동산 현황 0000000083 : xxxxxxxx…
+    ID 가 없는 한 줄짜리 옛 형식이면 그 키를 모든 데이터셋에 공통으로 쓴다."""
     for p in [BASE / "keys" / "iros.txt", Path("D:/claudeCowork/SECURITY/data.iros.go.kr.txt")] + \
              sorted(Path("/sessions").glob("*/mnt/claudeCowork/SECURITY/data.iros.go.kr.txt")):
         try:
-            k = Path(p).read_text(encoding="utf-8").strip()
-            if k:
-                return k
+            txt = Path(p).read_text(encoding="utf-8")
         except Exception:
-            pass
+            continue
+        out, fallback = {}, None
+        for line in txt.splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if ":" in line:
+                head, k = line.rsplit(":", 1)
+                k = k.strip()
+                ids = [w for w in head.replace(":", " ").split() if w.isdigit() and len(w) == 10]
+                if k and ids:
+                    out[ids[-1]] = k
+                    continue
+            if len(line.split()) == 1 and len(line) >= 20:
+                fallback = line
+        if out:
+            return out, fallback
+        if fallback:
+            return {}, fallback
     raise SystemExit("등기정보광장 인증키 없음 — keys/iros.txt")
 
 
-KEY = _key()
+KEYS, KEY_ANY = _keys()
+
+
+def key_for(did):
+    return KEYS.get(did) or KEY_ANY
 NOW = datetime.now()
 
 
@@ -79,7 +103,10 @@ def windows():
 
 
 def fetch(did, s, e, tries=3):
-    q = {"key": KEY, "id": did, "reqtype": "json", "search_type_api": "02",
+    k = key_for(did)
+    if not k:
+        return []
+    q = {"key": k, "id": did, "reqtype": "json", "search_type_api": "02",
          "search_start_date_api": s, "search_end_date_api": e}
     url = API + "?" + urllib.parse.urlencode(q)
     for k in range(tries):
@@ -102,8 +129,12 @@ def fetch(did, s, e, tries=3):
 
 
 def main():
+    print(f"인증키 {len(KEYS)}개 등록" + (" (+공통키)" if KEY_ANY else ""))
     acc = {k: {} for k, _, _ in SETS}          # {key: {(지역, ym): 건수}}
     for key, did, label in SETS:
+        if not key_for(did):
+            print(f"  {label:<12} 건너뜀 — {did} 인증키 없음")
+            continue
         n = 0
         for s, e in windows():
             for r in fetch(did, s, e):
