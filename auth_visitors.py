@@ -518,7 +518,7 @@ def build_stats(days: int = 1) -> dict:
             "relay": relay,
             "sig":   _sig(ip, u["dev"], u["br"]),
             "ref":   next((e[4] for e in ch if e[4] and e[4] != "-"
-                           and "141.147.160.13" not in e[4]
+                           and "161.33.190.254" not in e[4]
                            and "namoobi" not in e[4]), ""),
             "last":  ch[-1][1][:52],
             "pages": len(pages),

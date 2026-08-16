@@ -16,7 +16,7 @@ param([switch]$SkipFull)
 $ErrorActionPreference = "Stop"
 $ROOT = "D:\claudeCowork\namoobi-market-report-server"
 $KEY  = "D:\claudeCowork\SECURITY\nmr_deploy_key"
-$SRV  = "ubuntu@141.147.160.13"
+$SRV  = "ubuntu@161.33.190.254"
 
 function Step($n, $msg) { Write-Host "`n[$n] $msg" -ForegroundColor Cyan }
 function Die($msg)      { Write-Host "`n✗ $msg" -ForegroundColor Red; exit 1 }

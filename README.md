@@ -3,7 +3,7 @@
 `namoobi-market-report` 플러그인이 생성하는 데이터를 **공개 대시보드**로 서빙하는 서버 코드.
 서버가 사라져도 **이 저장소만 있으면 30분 안에 완전 복구**된다.
 
-**운영 주소**: http://namoobi.duckdns.org · http://141.147.160.13 (도메인 차단 망에서는 IP 직접)
+**운영 주소**: http://namoobi.duckdns.org · http://161.33.190.254 (도메인 차단 망에서는 IP 직접)
 **호스팅**: Oracle Cloud Always Free (도쿄 · VM.Standard.E2.1.Micro · 월 0원)
 
 ---
@@ -16,7 +16,7 @@
 | **PC — DB 정본** | `D:\claudeCowork\namoobi-market-report-server\db\` | **DB 52종 원본 — 이 저장소가 git 으로 버전관리·백업한다** |
 | **PC — 수집 중간산출물** | `D:\claudeCowork\namoobi-market-report-server\data\` | `nmr_*.json` · `report_data_*.json` · `poll.db` · `deriv_signals.db` · `krx_brief/` (DB 아님) |
 | **GitHub (백업)** | `namoobi-code/namoobi-market-report-server` (private) | 서버 코드 백업 |
-| **서버 (배포본)** | `ubuntu@141.147.160.13:~/namoobi/` | `app.py`·`static/`·`scripts/` + `data/db/` (PC에서 밀어넣은 사본) |
+| **서버 (배포본)** | `ubuntu@161.33.190.254:~/namoobi/` | `app.py`·`static/`·`scripts/` + `data/db/` (PC에서 밀어넣은 사본) |
 
 **코드 수정 → 배포 흐름**
 
@@ -24,9 +24,9 @@
 # 1) D:\claudeCowork\namoobi-market-report-server 에서 수정
 # 2) 서버 배포
 KEY=D:/claudeCowork/SECURITY/nmr_deploy_key
-scp -i $KEY static/app.js static/index.html ubuntu@141.147.160.13:namoobi/static/
-scp -i $KEY app.py scripts/*.py            ubuntu@141.147.160.13:namoobi/
-ssh -i $KEY ubuntu@141.147.160.13 'sudo systemctl restart namoobi'
+scp -i $KEY static/app.js static/index.html ubuntu@161.33.190.254:namoobi/static/
+scp -i $KEY app.py scripts/*.py            ubuntu@161.33.190.254:namoobi/
+ssh -i $KEY ubuntu@161.33.190.254 'sudo systemctl restart namoobi'
 # 3) GitHub 백업
 git add -A && git commit -m "..." && git push origin main
 ```
