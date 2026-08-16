@@ -144,13 +144,14 @@ def load_ppsm():
     공고·주택형 루프에서는 메모리 조회만 한다(공고 수천 건 × 쿼리 방지)."""
     if not APT_DB.exists():
         print("[sub] apt.sqlite 없음 — 예상시세 생략")
-        return None, {}
+        return None, {}, {}, {}
     try:
         from rtms import REGIONS                  # 지역코드→이름 (단일 출처 유지)
     except Exception as e:
         print(f"[sub] rtms REGIONS 로드 실패({e}) — 예상시세 생략")
-        return None, {}
+        return None, {}, {}, {}
     ym6 = (date.today().replace(day=1) - timedelta(days=183)).strftime("%Y%m")
+    ym12 = (date.today().replace(day=1) - timedelta(days=366)).strftime("%Y%m")
     cut = date.today().year - 15                  # '신축급' = 준공 15년 이내
     cx = sqlite3.connect(APT_DB)
     rows = cx.execute(
@@ -158,12 +159,54 @@ def load_ppsm():
         "FROM sale s JOIN apt a ON a.id=s.apt_id "
         "WHERE s.ym>=? AND s.ar>=20 AND s.avg>0 "
         "GROUP BY a.sgg, s.ar, a.build_year>=?", (cut, ym6, cut)).fetchall()
-    cx.close()
     db = defaultdict(list)
     for sgg, ar, nf, wp, n in rows:
         db[sgg].append((ar, nf, wp, n))
-    print(f"[sub] 예상시세 기준: {ym6}~ 실거래 · {len(db)}개 시군구")
-    return REGIONS, db
+    # (2026-08-16) 단지 자체 실거래 — 입주 시작된 완료 공고의 '실측' 시세용
+    apts = defaultdict(list)                      # sgg → [(apt_id, 정규화명, 준공년)]
+    for i2, sgg, nm, by in cx.execute(
+            "SELECT id, sgg, name, build_year FROM apt WHERE build_year>=?",
+            (date.today().year - 10,)):
+        apts[sgg].append((i2, re.sub(r"[^0-9A-Za-z가-힣]", "", str(nm or "").lower()), by))
+    asale = defaultdict(list)                     # apt_id → [(ar, ㎡당가가중, n)]
+    for aid, ar, wp, n in cx.execute(
+            "SELECT s.apt_id, s.ar, SUM(s.avg/s.ar*s.n), SUM(s.n) FROM sale s "
+            "JOIN apt a ON a.id=s.apt_id WHERE s.ym>=? AND a.build_year>=? "
+            "AND s.ar>=20 AND s.avg>0 GROUP BY s.apt_id, s.ar",
+            (ym12, date.today().year - 10)):
+        asale[aid].append((ar, wp, n))
+    cx.close()
+    print(f"[sub] 예상시세 기준: {ym6}~ 실거래 · {len(db)}개 시군구 · "
+          f"신축단지 {sum(len(v) for v in apts.values())}곳(실측 매칭용)")
+    return REGIONS, db, apts, asale
+
+
+def act_price(apts, asale, codes, name, mvn, ar):
+    """(2026-08-16) 입주 시작(mvn 경과)된 완료 공고 → 같은 시군구 신축 단지명 매칭으로
+    그 단지 자체의 최근 12개월 실거래 ㎡당가 × 전용 = '실측' 시세. 매칭 규칙:
+    정규화명 포함관계(4자 이상) + 준공년이 입주예정년 ±1. 표본 2건 이상일 때만."""
+    if not codes or not ar or not mvn:
+        return None
+    ym_now = date.today().strftime("%Y%m")
+    if str(mvn)[:6] > ym_now:
+        return None                               # 아직 미입주
+    nn = re.sub(r"[^0-9A-Za-z가-힣]", "", str(name or "").lower())
+    yr = int(str(mvn)[:4])
+    best = None
+    for c in codes:
+        for aid, anm, by in apts.get(c, ()):
+            if len(anm) < 4 or not (anm in nn or nn in anm):
+                continue
+            if by and abs(by - yr) > 1:
+                continue
+            wp = n = 0
+            for a2, w, k in asale.get(aid, ()):
+                if abs(a2 - ar) <= 5:
+                    wp += w
+                    n += k
+            if n >= 2 and (best is None or n > best[1]):
+                best = (round(wp / n * ar, 2), n)
+    return best[0] if best else None
 
 
 def sgg_codes(regions, reg, sgg):
@@ -182,12 +225,28 @@ def sgg_codes(regions, reg, sgg):
     return out
 
 
-def est_price(db, codes, ar):
-    """유사 면적(±5㎡) ㎡당가 가중평균 × 전용 = 예상시세(억).
-    신축급 표본 5건 이상이면 신축만, 아니면 전 연식(표본 3건 이상). 반환 (시세, 전연식플래그)"""
+def est_price(db, codes, ar, apts=None, asale=None):
+    """유사 면적(±5㎡) ㎡당가 가중평균 × 전용 = 예상시세(억). 3단계 폴백:
+    ① (2026-08-16 v3) 같은 시군구 '준공 10년 이내' 단지들의 단지별 실거래만 —
+       신규 분양의 비교군은 구축 섞인 지역 평균이 아니라 주변 신축(실측: 더샵
+       신길센트럴시티 52㎡가 영등포구 전체 평균에 끌려 -28%로 왜곡). 2개 단지·5건 이상.
+    ② 시군구 집계(준공 15년 이내) 5건 이상  ③ 전 연식 3건 이상(† 표기).
+    반환 (시세, 전연식플래그, 신축단지수)"""
     if not codes or not ar:
-        return None, 0
-    for new_only in (1, 0):
+        return None, 0, 0
+    if apts and asale:                            # ① 신축 10년 단지별
+        wp = n = 0
+        nb = set()
+        for c in codes:
+            for aid, _nm, _by in apts.get(c, ()):
+                for a2, w, k in asale.get(aid, ()):
+                    if abs(a2 - ar) <= 8:         # 신축은 59·84 위주라 밴드 ±8(52↔59 매칭)
+                        wp += w
+                        n += k
+                        nb.add(aid)
+        if len(nb) >= 3 and n >= 8:               # 1~2개 단지 표본은 왜곡 커서 폴백
+            return round(wp / n * ar, 2), 0, len(nb)
+    for new_only in (1, 0):                       # ②③ 시군구 집계 폴백
         wp = n = 0
         for c in codes:
             for a2, nf, w, k in db.get(c, ()):
@@ -195,10 +254,10 @@ def est_price(db, codes, ar):
                     wp += w
                     n += k
         if new_only and n >= 5:
-            return round(wp / n * ar, 2), 0
+            return round(wp / n * ar, 2), 0, 0
         if not new_only and n >= 3:
-            return round(wp / n * ar, 2), 1
-    return None, 0
+            return round(wp / n * ar, 2), 1, 0
+    return None, 0, 0
 
 
 def main():
@@ -248,7 +307,7 @@ def main():
     for r in md:
         mdl[str(r.get("HOUSE_MANAGE_NO") or "").strip()].append(r)
 
-    REG, PPSM = load_ppsm()                       # (2026-08-16) 예상시세용 실거래 ㎡당가
+    REG, PPSM, APTS, ASALE = load_ppsm()          # (2026-08-16) 예상시세용 실거래 ㎡당가
     # (2026-08-16) 공고문 PDF 층별 가격 캐시(applyhome_pdf.py) — 주택형별 최저·평균 분양가
     PDFP = {}
     pdf_f = BASE / "data" / "db" / "applyhome_pdf.json"
@@ -280,9 +339,15 @@ def main():
             pr = sane_pr(pr, ar)                          # 10배 단위오류 보정
             if pr:
                 prs.append(pr)
-            est, estb = (est_price(PPSM, codes, ar) if pr else (None, 0))
+            est, estb, nb = (est_price(PPSM, codes, ar, APTS, ASALE)
+                             if pr else (None, 0, 0))
+            act = (act_price(APTS, ASALE, codes, r.get("HOUSE_NM"),
+                             r.get("MVN_PREARNGE_YM"), ar) if pr else None)
+            if act:                               # 입주단지 실측이 있으면 추정 대신 사용
+                est, estb, nb = act, 0, 0
             pp = PDFP.get(no, {}).get(short_ty(ht)) if pr else None
             t = {"t": ht, "ar": ar, "pr": pr, "pct": pct,
+                 "act": 1 if act else 0, "nb": nb,
                  "prmn": (pp or {}).get("mn"), "prav": (pp or {}).get("av"),
                  "est": est, "estb": estb,
                  "gen": gen, "spc": ival(m.get("SPSPLY_HSHLDCO")),
