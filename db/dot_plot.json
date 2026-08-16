@@ -1,35 +1,34 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-15",
+ "as_of": "2026-08-16",
  "data": {
-  "unit": "%(연말 기준금리 midpoint 중간값)",
-  "source": "federalreserve.gov Summary of Economic Projections, fomcprojtabl20260617.pdf (Table 1, Federal funds rate memo line) — WebSearch·PDF 직접 확인 2026-08-15",
   "rows": [
    {
-    "period": "2026년말",
-    "mar": 3.4,
+    "year": "2026말",
     "jun": 3.8,
+    "mar": 3.4,
     "change": "+0.4"
    },
    {
-    "period": "2027년말",
-    "mar": 3.1,
+    "year": "2027말",
     "jun": 3.6,
+    "mar": 3.1,
     "change": "+0.5"
    },
    {
-    "period": "2028년말",
-    "mar": 3.1,
+    "year": "2028말",
     "jun": 3.4,
+    "mar": 3.1,
     "change": "+0.3"
    },
    {
-    "period": "장기중립",
-    "mar": 3.1,
+    "year": "장기중립",
     "jun": 3.1,
+    "mar": 3.1,
     "change": "+0.0"
    }
   ],
-  "note": "2026년 3월(3/17~18) SEP 대비 6월(6/16~17) SEP에서 2026년말 중간값이 3.4%→3.8%로 매파적 상향(18명 중 9명 연내 1회 이상 인상 전망). 2027년말 3.1%→3.6%, 2028년말 3.1%→3.4%로 동반 상향. 장기중립은 3.1%로 불변. 다음 SEP은 2026-09-16 예정."
+  "asof": "2026-06-17",
+  "source": "Federal Reserve, Summary of Economic Projections, June 17, 2026 (federalfundsrate median, midpoint of target range) https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf ; March values are the March 18, 2026 SEP median as restated in the June 2026 SEP table"
  }
 }
