@@ -31,7 +31,11 @@ def try_launch(ocpus, mem):
     except oci.exceptions.ServiceError as e:
         return None, e
 r=None; used=None; last_err=None
-for oc, mem in ((2,12),(1,6)):
+# (2026-08-16) 레이트리밋 완화 — 이틀간 180회+ 연타로 LaunchInstance 가 429 고착.
+#   회차당 호출을 2회→1회로 줄이고 시간대별로 사이즈를 번갈아 시도한다(짝수시 2/12, 홀수시 1/6).
+#   크론도 30분→60분. 실제 요청량은 종전의 1/4.
+SIZES = ((2,12),) if dt.datetime.now().hour % 2 == 0 else ((1,6),)
+for oc, mem in SIZES:
     resp, err = try_launch(oc, mem)
     if resp is not None:
         r=resp; used=f'{oc} OCPU/{mem}GB'; break
@@ -42,7 +46,7 @@ for oc, mem in ((2,12),(1,6)):
     import time as _t; _t.sleep(8)   # 2/12 → 1/6 사이 간격(연속 호출 429 방지)
 try:
     if r is None:
-        print(now,f'용량/한도 대기(2/12·1/6, 마지막={last_err.status}) — 다음 시도'); raise SystemExit
+        print(now,f'용량/한도 대기({SIZES[0][0]}/{SIZES[0][1]}, 마지막={last_err.status}) — 다음 시도'); raise SystemExit
     iid=r.data.id
     print(now,f'생성 성공({used})! instance', iid[-12:])
     # RUNNING 대기 후 공인 IP 조회

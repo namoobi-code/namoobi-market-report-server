@@ -109,7 +109,7 @@
 5 8 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py --mail >> /home/ubuntu/namoobi/health.log 2>&1
 
 # ── A1 무료 인스턴스 헌터 (10분 간격 · 성공 시 자기해제) — 성공 후 이 줄은 삭제해도 무방 ──
-*/30 * * * * cd /home/ubuntu/namoobi && python3 scripts/a1_hunter.py >> /home/ubuntu/namoobi/a1_hunter.log 2>&1
+17 * * * * cd /home/ubuntu/namoobi && python3 scripts/a1_hunter.py >> /home/ubuntu/namoobi/a1_hunter.log 2>&1
 
 # ── (2026-08-16) 🏗️ 청약 리스트 — 공고·주택형별 추첨제 추정 + 경쟁률·가점 (청약 탭 · applyhome.py 07:55 뒤) ──
 58 7 * * * cd /home/ubuntu/namoobi && python3 scripts/applyhome_list.py >> /home/ubuntu/namoobi/applyhome.log 2>&1
