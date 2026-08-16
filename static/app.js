@@ -2475,6 +2475,20 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                '#455a64','#9e9d24','#00838f','#e91e63','#3f51b5','#ff9800','#8bc34a','#1976d2','#795548','#43a047'];
   let _dqInit=false, _dqView='reg', _dqKind='가계', _dqBank='은행전체',
       _dqRegs=['전국','서울','경기','인천'];
+  /* (2026-08-16) 급매 압력 — firesale.json (실거래로 만든 대리지표 · 매일 07:30)
+     '연체율이 오르면 급매가 늘어난다'는 카드 설명을 말로만 두지 않고 같은 차트에 겹친다.
+     연체율은 0.1~1.2% 대, 급매 비중은 5~50% 대라 축을 나눠야 한다(line 의 r2). */
+  let _fsRaw=null, _fsP=null, _fsMode='off';
+  const firesale=()=>{ if(!_fsP) _fsP=fetch('/api/db/firesale').then(r=>r.ok?r.json():null)
+      .then(f=>{ if(f&&f.t&&f.t.length) _fsRaw=f; return _fsRaw; }).catch(()=>null);
+    return _fsP; };
+  /* 연체율 t 배열(YYYYMM)에 급매 시계열을 맞춘다. 없는 달은 null. */
+  function _fsAlign(t, kind, reg){
+    if(!_fsRaw) return null;
+    const a=(_fsRaw[kind]||{})[reg]; if(!a) return null;
+    const idx={}; _fsRaw.t.forEach((ym,i)=>idx[ym]=i);
+    return t.map(ym=>{ const i=idx[ym]; return i==null?null:(a[i]==null?null:a[i]); });
+  }
   function initDelq(){
     if(_dqInit) return; _dqInit=true;
     fetch('/api/db/hcredit').then(r=>r.ok?r.json():null).then(d=>{
@@ -2511,15 +2525,45 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           segbar('dq_kind', BANKS.map(k=>[k,k]), ()=>_dqBank, v=>_dqBank=v, redraw);
           $('dq_regwrap').style.display='none';
         }
+        segbar('dq_fs', [['off','끄기'],['deep','급매 체결'],['down','하락거래']],
+               ()=>_fsMode, v=>_fsMode=v, redraw);
       };
       const redraw=()=>{ bar(); draw(); };
+      firesale().then(f=>{ if(f) redraw(); });
+
+      /* 급매 지표 각주 — 자체 계산 지표라 '무엇을 어떻게 셌는지'를 반드시 같이 적는다.
+         공식 통계가 아닌 값을 근거처럼 보이게 두면 안 된다. */
+      function _fsNote(){
+        if(_fsMode==='off'||!_fsRaw) return '';
+        const P=_fsRaw.params||{}, t=_fsRaw.t||[], a=(_fsRaw[_fsMode]||{})['전국']||[];
+        let li=-1; for(let i=a.length-1;i>=0;i--) if(a[i]!=null){li=i;break;}
+        const peak=(()=>{let bi=-1;for(let i=0;i<a.length;i++) if(a[i]!=null&&(bi<0||a[i]>a[bi])) bi=i; return bi;})();
+        const nm=_fsMode==='deep'?'급매 체결 비중':'하락거래 비중';
+        return `<br><span class="note">🔵 <b>${nm}</b>(좌축) — `
+          +(_fsMode==='deep'
+             ? `그 달 <b>최저 체결가</b>가 같은 단지·면적의 직전 ${P.window||6}개월 중위가의 ${Math.round((P.deep_cut||0.9)*100)}% 미만인 칸의 비중`
+             : `그 달 <b>중위가</b>가 직전 ${P.window||6}개월 중위가의 ${Math.round((P.down_cut||0.95)*100)}% 미만인 칸의 거래건수 가중 비중`)
+          +`. 국토부 실거래로 서버가 직접 계산한 <b>대리지표(공식 통계 아님)</b>다.`
+          +(li>=0?` 최신 ${fm(t[li])} <b>${a[li]}%</b>`:'')
+          +(peak>=0?` · 최고 ${fm(t[peak])} <b>${a[peak]}%</b>(금리인상 급락장)`:'')
+          +`. 직전 ${P.window||6}개월 거래가 없던 칸은 기준선이 없어 빠지고, 최근 2개월은 신고가 진행 중이라 흔들린다 — `
+          +`절대수준보다 <b>방향</b>으로 보세요.</span>`;
+      }
+      /* 겹칠 급매 계열 — 지역별 뷰에서 고른 지역 중 급매 데이터가 있는 것만(최대 4개) */
+      function fsSeries(T){
+        if(_fsMode==='off'||!_fsRaw) return null;
+        const cand=(_dqView==='reg'?_dqRegs:['전국']).filter(r=>(_fsRaw[_fsMode]||{})[r]).slice(0,4);
+        const lab=_fsMode==='deep'?'급매':'하락거래';
+        return cand.map((r,i)=>({v:_fsAlign(T,_fsMode,r), color:'#0ea5e9',
+                                 label:`${r} ${lab}%(좌축)`})).filter(s=>s.v&&s.v.some(v=>v!=null));
+      }
 
       function draw(){
         if(_dqView==='reg'){
           const T=d.dreg.t||[], S=(d.dreg.s||{})[_dqKind]||{};
           const arr=_dqRegs.filter(r=>S[r]).map((r,i)=>({t:T, v:S[r], label:r,
             color:r==='전국'?'#1f2937':DQPAL[REGS.indexOf(r)%DQPAL.length]}));
-          line('dq_main', arr);
+          line('dq_main', arr, {r2:fsSeries(T)});
           {const e=$('dq_asof'); if(e) e.textContent=`예금은행 지역별 연체율(1개월 이상) · 수집 ${d.asof||''}`;}
           const nat=S['전국']||[], n=T.length, lv=nat[n-1], pv=nat[n-2], py=nat[n-13];
           // 최신월 기준 높은 지역 순 — 어디가 먼저 무너지는지가 이 카드의 핵심
@@ -2531,11 +2575,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             +(py!=null&&lv!=null?` · 전년 <b class="${lv-py>0?'dn':'up'}">${lv-py>0?'+':''}${(lv-py).toFixed(2)}p</b>`:'')
             +(rank.length?`<br>높은 지역 — ${rank.join(' · ')}`:'')
             +` <span class="note">— 연체율이 오르는 지역은 급매·경매 물량이 먼저 늘어난다. `
-            +`'주택관련'은 주담대만 뽑은 것이라 부동산 스트레스를 가장 직접적으로 보여준다. 1개월 이상 연체 기준.</span>`;
+            +`'주택관련'은 주담대만 뽑은 것이라 부동산 스트레스를 가장 직접적으로 보여준다. 1개월 이상 연체 기준.</span>`
+            +_fsNote();
         } else {
           const T=d.delq.t||[], S=(d.delq.s||{})[_dqBank]||{};
           const defs=[['가계','가계대출','#d9534f'],['기업','기업대출','#2f6fed'],['신용카드','신용카드대출','#e08e3c']];
-          line('dq_main', defs.filter(([k])=>S[k]).map(([k,l,c])=>({t:T, v:S[k], label:l, color:c})));
+          line('dq_main', defs.filter(([k])=>S[k]).map(([k,l,c])=>({t:T, v:S[k], label:l, color:c})),
+               {r2:fsSeries(T)});
           {const e=$('dq_asof'); if(e) e.textContent=`은행대출금 연체율(1일 이상) · ${_dqBank} · 수집 ${d.asof||''}`;}
           const a=S['가계']||[], n=T.length, lv=a[n-1], py=a[n-13];
           const mx=Math.max(...a.filter(v=>v!=null));
@@ -2543,7 +2589,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             +(py!=null&&lv!=null?` · 전년 <b class="${lv-py>0?'dn':'up'}">${lv-py>0?'+':''}${(lv-py).toFixed(2)}p</b>`:'')
             +(isFinite(mx)?` · 2005년 이후 최고 <b>${mx.toFixed(2)}%</b>`:'')
             +` <span class="note">— 1일 이상 연체 기준이라 아래 지역별(1개월 이상)보다 수치가 높다. `
-            +`두 지표는 기준이 달라 섞어 읽지 말 것. 카드사 부실이 먼저 튀는 경향이 있어 신용카드 계열을 같이 본다.</span>`;
+            +`두 지표는 기준이 달라 섞어 읽지 말 것. 카드사 부실이 먼저 튀는 경향이 있어 신용카드 계열을 같이 본다.</span>`
+            +_fsNote();
         }
       }
       redraw();

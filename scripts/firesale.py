@@ -54,34 +54,39 @@ def main():
     if not SRC.exists():
         raise SystemExit(f"✗ {SRC} 없음")
     cx = sqlite3.connect(f"file:{SRC}?mode=ro", uri=True)
-    print("apt.sqlite 스트리밍 집계 중…", flush=True)
-    # (2026-08-16) fetchall() 금지 — 268만 행을 한 번에 올렸다가 서버(메모리 작은 인스턴스)를
-    # 통째로 멈춰 세웠다. 커서를 그대로 순회하며 (단지·면적) 그룹이 바뀔 때마다 버린다.
-    cur = cx.execute(
-        """SELECT s.apt_id, s.ar, s.ym, s.n, s.med, s.mn, substr(a.sgg,1,2) sd
-           FROM sale s JOIN apt a ON a.id=s.apt_id
-           WHERE s.med IS NOT NULL AND s.n>0
-           ORDER BY s.apt_id, s.ar, s.ym""")
-    cur.arraysize = 5000
-    rows = cur                                   # 지연 순회 — 메모리에 다 안 올린다
+    cx.execute("PRAGMA cache_size=-8000")        # 캐시 8MB 로 제한 (인스턴스 RAM 954MB)
+    cx.execute("PRAGMA temp_store=FILE")
+
+    # (2026-08-16 · 사고 후 재작성) 이 서버는 메모리가 954MB 뿐이다.
+    #   첫 판은 JOIN + fetchall() 로 268만 행을 통째로 올렸다가 서버를 멈춰 세웠다.
+    #   지금은 두 가지로 막는다.
+    #   ① JOIN 을 없앤다 — 단지→시도 매핑(4만 건)만 dict 로 들고, 큰 표는 건드리지 않는다.
+    #   ② 정렬을 없앤다 — sale 의 PK 가 (apt_id, ym, ar) 이므로 그 순서로 읽으면
+    #      인덱스 스캔만 일어나고 임시 정렬 버퍼가 아예 안 생긴다.
+    #      같은 단지 안에서 ym 이 오름차순이므로 면적별 시계열도 자연히 시간순이 된다.
+    sd_of = {i: str(s)[:2] for i, s in cx.execute("SELECT id, sgg FROM apt")}
+    print(f"단지 {len(sd_of):,}개 · 스트리밍 집계 시작", flush=True)
 
     # (지역, 월) 누적기 — '전국'은 수집된 시군구 전체 합
     deep_hit, deep_tot = defaultdict(int), defaultdict(int)
     down_hit, down_tot = defaultdict(int), defaultdict(int)
 
-    cur_key, hist = None, []          # hist = [(ym, med)] 같은 (단지,면적)의 과거
-    for aid, ar, ym, n, med, mn, sd in rows:
-        key = (aid, ar)
-        if key != cur_key:
-            cur_key, hist = key, []
-        # 직전 6개월(연속 달력 기준) 안의 중위가들만 기준선으로 쓴다
-        lo = ymadd(ym, -WIN)
-        base = [m for (t, m) in hist if lo <= t < ym]
+    cur = cx.execute(
+        """SELECT apt_id, ym, ar, n, med, mn FROM sale
+           WHERE med IS NOT NULL AND n>0
+           ORDER BY apt_id, ym, ar""")
+    cur.arraysize = 2000
+    cur_apt, hist, seen = None, {}, 0             # hist[ar] = [(ym, med)] — 단지 바뀌면 버린다
+    for aid, ym, ar, n, med, mn in cur:
+        if aid != cur_apt:
+            cur_apt, hist = aid, {}
+        h = hist.setdefault(ar, [])
+        lo = ymadd(ym, -WIN)                      # 직전 6개월 안의 중위가만 기준선으로
+        base = [m for (t, m) in h if lo <= t < ym]
         if base:
             ref = statistics.median(base)
             if ref > 0:
-                regs = ("전국", SGG2.get(sd))
-                for r in regs:
+                for r in ("전국", SGG2.get(sd_of.get(aid, ""))):
                     if not r:
                         continue
                     deep_tot[(r, ym)] += 1
@@ -90,9 +95,12 @@ def main():
                     down_tot[(r, ym)] += n
                     if med < ref * DOWN_CUT:
                         down_hit[(r, ym)] += n
-        hist.append((ym, med))
-        if len(hist) > WIN + 2:
-            hist.pop(0)
+        h.append((ym, med))
+        if len(h) > WIN + 2:
+            h.pop(0)
+        seen += 1
+        if seen % 500000 == 0:
+            print(f"  {seen:,}행", flush=True)
 
     ts = sorted({ym for (_, ym) in deep_tot})
     regs = sorted({r for (r, _) in deep_tot}, key=lambda x: (x != "전국", x))
