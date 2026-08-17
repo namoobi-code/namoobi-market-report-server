@@ -2879,7 +2879,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      ══════════════════════════════════════════════════════════════════════════ */
   const RHPAL=['#1f2937','#d9534f','#2f6fed','#e08e3c','#27ae60','#7c3aed','#0e9aa7','#c2185b',
                '#5d4037','#9e9d24','#455a64','#00838f','#3f51b5','#8bc34a','#795548','#ad1457'];
-  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999', _rhSm='raw';
+  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999', _rhSm='raw', _rhMode={};
   function initRehub(){
     if(_rhInit) return; _rhInit=true;
     fetch('/api/db/rehub').then(r=>r.ok?r.json():null).then(d=>{
@@ -2896,6 +2896,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       const GLOB=['rate_kr','rate_us','csi'];
       const pick=(k,r)=>(D[k]||{})[GLOB.includes(k)?'전국':r];
       const axOf=k=>_rhAxis[k]||(M[k]||{}).axis||'R';
+      const MODES=[['val','값'],['idx','지수'],['yoy','전년비']];
+      const modeOf=k=>_rhMode[k]||'val';
+      const modeLab=k=>({val:'',idx:' 지수(구간시작=100)',yoy:' 전년비%'})[modeOf(k)];
+      const modeUnit=k=>({val:(M[k]||{}).unit,idx:'100기준',yoy:'%'})[modeOf(k)];
 
       const bar=()=>{
         $('rh_reg').innerHTML=regs.map(r=>{const on=r===_rhReg;
@@ -2918,9 +2922,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         /* 칩의 L/R 을 눌러 축을 옮긴다 — 값 차이가 큰 지표를 갈라놓는 유일한 수단 */
         $('rh_chips').innerHTML=_rhSel.map((k,i)=>{const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
           return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border-radius:10px;background:${c}18;border:1px solid ${c}">`
-            +`<b style="color:${c}">●</b>${E6(M[k].label)}<span class="note">${E6(M[k].unit)}</span>`
+            +`<b style="color:${c}">●</b>${E6(M[k].label)}<span class="note">${E6(modeUnit(k))}</span>`
+            +`<b data-md="${k}" title="표시방식 바꾸기 — 값 → 지수 → 전년비" style="cursor:pointer;color:${c};border:1px solid ${c};border-radius:4px;padding:0 4px">${MODES.find(m=>m[0]===modeOf(k))[1]}</b>`
             +`<b data-ax="${k}" title="축 바꾸기" style="cursor:pointer;color:#fff;background:${c};border-radius:4px;padding:0 4px">${axOf(k)==='L'?'좌':'우'}</b>`
             +`<b data-rm="${k}" style="cursor:pointer;color:#888">✕</b></span>`;}).join('');
+        $('rh_chips').querySelectorAll('[data-md]').forEach(x=>x.onclick=()=>{
+          const k=x.dataset.md, i=MODES.findIndex(m=>m[0]===modeOf(k));
+          _rhMode[k]=MODES[(i+1)%MODES.length][0]; redraw();});
         $('rh_chips').querySelectorAll('[data-ax]').forEach(x=>x.onclick=()=>{
           const k=x.dataset.ax; _rhAxis[k]=axOf(k)==='L'?'R':'L'; redraw();});
         $('rh_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{
@@ -2964,6 +2972,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            누적(합계)은 유량 지표에만 뜻이 있다 — 지수·가격·%는 더해도 의미가 없으므로
            그 경우엔 평균으로 대신 계산하고 각주에 그 사실을 적는다.
            창이 채워지기 전(앞 11개월)은 값을 만들지 않고 null 로 둔다. */
+        /* (2026-08-16) 계열별 표시방식 — 축이 둘뿐이라 값의 자릿수가 3종류를 넘으면
+           어느 축에 놔도 하나는 바닥에 눌린다(실측: 평균가 1,707 만원/㎡ 가 거래건수 26,886
+           옆에서 직선이 됐다). 그래서 계열마다 표현을 바꿀 수 있게 한다.
+             값   원자료 그대로
+             지수 보이는 구간의 첫 값 = 100 (확대하면 그 구간 기준으로 다시 잡힌다)
+             전년비 12개월 전 대비 %  — 수준이 아니라 '얼마나 빨리 변하나'를 본다
+           가격처럼 수준 차이가 큰 계열은 지수·전년비로 두면 지수·CSI 와 같은 축에서 읽힌다. */
         const FLOW=u=>u==='건'||u==='호';
         const roll=(a,k)=>{
           if(_rhSm==='raw') return a;
@@ -2976,13 +2991,25 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           }
           return out;
         };
-        const mk=k=>{const a=pick(k,_rhReg); if(!a) return null;
-          const v=roll(a,k).slice(st,st+n); return v.some(x=>x!=null)?v:null;};
+        const mk=k=>{const a0=pick(k,_rhReg); if(!a0) return null;
+          let a=roll(a0,k);
+          if(modeOf(k)==='yoy'){                    // 12개월 전 대비 — 자르기 전 전체에서 계산
+            const y=new Array(a.length).fill(null);
+            for(let i=12;i<a.length;i++) if(a[i]!=null&&a[i-12]!=null&&a[i-12]!==0)
+              y[i]=(a[i]/a[i-12]-1)*100;
+            a=y;
+          }
+          let v=a.slice(st,st+n);
+          if(modeOf(k)==='idx'){                    // 보이는 구간 첫 값 = 100
+            const b=v.find(x=>x!=null);
+            v=(b==null||b===0)?v:v.map(x=>x==null?null:x/b*100);
+          }
+          return v.some(x=>x!=null)?v:null;};
         const main=[], r2=[];
         _rhSel.forEach(k=>{ const v=mk(k); if(!v) return;
           const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
           const sfx=_rhSm==='raw'?'':(_rhSm==='sum12'&&(M[k].unit==='건'||M[k].unit==='호')?' 12M누적':' 12M평균');
-          (axOf(k)==='L'?r2:main).push({t, v, label:M[k].label+sfx, color:c});});
+          (axOf(k)==='L'?r2:main).push({t, v, label:M[k].label+sfx+modeLab(k), color:c});});
         if(!main.length&&r2.length){ main.push(r2.shift()); }   // 주계열이 비면 축이 안 그려진다
         line('rh_main', main, {r2:r2.length?r2:null});
         const last=k=>{const a=roll(pick(k,_rhReg)||[],k); for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [T[i],a[i]]; return null;};
@@ -2999,6 +3026,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             +`창이 채워지기 전 앞 11개월은 값을 만들지 않고 비운다.`
             +(_rhSm==='sum12'&&_rhSel.some(k=>M[k].unit!=='건'&&M[k].unit!=='호')?` 지수·가격·%는 <b>더해도 뜻이 없어 평균으로 계산</b>했다(라벨에 12M평균으로 표시).`:'')
             :'')
+          +(_rhSel.some(k=>modeOf(k)!=='val')?`<br>🔁 칩의 <b>값/지수/전년비</b> 배지로 표현을 바꿨다 — <b>지수</b>는 보이는 구간의 첫 값을 100으로 잡아 확대하면 다시 계산되고, <b>전년비</b>는 12개월 전 대비 %다. 자릿수가 크게 다른 계열(가격 vs 건수)을 같은 축에서 읽으려면 이쪽이 낫다.`:'')
           +`<br>🖱 <b>휠 = 확대/축소 · 드래그 = 좌우 이동</b> · '기간' 버튼을 누르면 확대가 풀린다.`
           +`<br>표시 구간 ${fm(t[0])}~${fm(t[t.length-1])} (${t.length}/${_rhLen}개월) · ${E6(d.note||'')}</span>`;
       }
