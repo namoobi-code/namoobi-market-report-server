@@ -2879,7 +2879,75 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      ══════════════════════════════════════════════════════════════════════════ */
   const RHPAL=['#1f2937','#d9534f','#2f6fed','#e08e3c','#27ae60','#7c3aed','#0e9aa7','#c2185b',
                '#5d4037','#9e9d24','#455a64','#00838f','#3f51b5','#8bc34a','#795548','#ad1457'];
-  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999', _rhSm='raw', _rhMode={};
+  /* ── 통합차트 전용 렌더러 (2026-08-16) ────────────────────────────────────
+     공용 line() 은 축이 최대 둘(좌·우)이라 자릿수가 다른 계열 셋 이상을 못 담는다.
+     여기서는 **선택한 순서대로 오른쪽에 축을 하나씩 쌓고** 각 축을 따로 확대·이동한다.
+     왼쪽에는 눈금을 그리지 않는다(요청).
+       · 플롯 영역에서 휠/드래그 = X축 확대·이동
+       · 축 기둥 위에서 휠/드래그 = 그 계열만 Y 확대·상하 이동
+       · 축 기둥 더블클릭 = 그 축 자동 범위로 복귀
+     축별 상태는 {lo,hi} 로 들고 있고 null 이면 보이는 구간에서 자동 계산한다. */
+  const RH_AXW=62;                                    // 축 기둥 하나의 폭(px)
+  function rhDraw(cvId, t, ser, yst){
+    const cv=$(cvId); if(!cv) return null;
+    const W=cv.clientWidth||900, H=cv.clientHeight||520; cv.width=W; cv.height=H;
+    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    const N=t.length; if(!N||!ser.length) return null;
+    const P={l:10,t:18,b:20}, RW=RH_AXW*ser.length, PW=Math.max(60,W-P.l-RW);
+    const X=i=>P.l+PW*i/Math.max(1,N-1);
+    const geo={W,H,P,RW,PW,axw:RH_AXW,plotR:P.l+PW};
+    x.font='10px sans-serif';
+    /* 각 계열의 세로 범위 — 저장된 값이 있으면 그걸 쓰고(사용자가 확대·이동한 상태) */
+    const sc=ser.map(s=>{
+      const st=yst[s.k];
+      if(st&&st.lo!=null&&st.hi!=null&&st.hi>st.lo) return {lo:st.lo,hi:st.hi};
+      const f=s.v.filter(v=>v!=null);
+      if(!f.length) return {lo:0,hi:1};
+      let lo=Math.min(...f), hi=Math.max(...f);
+      if(hi===lo){ hi=lo+Math.abs(lo||1)*0.1; lo-=Math.abs(lo||1)*0.1; }
+      const pad=(hi-lo)*0.08; return {lo:lo-pad,hi:hi+pad};
+    });
+    const Y=(i,v)=>P.t+(H-P.t-P.b)*(1-(v-sc[i].lo)/(sc[i].hi-sc[i].lo));
+    /* 가로 격자 — 첫 계열 기준 5줄. 여러 축의 격자를 다 그리면 화면이 지저분해진다 */
+    x.strokeStyle='#eef1f4';
+    for(let g=0;g<=4;g++){ const yy=P.t+(H-P.t-P.b)*g/4;
+      x.beginPath(); x.moveTo(P.l,yy); x.lineTo(P.l+PW,yy); x.stroke(); }
+    /* X축 연도 */
+    x.fillStyle='#98a2ad';
+    for(let i=0;i<N;i++){ const s=String(t[i]);
+      if(s.slice(4)==='01'&&(N<=140||+s.slice(0,4)%2===0)) x.fillText(s.slice(0,4),X(i)-12,H-5); }
+    /* 계열 선 */
+    ser.forEach((s,i)=>{ x.strokeStyle=s.color; x.lineWidth=1.7; x.beginPath(); let on=false;
+      for(let j=0;j<N;j++){ const v=s.v[j]; if(v==null){ on=false; continue; }
+        const px=X(j), py=Y(i,v);
+        on?x.lineTo(px,py):(x.moveTo(px,py),on=true); }
+      x.stroke(); x.lineWidth=1; });
+    /* 오른쪽 축 기둥 — 선택 순서대로 */
+    ser.forEach((s,i)=>{
+      const x0=P.l+PW+RH_AXW*i;
+      x.strokeStyle='#e5e8ec'; x.beginPath(); x.moveTo(x0,P.t-8); x.lineTo(x0,H-P.b); x.stroke();
+      x.fillStyle=s.color; x.globalAlpha=.10; x.fillRect(x0,P.t-8,RH_AXW,H-P.t-P.b+8); x.globalAlpha=1;
+      const dec=(sc[i].hi-sc[i].lo)<10?2:((sc[i].hi-sc[i].lo)<200?1:0);
+      x.fillStyle=s.color;
+      for(let g=0;g<=4;g++){ const vv=sc[i].lo+(sc[i].hi-sc[i].lo)*(1-g/4), yy=P.t+(H-P.t-P.b)*g/4;
+        const tx=Math.abs(vv)>=10000?Math.round(vv).toLocaleString():vv.toFixed(dec);
+        x.fillText(tx,x0+4,yy+3); }
+      /* 기둥 머리에 계열 이름(짧게) — 어느 축이 누구 것인지 */
+      const nm=s.short||s.label;
+      x.save(); x.font='bold 10px sans-serif';
+      x.fillText(nm.length>7?nm.slice(0,7):nm, x0+4, P.t-10); x.restore();
+      /* 최신값 배지 */
+      let li=-1; for(let j=s.v.length-1;j>=0;j--) if(s.v[j]!=null){li=j;break;}
+      if(li>=0){ const py=Y(i,s.v[li]);
+        x.fillStyle=s.color; x.globalAlpha=.9;
+        x.fillRect(x0+1,Math.max(P.t,Math.min(H-P.b-11,py-6)),RH_AXW-3,12); x.globalAlpha=1;
+        x.fillStyle='#fff';
+        const tv=Math.abs(s.v[li])>=10000?Math.round(s.v[li]).toLocaleString():s.v[li].toFixed(dec);
+        x.fillText(tv,x0+4,Math.max(P.t,Math.min(H-P.b-11,py-6))+9); }
+    });
+    return {geo,sc};
+  }
+  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999', _rhSm='raw', _rhMode={}, _rhY={};
   function initRehub(){
     if(_rhInit) return; _rhInit=true;
     fetch('/api/db/rehub').then(r=>r.ok?r.json():null).then(d=>{
@@ -2924,13 +2992,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border-radius:10px;background:${c}18;border:1px solid ${c}">`
             +`<b style="color:${c}">●</b>${E6(M[k].label)}<span class="note">${E6(modeUnit(k))}</span>`
             +`<b data-md="${k}" title="표시방식 바꾸기 — 값 → 지수 → 전년비" style="cursor:pointer;color:${c};border:1px solid ${c};border-radius:4px;padding:0 4px">${MODES.find(m=>m[0]===modeOf(k))[1]}</b>`
-            +`<b data-ax="${k}" title="축 바꾸기" style="cursor:pointer;color:#fff;background:${c};border-radius:4px;padding:0 4px">${axOf(k)==='L'?'좌':'우'}</b>`
             +`<b data-rm="${k}" style="cursor:pointer;color:#888">✕</b></span>`;}).join('');
         $('rh_chips').querySelectorAll('[data-md]').forEach(x=>x.onclick=()=>{
           const k=x.dataset.md, i=MODES.findIndex(m=>m[0]===modeOf(k));
           _rhMode[k]=MODES[(i+1)%MODES.length][0]; redraw();});
-        $('rh_chips').querySelectorAll('[data-ax]').forEach(x=>x.onclick=()=>{
-          const k=x.dataset.ax; _rhAxis[k]=axOf(k)==='L'?'R':'L'; redraw();});
         $('rh_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{
           _rhSel=_rhSel.filter(z=>z!==x.dataset.rm); redraw();});
       };
@@ -2939,24 +3004,52 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       /* (2026-08-16) 휠 확대/축소 · 드래그 좌우 이동 — 259개월을 한 화면에 다 그리면
          최근 구간이 뭉쳐 안 보인다. 지역비교 카드(re_rt_big)와 같은 조작 규칙을 쓴다.
          _rhN=null 이면 '기간' 버튼이 정한 구간 전체를 본다. */
-      let _rhN=null, _rhOff=0, _rhLen=0;
+      let _rhN=null, _rhOff=0, _rhLen=0, _rhGeo=null, _rhSer=[], _rhAuto=[];
       {const cv=$('rh_main');
        if(cv&&!cv._rhBound){ cv._rhBound=1;
+         /* 커서가 어느 축 기둥 위인지 — 아니면 -1(플롯 영역) */
+         const hit=e=>{ const g=_rhGeo; if(!g) return -1;
+           const r=cv.getBoundingClientRect(), px=(e.clientX-r.left)*(cv.width/r.width);
+           if(px<g.plotR) return -1;
+           const i=Math.floor((px-g.plotR)/g.axw);
+           return (i>=0&&i<_rhSer.length)?i:-1; };
          cv.addEventListener('wheel',e=>{ e.preventDefault();
-           const L=_rhLen||T.length;
+           const ai=hit(e);
+           if(ai>=0){                              // ── 그 계열의 Y 축만 확대/축소
+             const k=_rhSer[ai].k, cur=_rhY[k]||_rhAuto[ai]; if(!cur) return;
+             const r=cv.getBoundingClientRect(), g=_rhGeo;
+             const fy=Math.max(0,Math.min(1,((e.clientY-r.top)*(cv.height/r.height)-g.P.t)/(g.H-g.P.t-g.P.b)));
+             const anchor=cur.hi-(cur.hi-cur.lo)*fy;         // 커서가 가리키는 값 고정
+             const f=e.deltaY<0?0.8:1.25, span=(cur.hi-cur.lo)*f;
+             _rhY[k]={lo:anchor-span*fy, hi:anchor+span*(1-fy)};
+             draw(); return; }
+           const L=_rhLen||T.length;               // ── X축 확대/축소
            const r=cv.getBoundingClientRect(), fr=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
            const n0=_rhN?Math.min(_rhN,L):L, st=Math.max(0,L-n0-_rhOff), anchor=st+fr*(n0-1);
            const n1=Math.max(12,Math.min(L,Math.round(n0*(e.deltaY<0?0.8:1.25))));
            let s1=Math.round(anchor-fr*(n1-1)); s1=Math.max(0,Math.min(L-n1,s1));
            _rhN=n1; _rhOff=L-s1-n1; draw(); },{passive:false});
          let dr=null;
-         cv.addEventListener('mousedown',e=>{dr={x:e.clientX,o:_rhOff};});
+         cv.addEventListener('mousedown',e=>{ const ai=hit(e);
+           if(ai>=0){ const k=_rhSer[ai].k, cur=_rhY[k]||_rhAuto[ai];
+             dr={ax:ai,k,y:e.clientY,lo:cur.lo,hi:cur.hi}; }
+           else dr={x:e.clientX,o:_rhOff}; });
          cv.addEventListener('mousemove',e=>{ if(!dr) return;
+           if(dr.ax!=null){                        // ── 축 상하 이동
+             const g=_rhGeo; if(!g) return;
+             const r=cv.getBoundingClientRect();
+             const dy=(e.clientY-dr.y)*(cv.height/r.height);
+             const per=(dr.hi-dr.lo)/(g.H-g.P.t-g.P.b);
+             _rhY[dr.k]={lo:dr.lo+dy*per, hi:dr.hi+dy*per}; draw(); return; }
            const L=_rhLen||T.length, n0=_rhN?Math.min(_rhN,L):L;
            const bw=(cv.clientWidth||900)/Math.max(1,n0);
            _rhOff=Math.max(0,Math.min(L-n0,dr.o+Math.round((e.clientX-dr.x)/bw))); draw(); });
          cv.addEventListener('mouseup',()=>{dr=null;});
          cv.addEventListener('mouseleave',()=>{dr=null;});
+         cv.addEventListener('dblclick',e=>{ const ai=hit(e);
+           if(ai>=0){ delete _rhY[_rhSer[ai].k]; draw(); }      // 그 축만 자동 범위로
+           else { _rhN=null; _rhOff=0; _rhY={}; draw(); } });
+         cv.style.cursor='crosshair';
        }}
       function draw(){
         const want=(_rhSpan==='999')?T.length:+_rhSpan;
@@ -3005,13 +3098,17 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             v=(b==null||b===0)?v:v.map(x=>x==null?null:x/b*100);
           }
           return v.some(x=>x!=null)?v:null;};
-        const main=[], r2=[];
+        /* (2026-08-16) 축을 선택 순서대로 오른쪽에 하나씩 쌓는다 — 좌축은 쓰지 않는다.
+           계열마다 자릿수가 달라도 각자 축을 온전히 쓰므로 눌리는 계열이 없다. */
+        const ser=[];
         _rhSel.forEach(k=>{ const v=mk(k); if(!v) return;
           const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
           const sfx=_rhSm==='raw'?'':(_rhSm==='sum12'&&(M[k].unit==='건'||M[k].unit==='호')?' 12M누적':' 12M평균');
-          (axOf(k)==='L'?r2:main).push({t, v, label:M[k].label+sfx+modeLab(k), color:c});});
-        if(!main.length&&r2.length){ main.push(r2.shift()); }   // 주계열이 비면 축이 안 그려진다
-        line('rh_main', main, {r2:r2.length?r2:null});
+          ser.push({k, t, v, color:c, short:M[k].label,
+                    label:M[k].label+sfx+modeLab(k)});});
+        _rhSer=ser;
+        const R=rhDraw('rh_main', t, ser, _rhY);
+        _rhGeo=R?R.geo:null; _rhAuto=R?R.sc:[];
         const last=k=>{const a=roll(pick(k,_rhReg)||[],k); for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [T[i],a[i]]; return null;};
         const rows=_rhSel.map(k=>{const L=last(k); if(!L) return null;
           const v=Math.abs(L[1])>=1000?Math.round(L[1]).toLocaleString():L[1].toFixed(2);
