@@ -2866,8 +2866,96 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     }).catch(()=>{});
   }
 
+  /* ══════════════════════════════════════════════════════════════════════════
+     (2026-08-16) 🧭 부동산 통합차트 — rehub.json (매일 07:45)
+
+     지금까지 카드마다 소스가 달라 "가격이 먼저 꺾였나, 거래량이 먼저 꺾였나" 를
+     눈으로 맞춰볼 수가 없었다. 16개 지표를 한 월(月) 축에 올려 아무거나 겹쳐본다.
+
+     축 처리: 단위가 지수·만원/㎡·건·호·%로 제각각이라 **좌/우 두 축에 실제 값**으로
+     그린다(지수화하지 않는다 — 눈금이 곧 값이 되게). 지표마다 기본 축이 정해져 있고
+     칩의 L/R 배지를 눌러 반대 축으로 옮길 수 있다.
+     line() 은 주 계열 눈금을 오른쪽에, opts.r2 눈금을 왼쪽에 그린다 → R=주계열, L=r2.
+     ══════════════════════════════════════════════════════════════════════════ */
+  const RHPAL=['#1f2937','#d9534f','#2f6fed','#e08e3c','#27ae60','#7c3aed','#0e9aa7','#c2185b',
+               '#5d4037','#9e9d24','#455a64','#00838f','#3f51b5','#8bc34a','#795548','#ad1457'];
+  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999';
+  function initRehub(){
+    if(_rhInit) return; _rhInit=true;
+    fetch('/api/db/rehub').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!(d.t||[]).length){ const e=$('rh_main_n');
+        if(e) e.textContent='수집 대기 중 — 다음 수집(매일 07:45)부터 표시됩니다.'; return; }
+      const T=d.t, M=d.meta||{}, D=d.d||{};
+      const E6=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      const SIDO=['전국','서울','부산','대구','인천','광주','대전','울산','세종','경기',
+                  '강원','충북','충남','전북','전남','경북','경남','제주'];
+      const regs=SIDO.filter(r=>Object.keys(M).some(k=>(D[k]||{})[r]));
+      if(!regs.includes(_rhReg)) _rhReg=regs[0]||'전국';
+      {const e=$('rh_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
+      /* 지역 구분이 없는 거시 지표는 어느 지역을 골라도 '전국' 계열을 쓴다 */
+      const GLOB=['rate_kr','rate_us','csi'];
+      const pick=(k,r)=>(D[k]||{})[GLOB.includes(k)?'전국':r];
+      const axOf=k=>_rhAxis[k]||(M[k]||{}).axis||'R';
+
+      const bar=()=>{
+        $('rh_reg').innerHTML=regs.map(r=>{const on=r===_rhReg;
+          return `<button data-r="${E6(r)}" style="padding:2px 8px;font-size:11px;border:1px solid ${on?'#1f2937':'#d7dce3'};`
+            +`border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#5b6672'}">${E6(r)}</button>`;}).join('');
+        $('rh_reg').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{_rhReg=b.dataset.r; redraw();});
+        $('rh_ind').innerHTML=Object.keys(M).map((k,i)=>{
+          const on=_rhSel.includes(k), ok=!!pick(k,_rhReg), c=RHPAL[i%RHPAL.length];
+          return `<button data-k="${k}" ${ok?'':'disabled'} title="${E6(M[k].note||'')} (${E6(M[k].src||'')})"`
+            +` style="padding:2px 8px;font-size:11px;border:1px solid ${on?c:'#d7dce3'};border-radius:6px;`
+            +`cursor:${ok?'pointer':'not-allowed'};background:${on?c:'#fff'};color:${on?'#fff':(ok?'#5b6672':'#c9cfd6')}">`
+            +`${E6(M[k].label)}${M[k].cycle!=='M'?`<span style="opacity:.75">·${M[k].cycle==='Q'?'분기':'연'}</span>`:''}</button>`;}).join('');
+        $('rh_ind').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
+          const k=b.dataset.k;
+          _rhSel=_rhSel.includes(k)?_rhSel.filter(z=>z!==k):_rhSel.concat([k]);
+          redraw();});
+        segbar('rh_span',[['60','5년'],['120','10년'],['240','20년'],['999','전체']],()=>_rhSpan,v=>_rhSpan=v,redraw);
+        /* 칩의 L/R 을 눌러 축을 옮긴다 — 값 차이가 큰 지표를 갈라놓는 유일한 수단 */
+        $('rh_chips').innerHTML=_rhSel.map((k,i)=>{const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
+          return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border-radius:10px;background:${c}18;border:1px solid ${c}">`
+            +`<b style="color:${c}">●</b>${E6(M[k].label)}<span class="note">${E6(M[k].unit)}</span>`
+            +`<b data-ax="${k}" title="축 바꾸기" style="cursor:pointer;color:#fff;background:${c};border-radius:4px;padding:0 4px">${axOf(k)==='L'?'좌':'우'}</b>`
+            +`<b data-rm="${k}" style="cursor:pointer;color:#888">✕</b></span>`;}).join('');
+        $('rh_chips').querySelectorAll('[data-ax]').forEach(x=>x.onclick=()=>{
+          const k=x.dataset.ax; _rhAxis[k]=axOf(k)==='L'?'R':'L'; redraw();});
+        $('rh_chips').querySelectorAll('[data-rm]').forEach(x=>x.onclick=()=>{
+          _rhSel=_rhSel.filter(z=>z!==x.dataset.rm); redraw();});
+      };
+      const redraw=()=>{ bar(); draw(); };
+
+      function draw(){
+        const want=(_rhSpan==='999')?T.length:+_rhSpan;
+        const st=Math.max(0,T.length-Math.min(want,T.length));
+        const t=T.slice(st);
+        const mk=k=>{const a=pick(k,_rhReg); if(!a) return null;
+          const v=a.slice(st); return v.some(x=>x!=null)?v:null;};
+        const main=[], r2=[];
+        _rhSel.forEach(k=>{ const v=mk(k); if(!v) return;
+          const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
+          (axOf(k)==='L'?r2:main).push({t, v, label:M[k].label, color:c});});
+        if(!main.length&&r2.length){ main.push(r2.shift()); }   // 주계열이 비면 축이 안 그려진다
+        line('rh_main', main, {r2:r2.length?r2:null});
+        const last=k=>{const a=pick(k,_rhReg)||[]; for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [T[i],a[i]]; return null;};
+        const rows=_rhSel.map(k=>{const L=last(k); if(!L) return null;
+          const v=Math.abs(L[1])>=1000?Math.round(L[1]).toLocaleString():L[1].toFixed(2);
+          return `${E6(M[k].label)} <b>${v}</b>${E6(M[k].unit==='건'||M[k].unit==='호'?M[k].unit:'')} <span class="note">(${fm(L[0])})</span>`;}).filter(Boolean);
+        const cyc=_rhSel.filter(k=>M[k].cycle!=='M');
+        $('rh_main_n').innerHTML=(_rhSel.length?`<b>${E6(_rhReg)}</b> · ${rows.join(' · ')}`:'지표를 하나 이상 고르세요.')
+          +`<br><span class="note">축이 둘이다 — <b>오른쪽 눈금</b>은 우축 지표, <b>왼쪽 눈금</b>은 좌축 지표. 칩의 좌/우 배지를 누르면 축을 옮긴다. `
+          +`지수화하지 않고 실제 값 그대로라 눈금이 곧 값이다.`
+          +(cyc.length?`<br>${cyc.map(k=>E6(M[k].label)).join(' · ')} 는 ${cyc.some(k=>M[k].cycle==='Q')?'분기':'연간'} 지표라 해당 기간 각 달에 같은 값이 들어가 <b>계단 모양</b>이 된다.`:'')
+          +(_rhSel.some(k=>GLOB.includes(k))?`<br>금리·전망CSI 는 지역 구분이 없는 전국 값이라 어느 지역을 골라도 같은 선이 깔린다.`:'')
+          +`<br>표시 구간 ${fm(t[0])}~${fm(t[t.length-1])} (${t.length}개월) · ${E6(d.note||'')}</span>`;
+      }
+      redraw();
+    }).catch(()=>{});
+  }
+
   window.renderEstate=function(){
-    initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initBizClose(); initAutos();
+    initRehub(); initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initBizClose(); initAutos();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};
