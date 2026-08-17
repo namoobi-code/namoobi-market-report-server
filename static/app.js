@@ -2879,7 +2879,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      ══════════════════════════════════════════════════════════════════════════ */
   const RHPAL=['#1f2937','#d9534f','#2f6fed','#e08e3c','#27ae60','#7c3aed','#0e9aa7','#c2185b',
                '#5d4037','#9e9d24','#455a64','#00838f','#3f51b5','#8bc34a','#795548','#ad1457'];
-  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999';
+  let _rhInit=false, _rhReg='전국', _rhSel=['rt_idx','trade'], _rhAxis={}, _rhSpan='999', _rhSm='raw';
   function initRehub(){
     if(_rhInit) return; _rhInit=true;
     fetch('/api/db/rehub').then(r=>r.ok?r.json():null).then(d=>{
@@ -2913,6 +2913,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           _rhSel=_rhSel.includes(k)?_rhSel.filter(z=>z!==k):_rhSel.concat([k]);
           redraw();});
         segbar('rh_span',[['60','5년'],['120','10년'],['240','20년'],['999','전체']],()=>_rhSpan,v=>{_rhSpan=v;_rhN=null;_rhOff=0;},redraw);
+        segbar('rh_sm',[['raw','원본'],['ma12','12개월 평균'],['sum12','12개월 누적']],
+               ()=>_rhSm,v=>_rhSm=v,redraw);
         /* 칩의 L/R 을 눌러 축을 옮긴다 — 값 차이가 큰 지표를 갈라놓는 유일한 수단 */
         $('rh_chips').innerHTML=_rhSel.map((k,i)=>{const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
           return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border-radius:10px;background:${c}18;border:1px solid ${c}">`
@@ -2957,15 +2959,33 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const off=Math.max(0,Math.min(_rhOff,_rhLen-n));
         const st=base+Math.max(0,_rhLen-n-off);
         const t=T.slice(st,st+n);
+        /* (2026-08-16) 12개월 평균·누적 — 거래량·인허가 같은 유량(flow) 지표는 계절성이 커서
+           원본으로 보면 톱니만 보인다(1월 급감·3월 급증). 창을 12개월로 잡으면 계절성이 상쇄된다.
+           누적(합계)은 유량 지표에만 뜻이 있다 — 지수·가격·%는 더해도 의미가 없으므로
+           그 경우엔 평균으로 대신 계산하고 각주에 그 사실을 적는다.
+           창이 채워지기 전(앞 11개월)은 값을 만들지 않고 null 로 둔다. */
+        const FLOW=u=>u==='건'||u==='호';
+        const roll=(a,k)=>{
+          if(_rhSm==='raw') return a;
+          const sum=(_rhSm==='sum12')&&FLOW((M[k]||{}).unit);
+          const out=new Array(a.length).fill(null);
+          for(let i=11;i<a.length;i++){
+            let s=0,c=0;
+            for(let j=i-11;j<=i;j++) if(a[j]!=null){ s+=a[j]; c++; }
+            if(c===12) out[i]=sum?s:s/12;              // 한 달이라도 비면 계산하지 않는다
+          }
+          return out;
+        };
         const mk=k=>{const a=pick(k,_rhReg); if(!a) return null;
-          const v=a.slice(st,st+n); return v.some(x=>x!=null)?v:null;};
+          const v=roll(a,k).slice(st,st+n); return v.some(x=>x!=null)?v:null;};
         const main=[], r2=[];
         _rhSel.forEach(k=>{ const v=mk(k); if(!v) return;
           const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
-          (axOf(k)==='L'?r2:main).push({t, v, label:M[k].label, color:c});});
+          const sfx=_rhSm==='raw'?'':(_rhSm==='sum12'&&(M[k].unit==='건'||M[k].unit==='호')?' 12M누적':' 12M평균');
+          (axOf(k)==='L'?r2:main).push({t, v, label:M[k].label+sfx, color:c});});
         if(!main.length&&r2.length){ main.push(r2.shift()); }   // 주계열이 비면 축이 안 그려진다
         line('rh_main', main, {r2:r2.length?r2:null});
-        const last=k=>{const a=pick(k,_rhReg)||[]; for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [T[i],a[i]]; return null;};
+        const last=k=>{const a=roll(pick(k,_rhReg)||[],k); for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [T[i],a[i]]; return null;};
         const rows=_rhSel.map(k=>{const L=last(k); if(!L) return null;
           const v=Math.abs(L[1])>=1000?Math.round(L[1]).toLocaleString():L[1].toFixed(2);
           return `${E6(M[k].label)} <b>${v}</b>${E6(M[k].unit==='건'||M[k].unit==='호'?M[k].unit:'')} <span class="note">(${fm(L[0])})</span>`;}).filter(Boolean);
@@ -2975,6 +2995,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           +`지수화하지 않고 실제 값 그대로라 눈금이 곧 값이다.`
           +(cyc.length?`<br>${cyc.map(k=>E6(M[k].label)).join(' · ')} 는 ${cyc.some(k=>M[k].cycle==='Q')?'분기':'연간'} 지표라 해당 기간 각 달에 같은 값이 들어가 <b>계단 모양</b>이 된다.`:'')
           +(_rhSel.some(k=>GLOB.includes(k))?`<br>금리·전망CSI 는 지역 구분이 없는 전국 값이라 어느 지역을 골라도 같은 선이 깔린다.`:'')
+          +(_rhSm!=='raw'?`<br>📐 <b>${_rhSm==='sum12'?'12개월 누적':'12개월 이동평균'}</b> — 거래량·인허가처럼 계절성이 큰 지표(1월 급감·3월 급증)의 톱니를 걷어낸다. `
+            +`창이 채워지기 전 앞 11개월은 값을 만들지 않고 비운다.`
+            +(_rhSm==='sum12'&&_rhSel.some(k=>M[k].unit!=='건'&&M[k].unit!=='호')?` 지수·가격·%는 <b>더해도 뜻이 없어 평균으로 계산</b>했다(라벨에 12M평균으로 표시).`:'')
+            :'')
           +`<br>🖱 <b>휠 = 확대/축소 · 드래그 = 좌우 이동</b> · '기간' 버튼을 누르면 확대가 풀린다.`
           +`<br>표시 구간 ${fm(t[0])}~${fm(t[t.length-1])} (${t.length}/${_rhLen}개월) · ${E6(d.note||'')}</span>`;
       }
