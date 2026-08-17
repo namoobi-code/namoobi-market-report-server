@@ -2916,6 +2916,15 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     x.fillStyle='#98a2ad';
     for(let i=0;i<N;i++){ const s=String(t[i]);
       if(s.slice(4)==='01'&&(N<=140||+s.slice(0,4)%2===0)) x.fillText(s.slice(0,4),X(i)-12,H-5); }
+    /* 100 기준선 — CSI·수급동향은 100 이 의미를 가르는 값이라 점선으로 깐다.
+       (CSI 100 = 상승·하락 전망이 팽팽, 수급 100 = 사려는 쪽과 팔려는 쪽이 균형) */
+    ser.forEach((s,i)=>{ if(s.base==null) return;
+      const b=s.base; if(b<sc[i].lo||b>sc[i].hi) return;
+      const yy=Y(i,b);
+      x.save(); x.setLineDash([5,4]); x.strokeStyle=s.color; x.globalAlpha=.55; x.lineWidth=1.2;
+      x.beginPath(); x.moveTo(P.l,yy); x.lineTo(P.l+PW,yy); x.stroke(); x.restore();
+      x.fillStyle=s.color; x.globalAlpha=.8;
+      x.fillText(String(b), P.l+2, yy-3); x.globalAlpha=1; });
     /* 계열 선 */
     ser.forEach((s,i)=>{ x.strokeStyle=s.color; x.lineWidth=1.7; x.beginPath(); let on=false;
       for(let j=0;j<N;j++){ const v=s.v[j]; if(v==null){ on=false; continue; }
@@ -3019,9 +3028,13 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              const k=_rhSer[ai].k, cur=_rhY[k]||_rhAuto[ai]; if(!cur) return;
              const r=cv.getBoundingClientRect(), g=_rhGeo;
              const fy=Math.max(0,Math.min(1,((e.clientY-r.top)*(cv.height/r.height)-g.P.t)/(g.H-g.P.t-g.P.b)));
-             const anchor=cur.hi-(cur.hi-cur.lo)*fy;         // 커서가 가리키는 값 고정
-             const f=e.deltaY<0?0.8:1.25, span=(cur.hi-cur.lo)*f;
-             _rhY[k]={lo:anchor-span*fy, hi:anchor+span*(1-fy)};
+             /* (2026-08-16 수정) lo/hi 배분이 뒤집혀 있어 커서가 가리키던 값이 매번 밀려났다
+                (실측: 127.0 에서 굴리면 127→136→144 로 도망감 → 한쪽으로만 확대되는 느낌).
+                화면 위에서 fy 만큼 내려온 지점의 값 = hi - span*fy 이므로
+                hi = anchor + span*fy, lo = anchor - span*(1-fy) 이어야 한다. */
+             const anchor=cur.hi-(cur.hi-cur.lo)*fy;         // 커서가 가리키는 값
+             const f=e.deltaY<0?0.8:1.25, span=(cur.hi-cur.lo)*f;   // 위로=확대, 아래로=축소
+             _rhY[k]={lo:anchor-span*(1-fy), hi:anchor+span*fy};
              draw(); return; }
            const L=_rhLen||T.length;               // ── X축 확대/축소
            const r=cv.getBoundingClientRect(), fr=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
@@ -3104,7 +3117,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         _rhSel.forEach(k=>{ const v=mk(k); if(!v) return;
           const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
           const sfx=_rhSm==='raw'?'':(_rhSm==='sum12'&&(M[k].unit==='건'||M[k].unit==='호')?' 12M누적':' 12M평균');
-          ser.push({k, t, v, color:c, short:M[k].label,
+          /* 100 기준선을 그릴 지표 — 원값일 때만(지수·전년비로 바꾸면 100 의 뜻이 달라진다) */
+          const base=(modeOf(k)==='val'&&(k==='csi'||k==='supply'))?100:null;
+          ser.push({k, t, v, color:c, short:M[k].label, base,
                     label:M[k].label+sfx+modeLab(k)});});
         _rhSer=ser;
         const R=rhDraw('rh_main', t, ser, _rhY);

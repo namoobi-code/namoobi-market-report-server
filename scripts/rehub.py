@@ -321,19 +321,26 @@ def hf_series(statbl, cycle, periods):
 
 
 def quarters(y0):
+    """HF 분기 식별자는 YYYY + **분기번호(01~04)** 다. 분기 시작월(01/04/07/10)이 아니다.
+    (실측 2026-08-16: 202601·202504 는 응답 O, 202607·202610 은 빈 응답.
+     분기 시작월로 착각해 07·10 을 요청하는 바람에 매년 2·3분기가 통째로 비어
+     K-HAI 그래프가 빗살처럼 끊겨 보였다.)"""
     out = []
     for y in range(y0, NOW.year + 1):
         for q in range(1, 5):
-            if y == NOW.year and (q - 1) * 3 + 1 > NOW.month:
+            if y == NOW.year and q > (NOW.month + 2) // 3:
                 break
-            out.append(f"{y}{q*3-2:02d}")          # HF 는 분기 시작월 표기(201704=2017 2Q)
+            out.append(f"{y}{q:02d}")
     return out
 
 
 def q_to_months(pid):
-    """HF 분기 식별자(YYYYMM, 분기 시작월) → 그 분기의 세 달"""
-    y, m = int(pid[:4]), int(pid[4:])
-    return [f"{y}{m+i:02d}" for i in range(3) if m + i <= 12]
+    """YYYY+분기번호 → 그 분기에 해당하는 세 달"""
+    y, q = int(pid[:4]), int(pid[4:])
+    if not 1 <= q <= 4:
+        return []
+    m0 = (q - 1) * 3 + 1
+    return [f"{y}{m0+i:02d}" for i in range(3)]
 
 
 # ══════════════════ 금리 (ECOS · FRED) ══════════════════
