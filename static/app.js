@@ -2912,7 +2912,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           const k=b.dataset.k;
           _rhSel=_rhSel.includes(k)?_rhSel.filter(z=>z!==k):_rhSel.concat([k]);
           redraw();});
-        segbar('rh_span',[['60','5년'],['120','10년'],['240','20년'],['999','전체']],()=>_rhSpan,v=>_rhSpan=v,redraw);
+        segbar('rh_span',[['60','5년'],['120','10년'],['240','20년'],['999','전체']],()=>_rhSpan,v=>{_rhSpan=v;_rhN=null;_rhOff=0;},redraw);
         /* 칩의 L/R 을 눌러 축을 옮긴다 — 값 차이가 큰 지표를 갈라놓는 유일한 수단 */
         $('rh_chips').innerHTML=_rhSel.map((k,i)=>{const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
           return `<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 7px;font-size:11.5px;border-radius:10px;background:${c}18;border:1px solid ${c}">`
@@ -2926,12 +2926,39 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       };
       const redraw=()=>{ bar(); draw(); };
 
+      /* (2026-08-16) 휠 확대/축소 · 드래그 좌우 이동 — 259개월을 한 화면에 다 그리면
+         최근 구간이 뭉쳐 안 보인다. 지역비교 카드(re_rt_big)와 같은 조작 규칙을 쓴다.
+         _rhN=null 이면 '기간' 버튼이 정한 구간 전체를 본다. */
+      let _rhN=null, _rhOff=0, _rhLen=0;
+      {const cv=$('rh_main');
+       if(cv&&!cv._rhBound){ cv._rhBound=1;
+         cv.addEventListener('wheel',e=>{ e.preventDefault();
+           const L=_rhLen||T.length;
+           const r=cv.getBoundingClientRect(), fr=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+           const n0=_rhN?Math.min(_rhN,L):L, st=Math.max(0,L-n0-_rhOff), anchor=st+fr*(n0-1);
+           const n1=Math.max(12,Math.min(L,Math.round(n0*(e.deltaY<0?0.8:1.25))));
+           let s1=Math.round(anchor-fr*(n1-1)); s1=Math.max(0,Math.min(L-n1,s1));
+           _rhN=n1; _rhOff=L-s1-n1; draw(); },{passive:false});
+         let dr=null;
+         cv.addEventListener('mousedown',e=>{dr={x:e.clientX,o:_rhOff};});
+         cv.addEventListener('mousemove',e=>{ if(!dr) return;
+           const L=_rhLen||T.length, n0=_rhN?Math.min(_rhN,L):L;
+           const bw=(cv.clientWidth||900)/Math.max(1,n0);
+           _rhOff=Math.max(0,Math.min(L-n0,dr.o+Math.round((e.clientX-dr.x)/bw))); draw(); });
+         cv.addEventListener('mouseup',()=>{dr=null;});
+         cv.addEventListener('mouseleave',()=>{dr=null;});
+       }}
       function draw(){
         const want=(_rhSpan==='999')?T.length:+_rhSpan;
-        const st=Math.max(0,T.length-Math.min(want,T.length));
-        const t=T.slice(st);
+        const base=Math.max(0,T.length-Math.min(want,T.length));
+        const full=T.slice(base);
+        _rhLen=full.length;
+        const n=_rhN?Math.max(12,Math.min(_rhN,_rhLen)):_rhLen;
+        const off=Math.max(0,Math.min(_rhOff,_rhLen-n));
+        const st=base+Math.max(0,_rhLen-n-off);
+        const t=T.slice(st,st+n);
         const mk=k=>{const a=pick(k,_rhReg); if(!a) return null;
-          const v=a.slice(st); return v.some(x=>x!=null)?v:null;};
+          const v=a.slice(st,st+n); return v.some(x=>x!=null)?v:null;};
         const main=[], r2=[];
         _rhSel.forEach(k=>{ const v=mk(k); if(!v) return;
           const c=RHPAL[Object.keys(M).indexOf(k)%RHPAL.length];
@@ -2948,7 +2975,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           +`지수화하지 않고 실제 값 그대로라 눈금이 곧 값이다.`
           +(cyc.length?`<br>${cyc.map(k=>E6(M[k].label)).join(' · ')} 는 ${cyc.some(k=>M[k].cycle==='Q')?'분기':'연간'} 지표라 해당 기간 각 달에 같은 값이 들어가 <b>계단 모양</b>이 된다.`:'')
           +(_rhSel.some(k=>GLOB.includes(k))?`<br>금리·전망CSI 는 지역 구분이 없는 전국 값이라 어느 지역을 골라도 같은 선이 깔린다.`:'')
-          +`<br>표시 구간 ${fm(t[0])}~${fm(t[t.length-1])} (${t.length}개월) · ${E6(d.note||'')}</span>`;
+          +`<br>🖱 <b>휠 = 확대/축소 · 드래그 = 좌우 이동</b> · '기간' 버튼을 누르면 확대가 풀린다.`
+          +`<br>표시 구간 ${fm(t[0])}~${fm(t[t.length-1])} (${t.length}/${_rhLen}개월) · ${E6(d.note||'')}</span>`;
       }
       redraw();
     }).catch(()=>{});

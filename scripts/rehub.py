@@ -134,22 +134,48 @@ KAPI = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 KMETA = "https://kosis.kr/openapi/statisticsData.do"
 
 
-def kosis_regions(org, tbl, obj_kw="행정구역"):
-    """통계표의 지역 코드 → 표시명. 표마다 코드가 달라 이름으로 맞춘다."""
+def kosis_regions(org, tbl, obj_kw="행정구역", itm=None):
+    """통계표의 지역 코드 → 표시명. 표마다 코드가 달라 이름으로 맞춘다.
+
+    (2026-08-16 수정) 같은 이름이 코드 두 개로 나오는 표가 있다.
+      실측: DT_KAB_11672_S15/S16 은 '서울' 이 030(실데이터)과 200(빈 그룹 헤더) 둘 다다.
+      먼저 걸린 200 을 잡는 바람에 서울 평균·중위가가 통째로 비었다.
+      → 이름이 겹치면 **한 달치를 실제로 찔러보고 값이 나오는 코드**를 고른다.
+      자식 코드(UP_ITM_ID 있음)를 먼저 시험해 호출 수를 줄인다.
+    """
     u = (f"{KMETA}?method=getMeta&apiKey={KOSIS}&orgId={org}&tblId={tbl}"
          f"&type=ITM&format=json&jsonVD=Y")
     d = get(u) or []
-    out = {}
+    cand = {}
     if isinstance(d, list):
         for r in d:
             if obj_kw in str(r.get("OBJ_NM") or ""):
                 nm = str(r.get("ITM_NM") or "").strip()
-                if nm in SIDO and nm not in out.values():
-                    out[r["ITM_ID"]] = nm
+                if nm in SIDO:
+                    cand.setdefault(nm, []).append((r["ITM_ID"], bool(r.get("UP_ITM_ID"))))
+    out = {}
+    for nm, lst in cand.items():
+        if len(lst) == 1 or not itm:
+            out[lst[0][0]] = nm
+            continue
+        lst.sort(key=lambda x: not x[1])                 # 자식 코드 먼저
+        for code, _ in lst:
+            q = {"method": "getList", "apiKey": KOSIS, "itmId": itm, "objL1": code,
+                 "format": "json", "jsonVD": "Y", "prdSe": "M",
+                 "startPrdDe": YM_NOW, "endPrdDe": YM_NOW, "orgId": org, "tblId": tbl}
+            # 최신월은 아직 공표 전일 수 있어 1년 전으로 찔러본다
+            q["startPrdDe"] = q["endPrdDe"] = f"{int(YM_NOW[:4]) - 1}{YM_NOW[4:]}"
+            r = get(KAPI + "?" + urllib.parse.urlencode(q))
+            time.sleep(0.3)
+            if isinstance(r, list) and r:
+                out[code] = nm
+                break
+        else:
+            out[lst[0][0]] = nm
     return out
 
 
-def kosis_series(org, tbl, itm, regs, objn=1, fixed=None, cumulative=False):
+def kosis_series(org, tbl, itm, regs, objn=1, fixed=None, cumulative=False, grp=None):
     """{지역: {ym: 값}} — 지역 코드를 하나씩 돌며 월별로 받는다.
 
     fixed: 지역 말고 고정해야 하는 축들 {objL2: 코드, ...}. 국토부 표는
@@ -159,11 +185,15 @@ def kosis_series(org, tbl, itm, regs, objn=1, fixed=None, cumulative=False):
                 연간 합계라 월별 그래프가 우상향 톱니로 나온다.
     """
     acc = {}
+    SUDO = ("서울", "인천", "경기")
     for code, name in regs.items():
         q = {"method": "getList", "apiKey": KOSIS, "itmId": itm, f"objL{objn}": code,
              "format": "json", "jsonVD": "Y", "prdSe": "M",
              "startPrdDe": Y0, "endPrdDe": YM_NOW, "orgId": org, "tblId": tbl}
         q.update(fixed or {})
+        if grp:                                   # 지역마다 상위 그룹이 다른 표(분양실적)
+            g = grp.get(name) or grp["_수도권" if name in SUDO else "_지방"]
+            q["objL1"] = g
         d = get(KAPI + "?" + urllib.parse.urlencode(q))
         if isinstance(d, list):
             mp = {r["PRD_DE"]: num(r.get("DT")) for r in d if r.get("PRD_DE")}
@@ -198,9 +228,12 @@ MOLIT = {
                     fixed={"objL2": "B.0006", "objL3": "C.0007", "objL4": "D.0008"}),
     "comp":    dict(tbl="DT_MLTM_5373", itm="13103766973T1", pre="13102766973",
                     fixed={"objL2": "B.0006", "objL3": "C.0007", "objL4": "D.0008"}),
+    # 분양실적은 (구분1=수도권/지방) × (구분2=시도) 구조라 시도마다 상위 그룹이 다르다.
+    # '합계'+서울 조합은 빈 응답이 온다(실측 2026-08-16).
     "presale": dict(tbl="DT_MLTM_5557", itm="13103133605T1", pre="13102133605",
-                    fixed={"objL1": "13102133605A.0001", "objL3": "13102133605C.0001"},
-                    regn=2),
+                    fixed={"objL3": "13102133605C.0001"}, regn=2,
+                    grp={"전국": "13102133605A.0001",
+                         "_수도권": "13102133605A.0002", "_지방": "13102133605A.0003"}),
 }
 
 
@@ -362,7 +395,7 @@ def main():
     for key, tbl, itm in [("rt_idx", "DT_KAB_11672_S1", "T1"),
                           ("rt_avg", "DT_KAB_11672_S15", "T001"),
                           ("rt_med", "DT_KAB_11672_S16", "T001")]:
-        regs = kosis_regions(408, tbl)
+        regs = kosis_regions(408, tbl, itm=itm)
         D[key] = kosis_series(408, tbl, itm, regs)
         print(f"    {META[key][0]:<16} 지역 {len(D[key])}")
 
@@ -373,7 +406,8 @@ def main():
         fixed = {k: (v if v.startswith(cfg["pre"]) else cfg["pre"] + v)
                  for k, v in cfg["fixed"].items()}
         D[key] = kosis_series(116, cfg["tbl"], cfg["itm"], regs, objn=regn,
-                              fixed=fixed, cumulative=cfg.get("cumulative", False))
+                              fixed=fixed, cumulative=cfg.get("cumulative", False),
+                              grp=cfg.get("grp"))
         print(f"    {META[key][0]:<16} 지역 {len(D[key])}")
 
     print("[3/5] 한국부동산원 R-ONE 매매수급동향(아파트)")
