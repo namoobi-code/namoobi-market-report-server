@@ -274,6 +274,21 @@ _YEXCL = (r"(?:\bquarter\b|\bQ[1-4]\b|\b[1-4]Q\b)"
           r"\s*(?:(?:january|february|march|april|may|june|july|august|"
           r"september|october|november|december)\s+\d{1,2}\s*,?\s*)?"
           r"(?:fiscal\s+|calendar\s+)?(?:year\s+)?$")
+# (2026-08-21) **과거 사건을 가리키는 연도**는 기간 근거가 아니다. 실측 CHD:
+# "For the third quarter, we expect … driven entirely by the strategic portfolio actions
+#  **taken in 2025**. … Overall, adjusted EPS is expected to be approximately $0.89"
+# — 문단 머리의 'For the third quarter'(396자 거리)보다 이 '2025'(215자)가 값에 가까워
+# 분기 가이던스 0.89 가 연간으로 태그됐다(BZ 연간 3.78 대비 −77%). 완료된 행위를
+# 서술하는 동사 뒤의 연도는 후보에서 뺀다.
+#   in/during 은 _YRE 매칭 안에 포함될 수 있으므로(실측 CHD 는 'in 2025' 통째로 매칭)
+#   앞 문맥에 없을 수도 있다 → 선택으로 둔다.
+_YPAST = (r"\b(?:taken|made|completed|announced|incurred|recorded|occurred|closed|"
+          r"acquired|divested|launched|implemented|reported)\s+(?:(?:in|during)\s+)?$")
+# 값 **뒤**에 오는 '«연도» … Guidance/Outlook' 은 **다음 블록의 캡션**이지 이 값의 기간이
+# 아니다. 실측 HLIT: "Q3 2026 GAAP Financial Guidance … Net income per share $0.10 $0.14
+#  … **2026 GAAP Financial Guidance**" — 뒤따르는 연간 표 제목이 근거로 채택돼 분기 EPS
+# 0.12 가 연간으로 태그(BZ 0.71 대비 −83%).
+_YCAP = r"\s*(?:GAAP\s+|Non-GAAP\s+|Adjusted\s+)?(?:Financial\s+)?(?:Guidance|Outlook)\b"
 
 
 def _fwd_q(seg):
@@ -345,7 +360,11 @@ def _period(txt, start, end):
         # 연간 표지로 살아남았고, 값에 더 가깝다는 이유로 분기 가이던스가 연간으로 분류됐다
         # (연간 컨센과 비교돼 −74% 대 갭). 월 이름+일자를 낀 형태까지 분기 소속으로 본다.
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)
-             if not re.search(_YEXCL, seg[:m.start()][-60:], re.I)]
+             if not re.search(_YEXCL, seg[:m.start()][-60:], re.I)
+             and not re.search(_YPAST, seg[:m.start()][-40:], re.I)   # 과거 사건 연도 제외
+             # 값 뒤의 '«연도» Guidance' 는 다음 블록 캡션이지 이 값의 기간이 아니다
+             and not (anchor is not None and m.start() > anchor
+                      and re.match(_YCAP, seg[m.end():], re.I))]
         if not q and not y:
             return None
         if anchor is None:                      # 구절 안 등 기준점이 없으면 뒤쪽 우선(종전 동작)

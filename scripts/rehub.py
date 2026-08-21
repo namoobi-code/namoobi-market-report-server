@@ -21,6 +21,9 @@
      start   DT_MLTM_5387  착공(월계)
      comp    DT_MLTM_5373  준공(월계)
      presale DT_MLTM_5557  분양실적(공동주택) 2013.01~
+  ── 국가데이터처 (KOSIS 101) 연간 2000~ · 시도
+     grdp    DT_1C91  itm T1(명목) · objL2 Z10  지역내총생산(시장가격)  백만원 → 조원
+     grdp_pc DT_1C96  itm T1                    1인당 지역내총생산      천원 → 만원
   ── 한국주택금융공사 Open API (houstat.hf.go.kr)
      khai    T186503126543136  주택구입부담지수  분기 2004~
      khoi    T185033126522938  주택구입물량지수  연간 2012~
@@ -84,6 +87,13 @@ META = {
                 "한국은행 기준금리 · 전 지역 공통"),
     "rate_us": ("미국 정책금리",           "%",     "L", "M", "FRED",
                 "연방기금금리(FEDFUNDS) 월평균 · 전 지역 공통"),
+    # (2026-08-21 추가) 지역 경제력 — 집값의 '기초체력' 쪽 변수다.
+    #   부동산 지표가 전부 '가격·물량'인데, 그 지역이 실제로 얼마나 버는지를 나란히 못 봤다.
+    #   연간 지표라 월 축에서는 12칸 계단으로 깔린다(값을 만들어내는 보간은 하지 않는다).
+    "grdp":    ("지역내총생산(GRDP)",      "조원",   "R", "Y", "국가데이터처 KOSIS",
+                "명목 · 그 지역에서 1년간 새로 만들어진 부가가치 총액 · 2000~"),
+    "grdp_pc": ("1인당 GRDP",             "만원",   "R", "Y", "국가데이터처 KOSIS",
+                "명목 GRDP ÷ 인구 · 지역 간 소득수준을 같은 잣대로 비교할 때 쓴다 · 2000~"),
 }
 GLOBAL_KEYS = ("rate_kr", "rate_us", "csi")     # 지역 구분 없이 '전국' 하나만 있는 지표
 
@@ -201,6 +211,43 @@ def kosis_series(org, tbl, itm, regs, objn=1, fixed=None, cumulative=False, grp=
                 mp = decum(mp)
             acc[name] = mp
         time.sleep(0.5)
+    return acc
+
+
+# 시도 정식명 → 화면 표기 (KOSIS 지역소득 표는 '서울특별시' 처럼 정식명으로 준다)
+KOSIS_SIDO = {
+    "전국": "전국", "서울특별시": "서울", "부산광역시": "부산", "대구광역시": "대구",
+    "인천광역시": "인천", "광주광역시": "광주", "대전광역시": "대전", "울산광역시": "울산",
+    "세종특별자치시": "세종", "경기도": "경기", "강원특별자치도": "강원", "강원도": "강원",
+    "충청북도": "충북", "충청남도": "충남", "전북특별자치도": "전북", "전라북도": "전북",
+    "전라남도": "전남", "경상북도": "경북", "경상남도": "경남", "제주특별자치도": "제주",
+}
+
+
+def kosis_annual(org, tbl, itm, scale=1.0, objL2=None, y0=2000):
+    """연간 통계표 → {지역: {YYYYMM: 값}}. 그 해 12개월에 같은 값을 채운다(계단).
+
+    지역소득(101) 계열은 시도 축이 objL1, 항목(명목/실질)이 itmId 다.
+    호출은 지역 하나씩 돌지 않고 objL1=ALL 한 번으로 끝난다(연간이라 행이 적다).
+    scale: 원자료 단위 → 표시 단위 배율 (백만원→조원 1e-6, 천원→만원 0.1).
+    """
+    q = {"method": "getList", "apiKey": KOSIS, "itmId": itm, "objL1": "ALL",
+         "format": "json", "jsonVD": "Y", "prdSe": "Y",
+         "startPrdDe": str(y0), "endPrdDe": str(NOW.year), "orgId": org, "tblId": tbl}
+    if objL2:
+        q["objL2"] = objL2
+    d = get(KAPI + "?" + urllib.parse.urlencode(q))
+    acc = {}
+    if not isinstance(d, list):
+        return acc
+    for r in d:
+        nm = KOSIS_SIDO.get(str(r.get("C1_NM") or "").strip())
+        v, y = num(r.get("DT")), str(r.get("PRD_DE") or "")
+        if not nm or v is None or len(y) != 4:
+            continue
+        mp = acc.setdefault(nm, {})
+        for m in range(1, 13):
+            mp[f"{y}{m:02d}"] = v * scale
     return acc
 
 
@@ -435,12 +482,20 @@ def main():
         D["khai"], D["khoi"] = {}, {}
         print("    ⚠ HF 키 없음 — 건너뜀")
 
-    print("[5/6] 금리 2종 (ECOS·FRED)")
+    print("[5/7] 지역내총생산 2종 (국가데이터처 KOSIS 101)")
+    #   DT_1C91 시도별 경제활동별 GRDP — 항목 T1=명목, 경제활동 Z10=지역내총생산(시장가격)
+    #   DT_1C96 시도별 1인당 GRDP    — 항목 T1
+    #   실측(2026-08-21): 전국 2024 = 2,560,811,495백만원(=2,560.8조) · 서울 1인당 61,215천원(=6,121.5만원)
+    D["grdp"]    = kosis_annual(101, "DT_1C91", "T1", scale=1e-6, objL2="Z10")
+    D["grdp_pc"] = kosis_annual(101, "DT_1C96", "T1", scale=0.1)
+    print(f"    GRDP 총액 지역 {len(D['grdp'])} · 1인당 지역 {len(D['grdp_pc'])}")
+
+    print("[6/7] 금리 2종 (ECOS·FRED)")
     D["rate_kr"] = {"전국": ecos_monthly("722Y001", "0101000")}
     D["rate_us"] = {"전국": fred_monthly("FEDFUNDS")}
     print(f"    한국 {len(D['rate_kr']['전국'])}개월 · 미국 {len(D['rate_us']['전국'])}개월")
 
-    print("[6/6] 기존 수집분 합류 (csi·거래량·미분양)")
+    print("[7/7] 기존 수집분 합류 (csi·거래량·미분양)")
     re_ = load("realestate").get("series") or {}
     if re_.get("csi"):
         s = re_["csi"]
@@ -488,8 +543,8 @@ def main():
 
     out = {
         "asof": NOW.strftime("%Y-%m-%d %H:%M"),
-        "src": "한국부동산원·국토교통부(KOSIS) · 한국은행 ECOS · 한국주택금융공사",
-        "note": "월 축으로 통일. 분기(K-HAI)·연간(K-HOI) 지표는 해당 기간 각 달에 같은 값이 들어가 계단 모양이 된다.",
+        "src": "한국부동산원·국토교통부·국가데이터처(KOSIS) · 한국은행 ECOS · 한국주택금융공사",
+        "note": "월 축으로 통일. 분기(K-HAI)·연간(K-HOI·GRDP) 지표는 해당 기간 각 달에 같은 값이 들어가 계단 모양이 된다.",
         "meta": {k: {"label": v[0], "unit": v[1], "axis": v[2], "cycle": v[3],
                      "src": v[4], "note": v[5]} for k, v in META.items()},
         "t": ts,

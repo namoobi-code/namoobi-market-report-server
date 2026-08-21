@@ -288,6 +288,11 @@ def guidance_gap(sym, g, pool_us, ann=None):
             out["g_rev"] = round(mid / 1e6, 1)              # 백만 달러
             out["g_rev_gap"] = round((mid / base - 1) * 100, 1)
             out["g_rev_per"] = per
+            # (2026-08-21) 기준(GAAP/조정) 을 함께 싣는다. 파서는 예전부터 이 값을 만들고
+            # 있었는데 여기서 out 에 담지 않아 전 레코드가 basis=None 이었다(실측: 저장된
+            # 8-K 레코드 전량). BZ 불일치 80건 중 57건이 BZ 'Adj' 표기라 기준 대조가 필요하다.
+            if g.get(evk + "_basis"):
+                out["g_rev_basis"] = g[evk + "_basis"]
             if _ev.get(evk):                                # 근거 문장 — 화면에서 검증 가능하게
                 out["g_rev_ev"] = _ev[evk][:300]
             break
@@ -297,6 +302,8 @@ def guidance_gap(sym, g, pool_us, ann=None):
             out["g_eps"] = round(mid, 2)
             out["g_eps_gap"] = round((mid / base - 1) * 100, 1)
             out["g_eps_per"] = per
+            if g.get(evk + "_basis"):
+                out["g_eps_basis"] = g[evk + "_basis"]
             if _ev.get(evk):
                 out["g_eps_ev"] = _ev[evk][:300]
             break

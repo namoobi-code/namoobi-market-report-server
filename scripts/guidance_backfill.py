@@ -80,7 +80,9 @@ def recent_earn_8k(cik, d8=None):
 
 
 G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_own",
+            "g_rev_basis",
             "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_eps_src", "g_eps_own",
+            "g_eps_basis",
             "g_per", "g_capex", "g_capex_per", "g_capex_ev", "acc", "_d8")
 
 
