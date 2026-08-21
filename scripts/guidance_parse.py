@@ -792,8 +792,22 @@ def parse_guidance(txt, per_hint=None):
                 per, per_strong = _period(txt, m.start(), m.end())
                 if not per and per_hint:
                     # (2026-08-15) 회사 프로필 구제 — 이 회사는 이력상 한 종류 기간만 제시
-                    per = per_hint
-                    ctx += " [기간: 회사 프로필(이력상 %s만 제시)]" % ("연간" if per_hint == "Y" else "분기")
+                    # (2026-08-21) 단, **전망 문맥이 있는 값에만** 적용한다. 프로필은 '이 회사가
+                    # 어느 기간을 제시하는가'를 알려줄 뿐 '이 값이 가이던스인가'를 말해주지 않는데,
+                    # 종전엔 기간을 못 정한 값이면 무엇이든 구제해 실적 서술까지 가이던스로 실렸다.
+                    #   실측 GRMN — 실적 하이라이트 불릿 "Record consolidated revenue of
+                    #   approximately $2.02 billion, an 11% increase compared to the prior year
+                    #   quarter"(과거 실적)가 fy_rev 로 구제돼 먼저 선점하는 바람에, 같은 문서
+                    #   뒤쪽의 진짜 가이던스 "we are raising our full year 2026 guidance. We now
+                    #   anticipate revenue of approximately $8.05 billion" 이 무시됐다
+                    #   (BZ 연간 8,050M 대비 -75%). 전망 낱말 조건을 걸면 8,050M 이 채택된다.
+                    if (re.search(_FWD, lead, re.I) or re.search(_FWD, back[-120:], re.I)
+                            or re.search(_FWD, txt[m.end():m.end() + 80], re.I)):
+                        per = per_hint
+                        ctx += (" [기간: 회사 프로필(이력상 %s만 제시)]"
+                                % ("연간" if per_hint == "Y" else "분기"))
+                    else:
+                        skip.append(f"{metric}: 프로필 구제 보류 — 전망 문맥 없음 · {ctx[:100]}")
                 elif per and per_hint and per != per_hint and not per_strong:
                     # (2026-08-15 5차) 회사 프로필 **교정** — 이력상(BZ 2022~) 한 종류 기간만
                     # 제시해 온 회사(90%+·n≥4)에서 문맥 판정이 반대로 나오면, 그 판정은 이웃
