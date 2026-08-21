@@ -128,6 +128,12 @@ _QPAST = (r"(?:through|results through|through the|reported|ended|completed|"
 # 섹션 제목 "Second quarter results" 가 기간 근거로 채택돼 연간 EPS 5.35 가 0q 로 태그
 # (분기 컨센 대비 +294%). CXW 도 표 앞 "Second Quarter 2026 Financial Results" 가 같은 역할.
 _QRES = r"\s*(?:of\s+)?(?:fiscal\s+)?(?:20\d\d\s+)?(?:financial\s+|fiscal\s+)?(?:results|earnings|highlights)\b"
+# (2026-08-21) 값 뒤 **설명 종속절** — 이 뒤의 분기 표현은 값의 구성·사유를 설명할 뿐
+# 가이던스 기간이 아니다(실측 TGT "…$9.90 to $10.90, which includes second quarter
+# tariff refund benefits…"). 값보다 뒤에 있는 분기 토큰에만 적용한다.
+_QEXPL = (r"\b(?:which\s+(?:includes?|reflects?|assumes?)|including|reflecting|assuming|"
+          r"driven\s+by|due\s+to|benefits?\s+(?:of|from)|related\s+to|attributable\s+to|"
+          r"partially\s+offset\s+by|net\s+of)\b[^.•●]{0,25}$")
 # (2026-08-14) [1-4]Q 표기 추가 — "3Q 2026 Full Year 2026" 같은 표 머리글(실측 OPRT)에서
 # 분기 열을 인식하지 못해 분기 값이 연간으로 분류됐다.
 # (2026-08-15) '3rd Qtr' 축약(실측 MIDD)도 추가.
@@ -312,7 +318,16 @@ def _period(txt, start, end):
         """
         q = [m.start() for m in re.finditer(_QRE, seg, re.I)
              if not re.search(_QPAST, seg[:m.start()][-30:], re.I)
-             and not re.match(_QRES, seg[m.end():], re.I)]     # '«분기» results' 제목 제외
+             and not re.match(_QRES, seg[m.end():], re.I)      # '«분기» results' 제목 제외
+             # (2026-08-21) 값 **뒤**에 오는 **설명 종속절**의 분기는 기간 근거가 아니다.
+             # 실측 TGT: "An updated GAAP and Adjusted EPS guidance range of $9.90 to $10.90,
+             # **which includes second quarter tariff refund benefits** of ~$1..." — 연간
+             # 가이던스인데 뒤따르는 관세 환급 설명의 '2분기'가 근거로 채택돼 분기 컨센
+             # 2.04 대비 +410%(연간 컨센 9.91 대비로는 +4.9%로 정상). 이 불릿 안에는 연간
+             # 토큰이 없어 Q 가 무투표 당선됐다. 종속절이 수식하는 것은 값의 '구성'이지
+             # '기간'이 아니므로 후보에서 뺀다.
+             and not (anchor is not None and m.start() > anchor
+                      and re.search(_QEXPL, seg[:m.start()][-45:], re.I))]
         # 연도 앞에 분기 표시가 붙어 있으면(“third quarter 2026” · “Q3 2026”) 그건 분기다.
         # 연도만 보고 연간으로 세면 분기 가이던스를 연간 컨센과 비교하게 된다.
         # (2026-08-10 2차) 범위를 40자로 넓힌다. "Second Quarter **Fiscal Year 2027** Guidance"

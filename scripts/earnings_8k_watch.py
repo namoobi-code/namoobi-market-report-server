@@ -23,8 +23,26 @@ CIKMAP = BASE / "data" / "watch" / "cik_map.json"
 H = {"User-Agent": "namoobi research namoobi@gmail.com"}
 ET = timezone(timedelta(hours=-4))          # 미 동부(서머타임 EDT). 겨울(-5) 오차 1시간은 라벨용이라 허용
 
-def get(u, timeout=20):
-    return urllib.request.urlopen(urllib.request.Request(u, headers=H), timeout=timeout).read()
+def get(u, timeout=20, tries=3):
+    """SEC 요청 — 읽기 타임아웃은 **재시도**한다.
+
+    (2026-08-21) SEC/EDGAR 는 간헐적으로 응답이 느려 read timeout 을 던진다. 종전에는
+    그대로 예외가 올라가 **그 회차 전체가 중단**됐다(실측: 2,083회 실행 중 202회(9.7%)가
+    Traceback 으로 종료. 죽는 지점은 대부분 main() 의 EDGAR 최신 공시 피드 호출로,
+    한 건 실패가 5,163종 워치 전체를 날린다). 매분 폴링이라 다음 회차가 메워 주지만,
+    실적 발표가 몰리는 시간대에 연달아 실패하면 감지가 지연된다.
+    지수 백오프로 3회까지 재시도하고, 그래도 실패하면 예외를 올려 호출부 판단에 맡긴다.
+    """
+    last = None
+    for i in range(tries):
+        try:
+            return urllib.request.urlopen(
+                urllib.request.Request(u, headers=H), timeout=timeout).read()
+        except Exception as e:                       # 타임아웃·일시적 5xx·연결 끊김
+            last = e
+            if i < tries - 1:
+                time.sleep(1.5 * (i + 1))            # 1.5s → 3.0s
+    raise last
 
 def cik_map():
     """티커→CIK — 주 1회 갱신 캐시."""
@@ -315,10 +333,21 @@ def main():
     core = {mp[s] for s in core_syms if s in mp}
     watch = {mp[s]: s for s in set(pool_syms) | set(core_syms) if s in mp}
     # (2026-08-05) ADR(외국계: TSM·ASML 등)은 8-K 대신 6-K 로 실적을 낸다 → 두 피드 모두 감시
+    # (2026-08-21) 두 피드는 **독립적으로** 처리한다 — 재시도까지 실패한 쪽이 있어도
+    # 나머지 피드로 감시를 이어간다. 종전엔 6-K 한 건이 죽으면 8-K 결과까지 버려졌다.
     d = ""
+    feed_err = []
     for ftype in ("8-K", "6-K"):
-        d += get(f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type={ftype}"
-                 "&company=&dateb=&owner=include&count=100&output=atom").decode("utf-8", "ignore")
+        try:
+            d += get(f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcurrent&type={ftype}"
+                     "&company=&dateb=&owner=include&count=100&output=atom").decode("utf-8", "ignore")
+        except Exception as e:
+            feed_err.append(f"{ftype}:{type(e).__name__}")
+    if not d:                                    # 두 피드 모두 실패 — 이번 회차만 건너뛴다
+        print(f"[8k] 피드 수신 실패({', '.join(feed_err)}) — 이번 회차 건너뜀", flush=True)
+        return
+    if feed_err:
+        print(f"[8k] 일부 피드 실패({', '.join(feed_err)}) — 나머지로 진행", flush=True)
     live = {}
     try:
         live = json.loads(OUT.read_text(encoding="utf-8"))

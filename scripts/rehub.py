@@ -458,6 +458,25 @@ def main():
     for k in ("csi", "trade", "unsold", "unsold_done"):
         print(f"    {META[k][0]:<16} 지역 {len(D.get(k) or {})}")
 
+    # ── 이전 결과와 병합 (2026-08-21 수정) ────────────────────────────────
+    # --full 없이 돌면 최근 3년만 받는데, 예전엔 그걸 그대로 덮어써서 매일 07:45 크론이
+    # 과거를 지웠다(실측: 금리·K-HAI 가 2023.01 부터만 남음). 새로 받은 달만 갈아끼운다.
+    old = {}
+    if OUT.exists():
+        try:
+            old = json.loads(OUT.read_text(encoding="utf-8"))
+        except Exception:
+            old = {}
+    ot, od = old.get("t") or [], old.get("d") or {}
+    for key in META:
+        prev = od.get(key) or {}
+        cur = D.get(key) or {}
+        for reg, arr in prev.items():
+            base = {ot[i]: arr[i] for i in range(min(len(ot), len(arr))) if arr[i] is not None}
+            base.update(cur.get(reg) or {})          # 새 값이 이기게
+            cur[reg] = base
+        D[key] = cur
+
     # ── 월 축 통일 ──
     ts = sorted({t for k in D for r in D[k] for t in D[k][r] if len(str(t)) == 6})
     regions = []
