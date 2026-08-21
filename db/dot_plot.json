@@ -1,34 +1,34 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-16",
+ "as_of": "2026-08-21",
  "data": {
   "rows": [
    {
-    "year": "2026말",
-    "jun": 3.8,
+    "year": "2026년말",
     "mar": 3.4,
+    "jun": 3.8,
     "change": "+0.4"
    },
    {
-    "year": "2027말",
-    "jun": 3.6,
+    "year": "2027년말",
     "mar": 3.1,
+    "jun": 3.6,
     "change": "+0.5"
    },
    {
-    "year": "2028말",
-    "jun": 3.4,
+    "year": "2028년말",
     "mar": 3.1,
+    "jun": 3.4,
     "change": "+0.3"
    },
    {
     "year": "장기중립",
-    "jun": 3.1,
     "mar": 3.1,
+    "jun": 3.1,
     "change": "+0.0"
    }
   ],
-  "asof": "2026-06-17",
-  "source": "Federal Reserve, Summary of Economic Projections, June 17, 2026 (federalfundsrate median, midpoint of target range) https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf ; March values are the March 18, 2026 SEP median as restated in the June 2026 SEP table"
+  "note": "2026-03-18 SEP: 2026년말 3.4%(추가 1회 인하 시사)·2027·2028 3.1%·장기중립 3.1%. 2026-06-17 SEP: 2026년말 3월 3.4%→6월 3.8%로 매파적 상향(9/18명 연내 1회+ 인상 전망)·2027년말 3.6%·2028년말 3.4%·장기중립 3.1% 유지.",
+  "source": "federalreserve.gov FOMC SEP 2026-03-18, 2026-06-17 (server_fomc_meetings.json 수록)"
  }
 }
