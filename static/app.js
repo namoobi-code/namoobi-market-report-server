@@ -3161,7 +3161,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
 
   function rlDraw(t, hist, fut, ser, past){
     const cv=$('rl_main'); if(!cv) return;
-    const W=cv.clientWidth||900, H=cv.clientHeight||1040; cv.width=W; cv.height=H;
+    const W=cv.clientWidth||900, H=cv.clientHeight||520; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const N=t.length; if(!N) return;
     const P={l:10,t:18,b:20}, RW=RH_AXW*(ser.length+1), PW=Math.max(60,W-P.l-RW);
