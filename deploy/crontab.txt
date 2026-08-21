@@ -107,7 +107,7 @@
 40 18 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/program_trading.py >> /home/ubuntu/namoobi/program.log 2>&1
 30 7 * * 0 cd /home/ubuntu/namoobi && python3 scripts/sector_map.py >> /home/ubuntu/namoobi/sector.log 2>&1
 20 7 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms.py >> /home/ubuntu/namoobi/rtms.log 2>&1
-30 1 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms.py --backfill --months 250 --extend --budget 12000 >> /home/ubuntu/namoobi/rtms_deep.log 2>&1
+30 1 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms.py --backfill --months 250 --extend --budget 200000 >> /home/ubuntu/namoobi/rtms_deep.log 2>&1
 */5 7-18 * * 1-5 cd /home/ubuntu/namoobi && python3 scripts/earnings_watch.py >> logs/earnings_watch.log 2>&1
 */5 5-8 * * 2-6 cd /home/ubuntu/namoobi && flock -n /tmp/ern_us.lock python3 scripts/earnings_watch_us.py >> logs/earnings_watch_us.log 2>&1
 */5 19-22 * * 1-5 cd /home/ubuntu/namoobi && flock -n /tmp/ern_us.lock python3 scripts/earnings_watch_us.py >> logs/earnings_watch_us.log 2>&1
@@ -158,7 +158,7 @@
 # ── 자가진단: 화면을 깨뜨리는 변화(번들 비대·스키마 드리프트·수집 정지)를 사용자보다 먼저 잡는다 ──
 5 */2 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py >> /home/ubuntu/namoobi/health.log 2>&1
 5 8 * * * cd /home/ubuntu/namoobi && python3 scripts/healthcheck.py --mail >> /home/ubuntu/namoobi/health.log 2>&1
-0 2 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms_etc.py --months 250 --budget 12000 >> /home/ubuntu/namoobi/logs/rtms_etc_deep.log 2>&1
+0 2 * * * cd /home/ubuntu/namoobi && python3 scripts/rtms_etc.py --months 250 --budget 200000 >> /home/ubuntu/namoobi/logs/rtms_etc_deep.log 2>&1
 40 7 3-9 * * cd /home/ubuntu/namoobi && python3 scripts/fao_ffpi.py >> logs/fao_ffpi.log 2>&1
 # ── A1 무료 인스턴스 헌터: 10분 간격 생성 재시도, 성공 시 flag로 자기해제+메일 통보 ──
 # [A1이전 비활성] 17 * * * * cd /home/ubuntu/namoobi && python3 scripts/a1_hunter.py >> /home/ubuntu/namoobi/a1_hunter.log 2>&1
@@ -170,3 +170,5 @@
 # (2026-08-16) 공고문 PDF 층별 가격 파싱 → 리스트 재생성 병합
 10 8 * * * cd /home/ubuntu/namoobi && python3 scripts/applyhome_pdf.py >> /home/ubuntu/namoobi/logs/applyhome.log 2>&1 && python3 scripts/applyhome_list.py >> /home/ubuntu/namoobi/logs/applyhome.log 2>&1
 40 7 * * * cd /home/ubuntu/namoobi && python3 scripts/silv_trade.py --months 3 >> /home/ubuntu/namoobi/logs/applyhome.log 2>&1
+45 7 * * * cd /home/ubuntu/namoobi && python3 scripts/rehub.py >> /home/ubuntu/namoobi/logs/rehub.log 2>&1
+55 7 * * * cd /home/ubuntu/namoobi && nice -n 5 python3 scripts/relead.py >> /home/ubuntu/namoobi/logs/relead.log 2>&1

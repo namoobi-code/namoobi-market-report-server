@@ -3146,8 +3146,183 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     }).catch(()=>{});
   }
 
+  /* ══════════════════════════════════════════════════════════════════════
+     (2026-08-21) 🔮 선행지표·가격 예측 차트 — relead.json (매일 07:55)
+
+     통합차트가 "지나온 길"이라면 이건 "앞길"이다. 세 가지를 한 화면에 둔다.
+       ① 기준선: 아파트 매매 실거래 중위가격(3개월 평균) — 예측 대상
+       ② 선행지표: 복수 선택. '시차' 버튼을 켜면 각 지표를 자기 선행 개월수만큼
+          오른쪽으로 밀어 그린다 → 가격과 겹쳐지는 모양이 눈으로 확인된다.
+       ③ 예측: 마지막 관측 뒤로 12개월. 점선 + 80% 밴드.
+     예측을 곧이곧대로 믿지 않도록 백테스트 성적(과거 재현 오차·방향 적중률)을
+     차트 아래 표로 항상 같이 보여준다. 성적이 나쁘면 나쁜 대로 보인다.
+     ══════════════════════════════════════════════════════════════════════ */
+  let _rlInit=false, _rlReg='서울', _rlSel=[], _rlSpan='120', _rlShift=true, _rlPred=true, _rlD=null;
+
+  function rlDraw(t, hist, fut, ser, past){
+    const cv=$('rl_main'); if(!cv) return;
+    const W=cv.clientWidth||900, H=cv.clientHeight||520; cv.width=W; cv.height=H;
+    const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
+    const N=t.length; if(!N) return;
+    const P={l:10,t:18,b:20}, RW=RH_AXW*(ser.length+1), PW=Math.max(60,W-P.l-RW);
+    const X=i=>P.l+PW*i/Math.max(1,N-1);
+    x.font='10px sans-serif';
+    /* 세로 범위 — 기준선은 예측·밴드까지 포함해 잡는다 */
+    const rng=v=>{const f=v.filter(z=>z!=null); if(!f.length) return {lo:0,hi:1};
+      let lo=Math.min(...f), hi=Math.max(...f);
+      if(hi===lo){hi=lo+Math.abs(lo||1)*.1; lo-=Math.abs(lo||1)*.1;}
+      const pad=(hi-lo)*.08; return {lo:lo-pad,hi:hi+pad};};
+    const all=[...hist, ...fut.price, ...fut.lo, ...fut.hi];
+    const sc=[rng(all), ...ser.map(s=>rng(s.v))];
+    const Y=(i,v)=>P.t+(H-P.t-P.b)*(1-(v-sc[i].lo)/(sc[i].hi-sc[i].lo));
+    /* 격자 + 연도 */
+    x.strokeStyle='#eef1f4';
+    for(let g=0;g<=4;g++){const yy=P.t+(H-P.t-P.b)*g/4; x.beginPath(); x.moveTo(P.l,yy); x.lineTo(P.l+PW,yy); x.stroke();}
+    x.fillStyle='#98a2ad';
+    for(let i=0;i<N;i++){const v=String(t[i]);
+      if(v.slice(4)==='01'&&(N<=140||+v.slice(0,4)%2===0)) x.fillText(v.slice(0,4),X(i)-12,H-5);}
+    /* 예측 시작 경계 */
+    if(past<N-1){
+      x.save(); x.setLineDash([4,4]); x.strokeStyle='#c8ced6';
+      x.beginPath(); x.moveTo(X(past),P.t-8); x.lineTo(X(past),H-P.b); x.stroke(); x.restore();
+      x.fillStyle='#98a2ad'; x.fillText('예측 →', X(past)+3, P.t-1);
+      /* 80% 밴드 */
+      x.beginPath(); let started=false;
+      for(let j=past;j<N;j++){const v=fut.hi[j]; if(v==null) continue;
+        started?x.lineTo(X(j),Y(0,v)):(x.moveTo(X(j),Y(0,v)),started=true);}
+      for(let j=N-1;j>=past;j--){const v=fut.lo[j]; if(v==null) continue; x.lineTo(X(j),Y(0,v));}
+      x.closePath(); x.fillStyle='rgba(31,41,55,.10)'; x.fill();
+    }
+    /* 선행지표 */
+    ser.forEach((s,i)=>{x.strokeStyle=s.color; x.lineWidth=1.5; x.beginPath(); let on=false;
+      for(let j=0;j<N;j++){const v=s.v[j]; if(v==null){on=false;continue;}
+        const px=X(j),py=Y(i+1,v); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
+      x.stroke(); x.lineWidth=1;});
+    /* 기준선(실측) */
+    x.strokeStyle='#1f2937'; x.lineWidth=2.1; x.beginPath(); let on=false;
+    for(let j=0;j<N;j++){const v=hist[j]; if(v==null){on=false;continue;}
+      const px=X(j),py=Y(0,v); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
+    x.stroke();
+    /* 예측선(점선) */
+    x.save(); x.setLineDash([6,4]); x.strokeStyle='#d9534f'; x.lineWidth=2.1; x.beginPath(); on=false;
+    for(let j=0;j<N;j++){const v=fut.price[j]; if(v==null){on=false;continue;}
+      const px=X(j),py=Y(0,v); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
+    x.stroke(); x.restore(); x.lineWidth=1;
+    /* 오른쪽 축 기둥 — 0번은 기준선(가격) */
+    const cols=['#1f2937', ...ser.map(s=>s.color)];
+    const names=['중위가격', ...ser.map(s=>s.short||s.label)];
+    for(let i=0;i<sc.length;i++){
+      const x0=P.l+PW+RH_AXW*i;
+      x.strokeStyle='#e5e8ec'; x.beginPath(); x.moveTo(x0,P.t-8); x.lineTo(x0,H-P.b); x.stroke();
+      x.fillStyle=cols[i]; x.globalAlpha=.10; x.fillRect(x0,P.t-8,RH_AXW,H-P.t-P.b+8); x.globalAlpha=1;
+      const dec=(sc[i].hi-sc[i].lo)<10?2:((sc[i].hi-sc[i].lo)<200?1:0);
+      x.fillStyle=cols[i];
+      for(let g=0;g<=4;g++){const vv=sc[i].lo+(sc[i].hi-sc[i].lo)*(1-g/4), yy=P.t+(H-P.t-P.b)*g/4;
+        x.fillText(Math.abs(vv)>=10000?Math.round(vv).toLocaleString():vv.toFixed(dec), x0+4, yy+3);}
+      x.save(); x.font='bold 10px sans-serif';
+      x.fillText(names[i].length>7?names[i].slice(0,7):names[i], x0+4, P.t-10); x.restore();
+    }
+  }
+
+  function initRelead(){
+    if(_rlInit) return; _rlInit=true;
+    fetch('/api/db/relead').then(r=>r.ok?r.json():null).then(d=>{
+      const n=$('rl_main_n');
+      if(!d||!(d.t||[]).length){ if(n) n.textContent='수집 대기 중 — 다음 수집(매일 07:55)부터 표시됩니다.'; return; }
+      _rlD=d;
+      const E6=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+      const M=d.meta||{}, regs=d.regions||[];
+      if(!regs.includes(_rlReg)) _rlReg=regs[0];
+      {const e=$('rl_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
+      const btn=(on,txt,attr)=>`<button ${attr} style="padding:2px 8px;font-size:11px;border:1px solid ${on?'#1f2937':'#d7dce3'};`
+        +`border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#5b6672'}">${txt}</button>`;
+      const lagOf=k=>((d.lead[_rlReg]||{})[k]||{}).lag||0;
+      const corrOf=k=>((d.lead[_rlReg]||{})[k]||{}).corr;
+      const fm=t=>`${String(t).slice(0,4)}.${String(t).slice(4)}`;
+
+      function bar(){
+        /* 지역 */
+        $('rl_reg').innerHTML=regs.map(r=>btn(r===_rlReg,E6(r),`data-r="${E6(r)}"`)).join('');
+        $('rl_reg').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{_rlReg=b.dataset.r; _rlSel=defSel(); draw();});
+        /* 선행지표 — 그 지역에서 상관이 큰 순서로 나열하고 시차를 배지로 붙인다 */
+        const ks=Object.keys(d.lead[_rlReg]||{});
+        $('rl_ind').innerHTML=ks.map(k=>{const on=_rlSel.includes(k), L=lagOf(k);
+          return btn(on,`${E6(M[k].label)}<span style="opacity:.75">·${L}개월</span>`,`data-k="${k}"`);}).join('');
+        $('rl_ind').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
+          const k=b.dataset.k, i=_rlSel.indexOf(k);
+          if(i>=0) _rlSel.splice(i,1); else { if(_rlSel.length>=4){alert('선행지표는 최대 4개까지 겹쳐볼 수 있습니다.');return;} _rlSel.push(k); }
+          draw();});
+        /* 기간·시차·예측 */
+        $('rl_span').innerHTML=[['60','5년'],['120','10년'],['240','20년'],['999','전체']]
+          .map(([v,t])=>btn(_rlSpan===v,t,`data-s="${v}"`)).join('');
+        $('rl_span').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{_rlSpan=b.dataset.s; draw();});
+        $('rl_shift').innerHTML=btn(_rlShift,_rlShift?'적용':'해제','data-sh="1"');
+        $('rl_shift').querySelector('[data-sh]').onclick=()=>{_rlShift=!_rlShift; draw();};
+        $('rl_pred').innerHTML=btn(_rlPred,_rlPred?'표시':'숨김','data-p="1"');
+        $('rl_pred').querySelector('[data-p]').onclick=()=>{_rlPred=!_rlPred; draw();};
+        $('rl_chips').innerHTML=_rlSel.map((k,i)=>{const c=RHPAL[(i+1)%RHPAL.length];
+          return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;border:1px solid ${c};`
+            +`border-radius:6px;padding:1px 6px;color:${c}">${E6(M[k].label)} <b>${lagOf(k)}개월</b> r=${corrOf(k)}</span>`;}).join('');
+      }
+      function defSel(){ return Object.keys(d.lead[_rlReg]||{}).slice(0,2); }
+
+      function draw(){
+        bar();
+        const P=d.pred[_rlReg]||{}, price=(d.price[_rlReg]||{}).ma||[];
+        const T0=d.t, ft=(_rlPred?(P.t||[]):[]);
+        const t=[...T0, ...ft];
+        /* 표시 구간 자르기 */
+        const lim=_rlSpan==='999'?t.length:Math.min(t.length, +_rlSpan+ft.length);
+        const s0=t.length-lim;
+        const cut=a=>a.slice(s0);
+        const hist=cut([...price, ...ft.map(()=>null)]);
+        const fut={price:cut([...T0.map(()=>null), ...(P.price||[])]),
+                   lo:cut([...T0.map(()=>null), ...(P.lo||[])]),
+                   hi:cut([...T0.map(()=>null), ...(P.hi||[])])};
+        /* 예측선을 마지막 실측점과 이어 붙인다(끊겨 보이지 않게) */
+        const lastI=T0.length-1-s0;
+        if(_rlPred&&lastI>=0&&price.length) {fut.price[lastI]=price[T0.length-1];
+          fut.lo[lastI]=price[T0.length-1]; fut.hi[lastI]=price[T0.length-1];}
+        const ser=_rlSel.map((k,i)=>{
+          const src=(d.d[k]||{})[GLOBRL.includes(k)?'전국':_rlReg]||(d.d[k]||{})['전국']||[];
+          let v=[...src, ...ft.map(()=>null)];
+          if(_rlShift){const L=lagOf(k); v=[...Array(L).fill(null), ...v.slice(0,v.length-L)];}
+          return {k, label:M[k].label, short:M[k].label, color:RHPAL[(i+1)%RHPAL.length], v:cut(v)};
+        });
+        rlDraw(cut(t), hist, fut, ser, T0.length-1-s0);
+
+        /* 아래 설명 + 백테스트 표 */
+        const bt=P.backtest||{}, last=P.last||{};
+        const ch=(P.price&&P.price.length&&last.price)?((P.price[P.price.length-1]/last.price-1)*100):null;
+        $('rl_main_n').innerHTML=
+          `<b>${E6(_rlReg)}</b> · 기준 <b>${E6(d.target.label)}</b> ${last.price?last.price.toLocaleString():'-'} ${E6(d.target.unit)} (${fm(last.t||'')} · ${d.target.smooth}개월 평균)`
+          +(ch!=null?` → 12개월 뒤 예측 <b style="color:${ch>=0?'#d9534f':'#2f6fed'}">${P.price[P.price.length-1].toLocaleString()} (${ch>=0?'+':''}${ch.toFixed(1)}%)</b>`:'')
+          +`<br>🕐 <b>시차</b>는 그 지표가 가격보다 몇 개월 앞서 움직였는지를 <b>데이터로 찾은 값</b>이다(0~${d.maxlag}개월 중 상관이 가장 큰 지점). '시차 적용'을 켜면 그만큼 밀어 그려 가격과 겹쳐 보인다.`
+          +`<br>📉 예측은 <b>시차가 예측 기간보다 긴 지표만</b> 써서 회귀한다 — 아직 관측되지 않은 값을 쓰지 않는다는 뜻이다. 회색 띠는 80% 구간.`
+          +(P.guarded&&P.guarded.length?`<br>🛡 ${P.guarded.length}개 지점은 과거에 겪은 변화 범위(5~95%)를 벗어나 그 경계로 눌렀다.`:'')
+          +`<br><span style="opacity:.8">${E6(d.note||'')}</span>`;
+        const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12].includes(h));
+        $('rl_tbl').innerHTML=
+          `<table style="border-collapse:collapse;font-size:11px"><tr style="background:#f6f7f9">`
+          +`<th style="border:1px solid #e5e8ec;padding:3px 8px">과거 재현 성적</th>`
+          +rows.map(h=>`<th style="border:1px solid #e5e8ec;padding:3px 8px">${h}개월 뒤</th>`).join('')+`</tr>`
+          +`<tr><td style="border:1px solid #e5e8ec;padding:3px 8px">평균 오차(MAPE)</td>`
+          +rows.map(h=>`<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right">${bt.by_h[h].mape}%</td>`).join('')+`</tr>`
+          +`<tr><td style="border:1px solid #e5e8ec;padding:3px 8px">그냥 '변동 없음' 이라 했을 때</td>`
+          +rows.map(h=>`<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right;opacity:.7">${bt.by_h[h].naive}%</td>`).join('')+`</tr>`
+          +`<tr><td style="border:1px solid #e5e8ec;padding:3px 8px">방향(오를지 내릴지) 적중률</td>`
+          +rows.map(h=>`<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right">${bt.by_h[h].hit}%</td>`).join('')+`</tr></table>`
+          +`<div class="note" style="margin-top:4px">과거 ${bt.origins||0}개 시점으로 되돌아가 그때 자료만으로 예측하고 실제와 비교한 결과다(표본 ${bt.n||0}건). `
+          +`'변동 없음' 줄보다 오차가 작아야 예측에 의미가 있다. 방향 적중률 50%는 동전 던지기와 같다.</div>`;
+      }
+      const GLOBRL=['cli','m2','gdp','fx','rate_kr','mtg_bal','mtg_rate','kospi','hppci','jeonse','csi'];
+      _rlSel=defSel();
+      draw();
+    }).catch(()=>{});
+  }
+
   window.renderEstate=function(){
-    initRehub(); initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initBizClose(); initAutos();
+    initRehub(); initRelead(); initApt(); initMolit(); initEtc(); initApply(); initRedev(); initUsHouse(); initHCredit(); initDelq(); initAptRank(); initBizClose(); initAutos();
     if(loaded) return; loaded=true;
     fetch('/api/db/realestate').then(r=>r.json()).then(d=>{
       const S=d.series||{};

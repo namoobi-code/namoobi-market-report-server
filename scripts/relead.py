@@ -455,6 +455,7 @@ def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
     n = len(prices)
     errs = {h: [] for h in range(1, HZ + 1)}
     nerrs = {h: [] for h in range(1, HZ + 1)}      # 기준선: '지금 값 그대로' 라고 찍었을 때의 오차
+    pairs = {h: [] for h in range(1, HZ + 1)}      # (예측 변화율, 실제 변화율) — 보정계수 산출용
     hits = {h: [0, 0] for h in range(1, HZ + 1)}
     for o in range(n - HZ - origins, n - HZ):
         if o < 60 or prices[o] is None:
@@ -467,6 +468,7 @@ def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
                 continue
             errs[h].append(abs(r["price"] - act) / act)
             nerrs[h].append(abs(prices[o] - act) / act)
+            pairs[h].append((math.log(r["price"] / prices[o]), math.log(act / prices[o])))
             up_p, up_a = r["price"] > prices[o], act > prices[o]
             hits[h][0] += 1
             hits[h][1] += 1 if up_p == up_a else 0
@@ -478,10 +480,22 @@ def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
         mape = sum(e) / len(e)
         sd = math.sqrt(sum((x - mape) ** 2 for x in e) / len(e)) if len(e) > 1 else 0.0
         nv = sum(nerrs[h]) / len(nerrs[h]) if nerrs[h] else None
-        # 실력(skill) = 단순 예측 대비 오차를 얼마나 줄였나. 0이면 안 줄인 것, 1이면 완벽.
-        skill = max(0.0, min(1.0, 1 - mape / nv)) if nv else 0.0
+        skill = max(0.0, min(1.0, 1 - mape / nv)) if nv else 0.0     # 단순 예측 대비 오차 감소율(참고 표시용)
+        # 보정계수 = 백테스트에서 '예측한 변화율' 대비 '실제 일어난 변화율' 의 회귀 기울기.
+        #   1 이면 예측폭이 딱 맞았다는 뜻, 0.5 면 절반만 실현됐다는 뜻이라 그만큼 줄여 그린다.
+        #   오차 감소율(skill)을 그대로 쓰면 지나치게 눌려 예측선이 통째로 평평해진다(서울 실측 +0.0%).
+        pr = pairs[h]
+        calib = 0.0
+        if len(pr) >= 12:
+            mx = sum(a for a, _ in pr) / len(pr)
+            my = sum(b for _, b in pr) / len(pr)
+            vxx = sum((a - mx) ** 2 for a, _ in pr)
+            cxy = sum((a - mx) * (b - my) for a, b in pr)
+            if vxx > 1e-12:
+                calib = max(0.0, min(1.5, cxy / vxx))
         by_h[h] = {"mape": round(mape * 100, 2), "sd": round(sd * 100, 2),
                    "naive": round(nv * 100, 2) if nv else None, "skill": round(skill, 3),
+                   "calib": round(calib, 3),
                    "n": len(e), "hit": round(100 * hits[h][1] / hits[h][0], 1) if hits[h][0] else None}
     alle = [x for h in errs for x in errs[h]]
     allh = [hits[h] for h in hits if hits[h][0]]
@@ -585,15 +599,27 @@ def main():
         bt = backtest(feat, ytr, prices, keys)
         # (2026-08-21) 원시 회귀값을 그대로 쓰면 지평마다 지표 조합이 달라 경로가 튄다
         #   (전국 실측: 12개월 후 -27.8% 로 폭락 예측). 두 가지를 건다.
-        #   ① 실력 축소 — '변동 없음' 예측보다 얼마나 나았는지(skill)만큼만 움직임을 인정한다.
-        #      백테스트에서 단순 예측을 못 이긴 지평은 자동으로 거의 평평해진다.
+        #   ① 보정 — 백테스트에서 예측폭이 실제로 몇 배 실현됐는지(회귀 기울기)만큼만 반영한다.
+        #      과거에 헛짚은 지평은 계수가 0 에 가까워 자동으로 평평해진다.
         #   ② 지평 평활 — 이웃 지평 3개를 평균해 모델 간 잡음을 없앤다.
         base = prices[t_last]
-        g = {h: fc[h]["growth"] * (bt["by_h"].get(h, {}).get("skill", 0.0)) for h in fc}
-        gs = {}
+        g = {h: fc[h]["growth"] * (bt["by_h"].get(h, {}).get("calib", 0.0)) for h in fc}
+        gs, guard = {}, {}
         for h in sorted(g):
             nb = [g[x] for x in (h - 1, h, h + 1) if x in g]
-            gs[h] = sum(nb) / len(nb)
+            v = sum(nb) / len(nb)
+            #   ③ 역사 범위 가드 — 그 지역에서 h개월 동안 실제로 일어났던 변화의 5~95% 구간을 넘지 않는다.
+            #      회귀는 표본 밖으로 얼마든지 뻗을 수 있어, 겪어본 적 없는 폭락·폭등을 그리는 걸 막는다
+            #      (부산 실측: 보정 후에도 -14.6% 로 과거 최저 -14.4% 를 넘어섰다).
+            hist = sorted(math.log(prices[i + h] / prices[i])
+                          for i in range(len(prices) - h)
+                          if prices[i] and prices[i + h] and prices[i] > 0 and prices[i + h] > 0)
+            if len(hist) >= 40:
+                lo_, hi_ = hist[int(len(hist) * 0.05)], hist[int(len(hist) * 0.95)]
+                if v < lo_ or v > hi_:
+                    guard[h] = True
+                v = max(lo_, min(hi_, v))
+            gs[h] = v
         z = 1.2816                                        # 80% 구간
         ft, fp, flo, fhi = [], [], [], []
         for h in sorted(gs):
@@ -605,6 +631,7 @@ def main():
             flo.append(round(p * (1 - band), 2))
             fhi.append(round(p * (1 + band), 2))
         pred[reg] = {"t": ft, "price": fp, "lo": flo, "hi": fhi,
+                     "guarded": sorted(guard),
                      "last": {"t": T[t_last], "price": round(prices[t_last], 2),
                               "raw": prices_raw[t_last]},
                      "used": [{"key": k, "label": META[k][0], **lg_all[k]}
