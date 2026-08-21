@@ -326,6 +326,33 @@ def corr(a, b):
     return sxy / (sxx * syy), n
 
 
+# (2026-08-21) 지표 집합을 **전 지역 동일**하게 고정한다.
+#   처음엔 지역마다 상관 상위 6개를 자동으로 골랐는데, 그러면 같은 전국 지표가
+#   지역에 따라 뽑히기도 하고 빠지기도 해 "왜 서울은 오르고 부산은 내리나" 를
+#   설명할 수 없었다(선택 자체가 과적합의 원천이기도 하다).
+#   A/B 백테스트 실측(48시점·18개 시도): 고정 집합이 14개 지역에서 더 정확했다.
+#     예) 경기 7.14%→5.83%, 대구 4.29%→3.43%, 울산 6.40%→5.73%
+#   지역 차이는 이제 '지표 조합' 이 아니라 **그 지역 값·시차·회귀계수** 에서만 나온다.
+#   구성: 금리(비용) · M2(유동성) · CSI(심리) · 수급 · 전세(대체재) · 거래량 · 미분양(재고)
+FIXED_KEYS = ["mtg_rate", "m2", "csi", "supply", "jeonse", "trade", "unsold"]
+
+
+def best_lag_ge(x, y, h, maxlag=MAXLAG):
+    """시차를 h 이상 구간에서만 고른다.
+
+    지평 h 를 예측하려면 최소 h 개월 선행하는 값이어야 관측된 자료만으로 계산된다.
+    고정 집합에서도 모든 지평을 커버하려면, 지표마다 '그 지평에 쓸 수 있는 시차 중
+    상관이 가장 큰 것' 을 골라야 한다(지표를 버리는 대신 시차를 옮긴다).
+    """
+    bl, bc = h, 0.0
+    for L in range(h, maxlag + 1):
+        xs = [None] * L + x[:len(x) - L]
+        c, _ = corr(xs, y)
+        if abs(c) > abs(bc):
+            bl, bc = L, c
+    return bl, bc
+
+
 def best_lag(x, y, maxlag=MAXLAG):
     """x 를 0~maxlag 개월 뒤로 밀며 y 와의 상관이 가장 큰 시차를 찾는다.
     lag=L 이면 'x 가 L 개월 선행' 이라는 뜻이다."""
@@ -402,21 +429,28 @@ def build_xy(feat, ytr, h, lags, keys, upto=None, force=None):
     return X, Y, use
 
 
-def forecast(feat, ytr, prices, lags, keys, t_last, horizons=HZ, upto=None):
-    """t_last(관측 마지막 인덱스) 기준 1~horizons 개월 앞 가격 예측."""
+def forecast(feat, ytr, prices, keys, t_last, horizons=HZ, upto=None):
+    """t_last(관측 마지막 인덱스) 기준 1~horizons 개월 앞 가격 예측.
+
+    지표 집합은 고정이고, 시차만 지평별로 [h, MAXLAG] 안에서 다시 고른다.
+    """
     out = {}
     for h in range(1, horizons + 1):
+        cut = (upto if upto is not None else t_last) + 1
+        lags = {}
+        for k in keys:
+            L, c = best_lag_ge(feat[k][:cut], ytr[:cut], h)
+            lags[k] = {"lag": L, "corr": round(c, 3)}
         # (2026-08-21) 예측 시점에 값이 비어 있는 지표는 **모델에서 빼고** 나머지로 다시 적합한다.
         #   예전엔 하나라도 비면 그 지평 전체를 버려서, 지역 지표(거래량·미분양 등)의
         #   공표 지연 한 칸 때문에 12개월 중 1~3개월만 그려지는 지역이 속출했다(전북 실측 1개월).
-        elig = sorted([k for k in keys if lags[k]["lag"] >= h],
-                      key=lambda k: -abs(lags[k]["corr"]))
+        elig = sorted(keys, key=lambda k: -abs(lags[k]["corr"]))
         avail = []
         for k in elig:
             j = t_last - (lags[k]["lag"] - h)
             if 0 <= j < len(feat[k]) and feat[k][j] is not None:
                 avail.append(k)
-            if len(avail) >= TOPK:
+            if len(avail) >= len(keys):
                 break
         if not avail:
             continue
@@ -431,7 +465,9 @@ def forecast(feat, ytr, prices, lags, keys, t_last, horizons=HZ, upto=None):
         base = prices[t_last]
         if not base:
             continue
-        out[h] = {"growth": g, "price": base * math.exp(g), "n": len(X), "k": len(use)}
+        out[h] = {"growth": g, "price": base * math.exp(g), "n": len(X), "k": len(use),
+                  "lags": {k: lags[k]["lag"] for k in use},
+                  "corrs": {k: lags[k]["corr"] for k in use}}
     return out
 
 
@@ -460,8 +496,7 @@ def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
     for o in range(n - HZ - origins, n - HZ):
         if o < 60 or prices[o] is None:
             continue
-        lg = lags_for(feat, ytr, keys, upto=o)
-        fc = forecast(feat, ytr, prices, lg, keys, o, upto=o)
+        fc = forecast(feat, ytr, prices, keys, o, upto=o)
         for h, r in fc.items():
             act = prices[o + h] if o + h < n else None
             if act is None or act <= 0:
@@ -586,7 +621,11 @@ def main():
             if not mp:
                 continue
             f = transform(k, arr(mp))
-            if sum(1 for v in f if v is not None) < 60:
+            # 최소 표본 — 고정 집합의 지표는 48개월만 있어도 받는다.
+            #   (2026-08-21) 60개월로 잡았더니 미분양이 53개월치뿐이라 통째로 빠졌다.
+            #   회귀 표본은 build_xy 에서 36개 미만이면 어차피 걸러진다.
+            need = 48 if k in FIXED_KEYS else 60
+            if sum(1 for v in f if v is not None) < need:
                 continue
             feat[k] = f
             keys.append(k)
@@ -594,9 +633,10 @@ def main():
             continue
         lg_all = lags_for(feat, ytr, keys)
         lead[reg] = dict(sorted(lg_all.items(), key=lambda kv: -abs(kv[1]["corr"])))
+        model_keys = [k for k in FIXED_KEYS if k in feat]      # 전 지역 동일 집합
         t_last = max(i for i, v in enumerate(prices) if v is not None)
-        fc = forecast(feat, ytr, prices, lg_all, keys, t_last)
-        bt = backtest(feat, ytr, prices, keys)
+        fc = forecast(feat, ytr, prices, model_keys, t_last)
+        bt = backtest(feat, ytr, prices, model_keys)
         # (2026-08-21) 원시 회귀값을 그대로 쓰면 지평마다 지표 조합이 달라 경로가 튄다
         #   (전국 실측: 12개월 후 -27.8% 로 폭락 예측). 두 가지를 건다.
         #   ① 보정 — 백테스트에서 예측폭이 실제로 몇 배 실현됐는지(회귀 기울기)만큼만 반영한다.
@@ -634,10 +674,13 @@ def main():
                      "guarded": sorted(guard),
                      "last": {"t": T[t_last], "price": round(prices[t_last], 2),
                               "raw": prices_raw[t_last]},
-                     "used": [{"key": k, "label": META[k][0], **lg_all[k]}
-                              for k in sorted(keys, key=lambda k: -abs(lg_all[k]["corr"]))[:TOPK]],
+                     "used": [{"key": k, "label": META[k][0],
+                                "lag": (fc.get(HZ, {}).get("lags") or {}).get(k),
+                                "corr": (fc.get(HZ, {}).get("corrs") or {}).get(k)}
+                              for k in model_keys],
+                     "fixed_set": True,
                      "backtest": bt}
-        print(f"    {reg:<3} 후보지표 {len(keys)} · 예측 {len(fp)}개월 · 백테스트 MAPE {bt['mape']}% · 방향적중 {bt['hit']}%")
+        print(f"    {reg:<3} 모델지표 {len(model_keys)}(고정) · 예측 {len(fp)}개월 · 백테스트 MAPE {bt['mape']}% · 방향적중 {bt['hit']}%")
 
     out = {
         "asof": NOW.strftime("%Y-%m-%d %H:%M"),
@@ -650,6 +693,7 @@ def main():
                    "src": "한국부동산원", "smooth": SMOOTH,
                    "note": f"월별 실거래 중위가는 표본 구성에 따라 크게 튀어, 모델과 예측선은 {SMOOTH}개월 평균 기준이다(원자료도 함께 싣는다)."},
         "horizon": HZ, "maxlag": MAXLAG,
+        "fixed_keys": [{"key": k, "label": META[k][0]} for k in FIXED_KEYS],
         "t": T, "regions": regions,
         "meta": {k: {"label": v[0], "unit": v[1], "group": v[2], "cycle": v[3],
                      "src": v[4], "note": v[5]} for k, v in META.items()},

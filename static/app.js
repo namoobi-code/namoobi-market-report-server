@@ -6950,16 +6950,24 @@ await _canvasFlow(c);
                  + `<td style="text-align:right">${rv?((gc/rv*100).toFixed(1)+'%'):'<span class="note">—</span>'}</td>`
                  + `<td style="text-align:right" title="추정 — 영업현금흐름(TTM) ${Math.round(ocf).toLocaleString()} 기준">${fe==null?'<span class="note">—</span>':'<span class="note">≈</span>'+Math.round(fe).toLocaleString()}</td>`; };
           const evR=(gd2&&per===grp&&gd2.revEv)?` title="근거: ${E(gd2.revEv)}"`:'';
-          const evE=(gd2&&per===gep&&gd2.epsEv)?` title="근거: ${E(gd2.epsEv)}"`:'';
+          /* (2026-08-21) 리츠 FFO — 리츠는 컨센서스가 FFO 기준이라 EPS 갭을 만들지 않는다
+             (만들면 FFO 컨센과 비교돼 +64~967% 왜곡). 그래서 EPS 칸이 늘 '미제시'였다.
+             회사가 낸 FFO 가이던스 값 자체는 유효한 선행 정보이므로 그 칸에 대신 싣되,
+             무료 FFO 컨센서스가 없어 갭은 계산하지 않는다(판정 열은 '—' 그대로). */
+          const gf=(gd2&&gd2.ffo!=null&&(gd2.ffoPer||'0y')===per)?gd2.ffo:null;
+          const evE=(gd2&&per===gep&&gd2.epsEv)?` title="근거: ${E(gd2.epsEv)}"`
+                    :((gf!=null&&gd2.ffoEv)?` title="근거: ${E(gd2.ffoEv)}"`:'');
+          const FFOC=gf==null?'<span class="note">미제시</span>'
+            :`<b>${(+gf).toFixed(2)}</b> <span class="note" title="리츠는 애널리스트 컨센서스가 순이익(EPS)이 아니라 FFO 기준이라 EPS 가이던스로는 비교가 성립하지 않는다. 회사가 제시한 FFO 가이던스 값을 대신 싣는다 — 무료 FFO 컨센서스가 없어 갭(상회/하회)은 계산하지 않는다.">${gd2.ffoBasis==='core'?'조정FFO':'FFO'}</span>`;
           return `<tr style="border-bottom:1px solid #f2f4f7;background:#f6faf6"><td style="padding:3px 4px"><b>${LBL[per]}</b></td><td style="text-align:center" class="note">${E(e3.end||'—')}</td>
             <td style="text-align:right"${evR}>${gr==null?'<span class="note">미제시</span>':'<b>'+Math.round(gr).toLocaleString()+'</b>'+SB(gd2.revSrc,gd2.revOwn)}</td>
             <td style="text-align:right">${F(e3.rev)}</td><td style="text-align:right">${J2(jr)}</td>
             <td style="text-align:right">${(gd2&&per===((gd2.revPerP||grp)))?GP(gd2.revGapP,gd2.revGap,'매출'):'<span class="note">—</span>'}</td>
-            <td style="text-align:right"${evE}>${ge==null?'<span class="note">미제시</span>':'<b>'+(+ge).toFixed(2)+'</b>'+SB(gd2.epsSrc,gd2.epsOwn)}</td>
+            <td style="text-align:right"${evE}>${ge==null?FFOC:'<b>'+(+ge).toFixed(2)+'</b>'+SB(gd2.epsSrc,gd2.epsOwn)}</td>
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td>
             <td style="text-align:right">${(gd2&&per===((gd2.epsPerP||gep)))?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td>
             ${CXC(per,e3)}</tr>`; }).join('')+
-        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
+        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>FFO</b> 표기 — 리츠(부동산)는 애널리스트 컨센서스가 순이익(EPS)이 아니라 <b>FFO</b> 기준이라 EPS 가이던스로는 비교가 성립하지 않는다. 그래서 EPS 칸에 회사가 제시한 FFO 가이던스 값을 대신 싣고, 무료 FFO 컨센서스가 없어 <b>갭(상회/하회)은 계산하지 않는다</b>. '조정FFO' 는 회사가 주력으로 제시하는 Core/Normalized/Adjusted FFO 다.<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
       /* (2026-08-15) 가이던스 개정 습관 한 줄 — Benzinga 이력(2022~) 기반 자체 파생 신호.
          상향/하향 습관은 다음 가이던스의 방향 기대치를 잡는 데 쓰인다(판정 미사용). */
       { const td=(window._TENDJ&&window._TENDJ.sym)?window._TENDJ.sym[c]:null;

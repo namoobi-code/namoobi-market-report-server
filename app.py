@@ -780,7 +780,8 @@ def us_fin(sym: str):
                     # 종목이야말로 포털 값을 봐야 하는 경우다. 예전엔 파싱값이 있을 때만
                     # 블록을 만들어, 표의 포털 열이 통째로 '—' 로 보였다.
                     if it.get("c") == sym and any(it.get(k) is not None for k in
-                                                  ("g_rev", "g_eps", "g_rev_p", "g_eps_p")):
+                                                  ("g_rev", "g_eps", "g_rev_p", "g_eps_p",
+                                                   "g_ffo")):
                         gd = {"d": d8, "rev": it.get("g_rev"), "revGap": it.get("g_rev_gap"),
                               "eps": it.get("g_eps"), "epsGap": it.get("g_eps_gap"),
                               "per": it.get("g_per") or "0q",     # 대표 기간(구버전 호환)
@@ -806,6 +807,11 @@ def us_fin(sym: str):
                               # 설비투자 가이던스(회사 제시분만) — 컨센서스는 존재하지 않는다
                               "capex": it.get("g_capex"), "capexPer": it.get("g_capex_per"),
                               "capexEv": it.get("g_capex_ev"),
+                              # (2026-08-21) 리츠 FFO 가이던스 — 리츠는 컨센이 FFO 기준이라
+                              # EPS 갭을 만들지 않는다(만들면 +64~967% 왜곡). 무료 FFO
+                              # 컨센서스가 없어 갭 없이 **값만** 준다. basis: core(조정 FFO)·ffo.
+                              "ffo": it.get("g_ffo"), "ffoPer": it.get("g_ffo_per"),
+                              "ffoBasis": it.get("g_ffo_basis"), "ffoEv": it.get("g_ffo_ev"),
                               "acc": it.get("acc")}
         except Exception:
             pass
