@@ -333,8 +333,14 @@ def corr(a, b):
 #   A/B 백테스트 실측(48시점·18개 시도): 고정 집합이 14개 지역에서 더 정확했다.
 #     예) 경기 7.14%→5.83%, 대구 4.29%→3.43%, 울산 6.40%→5.73%
 #   지역 차이는 이제 '지표 조합' 이 아니라 **그 지역 값·시차·회귀계수** 에서만 나온다.
-#   구성: 금리(비용) · M2(유동성) · CSI(심리) · 수급 · 전세(대체재) · 거래량 · 미분양(재고)
-FIXED_KEYS = ["mtg_rate", "m2", "csi", "supply", "jeonse", "trade", "unsold"]
+#   그리고 '몇 개를 넣을 것인가' 도 실측으로 정했다.
+#   B(핵심 7개) vs C(수집한 전 지표) 백테스트 — C 가 18개 지역 전부에서 우세했다.
+#     서울 MAPE 7.20%→4.88%·방향 65.4%→76.3% · 전국 8.83%→5.14%·84.6%→86.0%
+#     세종 11.81%→6.22% · 경기 7.96%→5.27%(방향 56.1%→77.2%)
+#   변수를 늘리면 과적합이 걱정이지만, ① 릿지 정규화 ② 지평별 시차 재탐색
+#   ③ 워크포워드 백테스트(그 시점 자료만) 로 걸러본 결과 늘리는 쪽이 실제로 나았다.
+#   → 수집한 지표를 **전부** 쓴다. 지역 차이는 값·시차·회귀계수에서만 나온다.
+FIXED_KEYS = list(META)
 
 
 def best_lag_ge(x, y, h, maxlag=MAXLAG):
@@ -691,10 +697,13 @@ def main():
                      "guarded": sorted(guard),
                      "last": {"t": T[t_last], "price": round(prices[t_last], 2),
                               "raw": prices_raw[t_last]},
+                     # 12개월 지평에서 실제로 회귀에 들어간 지표만 싣는다.
+                     #   표본이 짧아 그 지평에서 빠진 지표는 lag 가 없어 화면 표가 깨졌다.
                      "used": [{"key": k, "label": META[k][0],
-                                "lag": (fc.get(HZ, {}).get("lags") or {}).get(k),
+                                "lag": (fc.get(HZ, {}).get("lags") or {})[k],
                                 "corr": (fc.get(HZ, {}).get("corrs") or {}).get(k)}
-                              for k in model_keys],
+                              for k in model_keys if k in (fc.get(HZ, {}).get("lags") or {})],
+                     "n_model_keys": len(model_keys),
                      "fixed_set": True,
                      "backtest": bt}
         print(f"    {reg:<3} 모델지표 {len(model_keys)}(고정) · 예측 {len(fp)}개월 · 백테스트 MAPE {bt['mape']}% · 방향적중 {bt['hit']}%")
