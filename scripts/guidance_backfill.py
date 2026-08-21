@@ -83,7 +83,9 @@ G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_o
             "g_rev_basis",
             "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_eps_src", "g_eps_own",
             "g_eps_basis",
-            "g_per", "g_capex", "g_capex_per", "g_capex_ev", "acc", "_d8")
+            "g_per", "g_capex", "g_capex_per", "g_capex_ev",
+            "g_ffo", "g_ffo_per", "g_ffo_basis", "g_ffo_ev",   # 리츠 FFO(갭 없이 값만)
+            "acc", "_d8")
 
 
 def _save(live):

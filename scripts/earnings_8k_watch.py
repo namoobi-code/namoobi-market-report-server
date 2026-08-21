@@ -321,6 +321,20 @@ def guidance_gap(sym, g, pool_us, ann=None):
             out["g_capex_per"] = per
             if (g.get("_ev") or {}).get(pre + "capex"):
                 out["g_capex_ev"] = g["_ev"][pre + "capex"][:300]
+    # (2026-08-21) **리츠 FFO 가이던스** — 리츠의 컨센서스는 FFO 기준이라 회사의 EPS
+    # 가이던스는 위(is_reit)에서 통째로 버리는데, 그러면 리츠는 가이던스 칸이 늘 비었다
+    # (실측: 부동산 섹터 8-K 192건 중 BZ 가 주당값을 주는 것 96건이 전량 공백).
+    # 회사가 낸 FFO 값 자체는 유효한 선행 정보이므로, 무료 FFO 컨센서스가 없는 만큼
+    # 갭은 계산하지 않고 **값만** 싣는다(CapEx 와 같은 취급).
+    for pre, per in (("", q_per), ("fy_", "0y")):
+        lo, hi = g.get(pre + "ffo_lo"), g.get(pre + "ffo_hi")
+        if lo and hi and "g_ffo" not in out:
+            out["g_ffo"] = round((lo + hi) / 2, 2)
+            out["g_ffo_per"] = per
+            if g.get(pre + "ffo_basis"):
+                out["g_ffo_basis"] = g[pre + "ffo_basis"]      # core(조정 FFO) · ffo(기본)
+            if _ev.get(pre + "ffo"):
+                out["g_ffo_ev"] = _ev[pre + "ffo"][:300]
     return out
 
 

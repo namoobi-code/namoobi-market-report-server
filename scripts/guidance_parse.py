@@ -211,7 +211,9 @@ def _forms(label, metric):
     gap25 = r"(?:(?!" + label + r")[^$%]){0,25}?"
     gap70 = r"(?:(?!" + label + r")[^$]){0,70}?"
     gap60d = r"(?:(?!" + label + r")[^$]){0,60}?"
-    if metric == "eps":
+    # (2026-08-21) FFO 는 리츠의 주당 이익 지표다 — EPS 와 같은 형식(달러 소수, 단위 접미사
+    # 없음)이므로 같은 후보 형식을 쓴다.
+    if metric in ("eps", "ffo"):
         return [
             ("range", label + gap + _NUM_D + r"\s*(?:to|through|-|and)\s*" + _NUM_D),
             ("rangec", label + gap + _NUM_C + r"\s*(?:to|through|-|and)\s*" + _NUM_C),
@@ -581,8 +583,15 @@ def parse_guidance(txt, per_hint=None):
             # $A–$B, and adjusted EPS $C–$D" 로 나란히 쓰면 먼저 나온 GAAP-성격 값이
             # 선점해 조정 컨센과 비교돼 갭이 틀어졌다(실측 ROK 12.87→13.15 정답 ·
             # INGR 9.45→10.6 · TKR 3.90→6.20 · DORM 8.08→8.65 — 전부 조정 쪽이 정답).
-            if not (metric == "eps" and basis == "adj"
-                    and out.get(pre + "eps_basis") != "adj"):
+            # (2026-08-21) FFO 도 같은 이유로 교체한다 — 리츠는 Nareit FFO(기본)와
+            # Core/Normalized/Adjusted FFO 를 **한 표에 나란히** 싣고, 컨센서스(BZ 포함)는
+            # 회사가 주력으로 제시하는 조정 쪽을 쓴다. 먼저 나오는 기본 FFO 가 선점하면
+            # 조정 컨센과 어긋난다(실측 VTR: Nareit FFO 3.69~3.76 채택 → BZ Normalized
+            # 3.88 대비 −4.1% · CPT: FFO 6.05~6.19 채택 → BZ Core FFO 6.75 대비 −8.9%).
+            if not ((metric == "eps" and basis == "adj"
+                     and out.get(pre + "eps_basis") != "adj")
+                    or (metric == "ffo" and basis == "core"
+                        and out.get(pre + "ffo_basis") != "core")):
                 return
         else:
             # (2026-08-10) 같은 수치가 이미 **다른 기간**으로 등록돼 있으면 무시한다.
@@ -596,7 +605,12 @@ def parse_guidance(txt, per_hint=None):
             other = ("fy_" if pre == "" else "") + metric
             ol, oh = out.get(other + "_lo"), out.get(other + "_hi")
             if ol and oh and lo and hi and abs(lo / ol - 1) <= 0.05 and abs(hi / oh - 1) <= 0.05:
-                return
+                # (2026-08-21) 단, 리츠는 Nareit FFO 와 Normalized/Core FFO 를 **한 표에 나란히**
+                # 싣고 두 값이 3~5% 밖에 안 벌어진다(실측 VTR: Nareit 3.69~3.76 · Normalized
+                # 3.82~3.89). 기준이 다르면 다른 항목이므로 중복으로 지우지 않는다.
+                if not (metric == "ffo" and basis and out.get(other + "_basis")
+                        and basis != out.get(other + "_basis")):
+                    return
         out[pre + metric + "_lo"], out[pre + metric + "_hi"] = (
             (lo, hi) if metric == "rev" else (round(lo, 2), round(hi, 2)))
         if basis:
@@ -612,6 +626,19 @@ def parse_guidance(txt, per_hint=None):
     for metric, label in (("rev", r"(?:revenues?|net sales)"),
                           ("eps", r"(?:diluted\s+)?earnings per (?:diluted\s+|common\s+)?share|\beps\b|"
                                   r"net income per (?:diluted\s+|common\s+)?share(?:s)?(?:\s*,\s*diluted)?"),
+                          # (2026-08-21) **리츠 FFO** — 리츠의 컨센서스는 순이익이 아니라
+                          # FFO 기준이라, 회사의 EPS 가이던스로는 비교가 성립하지 않아
+                          # guidance_gap 이 섹터 판정으로 EPS 를 통째로 버려 왔다(실측:
+                          # 부동산 섹터 8-K 192건 중 BZ 가 주당값을 주는 것 96건이 전부 공백).
+                          # FFO 자체를 뽑아 별도 필드로 실으면 그 96건이 화면에 살아난다.
+                          # 표기가 회사마다 다르다 — 실측 WELL 'normalized FFO' · PLD 'Core FFO' ·
+                          # VTR 'Normalized Funds From Operations … per share' · IRM/CCI 'AFFO
+                          # per share' · DLR 'FFO / diluted share and unit'.
+                          ("ffo", r"(?:core\s+|adjusted\s+|normalized\s+|nareit\s+|real\s+estate\s+)?"
+                                  r"(?:\bA?FFO\b|funds\s+from\s+operations)"
+                                  r"(?:\s*\([^)]{0,40}\))?"
+                                  r"(?:\s*(?:per|/)\s*(?:diluted\s+|common\s+)*"
+                                  r"share(?:\s+and\s+unit)?)?"),
                           ("capex", r"(?:capital expenditures?|\bcapex\b)")):
         for kind, pat in _forms(label, metric):
             for m in re.finditer(pat, txt, re.I):
@@ -739,7 +766,7 @@ def parse_guidance(txt, per_hint=None):
                 # (2026-08-14) 라벨과 숫자 사이에 **반대편 지표**가 끼면 그 숫자는 그쪽 것이다.
                 # 실측 LINC: "(… except … diluted EPS) Low High Revenue $590.0 - $600.0" 에서
                 # 괄호 속 'EPS' 라벨이 매출 590~600 을 EPS 로 채택(595.00 — 자릿수부터 불가능).
-                if metric == "eps" and re.search(r"\brevenues?\b|\bnet sales\b|\bexcept\b", lead, re.I):
+                if metric in ("eps", "ffo") and re.search(r"\brevenues?\b|\bnet sales\b|\bexcept\b", lead, re.I):
                     skip.append(f"eps: 라벨~숫자 사이에 매출 표현 → 매출 값 · {ctx[:110]}")
                     continue
                 if metric == "rev" and re.search(r"\beps\b|earnings per share|per[-\s]share", lead, re.I):
@@ -769,13 +796,13 @@ def parse_guidance(txt, per_hint=None):
                     um_ = pm_ and (re.search(r"\b(?:updated?|revised?|current|new)\b", _tail, re.I)
                                    or re.search(r"\b(?:guidance|outlook)\b", _tail, re.I))
                     if pm_ and um_:
-                        n2 = _NUM_D if metric == "eps" else _NUM
+                        n2 = _NUM_D if metric in ("eps", "ffo") else _NUM
                         m2 = re.match(r"[^$\d%]{0,30}?" + n2 + r"\s*(?:to|through|-|and)\s*" + n2,
                                       txt[m.end():m.end() + 90], re.I)
                         if m2:
-                            h2 = (m2.group(4) or m2.group(2) or "").lower() if metric != "eps" else None
-                            lo2 = _num(m2.group(1), None if metric == "eps" else m2.group(2), h2)
-                            hi2 = _num(m2.group(3), None if metric == "eps" else m2.group(4), h2)
+                            h2 = (m2.group(4) or m2.group(2) or "").lower() if metric not in ("eps", "ffo") else None
+                            lo2 = _num(m2.group(1), None if metric in ("eps", "ffo") else m2.group(2), h2)
+                            hi2 = _num(m2.group(3), None if metric in ("eps", "ffo") else m2.group(4), h2)
                             if lo2 is not None and hi2 is not None:
                                 lo, hi = lo2, hi2
                                 ctx += " [개정 열 채택: %s~%s]" % (m2.group(1), m2.group(3))
@@ -786,13 +813,13 @@ def parse_guidance(txt, per_hint=None):
                 if kind == "range" and re.search(r"\bfrom\s+(?:a\s+range\s+of\s+)?$", lead[-22:], re.I) and \
                    re.search(r"\b(?:increas\w+|rais\w+|lower\w+|updat\w+|revis\w+|narrow\w+|cut\w+)\b",
                              back + lead, re.I):
-                    n2 = _NUM_D if metric == "eps" else _NUM
+                    n2 = _NUM_D if metric in ("eps", "ffo") else _NUM
                     # (2026-08-15) "from a range of A to B **to a range of** C to D"(실측 ICUI)
                     m2 = re.match(r"\s*to\s*(?:a\s+range\s+of\s+)?" + n2 +
                                   r"(?:\s*(?:to|through|-|and)\s*" + n2 + r")?",
                                   txt[m.end():m.end() + 90], re.I)
                     if m2:                                   # from [구범위] to [신범위/값]
-                        if metric == "eps":
+                        if metric in ("eps", "ffo"):
                             a, b = _num(m2.group(1), None), (_num(m2.group(3), None)
                                                              if m2.group(3) else None)
                         else:
@@ -909,6 +936,58 @@ def parse_guidance(txt, per_hint=None):
                         skip.append(f"rev: 범위 비정상({lo:.0f}~{hi:.0f}) · {ctx[:120]}")
                         continue
                     add("rev", per, lo, hi, ctx)
+                elif metric == "ffo":
+                    # (2026-08-21) 리츠 FFO — 주당 값만 받는다. 리츠 보도자료는 총액 FFO
+                    # ("AFFO of $433 million")와 주당 FFO("$1.47 per share")를 나란히 쓰는데,
+                    # 총액에는 단위(million/billion)가 반드시 붙는다. 단위가 붙은 값은 총액이다.
+                    if re.search(r"^\s*(?:million|billion|bn|mm)\b", txt[m.end():m.end() + 12], re.I) \
+                            or re.search(r"(?:million|billion)\s*$", lead, re.I):
+                        skip.append(f"ffo: 총액 표기(주당 아님) · {ctx[:110]}")
+                        continue
+                    # 조정 명세표의 **비용 항목**은 FFO 가 아니다 — 리츠 가이던스 표는
+                    # "General and Administrative expense, net of adjustments **for FFO as
+                    # Adjusted** $65 to $75" 처럼 항목명 뒤에 FFO 를 단서로 붙인다. 라벨이
+                    # FFO 로 잡히지만 값은 그 비용(백만 달러)이다(실측 UDR 65~75 채택 →
+                    # BZ 2.53 대비 +2,667%). 라벨 **앞**에 다른 지표명이 있으면 그 항목이다.
+                    # 라벨 바로 앞이 전치사로 이어지면 FFO 는 그 항목을 **수식**할 뿐 주어가
+                    # 아니다("… expense, net of adjustments **for** FFO as Adjusted").
+                    # 리츠 표는 FFO 행 위아래에 순이익·배당·마진 행이 늘어서므로, 앞 문맥에
+                    # 다른 지표명이 있다는 이유만으로 막으면 정상 FFO 까지 사라진다(실측: 그렇게
+                    # 했더니 미추출 34→40 으로 늘었다) — 전치사 연결일 때만 막는다.
+                    if re.search(r"\b(?:for|of|to|in|on)\s*$", near, re.I) \
+                            and re.search(_OTHER, near[-45:], re.I):
+                        skip.append(f"ffo: 앞 항목 '{_OTHER_HIT(near[-45:])}' 를 수식 · {ctx[:110]}")
+                        continue
+                    # 인수·거래의 **효과**를 말하는 문장은 가이던스가 아니다 — "expected to be
+                    # accretive to FFO per share … $0.35"(실측 PSA: BZ Core FFO 16.90 대비 −98%).
+                    if re.search(r"\b(?:accretive|dilutive)\s+to\s*$|\bimpact\s+(?:on|to)\s*$|"
+                                 r"\bcontribut\w+\s+to\s*$", near, re.I):
+                        skip.append(f"ffo: 거래 효과 서술(가이던스 아님) · {ctx[:110]}")
+                        continue
+                    # "Increased 2026 AFFO Guidance **$0.01 to** $1.41 - $1.43"(실측 PSTL) —
+                    # 앞 숫자는 상향 **폭**이고 실제 범위는 뒤의 두 값이다. 매칭 직후에
+                    # 또 하나의 금액이 대시로 이어지면 (hi, 그 값)이 범위다.
+                    _nx = re.match(r"\s*[-–—]\s*\$?\s?([\d.]+)(?!\d)", txt[m.end():m.end() + 14])
+                    if _nx and hi > 0 and lo / hi < 0.2:
+                        _v = float(_nx.group(1))
+                        if hi <= _v < hi * 1.5:
+                            lo, hi = hi, _v
+                            ctx += " [상향폭 표기 → 뒤 범위 채택]"
+                    if not (0 < lo <= hi < 100):
+                        skip.append(f"ffo: 값 범위 비정상({lo}~{hi}) · {ctx[:110]}")
+                        continue
+                    # core/adjusted/normalized 는 리츠가 쓰는 조정 FFO 표기다. BZ 도 이 기준을
+                    # 쓰므로(g_bz_type=FFO) 어느 쪽인지 기록해 둔다.
+                    # 판정 범위에 **매칭된 라벨 자체**를 넣어야 한다 — lead 는 라벨 '끝'부터라
+                    # 라벨 안의 Normalized/Core 가 보이지 않는다(실측 VTR: 'Normalized FFO Per
+                    # Share Range* $3.82-$3.89' 가 기본 FFO 로 분류돼 먼저 잡힌 Nareit FFO
+                    # 3.69~3.76 을 교체하지 못했다 → BZ 3.88 대비 −4.1%).
+                    _fb = "core" if re.search(r"\bAFFO\b|"
+                                              r"\b(?:core|adjusted|normalized)\s*"
+                                              r"(?:A?FFO\b|funds\s+from)",
+                                              txt[m.start():m.start() + 45] + " " + lead + near,
+                                              re.I) else "ffo"
+                    add("ffo", per, lo, hi, ctx, _fb)
                 else:
                     # 회계 기준 판정은 **가까운 것부터** 본다.
                     # 넓은 ctx 하나로 판정하면 GAAP↔non-GAAP 조정표에서 두 단어가 함께 잡혀
