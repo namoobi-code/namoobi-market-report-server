@@ -61,7 +61,11 @@ _PART = (r"segment|product line|service revenue|subscription|recurring|licen[cs]
          # (2026-08-15 5차) 개별 시설·자산 매출 — "we expect **this facility** to generate
          # total annual revenue of approximately $75 million"(실측 CXW: 신규 수용시설 1곳의
          # 매출 75M 이 전사 연간 매출로 채택돼 컨센 2B 대비 −97%).
-         r"facilit(?:y|ies)|this property|per location")
+         r"facilit(?:y|ies)|this property|per location|"
+         # (2026-08-21) 동일 점포·동일 주택 기준 지표는 전사 실적이 아니다 —
+         # 실측 AMH(American Homes 4 Rent): 'Same-Home Core revenues growth 1.25% - 3.25%'
+         # 가 전사 매출 성장률로 채택됐다. 리츠·유통이 흔히 쓰는 표기다.
+         r"same[\s-]?(?:home|store|property|community|center)|comparable\s+(?:store|restaurant|sales)")
 # 전사 매출임을 확인해 주는 수식어(바로 앞 단어)
 # (2026-08-15) 오탐으로 확인된 무해 수식어 추가 — "expects to **report** revenue"(실측 TRMB) ·
 # "**its** revenue" · "FY27 revenue"(연도 표기) · 불릿 기호 "o Revenue" · "record revenue"(사상 최대)
@@ -1085,6 +1089,111 @@ def parse_guidance(txt, per_hint=None):
                         skip.append(f"eps: 값 범위 비정상({lo}~{hi}) · {ctx[:120]}")
                         continue
                     add("eps", per, lo, hi, ctx, "adj" if adj else "unspec")
+    # ────────────────────────────────────────────────────────────────────────
+    # (2026-08-21) **성장률 가이던스** — 금액을 아예 제시하지 않고 성장률로만 말하는 회사.
+    # 실측: 원문에 금액이 없는 미확보 279건 중 성장률 표기가 있는 것 47건
+    # (범위% 25 · up/increase 10 · 단일% 8 · 서술형 2 · 역순 2).
+    #   예) KARO 'EPS growth between 18% and 23%' · GPC 'Total sales growth 3% to 5.5%' ·
+    #       ADP 'EPS growth of 9% to 11%' · BLDR 'net sales growth of approximately 1%'
+    # 금액 환산은 도입하지 않는다(이 파일 첫머리 2026-08-16 실측 결론) — 성장률 **그대로**
+    # 별도 필드에 싣고 화면에도 성장률로 표시한다. 컨센서스는 금액이라 갭은 만들지 않는다.
+    # 'low-single digit' 같은 서술형은 숫자 범위로 바꾸려면 추정이 들어가므로 넣지 않는다.
+    # \b 로 닫아 과거형을 배제한다 — 'increased' 는 'increase' 뒤가 d 라 단어경계가 아니다.
+    # (실측 PEP: 'Core constant currency EPS **increased** 1% and 3%' 은 지난 실적 서술인데
+    #  과거형이 걸려 연간 EPS 성장률 가이던스로 실렸다.)
+    _GW = r"\b(?:growth|grow|increase|rise|expand)\b"
+    _P = r"(\d+(?:\.\d+)?)\s*%"
+    for metric, label in (("rev", r"(?:revenues?|(?:net|total)\s+sales)"),
+                          ("eps", r"(?:(?:diluted\s+)?earnings per (?:diluted\s+|common\s+)?share|\beps\b)")):
+        if metric + "_lo" in out or "fy_" + metric + "_lo" in out:
+            continue                                       # 금액을 이미 확보했으면 성장률은 불필요
+        gp = r"(?:(?!" + label + r")[^.•●]){0,70}?"
+        forms = [
+            ("grange", label + gp + _GW + r"(?:\s+(?:of|between|in|to|at))?"
+                       r"[^.•●]{0,28}?" + _P + r"\s*(?:to|-|–|and|through)\s*" + _P),
+            ("gpm",    label + gp + _GW + r"[^.•●]{0,28}?" + _P +
+                       r"\s*(?:±|\+/-|plus or minus)\s*" + _P),
+            ("gsingle", label + gp + _GW + r"\s+of\s+(?:(?:approximately|about|around)\s+)?" + _P),
+        ]
+        for kind, pat in forms:
+            done = False
+            for m in re.finditer(pat, txt, re.I):
+                seg = txt[max(0, m.start() - 130):m.end() + 40]
+                # 전망 문맥은 **같은 문장(불릿)** 또는 **바로 앞 머리글**에서만 인정한다.
+                # 앞 130자를 통째로 보면 두 문장 앞의 'Guidance' 가 실적 하이라이트 불릿까지
+                # 전망으로 만들어 버린다(실측 CMCO: 제목 '…sales in Q1 FY27; Increases FY27
+                # Guidance' 뒤 실적 불릿 'Net sales growth of 125% Y/Y driven by the Kito
+                # Crosby Acquisition' 이 연간 매출 성장률 가이던스로 실렸다).
+                # 불릿 목록은 머리글에만 guidance/outlook 이 있고 항목엔 없으므로
+                # (실측 MIR '…guidance for the fiscal year ending December 31, 2026. •
+                #  Revenue growth of approximately 22.0% - 24.0%') 직전 한 문장까지는 본다.
+                _BD = ("• ", "● ", "▪ ", "· ", ": ")
+                _b = max(txt.rfind(". ", 0, m.start()),
+                         *(txt.rfind(x, 0, m.start()) for x in _BD))
+                _cur = txt[max(0, _b):m.end() + 40]
+                if not re.search(_FORE, _cur, re.I):
+                    # 직전 문장을 찾을 때 10자를 물러선다 — "…2026. • Revenue" 처럼 마침표와
+                    # 불릿이 붙어 있으면 둘이 별개 경계로 잡혀 직전 문장이 ". " 두 글자가 된다.
+                    _b2 = max(txt.rfind(". ", 0, max(0, _b - 10)),
+                              *(txt.rfind(x, 0, max(0, _b - 10)) for x in _BD))
+                    if not re.search(_FORE, txt[max(0, _b2):max(0, _b)], re.I):
+                        continue                           # 전망 문맥이 아니면 실적 서술이다
+                # 이미 이룬 결과를 서술하는 동사 뒤의 성장률은 지난 실적이다.
+                # 실측 PACK: 'these factors **contributed to** net revenue growth of 14.0%'
+                # — 불릿 목록 머리글에 outlook 이 있어 전망 문맥 검사를 통과했다.
+                if re.search(r"\b(?:contributed\s+to|drove|delivered|reported|achieved|"
+                             r"resulted\s+in|generated|posted|recorded|led\s+to)\s*$",
+                             txt[max(0, m.start() - 40):m.start()], re.I):
+                    skip.append(f"{metric}성장률: 지난 실적 서술 · {seg[:90]}")
+                    continue
+                # 라벨과 숫자 사이에 **다른 지표**가 끼면 그 숫자는 그쪽 것이다.
+                # 실측 KARO: 'Cartrack Subscription Revenue growth to accelerate, with
+                # **EPS growth of 21%**' 에서 앞 revenue 라벨이 EPS 성장률을 가져갔다.
+                _other = (r"\beps\b|earnings per share" if metric == "rev"
+                          else r"\brevenues?\b|\bnet sales\b|\btotal sales\b")
+                if re.search(_other, m.group(0), re.I):
+                    skip.append(f"{metric}성장률: 다른 지표의 값 · {m.group(0)[:90]}")
+                    continue
+                # 세그먼트·부문 성장률은 전사 성장률이 아니다. 라벨 바로 앞 단어가 전사임을
+                # 확인해 주는 낱말이 아니면 기각한다(금액 파서와 같은 규칙).
+                # 실측 DIS: 'Entertainment SVOD (1) revenue growth of 11%' — 부문 매출이다.
+                # 수식어 검사는 **매출에만** 건다 — EPS 는 부문별로 쪼개지 않으므로
+                # 'adjusted diluted EPS growth of 9% to 11%'(실측 ADP)의 'diluted' 같은
+                # 정상 수식어까지 걸러 버린다.
+                if metric == "rev":
+                    _nr = txt[max(0, m.start() - 60):m.start() + 40]
+                    if re.search(_PART, _nr, re.I):
+                        skip.append(f"rev성장률: 전사 아님(부분 지표) · {seg[:90]}")
+                        continue
+                    _mw = re.search(r"([A-Za-z][\w\-]*)\s*(?:\([^)]{0,10}\)\s*)?$",
+                                    txt[max(0, m.start() - 40):m.start()])
+                    if _mw and re.sub(r"[^a-z]", "", _mw.group(1).lower()) not in _CORP_W:
+                        skip.append(f"rev성장률: 수식어 '{_mw.group(1)}' → 전사 아님 · {seg[:90]}")
+                        continue
+                try:
+                    a = float(m.group(1))
+                    b = float(m.group(2)) if m.lastindex and m.lastindex >= 2 else None
+                except Exception:
+                    continue
+                lo, hi = (a, a) if b is None else ((a - b, a + b) if kind == "gpm" else (a, b))
+                if lo > hi or not (-100 < lo <= hi < 200):
+                    continue
+                per, _ = _period(txt, m.start(), m.end())
+                if not per and per_hint:
+                    per = per_hint
+                if not per:
+                    skip.append(f"{metric}성장률: 기간 미명시 · {seg[:100]}")
+                    continue
+                pre = "" if per == "Q" else "fy_"
+                if pre + metric + "_gr_lo" in out:
+                    continue
+                out[pre + metric + "_gr_lo"], out[pre + metric + "_gr_hi"] = round(lo, 1), round(hi, 1)
+                ev[pre + metric + "_gr"] = re.sub(r"\s+", " ", seg)[:400]
+                done = True
+                break
+            if done:
+                break
+
     if ev:
         out["_ev"] = ev
     if skip:

@@ -85,6 +85,9 @@ G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_o
             "g_eps_basis",
             "g_per", "g_capex", "g_capex_per", "g_capex_ev",
             "g_ffo", "g_ffo_per", "g_ffo_basis", "g_ffo_ev",   # 리츠 FFO(갭 없이 값만)
+            # 성장률 가이던스(금액 미제시 회사) — 갭 없이 성장률 그대로
+            "g_rev_gr", "g_rev_gr_lo", "g_rev_gr_hi", "g_rev_gr_per", "g_rev_gr_ev",
+            "g_eps_gr", "g_eps_gr_lo", "g_eps_gr_hi", "g_eps_gr_per", "g_eps_gr_ev",
             "acc", "_d8")
 
 

@@ -335,6 +335,19 @@ def guidance_gap(sym, g, pool_us, ann=None):
                 out["g_ffo_basis"] = g[pre + "ffo_basis"]      # core(조정 FFO) · ffo(기본)
             if _ev.get(pre + "ffo"):
                 out["g_ffo_ev"] = _ev[pre + "ffo"][:300]
+    # (2026-08-21) **성장률 가이던스** — 금액을 안 주고 성장률로만 말하는 회사(실측 47건).
+    # 금액 환산은 도입하지 않는다(guidance_parse 첫머리 2026-08-16 실측 결론) — 성장률
+    # 그대로 싣는다. 컨센서스는 금액이라 갭은 만들지 않는다. 금액을 확보한 지표는
+    # 파서 단계에서 이미 건너뛰므로 여기서 금액과 겹치지 않는다.
+    for met, key in (("rev", "g_rev_gr"), ("eps", "g_eps_gr")):
+        for pre, per in (("", q_per), ("fy_", "0y")):
+            lo, hi = g.get(pre + met + "_gr_lo"), g.get(pre + met + "_gr_hi")
+            if lo is not None and hi is not None and key not in out:
+                out[key] = round((lo + hi) / 2, 1)
+                out[key + "_lo"], out[key + "_hi"] = lo, hi
+                out[key + "_per"] = per
+                if _ev.get(pre + met + "_gr"):
+                    out[key + "_ev"] = _ev[pre + met + "_gr"][:300]
     return out
 
 
