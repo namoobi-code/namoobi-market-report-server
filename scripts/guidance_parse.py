@@ -488,20 +488,42 @@ def _period(txt, start, end):
     # 종전엔 이 머리글을 지나쳐 **더 먼** "Outlook For the third quarter of 2026:" 을 집어
     # 연간 EPS 2.65~2.73 이 0q 로 태그됐다(분기 컨센 대비 +365%).
     hs, h0 = None, max(0, start - 800)
+    # (2026-08-21) 머리글 허용 길이 60→150 — 지표를 나열하고 기간을 맨 끝에 붙이는
+    # 긴 머리글이 흔한데 60자에서 잘려 인식되지 않았다. 실측 UPWK:
+    #   "Upwork's guidance for revenue, adjusted EBITDA, diluted weighted-average shares
+    #    outstanding, and non-GAAP diluted EPS **for the third quarter of 2026** is:"(133자)
+    # 이 안 잡혀 그 아래 분기 EPS 0.31~0.33 이 fy_eps 로 실렸고, 뒤에 오는 진짜 연간
+    # 가이던스가 중복 차단에 걸려 버려졌다(BZ 연간 1.40 대비 -77%).
+    # 사이에 마침표·불릿·콜론이 못 오므로 한 구절을 벗어나지 않는다.
     for hm in re.finditer(r"(?:guidance|outlook|expects?|expectations|anticipates?|"
                           r"following\s+(?:ranges|updates)|as\s+follows)"
-                          r"[^.•●▪:]{0,60}:", txt[h0:start], re.I):
+                          r"[^.•●▪:]{0,150}:", txt[h0:start], re.I):
         hs = hm                                   # 가장 가까운(=마지막) 머리글
     # (2026-08-15 5차) ②-c **맨몸 기간 머리글** — 실측 HLT: "Full Year 2026 • System-wide …"
     # 처럼 콜론도 키워드도 없이 기간 어구만으로 불릿 목록을 여는 형식. 기간 어구가 불릿
     # 기호 바로 앞에 오면 그 목록의 기간이다. "Second Quarter 2026 Results • …" 같은 실적
     # 헤드라인은 Results 가 사이에 끼므로 매치되지 않는다.
+    # (2026-08-21) ②-d **표 평문 머리글** — 표를 평문화하면 불릿도 콜론도 남지 않고
+    # "Q3 2026 Outlook Net Sales 2% to 3% … Normalized EPS $0.18 to $0.20" 처럼 머리글과
+    # 항목이 통째로 이어붙는다. 기간 어구 바로 뒤에 Outlook/Guidance/Targets 가 오면
+    # 그 자체가 블록 머리글이므로 불릿을 요구하지 않는다.
+    #   실측 NWL(Newell) — 'Q3 2026 Outlook' 을 못 읽어 분기 Normalized EPS 0.18~0.20 이
+    #   fy_eps 로 실렸다(BZ 연간 0.75 대비 -75%). 바로 뒤에 'Updated Full Year 2026
+    #   Outlook' 이 이어져 그쪽이 근거로 새어 들어간 형태.
+    # "Full Year **Fiscal** 2027"(실측 DXC)처럼 연간 어구와 연도 사이에 fiscal 이 끼는
+    # 표기를 받아야 한다 — 안 받으면 이 머리글이 통째로 밀려 앞의 "Second Quarter …
+    # Guidance" 가 대신 잡히고 연간 매출이 분기로 뒤집힌다(gp_cases DXC 회귀로 확인).
+    _PHD = (r"(?:(?:full[\s-]?year|fiscal\s+year|FY)\s*(?:of\s+)?(?:fiscal\s+)?20\d\d|"
+            r"(?:first|second|third|fourth)\s+quarter\s+(?:of\s+)?"
+            r"(?:fiscal\s+(?:year\s+)?)?20\d\d|\bQ[1-4]\s*(?:FY\s*)?20\d\d)")
     hc = None
-    for hm in re.finditer(r"(?:(?:full[\s-]?year|fiscal\s+year|FY)\s*(?:of\s+)?20\d\d|"
-                          r"(?:first|second|third|fourth)\s+quarter\s+(?:of\s+)?"
-                          r"(?:fiscal\s+(?:year\s+)?)?20\d\d)\s*[::]?\s*(?=[•●▪◦])",
-                          txt[h0:start], re.I):
+    for hm in re.finditer(_PHD + r"\s*[::]?\s*(?=[•●▪◦])", txt[h0:start], re.I):
         hc = hm
+    for hm in re.finditer(_PHD + r"\s+(?:GAAP\s+|Non-GAAP\s+|Adjusted\s+)?"
+                          r"(?:Financial\s+|Business\s+)?(?:Outlook|Guidance|Targets?)\b",
+                          txt[h0:start], re.I):
+        if hc is None or hm.start() > hc.start():
+            hc = hm
     # 값에 더 가까운 머리글이 그 값을 지배한다
     for knd, hm in sorted([("kw", hs), ("bare", hc)],
                           key=lambda x: -(x[1].start() if x[1] else -1)):
@@ -513,7 +535,11 @@ def _period(txt, start, end):
             if r15 == "Q" and not _fwd_q(seg):
                 r15 = None
         else:
-            if re.search(r"full[\s-]?year|fiscal\s+year|\bFY\b", hm.group(0), re.I):
+            # (2026-08-21) 분기 낱말이 있으면 분기다 — "Q3 FY2026 Outlook" 처럼 분기 머리글에
+            # 회계연도가 붙는 표기가 흔한데, FY 만 보고 연간으로 판정하면 정반대가 된다.
+            if re.search(r"\bquarter\b|\bQ[1-4]\b", hm.group(0), re.I):
+                r15 = "Q" if _fwd_q(txt[h0 + hm.start():h0 + hm.end() + 120]) else None
+            elif re.search(r"full[\s-]?year|fiscal\s+year|\bFY\b", hm.group(0), re.I):
                 r15 = "Y"
             else:                                  # 분기 머리글 — 뒤 불릿이 전망 문맥일 때만
                 r15 = "Q" if _fwd_q(txt[h0 + hm.start():h0 + hm.end() + 120]) else None

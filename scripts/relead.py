@@ -250,3 +250,389 @@ def from_re(re_, key):
     s = (re_.get("series") or {}).get(key) or {}
     t, v = s.get("t") or [], s.get("v") or []
     return {"전국": {str(t[i]): v[i] for i in range(min(len(t), len(v))) if v[i] is not None}}
+
+
+# ══════════════════ 예측 엔진 ══════════════════
+# 지표를 그대로 쓸지(수준), 전년비로 바꿀지 — 단위가 다른 계열을 같은 회귀에 넣기 위한 구분.
+#   금리·심리지수처럼 이미 '수준 자체가 의미'인 것은 그대로,
+#   통화량·대출잔액처럼 계속 커지는 것은 전년비로 바꿔야 추세에 회귀가 끌려가지 않는다.
+TRANS = {"rate_kr": "lvl", "mtg_rate": "lvl", "csi": "lvl", "supply": "lvl", "cli": "lvl"}
+RIDGE = 1.0            # 표준화 기준 정규화 강도 — 표본이 200개 남짓이라 과적합 방지용
+TOPK = 6               # 회귀에 넣을 지표 수 상한(상관 상위)
+BT_ORIGINS = 48        # 백테스트로 되돌아가 볼 시점 수(개월)
+
+
+SMOOTH = 3        # 기준계열 평활 창(개월)
+
+
+def ma(seq, w=SMOOTH):
+    """뒤쪽 w개월 이동평균(중심이 아니라 '지나간 w개월' — 미래를 쓰지 않는다).
+
+    (2026-08-21) 실거래 중위가격은 그 달에 어떤 단지가 팔렸느냐에 따라 월별로 크게 튄다.
+    원자료를 그대로 회귀에 넣으면 예측선이 톱니처럼 흔들려(서울 실측: 1635→1464→1428→1696)
+    쓸 수 없다. 3개월 평균으로 잡음을 눌러 추세만 남긴다.
+    """
+    out = [None] * len(seq)
+    for i in range(w - 1, len(seq)):
+        win = seq[i - w + 1:i + 1]
+        if all(v is not None for v in win):
+            out[i] = sum(win) / w
+    return out
+
+
+def yoy_log(seq):
+    """전년비 로그성장률. 12개월 전이 없거나 0 이하면 None."""
+    out = [None] * len(seq)
+    for i in range(12, len(seq)):
+        a, b = seq[i], seq[i - 12]
+        if a is None or b is None or a <= 0 or b <= 0:
+            continue
+        out[i] = math.log(a / b)
+    return out
+
+
+def step_log(prices, h):
+    """i 시점 대비 h개월 뒤 로그변화율. 예측의 '목표' 다.
+
+    (2026-08-21) 처음엔 전년비 성장률을 맞추고 12개월 전 값에 곱해 수준을 복원했는데,
+    복원 기준이 되는 '12개월 전 값' 자체가 달마다 달라 예측선이 계단처럼 튀었다
+    (서울 실측: 1390→1559→1514→1561). 마지막 관측치 하나를 공통 기준으로 삼아
+    거기서 h개월 누적으로 얼마나 움직이는지를 직접 맞추면 경로가 매끄럽게 이어진다.
+    """
+    out = [None] * len(prices)
+    for i in range(len(prices) - h):
+        a, b = prices[i + h], prices[i]
+        if a and b and a > 0 and b > 0:
+            out[i] = math.log(a / b)
+    return out
+
+
+def transform(key, seq):
+    return list(seq) if TRANS.get(key) == "lvl" else yoy_log(seq)
+
+
+def corr(a, b):
+    p = [(x, y) for x, y in zip(a, b) if x is not None and y is not None]
+    n = len(p)
+    if n < 24:
+        return 0.0, n
+    ax = sum(x for x, _ in p) / n
+    by = sum(y for _, y in p) / n
+    sxy = sum((x - ax) * (y - by) for x, y in p)
+    sxx = math.sqrt(sum((x - ax) ** 2 for x, _ in p))
+    syy = math.sqrt(sum((y - by) ** 2 for _, y in p))
+    if sxx == 0 or syy == 0:
+        return 0.0, n
+    return sxy / (sxx * syy), n
+
+
+def best_lag(x, y, maxlag=MAXLAG):
+    """x 를 0~maxlag 개월 뒤로 밀며 y 와의 상관이 가장 큰 시차를 찾는다.
+    lag=L 이면 'x 가 L 개월 선행' 이라는 뜻이다."""
+    bl, bc, bn = 0, 0.0, 0
+    for L in range(0, maxlag + 1):
+        xs = [None] * L + x[:len(x) - L] if L else list(x)
+        c, n = corr(xs, y)
+        if abs(c) > abs(bc):
+            bl, bc, bn = L, c, n
+    return bl, bc, bn
+
+
+def ridge_fit(X, y, lam=RIDGE):
+    """표준화 → 릿지 정규방정식(가우스 소거). numpy 없이 순수 파이썬으로 푼다
+    (서버 크론은 시스템 python3 로 도는 스크립트가 많아 의존성을 늘리지 않는다)."""
+    n, p = len(X), len(X[0])
+    mu = [sum(r[j] for r in X) / n for j in range(p)]
+    sd = [math.sqrt(sum((r[j] - mu[j]) ** 2 for r in X) / n) or 1.0 for j in range(p)]
+    Z = [[(r[j] - mu[j]) / sd[j] for j in range(p)] for r in X]
+    ym = sum(y) / n
+    yc = [v - ym for v in y]
+    A = [[sum(Z[i][a] * Z[i][b] for i in range(n)) + (lam if a == b else 0.0)
+          for b in range(p)] + [sum(Z[i][a] * yc[i] for i in range(n))] for a in range(p)]
+    for c in range(p):                                   # 가우스 소거
+        piv = max(range(c, p), key=lambda r: abs(A[r][c]))
+        if abs(A[piv][c]) < 1e-12:
+            return None
+        A[c], A[piv] = A[piv], A[c]
+        d = A[c][c]
+        A[c] = [v / d for v in A[c]]
+        for r in range(p):
+            if r != c and A[r][c]:
+                f = A[r][c]
+                A[r] = [A[r][k] - f * A[c][k] for k in range(p + 1)]
+    beta = [A[i][p] for i in range(p)]
+    return {"mu": mu, "sd": sd, "ym": ym, "beta": beta}
+
+
+def ridge_pred(m, row):
+    return m["ym"] + sum(m["beta"][j] * (row[j] - m["mu"][j]) / m["sd"][j]
+                         for j in range(len(row)))
+
+
+def build_xy(feat, ytr, h, lags, keys, upto=None, force=None):
+    """h 개월 앞 예측용 표본. 시차가 h 이상인 지표만 쓴다(미래 입력 금지).
+
+    y_{i} 를 맞추는 데 쓰는 x 는 x_{i-(L-h)} — L 개월 선행 지표를 h 개월 앞 예측에
+    쓰면 아직 (L-h) 개월치 여유가 남아 있다는 뜻이라, 관측된 값만으로 계산된다.
+    """
+    # (2026-08-21) 지표 선택은 '지평마다 다시' 한다.
+    #   전체 상관 순으로 6개를 먼저 뽑아버리면 시차가 짧은 지표가 자리를 차지해,
+    #   10~12개월 앞을 볼 때 쓸 지표가 하나도 안 남는 지역이 생겼다(울산·전남 실측 0개월).
+    use = force if force is not None else sorted(
+        [k for k in keys if lags[k]["lag"] >= h],
+        key=lambda k: -abs(lags[k]["corr"]))[:TOPK]
+    if not use:
+        return [], [], []
+    N = len(ytr) if upto is None else upto + 1
+    X, Y = [], []
+    for i in range(N):
+        if ytr[i] is None:
+            continue
+        row, ok = [], True
+        for k in use:
+            j = i - (lags[k]["lag"] - h)
+            v = feat[k][j] if 0 <= j < len(feat[k]) else None
+            if v is None:
+                ok = False
+                break
+            row.append(v)
+        if ok:
+            X.append(row)
+            Y.append(ytr[i])
+    return X, Y, use
+
+
+def forecast(feat, ytr, prices, lags, keys, t_last, horizons=HZ, upto=None):
+    """t_last(관측 마지막 인덱스) 기준 1~horizons 개월 앞 가격 예측."""
+    out = {}
+    for h in range(1, horizons + 1):
+        # (2026-08-21) 예측 시점에 값이 비어 있는 지표는 **모델에서 빼고** 나머지로 다시 적합한다.
+        #   예전엔 하나라도 비면 그 지평 전체를 버려서, 지역 지표(거래량·미분양 등)의
+        #   공표 지연 한 칸 때문에 12개월 중 1~3개월만 그려지는 지역이 속출했다(전북 실측 1개월).
+        elig = sorted([k for k in keys if lags[k]["lag"] >= h],
+                      key=lambda k: -abs(lags[k]["corr"]))
+        avail = []
+        for k in elig:
+            j = t_last - (lags[k]["lag"] - h)
+            if 0 <= j < len(feat[k]) and feat[k][j] is not None:
+                avail.append(k)
+            if len(avail) >= TOPK:
+                break
+        if not avail:
+            continue
+        X, Y, use = build_xy(feat, step_log(prices, h), h, lags, keys, upto=upto, force=avail)
+        if len(X) < 36:
+            continue
+        m = ridge_fit(X, Y)
+        if not m:
+            continue
+        row = [feat[k][t_last - (lags[k]["lag"] - h)] for k in use]
+        g = ridge_pred(m, row)                       # 마지막 관측 대비 h개월 누적 로그변화율
+        base = prices[t_last]
+        if not base:
+            continue
+        out[h] = {"growth": g, "price": base * math.exp(g), "n": len(X), "k": len(use)}
+    return out
+
+
+def lags_for(feat, ytr, keys, upto=None):
+    """지표별 최적 선행시차. upto 를 주면 그 시점까지 자료만 쓴다(백테스트 정직성)."""
+    out = {}
+    for k in keys:
+        x = feat[k] if upto is None else feat[k][:upto + 1]
+        y = ytr if upto is None else ytr[:upto + 1]
+        L, c, n = best_lag(x, y)
+        out[k] = {"lag": L, "corr": round(c, 3), "n": n}
+    return out
+
+
+def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
+    """과거로 되돌아가 그때 자료만으로 12개월을 예측하고 실제와 비교.
+
+    시차 탐색까지 그 시점 자료로 다시 한다 — 전체 기간으로 찾은 시차를 쓰면
+    '미래를 알고 고른 시차' 가 되어 성적이 부풀려진다.
+    """
+    n = len(prices)
+    errs = {h: [] for h in range(1, HZ + 1)}
+    nerrs = {h: [] for h in range(1, HZ + 1)}      # 기준선: '지금 값 그대로' 라고 찍었을 때의 오차
+    hits = {h: [0, 0] for h in range(1, HZ + 1)}
+    for o in range(n - HZ - origins, n - HZ):
+        if o < 60 or prices[o] is None:
+            continue
+        lg = lags_for(feat, ytr, keys, upto=o)
+        fc = forecast(feat, ytr, prices, lg, keys, o, upto=o)
+        for h, r in fc.items():
+            act = prices[o + h] if o + h < n else None
+            if act is None or act <= 0:
+                continue
+            errs[h].append(abs(r["price"] - act) / act)
+            nerrs[h].append(abs(prices[o] - act) / act)
+            up_p, up_a = r["price"] > prices[o], act > prices[o]
+            hits[h][0] += 1
+            hits[h][1] += 1 if up_p == up_a else 0
+    by_h = {}
+    for h in range(1, HZ + 1):
+        e = errs[h]
+        if not e:
+            continue
+        mape = sum(e) / len(e)
+        sd = math.sqrt(sum((x - mape) ** 2 for x in e) / len(e)) if len(e) > 1 else 0.0
+        nv = sum(nerrs[h]) / len(nerrs[h]) if nerrs[h] else None
+        # 실력(skill) = 단순 예측 대비 오차를 얼마나 줄였나. 0이면 안 줄인 것, 1이면 완벽.
+        skill = max(0.0, min(1.0, 1 - mape / nv)) if nv else 0.0
+        by_h[h] = {"mape": round(mape * 100, 2), "sd": round(sd * 100, 2),
+                   "naive": round(nv * 100, 2) if nv else None, "skill": round(skill, 3),
+                   "n": len(e), "hit": round(100 * hits[h][1] / hits[h][0], 1) if hits[h][0] else None}
+    alle = [x for h in errs for x in errs[h]]
+    allh = [hits[h] for h in hits if hits[h][0]]
+    return {
+        "by_h": by_h,
+        "mape": round(100 * sum(alle) / len(alle), 2) if alle else None,
+        "hit": round(100 * sum(a[1] for a in allh) / sum(a[0] for a in allh), 1) if allh else None,
+        "n": len(alle),
+        "origins": origins,
+    }
+
+
+def add_months(ym, k):
+    y, m = int(ym[:4]), int(ym[4:])
+    m += k
+    y += (m - 1) // 12
+    m = (m - 1) % 12 + 1
+    return f"{y}{m:02d}"
+
+
+# ══════════════════ main ══════════════════
+def main():
+    print(f"relead — 부동산 선행지표·예측 ({NOW:%Y-%m-%d %H:%M})")
+    hub, re_ = load("rehub"), load("realestate")
+    if not hub.get("t"):
+        print("  ⚠ rehub.json 이 없다 — 먼저 rehub.py 를 돌려야 한다"); return 1
+
+    D = {}
+    print("[1/3] 거시·금융·증시 수집 (ECOS·OECD·KOSIS)")
+    D["cli"] = {"전국": oecd_cli()}
+    D["m2"] = {"전국": ecos("161Y006", "BBHA00", scale=1e-3)}          # 십억원 → 조원
+    D["gdp"] = {"전국": ecos("200Y109", "10601", cycle="Q", s="1990Q1", scale=1e-3)}
+    D["fx"] = {"전국": ecos_daily_monthly("731Y001", "0000001")}
+    D["rate_kr"] = {"전국": ecos("722Y001", "0101000")}
+    D["mtg_bal"] = {"전국": ecos("151Y005", "11100A0", scale=1e-3)}    # 십억원 → 조원
+    D["kospi"] = {"전국": ecos("901Y014", "1070000")}
+    D["hdi_pc"] = kosis_annual(101, "DT_1C96", "T3", scale=0.1)        # 천원 → 만원
+    for k in ("cli", "m2", "gdp", "fx", "rate_kr", "mtg_bal", "kospi"):
+        v = D[k]["전국"]
+        print(f"    {META[k][0]:<18} {len(v):>4}개월" + (f"  최신 {sorted(v)[-1]}" if v else "  ⚠ 비었음"))
+    print(f"    {META['hdi_pc'][0]:<18} 지역 {len(D['hdi_pc'])}")
+
+    print("[2/3] 이미 수집된 파일에서 합류 (rehub·realestate)")
+    D["mtg_rate"] = from_re(re_, "mtg")
+    D["hppci"] = from_re(re_, "sale")
+    D["jeonse"] = from_re(re_, "js")
+    D["csi"] = from_re(re_, "csi")
+    for k in ("trade", "comp", "unsold", "supply"):
+        D[k] = from_hub(hub, k)
+    tgt = from_hub(hub, TARGET)
+    print(f"    기준계열 {TARGET_LABEL} 지역 {len(tgt)} · 합류 지표 {len([k for k in D if k not in GLOBAL_KEYS])}종")
+
+    # ── 월 축 통일 (기준계열이 있는 구간만)
+    ts = sorted({t for mp in tgt.values() for t in mp})
+    if not ts:
+        print("  ⚠ 기준계열 없음"); return 1
+    T = []
+    cur = ts[0]
+    while cur <= ts[-1]:
+        T.append(cur)
+        cur = add_months(cur, 1)
+    idx = {t: i for i, t in enumerate(T)}
+
+    def arr(mp):
+        a = [None] * len(T)
+        for t, v in mp.items():
+            if t in idx:
+                a[idx[t]] = v
+        return a
+
+    regions = [r for r in SIDO if r in tgt]
+    print(f"[3/3] 시차 탐색 + 회귀 예측 + 백테스트 — 축 {T[0]}~{T[-1]} ({len(T)}개월) · 지역 {len(regions)}")
+
+    lead, pred, out_d = {}, {}, {}
+    for k in META:
+        out_d[k] = {r: arr(mp) for r, mp in (D.get(k) or {}).items() if r in SIDO}
+    price_out = {}
+
+    for reg in regions:
+        prices_raw = arr(tgt[reg])
+        prices = ma(prices_raw)                 # 모델·예측은 3개월 평균 기준
+        price_out[reg] = {"raw": prices_raw, "ma": prices}
+        ytr = yoy_log(prices)
+        feat, keys = {}, []
+        for k in META:
+            src = D.get(k) or {}
+            mp = src.get("전국" if k in GLOBAL_KEYS else reg) or (src.get("전국") if k in GLOBAL_KEYS else None)
+            if not mp:
+                continue
+            f = transform(k, arr(mp))
+            if sum(1 for v in f if v is not None) < 60:
+                continue
+            feat[k] = f
+            keys.append(k)
+        if len(keys) < 3:
+            continue
+        lg_all = lags_for(feat, ytr, keys)
+        lead[reg] = dict(sorted(lg_all.items(), key=lambda kv: -abs(kv[1]["corr"])))
+        t_last = max(i for i, v in enumerate(prices) if v is not None)
+        fc = forecast(feat, ytr, prices, lg_all, keys, t_last)
+        bt = backtest(feat, ytr, prices, keys)
+        # (2026-08-21) 원시 회귀값을 그대로 쓰면 지평마다 지표 조합이 달라 경로가 튄다
+        #   (전국 실측: 12개월 후 -27.8% 로 폭락 예측). 두 가지를 건다.
+        #   ① 실력 축소 — '변동 없음' 예측보다 얼마나 나았는지(skill)만큼만 움직임을 인정한다.
+        #      백테스트에서 단순 예측을 못 이긴 지평은 자동으로 거의 평평해진다.
+        #   ② 지평 평활 — 이웃 지평 3개를 평균해 모델 간 잡음을 없앤다.
+        base = prices[t_last]
+        g = {h: fc[h]["growth"] * (bt["by_h"].get(h, {}).get("skill", 0.0)) for h in fc}
+        gs = {}
+        for h in sorted(g):
+            nb = [g[x] for x in (h - 1, h, h + 1) if x in g]
+            gs[h] = sum(nb) / len(nb)
+        z = 1.2816                                        # 80% 구간
+        ft, fp, flo, fhi = [], [], [], []
+        for h in sorted(gs):
+            sd = (bt["by_h"].get(h) or {}).get("sd") or (bt["by_h"].get(h) or {}).get("mape") or 0
+            band = sd / 100 * z
+            p = base * math.exp(gs[h])
+            ft.append(add_months(T[t_last], h))
+            fp.append(round(p, 2))
+            flo.append(round(p * (1 - band), 2))
+            fhi.append(round(p * (1 + band), 2))
+        pred[reg] = {"t": ft, "price": fp, "lo": flo, "hi": fhi,
+                     "last": {"t": T[t_last], "price": round(prices[t_last], 2),
+                              "raw": prices_raw[t_last]},
+                     "used": [{"key": k, "label": META[k][0], **lg_all[k]}
+                              for k in sorted(keys, key=lambda k: -abs(lg_all[k]["corr"]))[:TOPK]],
+                     "backtest": bt}
+        print(f"    {reg:<3} 후보지표 {len(keys)} · 예측 {len(fp)}개월 · 백테스트 MAPE {bt['mape']}% · 방향적중 {bt['hit']}%")
+
+    out = {
+        "asof": NOW.strftime("%Y-%m-%d %H:%M"),
+        "src": "한국부동산원·국토교통부·국가데이터처(KOSIS) · 한국은행 ECOS · OECD",
+        "note": ("기준계열은 한국부동산원 아파트 매매 실거래 중위가격(㎡당 만원). "
+                 "예측은 선행지표의 시차를 데이터로 찾아 회귀한 결과이며, 함께 표시된 "
+                 "백테스트 성적(과거 구간 재현 오차)을 보고 신뢰 수준을 판단할 것. "
+                 "투자 판단의 근거가 아니라 흐름 참고용이다."),
+        "target": {"key": TARGET, "label": TARGET_LABEL, "unit": "만원/㎡",
+                   "src": "한국부동산원", "smooth": SMOOTH,
+                   "note": f"월별 실거래 중위가는 표본 구성에 따라 크게 튀어, 모델과 예측선은 {SMOOTH}개월 평균 기준이다(원자료도 함께 싣는다)."},
+        "horizon": HZ, "maxlag": MAXLAG,
+        "t": T, "regions": regions,
+        "meta": {k: {"label": v[0], "unit": v[1], "group": v[2], "cycle": v[3],
+                     "src": v[4], "note": v[5]} for k, v in META.items()},
+        "d": out_d, "price": price_out, "lead": lead, "pred": pred,
+    }
+    DB.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+    print(f"  → {OUT} ({OUT.stat().st_size // 1024}KB)")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
