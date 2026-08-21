@@ -454,7 +454,22 @@ def forecast(feat, ytr, prices, keys, t_last, horizons=HZ, upto=None):
                 break
         if not avail:
             continue
-        X, Y, use = build_xy(feat, step_log(prices, h), h, lags, keys, upto=upto, force=avail)
+        # (2026-08-21) 표본이 짧은 지표 하나가 전체 회귀 표본을 잘라먹는 문제.
+        #   회귀는 '모든 지표가 동시에 있는 달' 만 쓸 수 있다. 미분양은 2022년부터라
+        #   전년비로 바꾸면 41개월뿐 — 이걸 넣는 순간 표본이 36 미만이 되어 그 지평이
+        #   통째로 버려졌다(실측: 서울 예측 12개월 → 0개월).
+        #   → 상관 낮은 쪽부터 하나씩 빼면서 표본이 충분해지는 조합을 찾는다.
+        #   빼는 순서가 중요하다. 상관이 낮은 쪽부터 뺐더니 정작 표본을 깎는 지표(미분양)가
+        #   상관이 높아 끝까지 남아 전 지평이 죽었다(실측: 대구·인천·광주 0개월).
+        #   → 표본을 가장 많이 깎는 지표(관측 수 최소)부터 뺀다.
+        sel = list(avail)
+        X, Y, use = [], [], []
+        while len(sel) >= 3:
+            X, Y, use = build_xy(feat, step_log(prices, h), h, lags, keys,
+                                 upto=upto, force=sel)
+            if len(X) >= 60:
+                break
+            sel.remove(min(sel, key=lambda k: sum(1 for v in feat[k] if v is not None)))
         if len(X) < 36:
             continue
         m = ridge_fit(X, Y)
@@ -624,7 +639,9 @@ def main():
             # 최소 표본 — 고정 집합의 지표는 48개월만 있어도 받는다.
             #   (2026-08-21) 60개월로 잡았더니 미분양이 53개월치뿐이라 통째로 빠졌다.
             #   회귀 표본은 build_xy 에서 36개 미만이면 어차피 걸러진다.
-            need = 48 if k in FIXED_KEYS else 60
+            #   전년비로 바꾸면 앞 12개월이 날아간다 — 미분양은 53개월 → 41개로 줄어
+            #   48 기준에도 걸렸다. 고정 집합은 36개월(회귀 최소 표본)까지 받는다.
+            need = 36 if k in FIXED_KEYS else 60
             if sum(1 for v in f if v is not None) < need:
                 continue
             feat[k] = f

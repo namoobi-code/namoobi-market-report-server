@@ -226,10 +226,27 @@ def _forms(label, metric):
             ("lowhigh", label + gap25 + _NUM_D + r"\s+" + _NUM_D),
             ("approx", label + gap + r"(?:approximately|about|around)\s*" + _NUM_D),
             ("approxc", label + gap + r"(?:approximately|about|around)\s*" + _NUM_C),
+            # (2026-08-21) **± 표기** — 매출·CapEx 에만 있고 EPS 에는 없어서, ± 로만 제시하는
+            # 회사의 EPS 가이던스가 통째로 누락됐다. 실측 PENG(Penguin Solutions):
+            #   "full-year non-GAAP EPS of $2.60 plus or minus 5 cents"(BZ 2.60) ·
+            #   표에도 "Diluted earnings per share $1.97 +/- $0.05 … $2.60 +/- $0.05"
+            ("pm", label + gap + _NUM_D + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM_D),
+            # 오차를 센트로 쓰는 형태("$2.60 plus or minus 5 cents")
+            ("pmc", label + gap + _NUM_D + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM_C),
         ]
     return [
         ("range", label + gap + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM),
         ("pm", label + gap + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM),
+        # (2026-08-21) **단일값 가이던스** — 범위 없이 한 숫자만 제시하는 회사가 있는데
+        # approximately/about 이 붙지 않으면 잡을 형식이 없었다. 실측 KMTS(Kestra):
+        #   "FY27 revenue guidance of $137 million" · "Kestra expects revenue of $137
+        #    million in FY27"(BZ 137.0) — 둘 다 후보조차 만들어지지 않았다.
+        # 실적 서술("revenue of $X million in the quarter")과 섞이지 않도록,
+        # 라벨 인접에 guidance/outlook/target 이 붙었거나 expect 동사가 라벨을 이끄는
+        # 형태만 받는다(전망 문맥 검사 _FORE 는 루프에서 별도로 또 걸린다).
+        ("single", label + gap25 + r"(?:guidance|outlook|targets?)\s+(?:of|at)\s*" + _NUM),
+        ("single2", r"expects?\s+(?:its\s+|full[\s-]?year\s+|annual\s+)?" + label +
+                    gap25 + r"(?:of|to be)\s*" + _NUM),
         ("pmpct", label + gap60d + _NUM + r"[^$]{0,20}?(?:±|\+/-|plus or minus)\s*([\d.]+)\s*%"),
         # (2026-08-15) Low/High 두 열 표 — "Revenue $ 2,115 $ 2,175"(실측 MH·GMRS·EQPT).
         # 단위는 표 머리의 '($ in millions)' 선언에서 가져온다(루프에서 처리).
@@ -254,6 +271,10 @@ def _pair(kind, m):
     if kind == "pm":
         h = (m.group(2) or m.group(4) or "").lower()
         c, d = _num(m.group(1), m.group(2), h), _num(m.group(3), m.group(4), h)
+        return (c - d, c + d) if (c is not None and d is not None) else (None, None)
+    if kind == "pmc":                          # "$2.60 plus or minus 5 cents"(실측 PENG)
+        c, d = _num(m.group(1), m.group(2)), _num(m.group(3), None)
+        d = d / 100 if d is not None else None
         return (c - d, c + d) if (c is not None and d is not None) else (None, None)
     if kind == "pmpct":
         c = _num(m.group(1), m.group(2))
@@ -623,7 +644,11 @@ def parse_guidance(txt, per_hint=None):
     # (2026-08-15) EPS 라벨 확장 — "Net income per (diluted|common) share" 표기(실측 LFTO·KLC·EAT).
     # 보통주 주당 순이익 = EPS 다. 'loss per share' 는 제외(음수 전용 표기, 컨센 비교 부적합).
     # (2차) "Earnings per **diluted** share"(실측 미매칭 표본) — 어순이 바뀐 표기도 흔하다.
-    for metric, label in (("rev", r"(?:revenues?|net sales)"),
+    # (2026-08-21) 매출 라벨에 'total sales' 추가 — 종전엔 'net sales' 만 받아 'Total sales'
+    # 표기가 통째로 누락됐다(실측 KRUS: "Total sales between $330.5 million and $331.5
+    # million" = BZ 331.0). 'sales' 단독은 부분 매출(같은 문서의 'comparable restaurant
+    # sales' 등)과 구별이 안 되므로 total/net 수식이 붙은 것만 받는다.
+    for metric, label in (("rev", r"(?:revenues?|(?:net|total)\s+sales)"),
                           ("eps", r"(?:diluted\s+)?earnings per (?:diluted\s+|common\s+)?share|\beps\b|"
                                   r"net income per (?:diluted\s+|common\s+)?share(?:s)?(?:\s*,\s*diluted)?"),
                           # (2026-08-21) **리츠 FFO** — 리츠의 컨센서스는 순이익이 아니라
