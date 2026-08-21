@@ -269,11 +269,25 @@ _FWD = r"guidance|outlook|expect|anticipat|forecast|project|estimat|to be in the
 # (2026-08-15) '분기에 붙은 연도' 제외 패턴 — pick()과 다중 열 가드가 공유한다.
 # "Q1 FY 2027"·"third quarter 2026"·"quarter ending September 30, 2026" 의 연도는
 # 분기 소속이지 연간 표지가 아니다.
+# (2026-08-21) 표 머리글은 분기와 연도를 **하이픈·슬래시**로 잇는다 — "Q4 - 2026" ·
+# "Q4/2026". 종전 패턴은 공백 구분만 허용해 이 연도가 연간 표지로 살아남았다.
+# 실측 DOX: "Q4 - 2026 Revenue $1,175 - $1,215 … Non-GAAP Diluted EPS $1.94 - $2.00"
+# 에서 Q4(거리 80) 보다 2026(거리 75)이 값에 가까워 분기 EPS 가 연간으로 태그됐다
+# (BZ 연간 7.41 대비 −73%).
 _YEXCL = (r"(?:\bquarter\b|\bQ[1-4]\b|\b[1-4]Q\b)"
-          r"(?:\s+(?:of|the|ended|ending|for|fiscal|calendar|year))*"
+          r"(?:(?:\s*[-–—/]\s*|\s+)(?:of|the|ended|ending|for|fiscal|calendar|year)?)*"
           r"\s*(?:(?:january|february|march|april|may|june|july|august|"
           r"september|october|november|december)\s+\d{1,2}\s*,?\s*)?"
           r"(?:fiscal\s+|calendar\s+)?(?:year\s+)?$")
+# (2026-08-21) **연도 뒤에 분기가 붙는 블록 제목** — "2026 Business Outlook Third Quarter •"
+# 처럼 회계연도를 앞세우고 분기를 뒤에 쓰는 형식이 흔하다. 이때 연도는 그 분기의 소속
+# 연도일 뿐 연간 표지가 아닌데, 값에서 보면 연도·분기가 나란히 있어 '어느 쪽인지 모름'
+# 으로 기각되고(둘 다 60자 이내) 회사 프로필 교정으로 연간이 됐다.
+#   실측 ALIT: 분기 매출 469~479M 이 fy_rev 로 저장 → BZ 연간 2,088M 대비 −77%.
+# 사이에 값·불릿·마침표가 끼지 않을 때만(=같은 제목 줄일 때만) 적용하고,
+# "…2026 … Second Quarter Results" 같은 지난 실적 제목은 제외한다.
+_YQAFT = (r"[^.•●▪$%\d]{0,30}?\b(?:(?:first|second|third|fourth)\s+quarter|Q[1-4])\b"
+          r"(?!\s*(?:results|earnings|highlights))")
 # (2026-08-21) **과거 사건을 가리키는 연도**는 기간 근거가 아니다. 실측 CHD:
 # "For the third quarter, we expect … driven entirely by the strategic portfolio actions
 #  **taken in 2025**. … Overall, adjusted EPS is expected to be approximately $0.89"
@@ -362,6 +376,7 @@ def _period(txt, start, end):
         y = [m.start() for m in re.finditer(_YRE, seg, re.I)
              if not re.search(_YEXCL, seg[:m.start()][-60:], re.I)
              and not re.search(_YPAST, seg[:m.start()][-40:], re.I)   # 과거 사건 연도 제외
+             and not re.match(_YQAFT, seg[m.end():], re.I)            # '«연도» … 3분기' 제목
              # 값 뒤의 '«연도» Guidance' 는 다음 블록 캡션이지 이 값의 기간이 아니다
              and not (anchor is not None and m.start() > anchor
                       and re.match(_YCAP, seg[m.end():], re.I))]
