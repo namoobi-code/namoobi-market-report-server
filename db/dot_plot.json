@@ -1,34 +1,43 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-21",
+ "as_of": "2026-08-22",
  "data": {
+  "summary": "2026년 6월 SEP(점도표)에서 2026년말 중간값이 3월 3.4%→3.8%로 매파적 상향(18명 중 9명 연내 1회 이상 인상 전망). 2027·2028년말·장기중립은 비교적 안정.",
   "rows": [
    {
     "year": "2026년말",
-    "mar": 3.4,
-    "jun": 3.8,
-    "change": "+0.4"
+    "jun": "3.8%",
+    "mar": "3.4%",
+    "change": ""
    },
    {
     "year": "2027년말",
-    "mar": 3.1,
-    "jun": 3.6,
-    "change": "+0.5"
+    "jun": "3.6%",
+    "mar": "3.1%",
+    "change": ""
    },
    {
     "year": "2028년말",
-    "mar": 3.1,
-    "jun": 3.4,
-    "change": "+0.3"
+    "jun": "3.4%",
+    "mar": "3.1%",
+    "change": ""
    },
    {
     "year": "장기중립",
-    "mar": 3.1,
-    "jun": 3.1,
-    "change": "+0.0"
+    "jun": "3.1%",
+    "mar": "3.1%",
+    "change": ""
    }
   ],
-  "note": "2026-03-18 SEP: 2026년말 3.4%(추가 1회 인하 시사)·2027·2028 3.1%·장기중립 3.1%. 2026-06-17 SEP: 2026년말 3월 3.4%→6월 3.8%로 매파적 상향(9/18명 연내 1회+ 인상 전망)·2027년말 3.6%·2028년말 3.4%·장기중립 3.1% 유지.",
-  "source": "federalreserve.gov FOMC SEP 2026-03-18, 2026-06-17 (server_fomc_meetings.json 수록)"
+  "policy_rate": "3.50~3.75%(2026-07-29 FOMC 동결, 5회 연속)",
+  "next_meeting": "2026-09-15~16(SEP 점도표 발표 예정)",
+  "sources": [
+   {
+    "source": "federalreserve.gov FOMC statement·SEP 2026-06-17"
+   },
+   {
+    "source": "federalreserve.gov FOMC statement·SEP 2026-03-18"
+   }
+  ]
  }
 }
