@@ -3161,7 +3161,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
 
   function rlDraw(t, hist, fut, ser, past){
     const cv=$('rl_main'); if(!cv) return;
-    const W=cv.clientWidth||900, H=cv.clientHeight||520; cv.width=W; cv.height=H;
+    const W=cv.clientWidth||900, H=cv.clientHeight||1040; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const N=t.length; if(!N) return;
     const P={l:10,t:18,b:20}, RW=RH_AXW*(ser.length+1), PW=Math.max(60,W-P.l-RW);
@@ -3250,7 +3250,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           return btn(on,`${E6(M[k].label)}<span style="opacity:.75">·${L}개월</span>`,`data-k="${k}"`);}).join('');
         $('rl_ind').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
           const k=b.dataset.k, i=_rlSel.indexOf(k);
-          if(i>=0) _rlSel.splice(i,1); else { if(_rlSel.length>=4){alert('선행지표는 최대 4개까지 겹쳐볼 수 있습니다.');return;} _rlSel.push(k); }
+          // (2026-08-21) 상한 4 → 8. 지표마다 오른쪽에 축 기둥(62px)이 하나씩 붙어
+          //   너무 많으면 그림 영역이 줄어든다. 8개면 축이 ~560px — 넓은 화면 기준 한계선.
+          if(i>=0) _rlSel.splice(i,1); else { if(_rlSel.length>=8){alert('선행지표는 최대 8개까지 겹쳐볼 수 있습니다.');return;} _rlSel.push(k); }
           draw();});
         /* 기간·시차·예측 */
         $('rl_span').innerHTML=[['60','5년'],['120','10년'],['240','20년'],['999','전체']]
