@@ -48,7 +48,9 @@ _R_ACT = r"\bactuals?\b|\bactual\b|\breported\b|\bytd\b|\b(?:months|year)\s+ende
 #   성립하지 않아 규칙이 통째로 불발됐다.
 _R_HALF = r"\b[12]H\s?['’]?\s?\d{2}|\b(?:first|second)[-\s]half\b|\bH[12]\b|\bhalf\s+year\b"
 # 행 라벨
-_L_REV = r"^(?:total\s+|net\s+|consolidated\s+)*(?:revenues?|net\s+sales|sales)\b"
+# (2026-08-22) reported/operating 접두 허용 — 실측 EFX 'Reported Revenue' 행이 라벨
+# 불일치로 통째로 무시됐다. reported=보고 기준(전사), operating revenue=영업수익(전사).
+_L_REV = r"^(?:total\s+|net\s+|consolidated\s+|reported\s+|operating\s+)*(?:revenues?|net\s+sales|sales)\b"
 _L_EPS = (r"(?:earnings|net\s+income|income)\s+per\s+(?:diluted\s+|common\s+)?share|\beps\b")
 _L_CAPEX = r"capital\s+(?:expenditures?|spending)|\bcapex\b"
 _L_FFO = r"\bffo\b|funds\s+from\s+operations|\baffo\b"
@@ -205,6 +207,72 @@ def _col_meta(head_rows, ncol, gcap=False):
     return meta
 
 
+def _runs(row):
+    """행의 셀들을 **연속 중복을 접어** 순서대로 — colspan 전개 복제와 빈 스페이서를 걷어낸
+    '논리적 셀 나열'. 열 인덱스는 버리고 순서만 남긴다."""
+    out, prev = [], None
+    for c in row:
+        c = _clean(c)
+        if not c:
+            prev = None
+            continue
+        if c != prev:
+            out.append(c)
+        prev = c
+    return out
+
+
+def _ordinal_meta(head_rows):
+    """머리글 행들 → (기간 나열, 역할 나열) — **순서 기반** 폴백용.
+
+    (2026-08-22) 열 인덱스 정렬은 SEC 표의 빈 스페이서·행마다 다른 colspan 때문에
+    어긋난다(실측 EFX: 머리글 'Q3 2026' 이 3~8열인데 값은 3~5·9~11열 — 같은 표인데
+    행마다 전개 폭이 다르다). 빈 행을 지우면 다른 표가 깨진다(실측 HLIT 회귀).
+    → 열 위치를 포기하고 **등장 순서**로 짝짓는다: 기간 행의 논리적 나열 [Q3, FY] 과
+    Low/High 행의 나열 [lo, hi, lo, hi], 데이터 행의 숫자 나열 [a, b, c, d] 가
+    개수까지 정확히 맞아떨어질 때만(2×기간 = 역할 = 숫자) 순서대로 배정한다.
+    하나라도 어긋나면 채택하지 않는다 — 추측이 아니라 검산이다.
+    """
+    pers, roles = [], []
+    for row in head_rows:
+        rr = _runs(row)
+        if not rr:
+            continue
+        # 기간 행 후보 — 모든 논리 셀이 기간으로 분류되고 Q·Y 가 둘 다 있으면 최우선
+        cls = []
+        for c in rr:
+            if re.search(_QRE, c, re.I) or re.search(r"\bthree\s+months\b", c, re.I):
+                cls.append("Q")
+            elif _is_year_cell(c) or re.search(r"\b(?:twelve\s+months|year\s+end)", c, re.I) \
+                    or (re.search(_YRE, c, re.I)
+                        and not re.search(_YEXCL, c[:_ys(c)][-60:], re.I)):
+                cls.append("Y")
+            else:
+                cls.append(None)
+        if all(cls) and 1 <= len(cls) <= 4:
+            if not pers or ("Q" in cls and "Y" in cls):
+                pers = cls
+        # 역할 행 후보 — 전부 Low/High 이고 lo·hi 가 번갈아 나오면 채택
+        rcls = []
+        for c in rr:
+            if re.search(_R_HIGH, c, re.I):
+                rcls.append("hi")
+            elif re.search(_R_LOW, c, re.I):
+                rcls.append("lo")
+            else:
+                rcls.append(None)
+        if rcls and all(rcls) and len(rcls) % 2 == 0 \
+                and all(rcls[i] == ("lo", "hi")[i % 2] for i in range(len(rcls))):
+            if not roles or len(rcls) > len(roles):
+                roles = rcls
+    return pers, roles
+
+
+def _ys(c):
+    m = re.search(_YRE, c, re.I)
+    return m.start() if m else 0
+
+
 def _pick_cols(meta, vals, per):
     """한 기간(per)의 값 열들에서 (lo, hi) 확정. 확정 못 하면 None(추측 금지)."""
     idx = [i for i, mt in enumerate(meta)
@@ -305,6 +373,7 @@ def parse_tables(html, txt_hint=""):
                      and re.search(_R_LOW, head_txt, re.I)
                      and re.search(_R_HIGH, head_txt, re.I))
         meta = _col_meta(head_rows, ncol, _gcap)
+        opers, oroles = _ordinal_meta(head_rows)      # 순서 기반 폴백용 (2026-08-22)
         # 표 전체가 한 기간이면(캡션 명시) 기간 없는 열에 부여.
         # (2026-08-15 2차) 캡션의 분기 토큰은 **전망 문맥일 때만** 인정 — "reported second
         # quarter results" 같은 실적 문구의 분기가 표 기간으로 오인돼 연간 표가 분기로
@@ -373,6 +442,8 @@ def parse_tables(html, txt_hint=""):
                                            c, re.I))
                        for c in row[1:]):
                     meta = _col_meta([row], ncol, _gcap)
+                    _p2, _r2 = _ordinal_meta([row])
+                    opers, oroles = (_p2 or opers), (_r2 or oroles)
                     continue
             label = _clean(row[0])
             if not label or _cell_val(label, mult):
@@ -414,6 +485,8 @@ def parse_tables(html, txt_hint=""):
             if lm:
                 rmult = _MULT[lm.group(1).lower()]
             vals = {i: _cell_val(row[i], rmult) for i in range(1, min(len(row), ncol))}
+            # 순서 기반 폴백용 — 논리적 숫자 나열(연속 중복 접기 · %·라벨 셀 제외)
+            onums = [v for v in (_cell_val(c, rmult) for c in _runs(row[1:])) if v is not None]
             # (2026-08-16) **단위 미확정 기각** — 캡션·라벨에 단위 선언이 없고 셀에도 단위
             # 접미(billion/million/[BM])가 없으면 자릿수를 확정할 수 없다(문장 파서의
             # '단위 미표기 기각'과 동일 원칙). 실측 FSTR: 천단위 관례 표("Net sales $540,000",
@@ -422,8 +495,20 @@ def parse_tables(html, txt_hint=""):
                not re.search(r"billion|million|\bbn\b|\bmm\b|[\d.]\s*[BM]\b",
                              " ".join(row[1:]), re.I):
                 continue
+            # ① 열 인덱스 기반(기존) → ② 실패 시 순서 기반 폴백.
+            # 폴백은 기간 나열 × 2 = Low/High 나열 = 숫자 나열이 **정확히 맞을 때만** 쓴다.
+            _pairs = []
             for per, pre in (("Q", ""), ("Y", "fy_")):
                 lo, hi = _pick_cols(meta, vals, per)
+                if lo is not None and hi is not None:
+                    _pairs.append((per, pre, lo, hi))
+            if not _pairs and opers and oroles \
+                    and len(oroles) == 2 * len(opers) and len(onums) == len(oroles):
+                _pairs = [(opers[j], ("" if opers[j] == "Q" else "fy_"),
+                           onums[2 * j][0], onums[2 * j + 1][1])
+                          for j in range(len(opers))]
+                _pairs = [(p, pr, lo, hi) for p, pr, lo, hi in _pairs if lo <= hi]
+            for per, pre, lo, hi in _pairs:
                 if lo is None or hi is None:
                     continue
                 # 새니티 — 문장 파서와 동일

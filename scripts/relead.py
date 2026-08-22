@@ -48,7 +48,7 @@
 산출: data/db/relead.json
 사용: relead.py [--full]        cron: 55 7 * * *  (rehub 07:45 뒤)
 """
-import json, math, socket, sys, urllib.parse, urllib.request
+import json, math, socket, sys, time, urllib.parse, urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -274,21 +274,35 @@ def kosis_annual(org, tbl, itm, scale=1.0, y0=2000):
     return acc
 
 
-def kosis_monthly(org, tbl, itm, fixed=None, scale=1.0, y0="200601", flt=None):
+def kosis_monthly(org, tbl, itm, fixed=None, scale=1.0, y0="200601", flt=None, chunk=0):
     """KOSIS 월별 통계표 → {지역: {YYYYMM: 값}}.
 
     표마다 지역이 C1/C2 어디에 오는지 다르고, 이름도 '서울' 과 '서울특별시' 가 섞인다.
     → 행마다 C1~C3 을 훑어 아는 지역명이 나오면 그걸 쓴다(추정하지 않고 매칭만).
     """
-    q = {"method": "getList", "apiKey": KOSIS, "itmId": itm, "format": "json",
-         "jsonVD": "Y", "prdSe": "M", "startPrdDe": y0,
-         "endPrdDe": NOW.strftime("%Y%m"), "orgId": str(org), "tblId": tbl}
-    q.update(fixed or {})
-    d = get(KAPI + "?" + urllib.parse.urlencode(q))
+    # chunk>0 이면 그 해수(年數)씩 잘라 부른다 — KOSIS 는 요청당 40,000셀 상한(err31)이
+    #   있어, 시군구가 섞인 표를 20년치 한 번에 부르면 통째로 빈손이 된다(실측).
+    spans = []
+    if chunk:
+        y = int(y0[:4])
+        while y <= NOW.year:
+            y2 = min(y + chunk - 1, NOW.year)
+            spans.append((f"{y}01" if f"{y}01" > y0 else y0, f"{y2}12"))
+            y = y2 + 1
+    else:
+        spans = [(y0, NOW.strftime("%Y%m"))]
+    rows = []
+    for s0, e0 in spans:
+        q = {"method": "getList", "apiKey": KOSIS, "itmId": itm, "format": "json",
+             "jsonVD": "Y", "prdSe": "M", "startPrdDe": s0, "endPrdDe": e0,
+             "orgId": str(org), "tblId": tbl}
+        q.update(fixed or {})
+        d = get(KAPI + "?" + urllib.parse.urlencode(q))
+        if isinstance(d, list):
+            rows.extend(d)
+        time.sleep(0.3)
     acc = {}
-    if not isinstance(d, list):
-        return acc
-    for r in d:
+    for r in rows:
         if flt and any(str(r.get(k) or "").strip() != v for k, v in flt.items()):
             continue
         nm = None
@@ -678,11 +692,11 @@ def main():
     #   모두 지정해야 했다(한도 아님 — err20 은 축 누락, err31 은 요청당 40,000셀 상한).
     #   시군구='계' 코드를 고정해 셀 수를 줄이고, 부문·규모는 '계' 행만 거른다.
     D["unsold_k"] = kosis_monthly(116, "DT_MLTM_2082", "ALL", {"objL1": "ALL", "objL2": "ALL"},
-                                  y0="200701", flt={"C2_NM": "계"})
+                                  y0="200701", flt={"C2_NM": "계"}, chunk=1)
     D["unsold_done_k"] = kosis_monthly(
         116, "DT_MLTM_5328", "13103871088T1",
         {"objL1": "ALL", "objL2": "13102871088B.0002", "objL3": "ALL", "objL4": "ALL"},
-        y0="200701", flt={"C2_NM": "계", "C3_NM": "계", "C4_NM": "계"})
+        y0="200701", flt={"C2_NM": "계", "C3_NM": "계", "C4_NM": "계"}, chunk=3)
     for k in ("jr", "supply_j", "unsold_k", "unsold_done_k"):
         lbl = META[k][0] if k in META else {"unsold_k": "미분양(2007~백필)", "unsold_done_k": "준공후(2007~백필)"}[k]
         v = (D.get(k) or {}).get("서울") or {}
