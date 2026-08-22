@@ -138,9 +138,22 @@ META = {
     #   ※ 이 표(DT_1YL20152E)는 공표가 반년쯤 뒤처진다(실측 최신 2026.01). 전가 추세 관찰용.
     "wolse":    ("주택월세가격지수", "지수", "부동산", "M", "국가데이터처 KOSIS",
                  "보유세 부담이 월세로 전가되면 먼저 오른다 · 2021.06~ · 공표 지연 큼 · 시도별"),
+    # (2026-08-22) 법원경매 매각통계 4종 — 다른 세션이 구축한 auction.json 합류.
+    #   C(현행) vs A(+경매) 백테스트: 6개 시험지역 전부 A 우세(서울 3.74→3.53%·대구 2.02→1.86%).
+    #   낙찰가율은 '경매시장이 매매시장보다 먼저 식는다'는 통설의 지표 — 서울 r=+0.613 실측.
+    #   전국 단일 계열(법원 API 가 지역 필터를 무시) · 2010.01~.
+    "bid_apt_rate": ("아파트 낙찰가율", "%", "경매", "M", "대법원 경매정보",
+                 "감정가 대비 낙찰가 · 경매 응찰 열기 = 매수 심리의 바닥 신호 · 전 지역 공통"),
+    "bid_apt_sldrate": ("아파트 매각률", "%", "경매", "M", "대법원 경매정보",
+                 "경매 물건 중 낙찰된 비중 · 전 지역 공통"),
+    "bid_apt_auctn": ("아파트 경매 진행건수", "건", "경매", "M", "대법원 경매정보",
+                 "경매로 나온 물량 — 침체가 길수록 쌓인다 · 전 지역 공통"),
+    "bid_all_rate": ("전체 낙찰가율", "%", "경매", "M", "대법원 경매정보",
+                 "주택 외 포함 전체 용도 낙찰가율 · 전 지역 공통"),
 }
 GLOBAL_KEYS = {"cli", "m2", "gdp", "fx", "rate_kr", "rate_us", "mtg_bal", "mtg_rate",
-               "kospi", "hppci", "jeonse", "csi"}
+               "kospi", "hppci", "jeonse", "csi",
+               "bid_apt_rate", "bid_apt_sldrate", "bid_apt_auctn", "bid_all_rate"}
 TARGET = "rt_med"
 TARGET_LABEL = "아파트 매매 실거래 중위가격"
 
@@ -354,7 +367,8 @@ def from_re(re_, key):
 #   통화량·대출잔액처럼 계속 커지는 것은 전년비로 바꿔야 추세에 회귀가 끌려가지 않는다.
 TRANS = {"rate_kr": "lvl", "rate_us": "lvl", "mtg_rate": "lvl", "csi": "lvl",
          "supply": "lvl", "cli": "lvl", "khai": "lvl", "khoi": "lvl",
-         "jr": "lvl", "supply_j": "lvl", "gap_am": "lvl"}
+         "jr": "lvl", "supply_j": "lvl", "gap_am": "lvl",
+         "bid_apt_rate": "lvl", "bid_apt_sldrate": "lvl", "bid_all_rate": "lvl"}
 RIDGE = 1.0            # 표준화 기준 정규화 강도 — 표본이 200개 남짓이라 과적합 방지용
 TOPK = 6               # 회귀에 넣을 지표 수 상한(상관 상위)
 BT_ORIGINS = 48        # 백테스트로 되돌아가 볼 시점 수(개월)
@@ -723,7 +737,16 @@ def main():
         v = (D.get(k) or {}).get("서울") or {}
         print(f"    {lbl:<12} 지역 {len(D.get(k) or {}):>2}" + (f" · 서울 최신 {sorted(v)[-1]} {v[sorted(v)[-1]]:.1f}" if v else " ⚠ 비었음"))
 
-    print("[2/3] 이미 수집된 파일에서 합류 (rehub·realestate)")
+    print("[2/3] 이미 수집된 파일에서 합류 (rehub·realestate·auction)")
+    au = load("auction")
+    if au.get("t"):
+        for k in ("bid_apt_rate", "bid_apt_sldrate", "bid_apt_auctn", "bid_all_rate"):
+            src = au.get(k)
+            a = src.get("전국") if isinstance(src, dict) else src
+            if a:
+                D[k] = {"전국": {au["t"][j]: a[j] for j in range(min(len(au["t"]), len(a)))
+                                if a[j] is not None}}
+        print(f"    경매 4종 합류 · 낙찰가율 {len((D.get('bid_apt_rate') or {}).get('전국') or {})}개월")
     D["mtg_rate"] = from_re(re_, "mtg")
     D["hppci"] = from_re(re_, "sale")
     D["jeonse"] = from_re(re_, "js")
