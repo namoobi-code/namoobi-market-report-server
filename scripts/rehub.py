@@ -94,8 +94,14 @@ META = {
                 "명목 · 그 지역에서 1년간 새로 만들어진 부가가치 총액 · 2000~"),
     "grdp_pc": ("1인당 GRDP",             "만원",   "R", "Y", "국가데이터처 KOSIS",
                 "명목 GRDP ÷ 인구 · 지역 간 소득수준을 같은 잣대로 비교할 때 쓴다 · 2000~"),
+    # (2026-08-22) 경매 — 대법원 법원경매정보 매각통계(auction.json 에서 합류).
+    #   지역 필터가 서버에서 동작하지 않아 **전국만** 있다. 지역별 물량은 경매 개시 계열을 볼 것.
+    "bid_rate":  ("아파트 낙찰가율",        "%",     "L", "M", "대법원 법원경매정보",
+                  "매각가 ÷ 감정가 · 100% 초과면 감정가보다 비싸게 팔린 것 · 전국 기준 · 2010~"),
+    "bid_auctn": ("아파트 경매 진행건수",   "건",    "R", "M", "대법원 법원경매정보",
+                  "그 달 경매가 진행된 아파트 물건 수 · 전국 기준 · 2010~"),
 }
-GLOBAL_KEYS = ("rate_kr", "rate_us", "csi")     # 지역 구분 없이 '전국' 하나만 있는 지표
+GLOBAL_KEYS = ("rate_kr", "rate_us", "csi", "bid_rate", "bid_auctn")     # 지역 구분 없이 '전국' 하나만 있는 지표
 
 
 def _key(*names):
@@ -504,13 +510,19 @@ def main():
     if ht.get("t"):
         D["trade"] = {r: {t: v for t, v in zip(ht["t"], a) if v is not None}
                       for r, a in (ht.get("apt") or {}).items()}
+    au = load("auction")
+    if au.get("t"):
+        for src_k, dst in [("bid_apt_rate", "bid_rate"), ("bid_apt_auctn", "bid_auctn")]:
+            a = (au.get(src_k) or {}).get("전국")
+            if a:
+                D[dst] = {"전국": {t: v for t, v in zip(au["t"], a) if v is not None}}
     ml = load("molit").get("series") or {}
     for key, mk in [("unsold", "unsold"), ("unsold_done", "unsold_done")]:
         s = ml.get(mk) or {}
         if s.get("t"):
             D[key] = {r: {t: v for t, v in zip(s["t"], a) if v is not None}
                       for r, a in (s.get("r") or {}).items()}
-    for k in ("csi", "trade", "unsold", "unsold_done"):
+    for k in ("csi", "trade", "unsold", "unsold_done", "bid_rate", "bid_auctn"):
         print(f"    {META[k][0]:<16} 지역 {len(D.get(k) or {})}")
 
     # ── 이전 결과와 병합 (2026-08-21 수정) ────────────────────────────────
