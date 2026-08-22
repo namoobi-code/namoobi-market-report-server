@@ -426,7 +426,10 @@ def transform(key, seq):
 def corr(a, b):
     p = [(x, y) for x, y in zip(a, b) if x is not None and y is not None]
     n = len(p)
-    if n < 24:
+    # (2026-08-22) 최소 표본 24 → 48. r값 전수 감사에서 월세지수 r=-0.891 이 표본 24개로
+    #   만들어져 서울 2위에 오르는 것을 발견 — 짧은 계열에 긴 시차를 밀면 겹치는 구간이
+    #   몇십 개로 줄어 우연히 높은 상관이 나온다. 4년치(48개월)는 겹쳐야 r 로 인정한다.
+    if n < 48:
         return 0.0, n
     ax = sum(x for x, _ in p) / n
     by = sum(y for _, y in p) / n
