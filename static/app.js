@@ -2498,6 +2498,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     open_f:  {src:'au', lab:'강제경매 개시',  unit:'건', color:'#c084fc'},
     sold_v:  {src:'au', lab:'임의경매 매각',  unit:'건', color:'#ea580c'},
     sold_f:  {src:'au', lab:'강제경매 매각',  unit:'건', color:'#fb923c'},
+    /* (2026-08-22) 대법원 법원경매정보 매각통계 — 전국만 제공(지역 필터가 서버에서 안 먹는다).
+       물량(등기정보광장·지역별)과 짝을 이루는 '가격' 쪽 지표다. */
+    bid_apt_rate:   {src:'au', lab:'아파트 낙찰가율', unit:'%', color:'#16a34a'},
+    bid_all_rate:   {src:'au', lab:'전체 낙찰가율',   unit:'%', color:'#65a30d'},
+    bid_apt_sldrate:{src:'au', lab:'아파트 매각률',   unit:'%', color:'#0d9488'},
   };
   const OVMAX=6;                                   // 선이 너무 많으면 못 읽는다
   let _fsRaw=null, _fsP=null, _fsSel=[], _auRaw=null, _auP=null;
@@ -3158,6 +3163,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      차트 아래 표로 항상 같이 보여준다. 성적이 나쁘면 나쁜 대로 보인다.
      ══════════════════════════════════════════════════════════════════════ */
   let _rlInit=false, _rlReg='서울', _rlSel=[], _rlSpan='120', _rlShift=true, _rlPred=true, _rlD=null;
+  /* (2026-08-22) 시군구 확장 — 서울 25개 구 + 경기 주요시(거래량 기준 45곳).
+     releadg.json 은 새벽 크론이 만든다(70지역 × 24지평이라 40분쯤 걸려 분리).
+     기준계열이 시도(만원/㎡)와 달리 '자체 RTMS 실거래 중위가(억원)' 라 단위가 다르다. */
+  let _rlGu='', _rlG=null;
 
   function rlDraw(t, hist, fut, ser, past){
     const cv=$('rl_main'); if(!cv) return;
@@ -3236,20 +3245,33 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       {const e=$('rl_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
       const btn=(on,txt,attr)=>`<button ${attr} style="padding:2px 8px;font-size:11px;border:1px solid ${on?'#1f2937':'#d7dce3'};`
         +`border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#5b6672'}">${txt}</button>`;
-      const lagOf=k=>((d.lead[_rlReg]||{})[k]||{}).lag||0;
-      const corrOf=k=>((d.lead[_rlReg]||{})[k]||{}).corr;
+      const LEAD=()=>((_rlGu&&_rlG?_rlG.lead[_rlGu]:d.lead[_rlReg])||{});
+      const lagOf=k=>(LEAD()[k]||{}).lag||0;
+      const corrOf=k=>(LEAD()[k]||{}).corr;
+      const MM=k=>M[k]||(_rlG&&_rlG.meta&&_rlG.meta[k])||{label:k,unit:'',cycle:'M'};
+      fetch('/api/db/releadg').then(r=>r.ok?r.json():null).then(g=>{ if(g&&g.pred){_rlG=g; draw();} }).catch(()=>{});
       const fm=t=>`${String(t).slice(0,4)}.${String(t).slice(4)}`;
 
       function bar(){
         /* 지역 */
         $('rl_reg').innerHTML=regs.map(r=>btn(r===_rlReg,E6(r),`data-r="${E6(r)}"`)).join('');
-        $('rl_reg').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{_rlReg=b.dataset.r; _rlSel=defSel(); draw();});
+        $('rl_reg').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{_rlReg=b.dataset.r; _rlGu=''; _rlSel=defSel(); draw();});
+        /* 시군구 셀렉트 — 서울·경기에서만, releadg 도착 후 */
+        {const gw=$('rl_gu');
+         if(gw){ if(_rlG&&(_rlReg==='서울'||_rlReg==='경기')){
+           const opts=Object.entries(_rlG.names||{}).filter(([c,n])=>(_rlG.pred[c]||{}).sido===_rlReg)
+             .sort((a,b)=>a[1].localeCompare(b[1]));
+           gw.innerHTML=`<select id="rl_gu_sel" style="font-size:11px;padding:2px 4px;border:1px solid #d7dce3;border-radius:6px">`
+             +`<option value="">(${E6(_rlReg)} 전체)</option>`
+             +opts.map(([c,n])=>`<option value="${c}"${c===_rlGu?' selected':''}>${E6(n)}</option>`).join('')+`</select>`;
+           gw.querySelector('select').onchange=e=>{_rlGu=e.target.value; _rlSel=defSel(); draw();};
+         } else gw.innerHTML='';}}
         /* 선행지표 — 그 지역에서 상관이 큰 순서로 나열하고 시차를 배지로 붙인다 */
-        const ks=Object.keys(d.lead[_rlReg]||{});
+        const ks=Object.keys(LEAD());
         //   순서 = |상관계수| 내림차순(= 그 지역 가격을 가장 잘 따라온 순). 번호와 r 값을 같이 보여준다.
         $('rl_ind').innerHTML=ks.map((k,i)=>{const on=_rlSel.includes(k), L=lagOf(k), r=corrOf(k);
           const rank=i<3?['①','②','③'][i]:`${i+1}.`;
-          return btn(on,`${rank} ${E6(M[k].label)}<span style="opacity:.75">·${L}개월·r=${(r>0?'+':'')}${r}</span>`,`data-k="${k}"`);}).join('');
+          return btn(on,`${rank} ${E6(MM(k).label)}<span style="opacity:.75">·${L}개월·r=${(r>0?'+':'')}${r}</span>`,`data-k="${k}"`);}).join('');
         $('rl_ind').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
           const k=b.dataset.k, i=_rlSel.indexOf(k);
           // (2026-08-21) 상한 4 → 8. 지표마다 오른쪽에 축 기둥(62px)이 하나씩 붙어
@@ -3266,13 +3288,16 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         $('rl_pred').querySelector('[data-p]').onclick=()=>{_rlPred=!_rlPred; draw();};
         $('rl_chips').innerHTML=_rlSel.map((k,i)=>{const c=RHPAL[(i+1)%RHPAL.length];
           return `<span style="display:inline-flex;align-items:center;gap:4px;font-size:11px;border:1px solid ${c};`
-            +`border-radius:6px;padding:1px 6px;color:${c}">${E6(M[k].label)} <b>${lagOf(k)}개월</b> r=${corrOf(k)}</span>`;}).join('');
+            +`border-radius:6px;padding:1px 6px;color:${c}">${E6(MM(k).label)} <b>${lagOf(k)}개월</b> r=${corrOf(k)}</span>`;}).join('');
       }
-      function defSel(){ return Object.keys(d.lead[_rlReg]||{}).slice(0,2); }
+      function defSel(){ return Object.keys(LEAD()).slice(0,2); }
 
       function draw(){
         bar();
-        const P=d.pred[_rlReg]||{}, price=(d.price[_rlReg]||{}).ma||[];
+        /* 시군구가 선택돼 있으면 releadg(자체 RTMS 실거래·억원) 를 쓴다 */
+        const GU=_rlGu&&_rlG&&_rlG.pred[_rlGu]?_rlGu:'';
+        const P= GU? _rlG.pred[GU] : (d.pred[_rlReg]||{});
+        const price= GU? ((_rlG.price[GU]||{}).ma||[]) : ((d.price[_rlReg]||{}).ma||[]);
         const T0=d.t, ft=(_rlPred?(P.t||[]):[]);
         const t=[...T0, ...ft];
         /* 표시 구간 자르기 */
@@ -3288,7 +3313,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         if(_rlPred&&lastI>=0&&price.length) {fut.price[lastI]=price[T0.length-1];
           fut.lo[lastI]=price[T0.length-1]; fut.hi[lastI]=price[T0.length-1];}
         const ser=_rlSel.map((k,i)=>{
-          const src=(d.d[k]||{})[GLOBRL.includes(k)?'전국':_rlReg]||(d.d[k]||{})['전국']||[];
+          const sidoOf= GU? P.sido : _rlReg;
+          const src= (GU&&((_rlG.d[GU]||{})[k]))
+            || (GU&&k==='sido_p'? ((d.price[P.sido]||{}).ma||[]) : null)
+            || (d.d[k]||{})[GLOBRL.includes(k)?'전국':sidoOf]||(d.d[k]||{})['전국']||[];
           let v=[...src, ...ft.map(()=>null)];
           if(_rlShift){const L=lagOf(k); v=[...Array(L).fill(null), ...v.slice(0,v.length-L)];}
           return {k, label:M[k].label, short:M[k].label, color:RHPAL[(i+1)%RHPAL.length], v:cut(v)};
@@ -3298,8 +3326,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         /* 아래 설명 + 백테스트 표 */
         const bt=P.backtest||{}, last=P.last||{};
         const ch=(P.price&&P.price.length&&last.price)?((P.price[P.price.length-1]/last.price-1)*100):null;
+        const regLbl= GU? _rlG.names[GU] : _rlReg;
+        const unitLbl= GU? '억원' : d.target.unit;
+        const tgtLbl= GU? 'RTMS 실거래 중위가' : d.target.label;
         $('rl_main_n').innerHTML=
-          `<b>${E6(_rlReg)}</b> · 기준 <b>${E6(d.target.label)}</b> ${last.price?last.price.toLocaleString():'-'} ${E6(d.target.unit)} (${fm(last.t||'')} · ${d.target.smooth}개월 평균)`
+          `<b>${E6(regLbl)}</b> · 기준 <b>${E6(tgtLbl)}</b> ${last.price?last.price.toLocaleString():'-'} ${E6(unitLbl)} (${fm(last.t||'')} · ${d.target.smooth}개월 평균)`
           +(ch!=null?` → 12개월 뒤 예측 <b style="color:${ch>=0?'#d9534f':'#2f6fed'}">${P.price[P.price.length-1].toLocaleString()} (${ch>=0?'+':''}${ch.toFixed(1)}%)</b>`:'')
           +`<br>📅 점선 경계 오른쪽은 <b>미래(예측 구간)</b>라 지표 관측값이 없다 — 지표선은 마지막 관측월에서 끝나고, '시차 적용'을 켠 지표만 자기 선행 개월수만큼 경계 너머로 밀려 그려진다.`
           +`<br>🥇 지표 버튼은 <b>맞힐 가능성이 높은 순</b>으로 정렬돼 있다 — 그 지역 가격과의 상관계수(r) 절대값 순서다. r 이 +면 같이 오르고, −면 반대로 움직인 지표다.`
@@ -3314,7 +3345,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         (function(){
           const el=$('rl_sig'); if(!el) return;
           const last=(a)=>{const i=a.map((v,j)=>v!=null?j:-1).filter(j=>j>=0); return i.length?i[i.length-1]:-1;};
-          const je=(d.d['jeonse']||{})['전국']||[], tr=(d.d['trade']||{})[_rlReg]||[];
+          const GU2=_rlGu&&_rlG&&_rlG.pred[_rlGu]?_rlGu:'';
+          const je= GU2? ((_rlG.d[GU2]||{}).rent_g||[]) : ((d.d['jeonse']||{})['전국']||[]);
+          const tr= GU2? ((_rlG.d[GU2]||{}).trade_g||[]) : ((d.d['trade']||{})[_rlReg]||[]);
           const j2=(d.d['jr']||{})[_rlReg];               // 전세가율(지역별, 2020~)
           const ji=last(je), ti=last(tr);
           let s1='', s2='';
@@ -3328,7 +3361,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
              4분면으로 국면을 판정한다: 가격↑거래↓=매물잠김 · 가격↓거래↓=거래절벽(관망) ·
              가격↑거래↑=활황 · 가격↓거래↑=매물출회. */
           let s3='';
-          const pm=(d.price[_rlReg]||{}).ma||[], pi=last(pm);
+          const pm= GU2? ((_rlG.price[GU2]||{}).ma||[]) : ((d.price[_rlReg]||{}).ma||[]); const pi=last(pm);
           if(pi>=6&&pm[pi-6]!=null&&s2){
             const pch=(pm[pi]/pm[pi-6]-1)*100;
             const tUp=s2.includes('활발'), tDn=s2.includes('위축');
@@ -3341,7 +3374,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                    : '보합권';
             s3=`국면: ${q}`;
           }
-          el.innerHTML=(s1||s2)?`🏷 <b>${E6(_rlReg)}</b> 매수 판단 2지표 <span class="note">(주간동아·김학렬 — "전세가와 거래량")</span> : ${[s1,s2,s3].filter(Boolean).join(' · ')}`:'';
+          el.innerHTML=(s1||s2)?`🏷 <b>${E6(GU2?_rlG.names[GU2]:_rlReg)}</b> 매수 판단 2지표 <span class="note">(주간동아·김학렬 — "전세가와 거래량")</span> : ${[s1,s2,s3].filter(Boolean).join(' · ')}`:'';
         })();
         const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12,15,18,21,24].includes(h));
         $('rl_tbl').innerHTML=

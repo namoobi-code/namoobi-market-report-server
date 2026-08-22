@@ -172,3 +172,5 @@
 40 7 * * * cd /home/ubuntu/namoobi && python3 scripts/silv_trade.py --months 3 >> /home/ubuntu/namoobi/logs/applyhome.log 2>&1
 45 7 * * * cd /home/ubuntu/namoobi && python3 scripts/rehub.py >> /home/ubuntu/namoobi/logs/rehub.log 2>&1
 55 7 * * * cd /home/ubuntu/namoobi && nice -n 5 python3 scripts/relead.py >> /home/ubuntu/namoobi/logs/relead.log 2>&1
+45 9 * * * cd /home/ubuntu/namoobi && python3 scripts/guidance_profile.py >> logs/guidance_profile.log 2>&1
+30 3 * * * cd /home/ubuntu/namoobi && nice -n 5 python3 scripts/releadg.py >> /home/ubuntu/namoobi/logs/releadg.log 2>&1
