@@ -91,6 +91,24 @@ def _cell_val(s, mult):
     s = re.sub(r"\((\d{1,2})\)", " ", s)              # 각주 "(1)" 제거 (음수 괄호는 소수·큰수라 보존)
     neg = bool(re.match(r"^\(\s*\$?\s*[\d,.]+\s*\)$", s))
     s = s.strip("()")
+    # (2026-08-22) ± 표기 셀 — "$0.75 +/- $0.09"(실측 FORM). 종전 정규식은 범위·단일값만
+    # 받아 이 셀이 None 이 됐고, 옆의 조정 항목($0.11)이 대신 채택됐다.
+    pm = re.match(r"^\$?\s*([\d,]+(?:\.\d+)?)\s*(billion|million|bn|mm|thousand|[BM])?"
+                  r"\s*(?:±|\+/-)\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(billion|million|bn|mm|thousand|[BM])?$",
+                  s, re.I)
+    if pm:
+        h = pm.group(4) or pm.group(2)
+
+        def _u(u):
+            u = (u or "").lower()
+            u = {"b": "billion", "m": "million"}.get(u, u)
+            return _MULT.get(u, mult)
+        try:
+            c = float(pm.group(1).replace(",", "")) * _u(pm.group(2) or h)
+            d = float(pm.group(3).replace(",", "")) * _u(h)
+        except Exception:
+            return None
+        return (c - d, c + d)
     m = re.match(r"^\$?\s*([\d,]+(?:\.\d+)?)\s*(billion|million|bn|mm|thousand|[BM])?"
                  r"\s*(?:-|to|–)\s*\$?\s*([\d,]+(?:\.\d+)?)\s*(billion|million|bn|mm|thousand|[BM])?$",
                  s, re.I)
@@ -165,7 +183,12 @@ def _col_meta(head_rows, ncol, gcap=False):
                     meta[i]["per"] = "Y"
             for role, pat in (("prior", _R_PRIOR), ("cur", _R_CUR), ("lo", _R_LOW),
                               ("hi", _R_HIGH), ("mid", _R_MID), ("pct", _R_PCT), ("act", _R_ACT),
-                              ("half", _R_HALF)):
+                              ("half", _R_HALF),
+                              # (2026-08-22) GAAP↔Non-GAAP **조정표** 열 — 'GAAP | Reconciling
+                              # Items | Non-GAAP' 3열 형식(실측 FORM). 열 기준을 구분해
+                              # Non-GAAP 열을 우선 채택하고 조정 항목 열은 버린다.
+                              ("gaapc", _GAAP), ("adjc", _ADJ),
+                              ("recon", r"\breconcil\w+")):
                 if role == "act" and gcap and not re.search(
                         r"\bactuals?\b|\breported\b|\bytd\b", c, re.I):
                     continue          # 가이던스 표의 'months ended' 는 대상 기간 표기다
@@ -186,9 +209,19 @@ def _pick_cols(meta, vals, per):
     """한 기간(per)의 값 열들에서 (lo, hi) 확정. 확정 못 하면 None(추측 금지)."""
     idx = [i for i, mt in enumerate(meta)
            if mt["per"] == per and vals.get(i) is not None
-           and not (mt["role"] & {"act", "pct", "mid", "half"})]
+           and not (mt["role"] & {"act", "pct", "mid", "half", "recon"})]
     if not idx:
         return None, None
+    # (2026-08-22) GAAP↔Non-GAAP 조정표 — Non-GAAP(조정) 열이 있으면 그쪽만 쓴다.
+    # 컨센서스가 조정 기준이라 GAAP 열을 집으면 반드시 어긋난다(실측 FORM:
+    # 'GAAP | Reconciling Items | Non-GAAP' 3열에서 GAAP 0.75 와 조정항목 0.11 을 집어
+    # BZ Non-GAAP 0.86 과 불일치). 문장 파서의 'GAAP 기준 기각' 규칙과 같은 원칙이다.
+    adjc = [i for i in idx if "adjc" in meta[i]["role"]]
+    if adjc:
+        idx = adjc
+    elif any("gaapc" in meta[i]["role"] for i in idx) \
+            and not all("gaapc" in meta[i]["role"] for i in idx):
+        idx = [i for i in idx if "gaapc" not in meta[i]["role"]]
     cur = [i for i in idx if "cur" in meta[i]["role"]]
     pri = [i for i in idx if "prior" in meta[i]["role"]]
     unq = [i for i in idx if i not in cur and i not in pri]

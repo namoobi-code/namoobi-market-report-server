@@ -481,6 +481,13 @@ def _period(txt, start, end):
     # **다음 블록 머리글**도 오른쪽 경계다 — 실측 TDC: 분기 블록 마지막 불릿(Non-GAAP EPS
     # $0.55~0.59) 뒤에 마침표 없이 연간 블록 머리글이 이어져, 그 머리글의 'full year 2026'
     # 이 분기 값의 근거로 잡혀 Q3 값이 연간으로(그리고 연간 값이 분기로) 서로 뒤바뀌었다.
+    # (2026-08-22) "«회사명»'s guidance/outlook …" 도 새 블록 머리글이다.
+    # 실측 UPWK: Q3 블록 마지막 불릿 "…Non-GAAP diluted EPS: $0.31 to $0.33 Upwork's
+    # guidance … for full year 2026 is:" 이 마침표 없이 이어져 FY 표지가 같은 문장으로
+    # 새어 들어왔고, 분기 EPS 가 연간으로 실려 진짜 연간 값이 중복 차단에 막혔다
+    # (BZ FY 1.40 대비 -77%).
+    _m9 = re.search(r"\s[A-Z][\w.&-]*(?:'|’)s\s+(?:guidance|outlook)\b", txt[end:end + 400])
+    _poss = (end + _m9.start()) if _m9 else -1
     rs = min([p for p in ([txt.find(". ", end), txt.find(" - - ", end), txt.find(" “", end)] +
                           [txt.find(ph, end) for ph in (" The following ", " The Company ",
                                                         " In addition", " Additionally,", " Separately,",
@@ -495,7 +502,8 @@ def _period(txt, start, end):
                                                         # 이어져 Y 가 근거로 채택(3배 페널티로도 역전),
                                                         # 분기 값이 연간으로·연간 값이 분기로 뒤바뀜(+221%).
                                                         " Table ")] +
-                          [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")]) if p > 0] or [-1])
+                          [txt.find(b, end) for b in ("• ", "● ", "▪ ", "· ")] +
+                          [_poss]) if p > 0] or [-1])
     s0 = (ls + 2 if ls > 0 else max(0, start - 400))
     sent = txt[s0:(rs if rs > 0 else min(len(txt), end + 200))]
     r1 = pick(sent, start - s0)
