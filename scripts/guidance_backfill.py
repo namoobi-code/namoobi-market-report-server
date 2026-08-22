@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from earnings_8k_watch import (cik_map, exhibit_text, exhibit_texts_extra,
-                               parse_guidance, guidance_gap, RAW_CACHE)
+                               parse_guidance, guidance_gap, exhibit_raw)
 from guidance_table import parse_tables
 
 BASE = Path(__file__).resolve().parent.parent
@@ -148,10 +148,13 @@ def main():
             if FORCE:
                 # 재파싱 전에 옛 값을 지운다 — 안 지우면 이번에 기각된 항목(오파싱이라
                 # 걸러낸 것)이 옛 값 그대로 남아 "고쳤는데 화면은 그대로"가 된다.
-                for k in ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev",
-                          "g_eps", "g_eps_gap", "g_eps_per", "g_eps_ev", "g_per",
-                          "g_capex", "g_capex_per", "g_capex_ev"):
-                    it.pop(k, None)
+                # (2026-08-21) 이 목록은 **G_FIELDS 와 같아야 한다** — 새 필드를 추가하고
+                # 여기에 빠뜨리면, 이번 재파싱에서 기각된 값이 옛 값 그대로 남는다.
+                # 실측: 성장률 필드를 추가한 뒤 CMCO(+125%)·PACK 등 9건이 잘못 저장된 채
+                # 남아 있었다(오채택을 고쳤는데도 화면은 그대로). 접수번호·발표일만 뺀다.
+                for k in G_FIELDS:
+                    if k not in ("acc", "_d8"):
+                        it.pop(k, None)
             r = pool_us.get(c) or {}
             if r.get("rq1") is None and r.get("eq1") is None:
                 continue
@@ -228,7 +231,7 @@ def main():
                 or not ("eps_lo" in g or "fy_eps_lo" in g)
             if need_tb:
                 try:
-                    gt = parse_tables(RAW_CACHE.get((str(cik), acc)) or "")
+                    gt = parse_tables(exhibit_raw(cik, acc))
                 except Exception:
                     gt = {}
             # (2026-08-10 되돌림) 표 값을 문장 값보다 **우선**시켰더니 전체 이상치가

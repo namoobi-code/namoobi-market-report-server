@@ -165,6 +165,28 @@ def _strip(t):
     return re.sub(r"\s+", " ", t)
 
 
+def exhibit_raw(cik, accno):
+    """표 파서용 **원문 HTML** — 디스크 캐시에서 직접 읽는다.
+
+    (2026-08-21) 종전에는 표 파서가 RAW_CACHE 만 봤는데, 이 캐시는 8개가 넘으면
+    통째로 비우고(clear) 워커 4개가 동시에 쓴다. 그래서 대량 배치에서는 자기 원문이
+    남의 것에 밀려 사라지고, 표 파서가 빈 문자열을 받아 조용히 {} 를 반환했다
+    (실측 WEX: 단독 실행하면 fy_eps 19.68~20.08(BZ 19.88 과 일치)을 정확히 뽑는데
+     백필로 돌리면 값이 없다). 표 파서 v2 를 고쳐도 실측이 안 움직이던 원인이다.
+    보도자료는 제출 뒤 바뀌지 않으므로 디스크 캐시를 직접 읽으면 SEC 호출은 0회다.
+    """
+    t = RAW_CACHE.get((str(cik), accno))
+    if t:
+        return t
+    cp = _exc_path(accno)
+    if cp.exists():
+        try:
+            return gzip.decompress(cp.read_bytes()).decode("utf-8", "ignore")
+        except Exception:
+            pass
+    return ""
+
+
 def exhibit_text(cik, accno):
     """8-K 첨부 중 **실적 보도자료** 본문 → 태그 제거한 평문.
 
