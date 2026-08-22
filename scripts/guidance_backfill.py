@@ -28,6 +28,7 @@ BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "earnings_live_us.json"
 POOL = BASE / "data" / "db" / "screener_pool.json"
 TEND = BASE / "data" / "db" / "guidance_tendency.json"    # 회사별 이력 프로필(guidance_history.py)
+PROF = BASE / "data" / "db" / "guidance_profile.json"     # 종목별 가이던스 프로필(guidance_profile.py)
 H = {"User-Agent": "namoobi research namoobi@gmail.com"}
 ARG = lambda k, d: (int(sys.argv[sys.argv.index(k) + 1]) if k in sys.argv else d)
 DAYS, WORKERS, LIMIT = ARG("--days", 45), ARG("--workers", 4), ARG("--limit", 0)
@@ -171,6 +172,15 @@ def main():
         tend = (json.loads(TEND.read_text(encoding="utf-8")) or {}).get("sym") or {}
     except Exception:
         pass
+    # (2026-08-21) 종목별 프로필 — 단위 미표기 값의 자릿수를 회사 규모로 확정하는 데 쓴다.
+    prof = {}
+    try:
+        prof = (json.loads(PROF.read_text(encoding="utf-8")) or {}).get("sym") or {}
+    except Exception:
+        pass
+
+    def _scale(sym):
+        return (prof.get(sym.upper()) or {}).get("scale") or None
 
     def _hint(sym):
         td = tend.get(sym)
@@ -202,7 +212,7 @@ def main():
                 continue
             if not t_:
                 continue
-            g_ = parse_guidance(t_, _hint(sym))
+            g_ = parse_guidance(t_, _hint(sym), _scale(sym))
             if any(k in g_ for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
                 acc, best = a, (t_, g_)
                 break
@@ -220,7 +230,7 @@ def main():
             # 발생하고, 파일별 캐시라 재실행 시 0회.
             if not any(k in g for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
                 for t2 in exhibit_texts_extra(cik, acc):
-                    g2 = parse_guidance(t2, _hint(sym))
+                    g2 = parse_guidance(t2, _hint(sym), _scale(sym))
                     if any(k in g2 for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
                         g = g2
                         break

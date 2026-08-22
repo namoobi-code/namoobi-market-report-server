@@ -113,6 +113,16 @@ META = {
                  "기준계열과 같은 실거래 원천 — 가격 자신의 과거 흐름(자기회귀 항) · 시도별"),
     "rt_avg":   ("평균매매가격", "만원/㎡", "가격", "M", "한국부동산원",
                  "실거래 평균가 · 중위가와 벌어지는 폭이 고가거래 쏠림을 알려준다 · 시도별"),
+    # (2026-08-22 추가) 인덱서고 지표 목록 검토 후 원천(KOSIS)에서 직접 수집한 3종.
+    #   전세가율은 갭투자 유인의 척도라 매매가 선행지표로 가장 널리 인용되고,
+    #   세대수는 '집이 필요한 단위' 그 자체라 수요의 바닥을 이룬다.
+    #   ※ 전월세전환율(DT_KAB_11671_N06)은 축 구조가 달라 이번엔 제외했다.
+    "jr":       ("전세가율", "%", "가격", "M", "한국부동산원",
+                 "매매가격 대비 전세가격 비율 · 높을수록 갭이 작아 매수 전환 유인이 커진다 · 시도별"),
+    "hh":       ("세대수", "만세대", "인구", "M", "국가데이터처 KOSIS",
+                 "주민등록 세대 — 인구보다 세대가 집 수요의 단위다 · 시도별"),
+    "supply_j": ("전세수급동향", "0~200", "부동산", "M", "한국부동산원",
+                 "100 미만이면 전세 공급우위 · 전세난은 매매 전환 압력으로 이어진다 · 시도별"),
 }
 GLOBAL_KEYS = {"cli", "m2", "gdp", "fx", "rate_kr", "rate_us", "mtg_bal", "mtg_rate",
                "kospi", "hppci", "jeonse", "csi"}
@@ -258,6 +268,37 @@ def kosis_annual(org, tbl, itm, scale=1.0, y0=2000):
     return acc
 
 
+def kosis_monthly(org, tbl, itm, fixed=None, scale=1.0, y0="200601"):
+    """KOSIS 월별 통계표 → {지역: {YYYYMM: 값}}.
+
+    표마다 지역이 C1/C2 어디에 오는지 다르고, 이름도 '서울' 과 '서울특별시' 가 섞인다.
+    → 행마다 C1~C3 을 훑어 아는 지역명이 나오면 그걸 쓴다(추정하지 않고 매칭만).
+    """
+    q = {"method": "getList", "apiKey": KOSIS, "itmId": itm, "format": "json",
+         "jsonVD": "Y", "prdSe": "M", "startPrdDe": y0,
+         "endPrdDe": NOW.strftime("%Y%m"), "orgId": str(org), "tblId": tbl}
+    q.update(fixed or {})
+    d = get(KAPI + "?" + urllib.parse.urlencode(q))
+    acc = {}
+    if not isinstance(d, list):
+        return acc
+    for r in d:
+        nm = None
+        for f in ("C1_NM", "C2_NM", "C3_NM"):
+            v = str(r.get(f) or "").strip()
+            if v in SIDO:
+                nm = v
+                break
+            if v in KOSIS_SIDO:
+                nm = KOSIS_SIDO[v]
+                break
+        v, t = num(r.get("DT")), str(r.get("PRD_DE") or "")
+        if not nm or v is None or len(t) != 6:
+            continue
+        acc.setdefault(nm, {})[t] = v * scale
+    return acc
+
+
 def from_hub(hub, key):
     """rehub.json 의 {t, d:{key:{지역:[...]}}} → {지역: {YYYYMM: 값}}"""
     t = hub.get("t") or []
@@ -281,7 +322,8 @@ def from_re(re_, key):
 #   금리·심리지수처럼 이미 '수준 자체가 의미'인 것은 그대로,
 #   통화량·대출잔액처럼 계속 커지는 것은 전년비로 바꿔야 추세에 회귀가 끌려가지 않는다.
 TRANS = {"rate_kr": "lvl", "rate_us": "lvl", "mtg_rate": "lvl", "csi": "lvl",
-         "supply": "lvl", "cli": "lvl", "khai": "lvl", "khoi": "lvl"}
+         "supply": "lvl", "cli": "lvl", "khai": "lvl", "khoi": "lvl",
+         "jr": "lvl", "supply_j": "lvl"}
 RIDGE = 1.0            # 표준화 기준 정규화 강도 — 표본이 200개 남짓이라 과적합 방지용
 TOPK = 6               # 회귀에 넣을 지표 수 상한(상관 상위)
 BT_ORIGINS = 48        # 백테스트로 되돌아가 볼 시점 수(개월)
@@ -618,6 +660,14 @@ def main():
         v = D[k]["전국"]
         print(f"    {META[k][0]:<18} {len(v):>4}개월" + (f"  최신 {sorted(v)[-1]}" if v else "  ⚠ 비었음"))
     print(f"    {META['hdi_pc'][0]:<18} 지역 {len(D['hdi_pc'])}")
+
+    print("[1.5/3] 인덱서고 검토분 3종 (KOSIS 408·101)")
+    D["jr"] = kosis_monthly(408, "DT_08002_07_007A", "T001", {"objL1": "ALL", "objL2": "0001"})
+    D["hh"] = kosis_monthly(101, "DT_1B040B3", "T1", {"objL1": "ALL"}, scale=1e-4)
+    D["supply_j"] = kosis_monthly(408, "DT_40803_N0009", "index", {"objL1": "01", "objL2": "ALL"})
+    for k in ("jr", "hh", "supply_j"):
+        v = D[k].get("서울") or {}
+        print(f"    {META[k][0]:<12} 지역 {len(D[k]):>2}" + (f" · 서울 최신 {sorted(v)[-1]} {v[sorted(v)[-1]]:.1f}" if v else " ⚠ 비었음"))
 
     print("[2/3] 이미 수집된 파일에서 합류 (rehub·realestate)")
     D["mtg_rate"] = from_re(re_, "mtg")

@@ -7,6 +7,24 @@ from fastapi.staticfiles import StaticFiles
 
 BASE = Path(__file__).parent
 DB   = BASE / "data" / "db"
+
+# (2026-08-21) 종목별 가이던스 프로필(guidance_profile.py 산출) — 파일이 바뀔 때만 다시 읽는다.
+_GPROF = {"mt": 0, "d": {}}
+
+
+def _gprof():
+    p = DB / "guidance_profile.json"
+    try:
+        mt = p.stat().st_mtime
+    except OSError:
+        return {}
+    if mt != _GPROF["mt"]:
+        try:
+            _GPROF["d"] = (json.loads(p.read_text(encoding="utf-8")) or {}).get("sym") or {}
+            _GPROF["mt"] = mt
+        except Exception:
+            return _GPROF["d"]
+    return _GPROF["d"]
 RPT  = BASE / "data" / "reports"
 POLL = BASE / "data" / "poll.db"
 RPTD = BASE / "data" / "report"
@@ -821,6 +839,16 @@ def us_fin(sym: str):
                               "epsGrHi": it.get("g_eps_gr_hi"), "epsGrPer": it.get("g_eps_gr_per"),
                               "epsGrEv": it.get("g_eps_gr_ev"),
                               "acc": it.get("acc")}
+            # (2026-08-21) **종목별 가이던스 프로필** — 이 회사가 무엇을 어떤 기준·기간으로
+            # 내 왔는지(Benzinga 이력 2022~). 화면에서 "이번 파싱이 이 회사의 평소 형식과
+            # 맞는가"를 눈으로 대조하는 근거이며, 값이 비었을 때 '원래 안 주는 회사'인지
+            # '우리가 놓친 것'인지 구분해 준다.
+            try:
+                _pf = (_gprof() or {}).get(sym.upper())
+                if _pf and gd is not None:
+                    gd["prof"] = {k: _pf.get(k) for k in ("n", "per", "has", "basis", "first", "last")}
+            except Exception:
+                pass
         except Exception:
             pass
         # (2026-08-09) 예전엔 여기서 10분기로 잘라 앞쪽 행의 YoY 기준(t−4)이 사라졌다.

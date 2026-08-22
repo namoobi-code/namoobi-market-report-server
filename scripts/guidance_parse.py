@@ -588,8 +588,13 @@ def _period(txt, start, end):
     return pick(txt[end:end + 90]), False
 
 
-def parse_guidance(txt, per_hint=None):
+def parse_guidance(txt, per_hint=None, scale_hint=None):
     """보도자료 평문 → {rev_lo,rev_hi,eps_lo,eps_hi, fy_*} + _ev(근거) + _skip(기각 사유).
+
+    scale_hint (dict|None): **회사 규모 힌트** (2026-08-21) — guidance_profile.json 의
+    {"rev": [최소, 최대], "eps": [...]}. Benzinga 이력(2022~)에 남은 이 회사의 과거
+    가이던스 값 범위다. 단위를 안 쓴 표기("Revenue $172")의 자릿수를 산술로 확정하는 데만
+    쓴다(추측이 아니라 계산 — 후보 배수 중 범위에 드는 것이 하나뿐일 때만 채택).
 
     per_hint ('Y'|'Q'|None): **회사별 프로필 힌트** (2026-08-15). Benzinga 이력(2022~)에서
     이 회사가 한 종류 기간만 제시해 왔음이 확인되면(예: 연간만 90%+, 4회 이상),
@@ -956,9 +961,17 @@ def parse_guidance(txt, per_hint=None):
                     # MWH·OCTV·AEBI·MH·GMRS·EQPT). 숫자별 단위를 요구하면 전부 기각됐다.
                     tblu = re.search(r"\(\s*(?:\$\s*)?in\s+(million|billion)s?\b", back300 + ctx, re.I)
                     if not re.search(r"(billion|million|bn|mm)\b|\$\s?[\d,.]+\s*[BM]\b", ctx) and not tblu:
+                        # (2026-08-21 시도·철회) 회사의 과거 매출 규모(guidance_profile)로
+                        # 단위를 역산해 보았으나 **실측하면 손해였다**. 이 22건은 단위만
+                        # 빠진 게 아니라 후보 숫자 자체가 가이던스가 아닌 경우가 섞여 있어,
+                        # 규모 조건을 통과시키면 그 오답까지 살아난다
+                        # (실측: 회수 NXPI 1건 vs 오채택 SCHL 2,000M(정답 1,629) ·
+                        #  LII 8,000M(정답 5,611) 2건. 과거 범위가 LII 4.7~7.5B 처럼 넓어
+                        #  ±15% 로 좁혀도 걸러지지 않는다).
+                        # 단위가 없으면 자릿수를 확정할 수 없다 — 추측하지 않고 버린다.
                         skip.append(f"rev: 단위 미표기 → 자릿수 확정 불가 · {ctx[:120]}")
                         continue
-                    if tblu and lo < 1e5:                  # 맨몸 숫자 → 머리 선언 단위로 환산
+                    elif tblu and lo < 1e5:                # 맨몸 숫자 → 머리 선언 단위로 환산
                         mult = 1e9 if tblu.group(1).lower() == "billion" else 1e6
                         lo, hi = lo * mult, hi * mult
                     if not (0 < lo <= hi and lo > 1e5 and hi / lo < 1.6):

@@ -3246,8 +3246,10 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         $('rl_reg').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{_rlReg=b.dataset.r; _rlSel=defSel(); draw();});
         /* 선행지표 — 그 지역에서 상관이 큰 순서로 나열하고 시차를 배지로 붙인다 */
         const ks=Object.keys(d.lead[_rlReg]||{});
-        $('rl_ind').innerHTML=ks.map(k=>{const on=_rlSel.includes(k), L=lagOf(k);
-          return btn(on,`${E6(M[k].label)}<span style="opacity:.75">·${L}개월</span>`,`data-k="${k}"`);}).join('');
+        //   순서 = |상관계수| 내림차순(= 그 지역 가격을 가장 잘 따라온 순). 번호와 r 값을 같이 보여준다.
+        $('rl_ind').innerHTML=ks.map((k,i)=>{const on=_rlSel.includes(k), L=lagOf(k), r=corrOf(k);
+          const rank=i<3?['①','②','③'][i]:`${i+1}.`;
+          return btn(on,`${rank} ${E6(M[k].label)}<span style="opacity:.75">·${L}개월·r=${(r>0?'+':'')}${r}</span>`,`data-k="${k}"`);}).join('');
         $('rl_ind').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{
           const k=b.dataset.k, i=_rlSel.indexOf(k);
           // (2026-08-21) 상한 4 → 8. 지표마다 오른쪽에 축 기둥(62px)이 하나씩 붙어
@@ -3299,6 +3301,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         $('rl_main_n').innerHTML=
           `<b>${E6(_rlReg)}</b> · 기준 <b>${E6(d.target.label)}</b> ${last.price?last.price.toLocaleString():'-'} ${E6(d.target.unit)} (${fm(last.t||'')} · ${d.target.smooth}개월 평균)`
           +(ch!=null?` → 12개월 뒤 예측 <b style="color:${ch>=0?'#d9534f':'#2f6fed'}">${P.price[P.price.length-1].toLocaleString()} (${ch>=0?'+':''}${ch.toFixed(1)}%)</b>`:'')
+          +`<br>🥇 지표 버튼은 <b>맞힐 가능성이 높은 순</b>으로 정렬돼 있다 — 그 지역 가격과의 상관계수(r) 절대값 순서다. r 이 +면 같이 오르고, −면 반대로 움직인 지표다.`
           +`<br>🕐 <b>시차</b>는 그 지표가 가격보다 몇 개월 앞서 움직였는지를 <b>데이터로 찾은 값</b>이다(0~${d.maxlag}개월 중 상관이 가장 큰 지점). '시차 적용'을 켜면 그만큼 밀어 그려 가격과 겹쳐 보인다.`
           +`<br>📉 예측은 <b>수집한 ${Object.keys(M).length}개 지표를 전 지역 동일하게</b> 넣어 회귀한다(지역 차이는 값·시차·계수에서만 난다). 지표마다 <b>예측 기간보다 긴 시차</b>를 다시 골라 쓰므로 아직 관측되지 않은 값은 쓰지 않는다. 회색 띠는 80% 구간.`
           +`<br>🔬 지표 조합은 백테스트로 정했다 — 지역별 자동선택(6개)·핵심 7개·전 지표 세 방식을 겨뤄 <b>전 지표가 18개 시도 모두에서 가장 정확</b>했다.`
@@ -6979,7 +6982,14 @@ await _canvasFlow(c);
             <td style="text-align:right">${e3.eps==null?'—':(+e3.eps).toFixed(2)}</td><td style="text-align:right">${J2(je)}</td>
             <td style="text-align:right">${(gd2&&per===((gd2.epsPerP||gep)))?GP(gd2.epsGapP,gd2.epsGap,'EPS'):'<span class="note">—</span>'}</td>
             ${CXC(per,e3)}</tr>`; }).join('')+
-        `</table><div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>성장률</b> 표기 — 금액을 아예 제시하지 않고 성장률로만 말하는 회사가 있다(예: '매출 +5~6% · EPS +9~11%'). 이때는 성장률을 그대로 싣는다. 전년 실적으로 금액을 역산하지 않는 이유는 회사가 쓰는 기준(환율 중립·조정 등)이 달라 오차가 커지기 때문이며, 같은 이유로 <b>갭(상회/하회)도 계산하지 않는다</b>.<br><b>FFO</b> 표기 — 리츠(부동산)는 애널리스트 컨센서스가 순이익(EPS)이 아니라 <b>FFO</b> 기준이라 EPS 가이던스로는 비교가 성립하지 않는다. 그래서 EPS 칸에 회사가 제시한 FFO 가이던스 값을 대신 싣고, 무료 FFO 컨센서스가 없어 <b>갭(상회/하회)은 계산하지 않는다</b>. '조정FFO' 는 회사가 주력으로 제시하는 Core/Normalized/Adjusted FFO 다.<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
+        `</table>${(function(){          /* (2026-08-21) 이 회사의 가이던스 제시 습관 — 값이 비었을 때
+             '원래 안 주는 회사'인지 '우리가 놓친 것'인지 구분하는 근거다(출처 Benzinga 이력). */
+          const pf=gd2&&gd2.prof; if(!pf||!pf.n) return '';
+          const pe=pf.per||{}, hs=pf.has||{}, bs=pf.basis||{};
+          const per=[pe.FY?`연간 ${pe.FY}회`:'',pe.Q?`분기 ${pe.Q}회`:''].filter(Boolean).join(' · ');
+          const met=[hs.rev?`매출 ${hs.rev}회`:'',hs.eps?`EPS ${hs.eps}회`:''].filter(Boolean).join(' · ');
+          const ba=[bs.eps?`EPS ${bs.eps}`:'',bs.rev?`매출 ${bs.rev}`:''].filter(Boolean).join(' · ');
+          return `<div class="note" style="margin-top:4px">이 회사의 가이던스 습관 <b>(${E(pf.first||'')}~${E(pf.last||'')} · 이력 ${pf.n}건)</b> — 제시 기간: ${per||'—'} · 제시 지표: ${met||'—'}${ba?' · 기준: '+ba:''} <span class="note">(출처 Benzinga 이력 — 위 표의 값이 이 습관과 어긋나면 파싱을 의심할 근거다)</span></div>`;})()}<div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>성장률</b> 표기 — 금액을 아예 제시하지 않고 성장률로만 말하는 회사가 있다(예: '매출 +5~6% · EPS +9~11%'). 이때는 성장률을 그대로 싣는다. 전년 실적으로 금액을 역산하지 않는 이유는 회사가 쓰는 기준(환율 중립·조정 등)이 달라 오차가 커지기 때문이며, 같은 이유로 <b>갭(상회/하회)도 계산하지 않는다</b>.<br><b>FFO</b> 표기 — 리츠(부동산)는 애널리스트 컨센서스가 순이익(EPS)이 아니라 <b>FFO</b> 기준이라 EPS 가이던스로는 비교가 성립하지 않는다. 그래서 EPS 칸에 회사가 제시한 FFO 가이던스 값을 대신 싣고, 무료 FFO 컨센서스가 없어 <b>갭(상회/하회)은 계산하지 않는다</b>. '조정FFO' 는 회사가 주력으로 제시하는 Core/Normalized/Adjusted FFO 다.<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
       /* (2026-08-15) 가이던스 개정 습관 한 줄 — Benzinga 이력(2022~) 기반 자체 파생 신호.
          상향/하향 습관은 다음 가이던스의 방향 기대치를 잡는 데 쓰인다(판정 미사용). */
       { const td=(window._TENDJ&&window._TENDJ.sym)?window._TENDJ.sym[c]:null;
