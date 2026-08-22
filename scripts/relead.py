@@ -547,7 +547,7 @@ def build_xy(feat, ytr, h, lags, keys, upto=None, force=None):
     return X, Y, use
 
 
-def forecast(feat, ytr, prices, keys, t_last, horizons=HZ, upto=None):
+def forecast(feat, ytr, prices, keys, t_last, horizons=HZ, upto=None, lam=RIDGE):
     """t_last(관측 마지막 인덱스) 기준 1~horizons 개월 앞 가격 예측.
 
     지표 집합은 고정이고, 시차만 지평별로 [h, MAXLAG] 안에서 다시 고른다.
@@ -590,7 +590,7 @@ def forecast(feat, ytr, prices, keys, t_last, horizons=HZ, upto=None):
             sel.remove(min(sel, key=lambda k: sum(1 for v in feat[k] if v is not None)))
         if len(X) < 36:
             continue
-        m = ridge_fit(X, Y)
+        m = ridge_fit(X, Y, lam=lam)
         if not m:
             continue
         row = [feat[k][t_last - (lags[k]["lag"] - h)] for k in use]
@@ -615,7 +615,7 @@ def lags_for(feat, ytr, keys, upto=None):
     return out
 
 
-def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
+def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS, lam=RIDGE):
     """과거로 되돌아가 그때 자료만으로 12개월을 예측하고 실제와 비교.
 
     시차 탐색까지 그 시점 자료로 다시 한다 — 전체 기간으로 찾은 시차를 쓰면
@@ -629,7 +629,7 @@ def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
     for o in range(n - HZ - origins, n - HZ):
         if o < 60 or prices[o] is None:
             continue
-        fc = forecast(feat, ytr, prices, keys, o, upto=o)
+        fc = forecast(feat, ytr, prices, keys, o, upto=o, lam=lam)
         for h, r in fc.items():
             act = prices[o + h] if o + h < n else None
             if act is None or act <= 0:
@@ -674,6 +674,52 @@ def backtest(feat, ytr, prices, keys, origins=BT_ORIGINS):
         "n": len(alle),
         "origins": origins,
     }
+
+
+# (2026-08-22) 릿지 강도 λ 지역별 튜닝.
+#   3파전 백테스트(λ선택은 앞 18시점, 채점은 뒤 18시점 — 선택 편향 차단):
+#     C(λ=1) vs L(λ튜닝) vs F(테마 팩터 회귀) → L 이 4/6 승(서울 3.17→2.84%·전국 4.95→4.73%),
+#     F 는 전패(테마 평균이 지표별 타이밍 정보를 뭉개서 서울 5.48%로 악화) — 팩터안 기각.
+#   λ 후보는 {0.3, 1, 3}. λ 가 클수록 중복 지표 가족의 과대 영향이 더 눌린다.
+LAM_GRID = [0.3, 1.0, 3.0]
+
+
+def select_lam(feat, ytr, prices, keys, origins=BT_ORIGINS):
+    """오래된 절반 시점(1~12개월 지평)에서 λ 별 오차를 재고 최소를 고른다."""
+    n = len(prices)
+    errs = {l: [] for l in LAM_GRID}
+    O = [o for o in range(n - HZ - origins, n - HZ - origins // 2)
+         if o >= 60 and prices[o] is not None]
+    for o in O:
+        for h in range(1, 13):
+            lags = {}
+            for k in keys:
+                L, c = best_lag_ge(feat[k][:o + 1], ytr[:o + 1], h)
+                lags[k] = {"lag": L, "corr": c}
+            avail = [k for k in sorted(keys, key=lambda k: -abs(lags[k]["corr"]))
+                     if 0 <= o - (lags[k]["lag"] - h) < n
+                     and feat[k][o - (lags[k]["lag"] - h)] is not None]
+            sel = list(avail)
+            X = []
+            while len(sel) >= 3:
+                X, Y, use = build_xy(feat, step_log(prices, h), h, lags, keys,
+                                     upto=o, force=sel)
+                if len(X) >= 60:
+                    break
+                sel.remove(min(sel, key=lambda k: sum(1 for v in feat[k] if v is not None)))
+            if len(X) < 36:
+                continue
+            row = [feat[k][o - (lags[k]["lag"] - h)] for k in use]
+            act = prices[o + h] if o + h < n else None
+            if not act:
+                continue
+            for l in LAM_GRID:
+                m = ridge_fit(X, Y, lam=l)
+                if not m:
+                    continue
+                g = ridge_pred(m, row)
+                errs[l].append(abs(prices[o] * math.exp(g) - act) / act)
+    return min(LAM_GRID, key=lambda l: (sum(errs[l]) / len(errs[l])) if errs[l] else 9e9)
 
 
 def add_months(ym, k):
@@ -829,8 +875,9 @@ def main():
         lead[reg] = dict(sorted(lg_all.items(), key=lambda kv: -abs(kv[1]["corr"])))
         model_keys = [k for k in FIXED_KEYS if k in feat]      # 전 지역 동일 집합
         t_last = max(i for i, v in enumerate(prices) if v is not None)
-        fc = forecast(feat, ytr, prices, model_keys, t_last)
-        bt = backtest(feat, ytr, prices, model_keys)
+        lam = select_lam(feat, ytr, prices, model_keys)
+        fc = forecast(feat, ytr, prices, model_keys, t_last, lam=lam)
+        bt = backtest(feat, ytr, prices, model_keys, lam=lam)
         # (2026-08-21) 원시 회귀값을 그대로 쓰면 지평마다 지표 조합이 달라 경로가 튄다
         #   (전국 실측: 12개월 후 -27.8% 로 폭락 예측). 두 가지를 건다.
         #   ① 보정 — 백테스트에서 예측폭이 실제로 몇 배 실현됐는지(회귀 기울기)만큼만 반영한다.
@@ -876,9 +923,9 @@ def main():
                                 "corr": (fc.get(12, {}).get("corrs") or {}).get(k)}
                               for k in model_keys if k in (fc.get(12, {}).get("lags") or {})],
                      "n_model_keys": len(model_keys),
-                     "fixed_set": True,
+                     "fixed_set": True, "lam": lam,
                      "backtest": bt}
-        print(f"    {reg:<3} 모델지표 {len(model_keys)}(고정) · 예측 {len(fp)}개월 · 백테스트 MAPE {bt['mape']}% · 방향적중 {bt['hit']}%")
+        print(f"    {reg:<3} 모델지표 {len(model_keys)} · λ={lam} · 예측 {len(fp)}개월 · 백테스트 MAPE {bt['mape']}% · 방향적중 {bt['hit']}%")
 
     out = {
         "asof": NOW.strftime("%Y-%m-%d %H:%M"),
