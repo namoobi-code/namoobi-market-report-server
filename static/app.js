@@ -3333,6 +3333,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           `<b>${E6(regLbl)}</b> · 기준 <b>${E6(tgtLbl)}</b> ${last.price?last.price.toLocaleString():'-'} ${E6(unitLbl)} (${fm(last.t||'')} · ${d.target.smooth}개월 평균)`
           +(ch!=null?` → 12개월 뒤 예측 <b style="color:${ch>=0?'#d9534f':'#2f6fed'}">${P.price[P.price.length-1].toLocaleString()} (${ch>=0?'+':''}${ch.toFixed(1)}%)</b>`:'')
           +`<br>📅 점선 경계 오른쪽은 <b>미래(예측 구간)</b>라 지표 관측값이 없다 — 지표선은 마지막 관측월에서 끝나고, '시차 적용'을 켠 지표만 자기 선행 개월수만큼 경계 너머로 밀려 그려진다.`
+          +`<br>📐 r 은 <b>원값이 아니라 전년비 변동률끼리</b> 잰다 — 20년 우상향한 두 계열은 무관해도 원값 상관이 0.9를 넘기 때문(추세 공유 착시). 그래서 GRDP·소득처럼 꾸준히만 크는 지표는 차트로는 겹쳐 보여도 r 이 낮게 나오는 것이 정상이다(서울 1인당 GRDP 실측: 원값 +0.94 vs 변동률 +0.18).`
           +`<br>🥇 지표 버튼은 <b>맞힐 가능성이 높은 순</b>으로 정렬돼 있다 — 그 지역 가격과의 상관계수(r) 절대값 순서다. r 이 +면 같이 오르고, −면 반대로 움직인 지표다.`
           +`<br>🕐 <b>시차</b>는 그 지표가 가격보다 몇 개월 앞서 움직였는지를 <b>데이터로 찾은 값</b>이다(0~${d.maxlag}개월 중 상관이 가장 큰 지점). '시차 적용'을 켜면 그만큼 밀어 그려 가격과 겹쳐 보인다.`
           +`<br>📉 예측은 <b>수집한 ${Object.keys(M).length}개 지표를 전 지역 동일하게</b> 넣어 회귀한다(지역 차이는 값·시차·계수에서만 난다). 지표마다 <b>예측 기간보다 긴 시차</b>를 다시 골라 쓰므로 아직 관측되지 않은 값은 쓰지 않는다. 회색 띠는 80% 구간.`
@@ -3375,6 +3376,48 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             s3=`국면: ${q}`;
           }
           el.innerHTML=(s1||s2)?`🏷 <b>${E6(GU2?_rlG.names[GU2]:_rlReg)}</b> 매수 판단 2지표 <span class="note">(주간동아·김학렬 — "전세가와 거래량")</span> : ${[s1,s2,s3].filter(Boolean).join(' · ')}`:'';
+        })();
+        /* (2026-08-22) 🧠 모델 사용 내역 표 — 사용자 질문("지표별 가중치·중복·λ가 어떻게 쓰이나")에
+           화면으로 답한다. β 는 릿지가 학습한 표준화 가중치(12개월 지평 기준): 모든 지표를 평균0·표준편차1로
+           맞춘 뒤의 계수라 단위와 무관하게 |β| 가 클수록 예측을 많이 움직인 지표다. r 은 참고용 단순 상관,
+           실제 가중치는 β — 둘의 순위가 다른 것이 정상이다(중복 지표는 릿지가 가중치를 나눠 갖는다). */
+        (function(){
+          const el=$('rl_model'); if(!el) return;
+          const U=(P.used||[]).filter(u=>u.beta!=null);
+          if(!U.length){ el.innerHTML=''; return; }
+          const lam=P.lam!=null?P.lam:'-';
+          const srt=[...U].sort((a,b)=>Math.abs(b.beta)-Math.abs(a.beta));
+          const bmax=Math.max(...srt.map(u=>Math.abs(u.beta)))||1;
+          const grpCnt={}; U.forEach(u=>{grpCnt[u.group]=(grpCnt[u.group]||0)+1;});
+          el.innerHTML=
+            `<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">🧠 이번 예측이 지표를 쓴 방식 — 가중치(β)·시차·상관 전체 표 <span class="note">(릿지 강도 λ=${lam} · 12개월 지평 모델 · ${U.length}개 지표 사용)</span></summary>`
+            +`<div class="note" style="margin:6px 0;line-height:1.7">`
+            +`가중치는 사람이 정하지 않는다 — 모든 지표를 표준화한 뒤 <b>릿지 회귀가 β 를 학습</b>한다. |β| 가 클수록 이번 예측을 많이 움직인 지표. `
+            +`r(단순 상관)와 β 순위가 다른 것이 정상이다: 비슷한 지표들(같은 <b>그룹</b>)은 릿지가 가중치를 <b>나눠 갖게</b> 눌러서, 한 주제가 여러 표를 행사하는 것을 막는다. `
+            +`λ 는 그 누르는 강도이며 지역별 백테스트로 {0.3, 1, 3} 중 자동 선택된다(클수록 강하게 누름). `
+            +`시차 열은 그 지표를 몇 개월 전 값으로 넣었는지다 — 12개월 예측이라 모든 지표가 12개월 이상 전 값만 쓴다(미래 참조 없음).</div>`
+            +`<table style="border-collapse:collapse;font-size:11px"><tr style="background:#f6f7f9">`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px">#</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px">지표</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px">그룹(중복 가족)</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px">시차</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px">r(상관)</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px">β(가중치)</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:3px 7px;min-width:130px">영향력</th></tr>`
+            +srt.map((u,i)=>{
+              const w=Math.round(100*Math.abs(u.beta)/bmax);
+              const c=u.beta>=0?'#d9534f':'#2f6fed';
+              const dup=grpCnt[u.group]>1?` <span style="opacity:.6">×${grpCnt[u.group]}</span>`:'';
+              return `<tr><td style="border:1px solid #e5e8ec;padding:2px 7px;text-align:right">${i+1}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 7px">${E6(u.label)}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 7px">${E6(u.group||'')}${dup}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 7px;text-align:right">${u.lag}개월</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 7px;text-align:right">${u.corr>0?'+':''}${u.corr}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 7px;text-align:right;color:${c};font-weight:600">${u.beta>0?'+':''}${u.beta}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 7px"><span style="display:inline-block;height:8px;width:${w}%;min-width:2px;background:${c};border-radius:2px;opacity:.75"></span></td></tr>`;
+            }).join('')+`</table>`
+            +`<div class="note" style="margin-top:4px">β 부호: <b style="color:#d9534f">+</b> 이 지표가 오르면 가격 상승 쪽으로, <b style="color:#2f6fed">−</b> 는 하락 쪽으로 기여. 그룹 ×N 표시는 같은 주제의 지표가 N개 있다는 뜻 — 릿지가 이들의 가중치를 나눠 과대반영을 막는다.</div>`
+            +`</details>`;
         })();
         const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12,15,18,21,24].includes(h));
         $('rl_tbl').innerHTML=

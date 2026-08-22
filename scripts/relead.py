@@ -600,7 +600,8 @@ def forecast(feat, ytr, prices, keys, t_last, horizons=HZ, upto=None, lam=RIDGE)
             continue
         out[h] = {"growth": g, "price": base * math.exp(g), "n": len(X), "k": len(use),
                   "lags": {k: lags[k]["lag"] for k in use},
-                  "corrs": {k: lags[k]["corr"] for k in use}}
+                  "corrs": {k: lags[k]["corr"] for k in use},
+                  "betas": {k: round(m["beta"][j], 4) for j, k in enumerate(use)}}
     return out
 
 
@@ -918,9 +919,10 @@ def main():
                      # 12개월 지평에서 실제로 회귀에 들어간 지표만 싣는다.
                      #   표본이 짧아 그 지평에서 빠진 지표는 lag 가 없어 화면 표가 깨졌다.
                      # used 는 12개월 지평 기준(대표성) — 24개월 지평은 쓸 수 있는 지표가 적다
-                     "used": [{"key": k, "label": META[k][0],
+                     "used": [{"key": k, "label": META[k][0], "group": META[k][2],
                                 "lag": (fc.get(12, {}).get("lags") or {})[k],
-                                "corr": (fc.get(12, {}).get("corrs") or {}).get(k)}
+                                "corr": (fc.get(12, {}).get("corrs") or {}).get(k),
+                                "beta": (fc.get(12, {}).get("betas") or {}).get(k)}
                               for k in model_keys if k in (fc.get(12, {}).get("lags") or {})],
                      "n_model_keys": len(model_keys),
                      "fixed_set": True, "lam": lam,
