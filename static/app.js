@@ -3308,6 +3308,23 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           +`<br>🔬 지표 조합은 백테스트로 정했다 — 지역별 자동선택(6개)·핵심 7개·전 지표 세 방식을 겨뤄 <b>전 지표가 18개 시도 모두에서 가장 정확</b>했다.`
           +(P.guarded&&P.guarded.length?`<br>🛡 ${P.guarded.length}개 지점은 과거에 겪은 변화 범위(5~95%)를 벗어나 그 경계로 눌렀다.`:'')
           +`<br><span style="opacity:.8">${E6(d.note||'')}</span>`;
+        /* (2026-08-22) 주간동아 김학렬 인터뷰 — "매입할 아파트를 고를 때 확인해야 하는 지표는 딱 2가지,
+           전세가와 거래량" 을 지역 신호로 요약한다. 전세가: 최근 6개월 추세(꾸준히 오르는가),
+           거래량: 최근 3개월 평균의 전년 동기 대비. 실측값만 쓰고 판정 기준을 그대로 적는다. */
+        (function(){
+          const el=$('rl_sig'); if(!el) return;
+          const last=(a)=>{const i=a.map((v,j)=>v!=null?j:-1).filter(j=>j>=0); return i.length?i[i.length-1]:-1;};
+          const je=(d.d['jeonse']||{})['전국']||[], tr=(d.d['trade']||{})[_rlReg]||[];
+          const j2=(d.d['jr']||{})[_rlReg];               // 전세가율(지역별, 2020~)
+          const ji=last(je), ti=last(tr);
+          let s1='', s2='';
+          if(ji>=6&&je[ji-6]!=null){const ch=(je[ji]/je[ji-6]-1)*100;
+            s1=`전세지수 6개월 ${ch>=0?'+':''}${ch.toFixed(1)}% ${ch>0.5?'<b style="color:#d9534f">↑ 수요 탄탄</b>':(ch<-0.5?'<b style="color:#2f6fed">↓ 주의</b>':'→ 보합')}`;}
+          if(ti>=14){const cur=(tr[ti]+tr[ti-1]+tr[ti-2])/3, prv=(tr[ti-12]+tr[ti-13]+tr[ti-14])/3;
+            if(prv){const ch=(cur/prv-1)*100;
+              s2=`거래량 3개월평균 전년비 ${ch>=0?'+':''}${ch.toFixed(0)}% ${ch>10?'<b style="color:#d9534f">↑ 활발</b>':(ch<-10?'<b style="color:#2f6fed">↓ 위축</b>':'→ 평년')}`;}}
+          el.innerHTML=(s1||s2)?`🏷 <b>${E6(_rlReg)}</b> 매수 판단 2지표 <span class="note">(주간동아·김학렬 — "전세가와 거래량")</span> : ${[s1,s2].filter(Boolean).join(' · ')}`:'';
+        })();
         const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12,15,18,21,24].includes(h));
         $('rl_tbl').innerHTML=
           `<table style="border-collapse:collapse;font-size:11px"><tr style="background:#f6f7f9">`

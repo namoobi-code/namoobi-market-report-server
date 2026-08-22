@@ -183,6 +183,11 @@ def _col_meta(head_rows, ncol, gcap=False):
                 ym = re.search(_YRE, c, re.I)
                 if ym and not re.search(_YEXCL, c[:ym.start()][-60:], re.I):
                     meta[i]["per"] = "Y"
+            # (2026-08-22) 머리글의 연도 숫자를 기억한다 — 'FY2026 전망 | FY2025 실적' 두 열
+            # 표에서 과거 연도 열이 실적 비교 열임을 가려내는 근거(_pick_cols 의 연도 서열).
+            y4 = re.search(r"\b(?:19|20)\d\d\b", c)
+            if y4:
+                meta[i]["yr"] = int(y4.group(0))
             for role, pat in (("prior", _R_PRIOR), ("cur", _R_CUR), ("lo", _R_LOW),
                               ("hi", _R_HIGH), ("mid", _R_MID), ("pct", _R_PCT), ("act", _R_ACT),
                               ("half", _R_HALF),
@@ -198,12 +203,14 @@ def _col_meta(head_rows, ncol, gcap=False):
                     meta[i]["role"].add(role)
     # 두 단 머리글: 기간이 일부 열에만 붙으면(colspan 전개 후에도) 왼쪽 값을 상속하되,
     # **다른 기간이 나오기 전까지만** 잇는다.
-    last = None
+    last, lyr = None, None
     for i in range(ncol):
         if meta[i]["per"]:
-            last = meta[i]["per"]
+            last, lyr = meta[i]["per"], meta[i].get("yr")
         elif last and not (meta[i]["role"] & {"act", "pct"}):
             meta[i]["per"] = last
+            if lyr and "yr" not in meta[i]:
+                meta[i]["yr"] = lyr
     return meta
 
 
@@ -290,6 +297,17 @@ def _pick_cols(meta, vals, per):
     elif any("gaapc" in meta[i]["role"] for i in idx) \
             and not all("gaapc" in meta[i]["role"] for i in idx):
         idx = [i for i in idx if "gaapc" not in meta[i]["role"]]
+    # (2026-08-22) **연도 서열** — 같은 기간(Y) 후보 열의 연도가 서로 다르면 과거 연도 열은
+    # 전년 실적 비교 열이다. 실측 INIO: 'Fiscal Year 2026 Outlook | Fiscal Year 2025' 두 열
+    # (\$3.8-\$3.9B | \$2.6B)이 '값이 다른 다중 열'로 통째 기각됐다 — 2025 열을 걸러내면
+    # 남는 열이 하나뿐이라 모호성이 사라진다(BZ 3,850 = 중간값 3,850 일치).
+    _ys2 = {i: meta[i].get("yr") for i in idx}
+    _kn = [y for y in _ys2.values() if y]
+    if len(set(_kn)) > 1:
+        _mx = max(_kn)
+        idx = [i for i in idx if _ys2.get(i) in (None, _mx)]
+        if not idx:
+            return None, None
     cur = [i for i in idx if "cur" in meta[i]["role"]]
     pri = [i for i in idx if "prior" in meta[i]["role"]]
     unq = [i for i in idx if i not in cur and i not in pri]

@@ -129,6 +129,11 @@ META = {
     #     주기·코드 체계가 이 표만 다른 듯하다 — 추정으로 채우지 않고 다음에 다시 본다.
     "supply_j": ("전세수급동향", "0~200", "부동산", "M", "한국부동산원",
                  "100 미만이면 전세 공급우위 · 전세난은 매매 전환 압력으로 이어진다 · 시도별"),
+    # (2026-08-22) 주간동아 김학렬 인터뷰(세제개편·수요 확산) 반영 파생지표 2종 — 새 API 호출 없음.
+    "seoul_p":  ("서울 중위가(파급)", "만원/㎡", "가격", "M", "한국부동산원(파생)",
+                 "서울 가격이 몇 달 뒤 그 지역으로 번지는가(순차 확산) — 서울 자신은 제외"),
+    "gap_am":   ("평균/중위 괴리배율", "배", "가격", "M", "한국부동산원(파생)",
+                 "평균가÷중위가 · 1에 가까울수록 '중위 평준화', 커질수록 고가거래 쏠림"),
 }
 GLOBAL_KEYS = {"cli", "m2", "gdp", "fx", "rate_kr", "rate_us", "mtg_bal", "mtg_rate",
                "kospi", "hppci", "jeonse", "csi"}
@@ -345,7 +350,7 @@ def from_re(re_, key):
 #   통화량·대출잔액처럼 계속 커지는 것은 전년비로 바꿔야 추세에 회귀가 끌려가지 않는다.
 TRANS = {"rate_kr": "lvl", "rate_us": "lvl", "mtg_rate": "lvl", "csi": "lvl",
          "supply": "lvl", "cli": "lvl", "khai": "lvl", "khoi": "lvl",
-         "jr": "lvl", "supply_j": "lvl"}
+         "jr": "lvl", "supply_j": "lvl", "gap_am": "lvl"}
 RIDGE = 1.0            # 표준화 기준 정규화 강도 — 표본이 200개 남짓이라 과적합 방지용
 TOPK = 6               # 회귀에 넣을 지표 수 상한(상관 상위)
 BT_ORIGINS = 48        # 백테스트로 되돌아가 볼 시점 수(개월)
@@ -691,8 +696,10 @@ def main():
     #   준공후 미분양(5328)도 2007.01~ — 4축 표(시도×시군구×부문×규모)라 objL1~4 를
     #   모두 지정해야 했다(한도 아님 — err20 은 축 누락, err31 은 요청당 40,000셀 상한).
     #   시군구='계' 코드를 고정해 셀 수를 줄이고, 부문·규모는 '계' 행만 거른다.
-    D["unsold_k"] = kosis_monthly(116, "DT_MLTM_2082", "ALL", {"objL1": "ALL", "objL2": "ALL"},
-                                  y0="200701", flt={"C2_NM": "계"}, chunk=1)
+    #   (실측) objL2=ALL 은 시군구 큐브 전체를 세어 1년 조각도 40,000셀 초과.
+    #   시군구 '계' 코드(13102871087B.0001)를 직접 지정하면 20년치가 한 번(3,909행)에 온다.
+    D["unsold_k"] = kosis_monthly(116, "DT_MLTM_2082", "ALL",
+                                  {"objL1": "ALL", "objL2": "13102871087B.0001"}, y0="200701")
     D["unsold_done_k"] = kosis_monthly(
         116, "DT_MLTM_5328", "13103871088T1",
         {"objL1": "ALL", "objL2": "13102871088B.0002", "objL3": "ALL", "objL4": "ALL"},
@@ -718,7 +725,18 @@ def main():
         for reg, mp in recent.items():
             D[key].setdefault(reg, {}).update(mp)
     tgt = from_hub(hub, TARGET)
-    print(f"    기준계열 {TARGET_LABEL} 지역 {len(tgt)} · 합류 지표 {len([k for k in D if k not in GLOBAL_KEYS])}종")
+    # 파생 ①: 서울 중위가를 타 지역의 후보 지표로 (서울→수도권→지방 순차 확산 가설).
+    #   서울 자신에게는 목표와 동일한 계열이라 제외한다. 시차 탐색이 '몇 달 뒤 번지는지'를 찾는다.
+    seoul_mp = tgt.get("서울") or {}
+    D["seoul_p"] = {r: seoul_mp for r in tgt if r != "서울"}
+    # 파생 ②: 평균가 ÷ 중위가 — 고가 거래 쏠림의 척도. 세제 이벤트로 '중위 평준화'가 진행되면 내려온다.
+    D["gap_am"] = {}
+    for r, med in tgt.items():
+        avg = (D.get("rt_avg") or {}).get(r) or {}
+        mp = {t: avg[t] / v for t, v in med.items() if t in avg and v}
+        if mp:
+            D["gap_am"][r] = mp
+    print(f"    기준계열 {TARGET_LABEL} 지역 {len(tgt)} · 파생 seoul_p {len(D['seoul_p'])}·gap_am {len(D['gap_am'])}")
 
     # ── 월 축 통일 (기준계열이 있는 구간만)
     ts = sorted({t for mp in tgt.values() for t in mp})
