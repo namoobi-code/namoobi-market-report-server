@@ -60,7 +60,14 @@ def _clean(s):
 
 
 def _grid(tb):
-    """<table> → colspan 전개한 2차원 텍스트 그리드."""
+    """<table> → colspan 전개한 2차원 텍스트 그리드.
+
+    (2026-08-21 검토·보류) SEC 표에는 전부 빈 더미 행(<td> 24개가 모두 빈 칸)이 섞여
+    있어 ncol 을 부풀린다(실측 EFX: 데이터 5열인데 ncol=24). 이를 제거하거나 빈 열까지
+    지우면 EFX 계열이 풀릴 것 같지만, **실측하면 오히려 손해다** — 머리글 행 판정이
+    한 칸씩 밀려 HLIT 연간 매출이 515M 대신 실적 열 173M 으로 바뀌었다(gt2 31/0 → 30/1).
+    빈 행도 열 정렬 정보의 일부이므로 그대로 둔다. EFX 계열은 다른 접근이 필요하다.
+    """
     rows = []
     for tr in tb.find_all("tr"):
         cells = []
@@ -122,10 +129,25 @@ def _is_year_cell(s):
     return bool(re.match(r"^\s*(?:FY\s*)?(?:19|20)\d\d\s*$", _clean(s or "")))
 
 
-def _col_meta(head_rows, ncol):
-    """머리글 행들 → 열별 {per: 'Q'|'Y'|None, role: set}. 위→아래로 덮어쓴다."""
+def _col_meta(head_rows, ncol, gcap=False):
+    """머리글 행들 → 열별 {per: 'Q'|'Y'|None, role: set}. 위→아래로 덮어쓴다.
+
+    gcap: 범위(Low/High)를 제시하는 가이던스 표인가. True 면 'months ended' 를 실적 열
+          표기로 보지 않는다 — 가이던스 표도 대상 기간을 'For the three months ended
+          September 30, 2026' 로 쓴다(실측 OPK: 전 값 열이 act 로 찍혀 통째로 버려졌다).
+          ※ 이 완화만으로는 OPK 가 회수되지 않는다. 빈 더미 행 제거가 함께 있어야
+             열 정렬이 맞는데, 그 처리는 HLIT 를 깨뜨려 보류했다(_grid 주석 참조).
+    """
     meta = [{"per": None, "role": set()} for _ in range(ncol)]
     for row in head_rows:
+        # (2026-08-21) **표 제목 행**(colspan 으로 전 열이 같은 문구)은 열 구분 정보가 아니다.
+        # 실측 EFX: 제목 '2026 Third Quarter and Full Year Guidance' 가 24열 전부에 퍼져
+        # 라벨 열까지 분기(Q)로 칠했고, 그 아래 'Q3 2026 | FY 2026' 두 단 머리글의
+        # 열 구분이 묻혔다. 제목은 표 전체 캡션으로만 쓰고 열 판정에서는 건너뛴다.
+        _nz = [c for c in row[:ncol] if c]
+        if (len(_nz) >= 3 and len(set(_nz)) == 1
+                and re.search(_QRE, _nz[0], re.I) and re.search(_YRE, _nz[0], re.I)):
+            continue        # 분기·연간이 함께 든 제목 행은 열 구분 정보가 아니다
         for i in range(min(len(row), ncol)):
             c = row[i]
             if not c:
@@ -144,6 +166,9 @@ def _col_meta(head_rows, ncol):
             for role, pat in (("prior", _R_PRIOR), ("cur", _R_CUR), ("lo", _R_LOW),
                               ("hi", _R_HIGH), ("mid", _R_MID), ("pct", _R_PCT), ("act", _R_ACT),
                               ("half", _R_HALF)):
+                if role == "act" and gcap and not re.search(
+                        r"\bactuals?\b|\breported\b|\bytd\b", c, re.I):
+                    continue          # 가이던스 표의 'months ended' 는 대상 기간 표기다
                 if re.search(pat, c, re.I):
                     meta[i]["role"].add(role)
     # 두 단 머리글: 기간이 일부 열에만 붙으면(colspan 전개 후에도) 왼쪽 값을 상속하되,
@@ -238,7 +263,15 @@ def parse_tables(html, txt_hint=""):
             data_start = ri + 1
         if not head_rows:
             continue
-        meta = _col_meta(head_rows, ncol)
+        # (2026-08-21) 'months ended' 를 실적 열로 볼지 — 캡션에 guidance 가 있다는 것만으로는
+        # 부족하다(실적 비교 표도 가이던스 문단 근처에 붙는다. 실측 HLIT: 완화했더니 연간
+        # 매출이 173M 으로, 정답 515M 대신 실적 열을 집었다). 머리글에 **Low 와 High 가
+        # 모두** 있는 표, 즉 범위를 제시하는 전망 표일 때만 완화한다 —
+        # 실측 OPK 'For the three months ended September 30, 2026 … Low High Low High'.
+        _gcap = bool(re.search(r"\b(?:guidance|outlook)\b", cap, re.I)
+                     and re.search(_R_LOW, head_txt, re.I)
+                     and re.search(_R_HIGH, head_txt, re.I))
+        meta = _col_meta(head_rows, ncol, _gcap)
         # 표 전체가 한 기간이면(캡션 명시) 기간 없는 열에 부여.
         # (2026-08-15 2차) 캡션의 분기 토큰은 **전망 문맥일 때만** 인정 — "reported second
         # quarter results" 같은 실적 문구의 분기가 표 기간으로 오인돼 연간 표가 분기로
@@ -306,7 +339,7 @@ def parse_tables(html, txt_hint=""):
                               or re.search(_R_PRIOR + "|" + _R_CUR + "|" + _R_LOW + "|" + _R_HIGH,
                                            c, re.I))
                        for c in row[1:]):
-                    meta = _col_meta([row], ncol)
+                    meta = _col_meta([row], ncol, _gcap)
                     continue
             label = _clean(row[0])
             if not label or _cell_val(label, mult):
