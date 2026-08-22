@@ -3323,7 +3323,25 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           if(ti>=14){const cur=(tr[ti]+tr[ti-1]+tr[ti-2])/3, prv=(tr[ti-12]+tr[ti-13]+tr[ti-14])/3;
             if(prv){const ch=(cur/prv-1)*100;
               s2=`거래량 3개월평균 전년비 ${ch>=0?'+':''}${ch.toFixed(0)}% ${ch>10?'<b style="color:#d9534f">↑ 활발</b>':(ch<-10?'<b style="color:#2f6fed">↓ 위축</b>':'→ 평년')}`;}}
-          el.innerHTML=(s1||s2)?`🏷 <b>${E6(_rlReg)}</b> 매수 판단 2지표 <span class="note">(주간동아·김학렬 — "전세가와 거래량")</span> : ${[s1,s2].filter(Boolean).join(' · ')}`:'';
+          /* (2026-08-22) 월간중앙 전문가 10인 설문 — "시장이 규제로 지나치게 경직되면 가격이
+             내려가기보다 거래량이 먼저 사라진다". 가격(3개월평균 6개월 변화) × 거래량(전년비)
+             4분면으로 국면을 판정한다: 가격↑거래↓=매물잠김 · 가격↓거래↓=거래절벽(관망) ·
+             가격↑거래↑=활황 · 가격↓거래↑=매물출회. */
+          let s3='';
+          const pm=(d.price[_rlReg]||{}).ma||[], pi=last(pm);
+          if(pi>=6&&pm[pi-6]!=null&&s2){
+            const pch=(pm[pi]/pm[pi-6]-1)*100;
+            const tUp=s2.includes('활발'), tDn=s2.includes('위축');
+            const ph=pch>1, pl=pch<-1;
+            const q= ph&&tDn?'<b style="color:#e08e3c">매물잠김형 상승</b> — 거래 없이 가격만 오름(호가 주도, 신뢰 낮음)'
+                   : pl&&tDn?'<b style="color:#6b7280">거래절벽 관망</b> — 가격·거래 동반 위축(방향 탐색 국면)'
+                   : ph&&!tDn&&!tUp?'가격 완만한 상승(거래 평년)'
+                   : ph&&tUp?'<b style="color:#d9534f">활황</b> — 가격·거래 동반 상승(추세 신뢰 높음)'
+                   : pl&&tUp?'<b style="color:#2f6fed">매물출회</b> — 가격 하락 속 거래 증가(하방 압력)'
+                   : '보합권';
+            s3=`국면: ${q}`;
+          }
+          el.innerHTML=(s1||s2)?`🏷 <b>${E6(_rlReg)}</b> 매수 판단 2지표 <span class="note">(주간동아·김학렬 — "전세가와 거래량")</span> : ${[s1,s2,s3].filter(Boolean).join(' · ')}`:'';
         })();
         const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12,15,18,21,24].includes(h));
         $('rl_tbl').innerHTML=
