@@ -92,7 +92,8 @@ META = {
     "trade":    ("매매거래건수", "건", "부동산", "M", "한국부동산원·국토부", "시도별"),
     "comp":     ("준공실적", "호", "부동산", "M", "국토교통부",
                  "입주물량 대체 지표 — 입주물량 자체는 공개 API 가 없다 · 시도별"),
-    "unsold":   ("미분양주택", "호", "부동산", "M", "국토교통부", "시도별"),
+    "unsold":   ("미분양주택", "호", "부동산", "M", "국토교통부",
+                 "시도별 · 2007.01~ (KOSIS DT_MLTM_2082 시군구별 미분양, 시도 '계' 행)"),
     "supply":   ("매매수급동향", "0~200", "부동산", "M", "한국부동산원 R-ONE", "시도별"),
     # (2026-08-21 추가) 통합차트(rehub)에만 있던 지표 11종.
     #   C(16종) vs D(+공급 9종) vs E(+가격계열 2종) 백테스트 결과 E 가 6개 시험지역 전부 최적:
@@ -102,7 +103,7 @@ META = {
     "start":    ("착공실적", "호", "공급", "M", "국토교통부", "아파트 · 시도별"),
     "presale":  ("분양실적", "호", "공급", "M", "국토교통부", "공동주택 · 2013.01~ · 시도별"),
     "unsold_done": ("준공후 미분양", "호", "공급", "M", "국토교통부",
-                 "악성 미분양 — 다 짓고도 안 팔린 물량 · 시도별"),
+                 "악성 미분양 — 다 짓고도 안 팔린 물량 · 시도별 · 2007.01~ (KOSIS 5328)"),
     "khai":     ("주택구입부담지수(K-HAI)", "지수", "부담", "Q", "한국주택금융공사",
                  "100 = 중간소득 가구가 중간가격 주택 살 때 소득의 25%를 원리금으로 · 분기 · 시도별"),
     "khoi":     ("주택구입물량지수(K-HOI)", "%", "부담", "Y", "한국주택금융공사",
@@ -273,7 +274,7 @@ def kosis_annual(org, tbl, itm, scale=1.0, y0=2000):
     return acc
 
 
-def kosis_monthly(org, tbl, itm, fixed=None, scale=1.0, y0="200601"):
+def kosis_monthly(org, tbl, itm, fixed=None, scale=1.0, y0="200601", flt=None):
     """KOSIS 월별 통계표 → {지역: {YYYYMM: 값}}.
 
     표마다 지역이 C1/C2 어디에 오는지 다르고, 이름도 '서울' 과 '서울특별시' 가 섞인다.
@@ -288,6 +289,8 @@ def kosis_monthly(org, tbl, itm, fixed=None, scale=1.0, y0="200601"):
     if not isinstance(d, list):
         return acc
     for r in d:
+        if flt and any(str(r.get(k) or "").strip() != v for k, v in flt.items()):
+            continue
         nm = None
         for f in ("C1_NM", "C2_NM", "C3_NM"):
             v = str(r.get(f) or "").strip()
@@ -669,19 +672,37 @@ def main():
     print("[1.5/3] 인덱서고 검토분 3종 (KOSIS 408·101)")
     D["jr"] = kosis_monthly(408, "DT_08002_07_007A", "T001", {"objL1": "ALL", "objL2": "0001"})
     D["supply_j"] = kosis_monthly(408, "DT_40803_N0009", "index", {"objL1": "01", "objL2": "ALL"})
-    for k in ("jr", "supply_j"):
-        v = D[k].get("서울") or {}
-        print(f"    {META[k][0]:<12} 지역 {len(D[k]):>2}" + (f" · 서울 최신 {sorted(v)[-1]} {v[sorted(v)[-1]]:.1f}" if v else " ⚠ 비었음"))
+    # (2026-08-22) 미분양주택 백필 — 기존 molit.json 합류분은 2022.01~ 53개월뿐이었다.
+    #   국토부 원통계(2082)는 2007.01부터 월별로 있고, 시도 행에 시군구가 섞여 있어 '계'만 거른다.
+    #   준공후 미분양(5328)도 2007.01~ — 4축 표(시도×시군구×부문×규모)라 objL1~4 를
+    #   모두 지정해야 했다(한도 아님 — err20 은 축 누락, err31 은 요청당 40,000셀 상한).
+    #   시군구='계' 코드를 고정해 셀 수를 줄이고, 부문·규모는 '계' 행만 거른다.
+    D["unsold_k"] = kosis_monthly(116, "DT_MLTM_2082", "ALL", {"objL1": "ALL", "objL2": "ALL"},
+                                  y0="200701", flt={"C2_NM": "계"})
+    D["unsold_done_k"] = kosis_monthly(
+        116, "DT_MLTM_5328", "13103871088T1",
+        {"objL1": "ALL", "objL2": "13102871088B.0002", "objL3": "ALL", "objL4": "ALL"},
+        y0="200701", flt={"C2_NM": "계", "C3_NM": "계", "C4_NM": "계"})
+    for k in ("jr", "supply_j", "unsold_k", "unsold_done_k"):
+        lbl = META[k][0] if k in META else {"unsold_k": "미분양(2007~백필)", "unsold_done_k": "준공후(2007~백필)"}[k]
+        v = (D.get(k) or {}).get("서울") or {}
+        print(f"    {lbl:<12} 지역 {len(D.get(k) or {}):>2}" + (f" · 서울 최신 {sorted(v)[-1]} {v[sorted(v)[-1]]:.1f}" if v else " ⚠ 비었음"))
 
     print("[2/3] 이미 수집된 파일에서 합류 (rehub·realestate)")
     D["mtg_rate"] = from_re(re_, "mtg")
     D["hppci"] = from_re(re_, "sale")
     D["jeonse"] = from_re(re_, "js")
     D["csi"] = from_re(re_, "csi")
-    for k in ("trade", "comp", "unsold", "supply",
-              "permit", "start", "presale", "unsold_done", "khai", "khoi",
+    for k in ("trade", "comp", "supply",
+              "permit", "start", "presale", "khai", "khoi",
               "rate_us", "grdp", "grdp_pc", "rt_idx", "rt_avg"):
         D[k] = from_hub(hub, k)
+    # 미분양 = KOSIS 백필(2007~) 위에 rehub 최신분을 덮는다(공표 지연 보완)
+    for key, kback in (("unsold", "unsold_k"), ("unsold_done", "unsold_done_k")):
+        recent = from_hub(hub, key)
+        D[key] = D.pop(kback, {})
+        for reg, mp in recent.items():
+            D[key].setdefault(reg, {}).update(mp)
     tgt = from_hub(hub, TARGET)
     print(f"    기준계열 {TARGET_LABEL} 지역 {len(tgt)} · 합류 지표 {len([k for k in D if k not in GLOBAL_KEYS])}종")
 

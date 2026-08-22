@@ -239,6 +239,13 @@ def _forms(label, metric):
             ("pmc", label + gap + _NUM_D + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM_C),
         ]
     return [
+        # (2026-08-22) **값이 라벨 앞에 오는 인포그래픽 형식** — "$900M - $950M 2026 Revenue
+        # Guidance $50M - $54M 2026 Adj. EBITDA Guidance"(실측 ORN). 종전 라벨→값 형식으로는
+        # 'Revenue Guidance' 뒤의 $50-54M(다음 항목 EBITDA 의 값)을 매출로 오채택했다
+        # (BZ 925 대비 −94%). 값→(연도)→라벨+Guidance 순서를 먼저 매칭하면 900~950 이
+        # 등록되고, 뒤따르는 오채택은 add() 중복 차단에 걸린다.
+        ("prelab", _NUM + r"\s*(?:-|–|to)\s*" + _NUM +
+                   r"\s*(?:20\d\d\s+)?" + label + r"\s+guidance\b"),
         ("range", label + gap + _NUM + r"\s*(?:to|through|-|and)\s*" + _NUM),
         ("pm", label + gap + _NUM + r"\s*(?:±|\+/-|plus or minus)\s*" + _NUM),
         # (2026-08-21) **단일값 가이던스** — 범위 없이 한 숫자만 제시하는 회사가 있는데
@@ -269,7 +276,7 @@ def _pair(kind, m):
         a = _num(m.group(1), None)
         a = a / 100 if a is not None else None
         return a, a
-    if kind in ("range", "prange", "lowhigh"):     # (2026-08-15) 신설 2종은 그룹 구조가 같다
+    if kind in ("range", "prange", "lowhigh", "prelab"):   # 그룹 구조가 같은 형식들
         h = (m.group(4) or m.group(2) or "").lower()
         return _num(m.group(1), m.group(2), h), _num(m.group(3), m.group(4), h)
     if kind == "pm":
@@ -559,7 +566,17 @@ def _period(txt, start, end):
         if knd == "kw":
             seg = txt[max(0, h0 + hm.start() - 130):h0 + hm.end()]
             r15 = pick(seg, len(seg))             # 머리글 끝(콜론)에 가장 가까운 표현
-            if r15 == "Q" and not _fwd_q(seg):
+            # (2026-08-22) Q 토큰이 **머리글 매치 자체 안**에 있으면 _fwd_q 를 묻지 않는다 —
+            # kw 머리글은 guidance/outlook 낱말로 매치된 어구라 전망 문맥이 자명한데,
+            # _fwd_q 는 Q 토큰 ±60자 창만 봐서 긴 머리글에서 실패한다.
+            #   실측 UPWK: "Upwork's guidance for revenue, adjusted EBITDA, diluted
+            #   weighted-average shares outstanding, and non-GAAP diluted EPS **for the
+            #   third quarter of 2026** is:"(133자) — 'guidance' 가 Q 토큰에서 100자
+            #   밖이라 기간이 기각됐고, Q3 블록의 EPS 0.31~0.33 이 연간으로 실려
+            #   진짜 연간 값이 중복 차단에 막혔다(BZ FY 1.40 대비 -77%).
+            # _fwd_q 검사는 머리글 **앞 130자**(다른 문장)에서 온 Q 토큰을 거르기 위한
+            # 것이므로, 매치 어구 안의 Q 는 그대로 믿는다.
+            if r15 == "Q" and not (_fwd_q(seg) or re.search(_QRE, hm.group(0), re.I)):
                 r15 = None
         else:
             # (2026-08-21) 분기 낱말이 있으면 분기다 — "Q3 FY2026 Outlook" 처럼 분기 머리글에
@@ -944,6 +961,14 @@ def parse_guidance(txt, per_hint=None, scale_hint=None):
                     if re.search(r"\bfrom\s+(?:the\s+)?(?:sales?\s+of|royalt)|\bproducts?\b", lead, re.I):
                         skip.append(f"rev: 제품·원천 한정 → 전사 아님 · {ctx[:110]}")
                         continue
+                    # (2026-08-22) 라벨 뒤 'excluding X' — 일부를 뺀 조정 범위 매출은 전사
+                    # 컨센과 비교할 수 없다. 실측 FMC: 'Revenue **excluding India** lowered to
+                    # a range of $3.50 billion to $3.70 billion' 이 전사 매출로 채택돼
+                    # BZ 1,130 대비 +219%. FX 중립('excluding the impact of foreign
+                    # exchange')도 같은 이유로 컨센(보고 기준)과 어긋난다.
+                    if re.search(r"\bexcluding\b", lead, re.I):
+                        skip.append(f"rev: 'excluding' 조정 범위 → 컨센과 기준 다름 · {ctx[:110]}")
+                        continue
                     # (2026-08-16) 수식어는 **라벨 직전 토큰**만 본다 — 종전엔 near(앞 60자)
                     # 전체에서 마지막 'X revenue' 를 찾아, 다른 문장에 있던 낱말이 현재
                     # 라벨의 수식어로 오인됐다. 실측 NE: "Backlog excludes mobilization and
@@ -952,8 +977,13 @@ def parse_guidance(txt, per_hint=None, scale_hint=None):
                     # 'demobilization' 이 근거가 돼 명시된 전사 매출 2.8~2.9B(BZ 동일)이 기각.
                     # 라벨 앞이 숫자·문장부호로 끝나면(“…2026, Revenue”) 수식어가 없는 것이니
                     # 검사를 건너뛴다. 진짜 부분 매출은 _PART 정규식이 별도로 막는다.
+                    # prelab(값→라벨 인포그래픽)은 이 검사를 건너뛴다 — near 는 라벨이 아니라
+                    # **값** 앞 문맥이라 무관한 낱말이 잡힌다(실측 ORN: 'SAFETY RECORD AND
+                    # RECOGNITIONS $900M…' 의 RECOGNITIONS). 라벨+Guidance 결합 자체가
+                    # 전사 가이던스임을 보증한다.
                     mw = re.search(r"([A-Za-z][\w\-]*)\s*$", near)
-                    if mw and re.sub(r"[^a-z]", "", mw.group(1).lower()) not in _CORP_W:
+                    if kind != "prelab" and mw and \
+                            re.sub(r"[^a-z]", "", mw.group(1).lower()) not in _CORP_W:
                         skip.append(f"rev: 수식어 '{mw.group(1)}' → 전사 아님 · {ctx[:120]}")
                         continue
                     # (2026-08-15) 표 머리의 '($ in millions)' 선언 인정 — 표 형식은 단위를
