@@ -3307,19 +3307,20 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           +`<br>🔬 지표 조합은 백테스트로 정했다 — 지역별 자동선택(6개)·핵심 7개·전 지표 세 방식을 겨뤄 <b>전 지표가 18개 시도 모두에서 가장 정확</b>했다.`
           +(P.guarded&&P.guarded.length?`<br>🛡 ${P.guarded.length}개 지점은 과거에 겪은 변화 범위(5~95%)를 벗어나 그 경계로 눌렀다.`:'')
           +`<br><span style="opacity:.8">${E6(d.note||'')}</span>`;
-        const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12].includes(h));
+        const rows=Object.keys(bt.by_h||{}).map(h=>+h).sort((a,b)=>a-b).filter(h=>[1,3,6,9,12,15,18,21,24].includes(h));
         $('rl_tbl').innerHTML=
           `<table style="border-collapse:collapse;font-size:11px"><tr style="background:#f6f7f9">`
           +`<th style="border:1px solid #e5e8ec;padding:3px 8px">과거 재현 성적</th>`
           +rows.map(h=>`<th style="border:1px solid #e5e8ec;padding:3px 8px">${h}개월 뒤</th>`).join('')+`</tr>`
           +`<tr><td style="border:1px solid #e5e8ec;padding:3px 8px">평균 오차(MAPE)</td>`
-          +rows.map(h=>`<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right">${bt.by_h[h].mape}%</td>`).join('')+`</tr>`
+          +rows.map(h=>{const b=bt.by_h[h], worse=b.naive!=null&&b.mape>b.naive;
+            return `<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right;${worse?'color:#d9534f;font-weight:600':''}">${b.mape}%${worse?' ⚠':''}</td>`;}).join('')+`</tr>`
           +`<tr><td style="border:1px solid #e5e8ec;padding:3px 8px">그냥 '변동 없음' 이라 했을 때</td>`
           +rows.map(h=>`<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right;opacity:.7">${bt.by_h[h].naive}%</td>`).join('')+`</tr>`
           +`<tr><td style="border:1px solid #e5e8ec;padding:3px 8px">방향(오를지 내릴지) 적중률</td>`
           +rows.map(h=>`<td style="border:1px solid #e5e8ec;padding:3px 8px;text-align:right">${bt.by_h[h].hit}%</td>`).join('')+`</tr></table>`
           +`<div class="note" style="margin-top:4px">과거 ${bt.origins||0}개 시점으로 되돌아가 그때 자료만으로 예측하고 실제와 비교한 결과다(표본 ${bt.n||0}건). `
-          +`'변동 없음' 줄보다 오차가 작아야 예측에 의미가 있다. 방향 적중률 50%는 동전 던지기와 같다.</div>`;
+          +`'변동 없음' 줄보다 오차가 작아야 예측에 의미가 있다 — <b style="color:#d9534f">⚠ 붉은 칸</b>은 단순 예측만 못한 지평이니 그 구간 예측선은 참고만 할 것. 방향 적중률 50%는 동전 던지기와 같다.</div>`;
       }
       const GLOBRL=['cli','m2','gdp','fx','rate_kr','mtg_bal','mtg_rate','kospi','hppci','jeonse','csi'];
       _rlSel=defSel();
@@ -6989,7 +6990,12 @@ await _canvasFlow(c);
           const per=[pe.FY?`연간 ${pe.FY}회`:'',pe.Q?`분기 ${pe.Q}회`:''].filter(Boolean).join(' · ');
           const met=[hs.rev?`매출 ${hs.rev}회`:'',hs.eps?`EPS ${hs.eps}회`:''].filter(Boolean).join(' · ');
           const ba=[bs.eps?`EPS ${bs.eps}`:'',bs.rev?`매출 ${bs.rev}`:''].filter(Boolean).join(' · ');
-          return `<div class="note" style="margin-top:4px">이 회사의 가이던스 습관 <b>(${E(pf.first||'')}~${E(pf.last||'')} · 이력 ${pf.n}건)</b> — 제시 기간: ${per||'—'} · 제시 지표: ${met||'—'}${ba?' · 기준: '+ba:''} <span class="note">(출처 Benzinga 이력 — 위 표의 값이 이 습관과 어긋나면 파싱을 의심할 근거다)</span></div>`;})()}<div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>성장률</b> 표기 — 금액을 아예 제시하지 않고 성장률로만 말하는 회사가 있다(예: '매출 +5~6% · EPS +9~11%'). 이때는 성장률을 그대로 싣는다. 전년 실적으로 금액을 역산하지 않는 이유는 회사가 쓰는 기준(환율 중립·조정 등)이 달라 오차가 커지기 때문이며, 같은 이유로 <b>갭(상회/하회)도 계산하지 않는다</b>.<br><b>FFO</b> 표기 — 리츠(부동산)는 애널리스트 컨센서스가 순이익(EPS)이 아니라 <b>FFO</b> 기준이라 EPS 가이던스로는 비교가 성립하지 않는다. 그래서 EPS 칸에 회사가 제시한 FFO 가이던스 값을 대신 싣고, 무료 FFO 컨센서스가 없어 <b>갭(상회/하회)은 계산하지 않는다</b>. '조정FFO' 는 회사가 주력으로 제시하는 Core/Normalized/Adjusted FFO 다.<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
+          /* 이력상 늘 제시하는데 이번엔 못 뽑은 지표 — 빈 칸이 '회사가 안 준 것'인지
+             '우리가 놓친 것'인지 구분해 준다. 값을 지어내지 않고 한계를 드러낸다. */
+          const MS={rev:'매출',eps:'EPS'};
+          const ms=(gd2.miss||'').split(',').filter(Boolean).map(x=>MS[x]||x).join('·');
+          const warn=ms?` <b class="dn">※ ${ms} 미확보</b> <span class="note">— 이 회사는 평소 제시하는 항목인데 이번 공시에서 뽑지 못했다(보조 첨부까지 확인). 표의 '미제시'는 회사가 안 준 것이 아니라 우리가 놓친 것일 수 있다.</span>`:'';
+          return `<div class="note" style="margin-top:4px">이 회사의 가이던스 습관 <b>(${E(pf.first||'')}~${E(pf.last||'')} · 이력 ${pf.n}건)</b> — 제시 기간: ${per||'—'} · 제시 지표: ${met||'—'}${ba?' · 기준: '+ba:''}${warn} <span class="note">(출처 Benzinga 이력 — 위 표의 값이 이 습관과 어긋나면 파싱을 의심할 근거다)</span></div>`;})()}<div class="note" style="line-height:1.7"><b>구분 읽는 법</b> — <b>진행분기</b>: 진행 중인 다음 분기 또는 직후 분기 <b>(가장 중요)</b> · <b>다음분기</b>: 그다음 분기(회사가 제시하면 확인) · <b>올해(FY)</b>: 연간 전망 <b>(매우 중요)</b> · <b>내년(FY)</b>: 내년 연간 전망(회사가 제시할 때만 확인)<br>판정 = 가이던스 중간값 ÷ 같은 기간 컨센 − 1 · 회사가 숫자 가이던스를 안 주면 '미제시'(애플형) · <b>연간(FY) 가이던스도 연간 컨센과 비교해 표시</b>(2026-08-10 추가) · 매출·EPS 는 각각 우선순위(진행분기→다음분기→올해FY→내년FY)로 해당 행에 배치<br><b>성장률</b> 표기 — 금액을 아예 제시하지 않고 성장률로만 말하는 회사가 있다(예: '매출 +5~6% · EPS +9~11%'). 이때는 성장률을 그대로 싣는다. 전년 실적으로 금액을 역산하지 않는 이유는 회사가 쓰는 기준(환율 중립·조정 등)이 달라 오차가 커지기 때문이며, 같은 이유로 <b>갭(상회/하회)도 계산하지 않는다</b>.<br><b>FFO</b> 표기 — 리츠(부동산)는 애널리스트 컨센서스가 순이익(EPS)이 아니라 <b>FFO</b> 기준이라 EPS 가이던스로는 비교가 성립하지 않는다. 그래서 EPS 칸에 회사가 제시한 FFO 가이던스 값을 대신 싣고, 무료 FFO 컨센서스가 없어 <b>갭(상회/하회)은 계산하지 않는다</b>. '조정FFO' 는 회사가 주력으로 제시하는 Core/Normalized/Adjusted FFO 다.<br><b>CapEx(E)</b> = 회사가 제시한 설비투자 가이던스(8-K 파싱) — 애널리스트 CapEx 컨센서스는 무료로 존재하지 않아 회사 발표가 유일한 근거다. 제시하지 않으면 '미제시'. <b>FCF(E)</b> 는 추정(≈): 영업현금흐름(최근 4분기) × 매출성장 − CapEx(E) — 시황 보고서 3.1.8 과 같은 산식.<br><b>가이던스 갭(포털)</b> = 같은 항목을 포털(Benzinga)에서 받아 계산한 갭 — <b>우리 8-K 파싱이 맞는지 눈으로 대조하는 검증용</b>이다. 색을 칠하지 않은 것은 <b>상회/하회 판정에는 쓰지 않기 때문</b>이며, 판정은 언제나 왼쪽 파싱값 기준이다. '—' 는 포털에 같은 기간 값이 없거나 컨센 역매칭에 실패해 대조하지 못한 경우다.</div></div>`;
       /* (2026-08-15) 가이던스 개정 습관 한 줄 — Benzinga 이력(2022~) 기반 자체 파생 신호.
          상향/하향 습관은 다음 가이던스의 방향 기대치를 잡는 데 쓰인다(판정 미사용). */
       { const td=(window._TENDJ&&window._TENDJ.sym)?window._TENDJ.sym[c]:null;

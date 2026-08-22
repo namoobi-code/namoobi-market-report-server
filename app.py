@@ -838,6 +838,8 @@ def us_fin(sym: str):
                               "epsGr": it.get("g_eps_gr"), "epsGrLo": it.get("g_eps_gr_lo"),
                               "epsGrHi": it.get("g_eps_gr_hi"), "epsGrPer": it.get("g_eps_gr_per"),
                               "epsGrEv": it.get("g_eps_gr_ev"),
+                              # 이력상 늘 제시하는데 이번엔 확보하지 못한 지표(rev/eps)
+                              "miss": it.get("g_miss"),
                               "acc": it.get("acc")}
             # (2026-08-21) **종목별 가이던스 프로필** — 이 회사가 무엇을 어떤 기준·기간으로
             # 내 왔는지(Benzinga 이력 2022~). 화면에서 "이번 파싱이 이 회사의 평소 형식과

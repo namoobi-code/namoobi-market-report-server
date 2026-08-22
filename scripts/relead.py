@@ -58,8 +58,13 @@ DB = BASE / "data" / "db"
 OUT = DB / "relead.json"
 NOW = datetime.now()
 FULL = "--full" in sys.argv
-HZ = 12                      # 예측 지평(개월)
-MAXLAG = 18                  # 시차 탐색 상한(개월)
+# (2026-08-22) 예측 지평 12 → 24개월, 시차 탐색 상한 18 → 30개월.
+#   h개월 예측에는 h개월 이상 선행한 지표만 쓸 수 있으므로, 24개월 예측에는
+#   시차 상한도 그만큼 넓어야 한다. 인허가(2~3년 뒤 입주)·GRDP 같은 장주기 지표가
+#   먼 지평을 담당한다. 몇 개월까지 '단순 예측(변동 없음)보다 나은지'는
+#   백테스트 표(by_h)가 지평별로 그대로 보여준다 — 화면에서 판단할 것.
+HZ = 24                      # 예측 지평(개월)
+MAXLAG = 30                  # 시차 탐색 상한(개월)
 SIDO = ["전국", "서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종",
         "경기", "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주"]
 
@@ -775,10 +780,11 @@ def main():
                               "raw": prices_raw[t_last]},
                      # 12개월 지평에서 실제로 회귀에 들어간 지표만 싣는다.
                      #   표본이 짧아 그 지평에서 빠진 지표는 lag 가 없어 화면 표가 깨졌다.
+                     # used 는 12개월 지평 기준(대표성) — 24개월 지평은 쓸 수 있는 지표가 적다
                      "used": [{"key": k, "label": META[k][0],
-                                "lag": (fc.get(HZ, {}).get("lags") or {})[k],
-                                "corr": (fc.get(HZ, {}).get("corrs") or {}).get(k)}
-                              for k in model_keys if k in (fc.get(HZ, {}).get("lags") or {})],
+                                "lag": (fc.get(12, {}).get("lags") or {})[k],
+                                "corr": (fc.get(12, {}).get("corrs") or {}).get(k)}
+                              for k in model_keys if k in (fc.get(12, {}).get("lags") or {})],
                      "n_model_keys": len(model_keys),
                      "fixed_set": True,
                      "backtest": bt}

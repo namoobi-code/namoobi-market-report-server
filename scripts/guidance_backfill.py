@@ -89,6 +89,7 @@ G_FIELDS = ("g_rev", "g_rev_gap", "g_rev_per", "g_rev_ev", "g_rev_src", "g_rev_o
             # 성장률 가이던스(금액 미제시 회사) — 갭 없이 성장률 그대로
             "g_rev_gr", "g_rev_gr_lo", "g_rev_gr_hi", "g_rev_gr_per", "g_rev_gr_ev",
             "g_eps_gr", "g_eps_gr_lo", "g_eps_gr_hi", "g_eps_gr_per", "g_eps_gr_ev",
+            "g_miss",          # 이력상 늘 제시하는데 이번에 못 뽑은 지표(rev/eps)
             "acc", "_d8")
 
 
@@ -182,6 +183,23 @@ def main():
     def _scale(sym):
         return (prof.get(sym.upper()) or {}).get("scale") or None
 
+    def _need(sym, g):
+        """이 회사가 **늘 제시하는데 이번엔 못 뽑은** 지표. 값을 만들어내지 않고
+        '더 뒤져야 한다'는 신호로만 쓴다(추측이 아니라 탐색 트리거).
+        판단 근거: Benzinga 이력(2022~) 에서 그 지표를 제시한 비율이 80% 이상이고
+        표본이 4건 이상일 때만. 리츠는 EPS 자리에 FFO 를 싣는다."""
+        pf = prof.get(sym.upper()) or {}
+        n, has = pf.get("n") or 0, pf.get("has") or {}
+        if n < 4:
+            return set()
+        out = set()
+        if has.get("rev", 0) >= n * 0.8 and not ("rev_lo" in g or "fy_rev_lo" in g):
+            out.add("rev")
+        if has.get("eps", 0) >= n * 0.8 and not any(
+                k in g for k in ("eps_lo", "fy_eps_lo", "ffo_lo", "fy_ffo_lo")):
+            out.add("eps")
+        return out
+
     def _hint(sym):
         td = tend.get(sym)
         if not td or td.get("n", 0) < 4:
@@ -228,11 +246,26 @@ def main():
             # 프레젠테이션·prepared remarks)를 추가로 읽는다 — 가이던스를 99.2 에만 싣는
             # 회사가 실재('원문에 없음' 감사에서 확인). 못 찾은 경우에만 추가 SEC 호출이
             # 발생하고, 파일별 캐시라 재실행 시 0회.
-            if not any(k in g for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
+            # (2026-08-21) 조건을 **종목별 프로필 대조**로 바꾼다. 종전엔 '아무것도 못 찾았을
+            # 때'만 보조 첨부를 봤는데, 그러면 매출은 찾고 EPS 를 놓친 경우가 그대로 남는다.
+            # 이 회사가 이력상 늘 제시하는 지표(Benzinga 2022~, 80% 이상)가 비어 있다면
+            # 그건 '회사가 안 준 것'이 아니라 '우리가 놓친 것'이므로 더 뒤져야 한다.
+            # 보조 첨부에서 나온 값은 **빈 키만 보충**한다(통째 교체하면 주 첨부의 정상 값이
+            # 프레젠테이션의 다른 기간 값으로 바뀔 수 있다).
+            miss = _need(sym, g)
+            if miss:
                 for t2 in exhibit_texts_extra(cik, acc):
                     g2 = parse_guidance(t2, _hint(sym), _scale(sym))
-                    if any(k in g2 for k in ("rev_lo", "eps_lo", "fy_rev_lo", "fy_eps_lo")):
-                        g = g2
+                    ev2 = g2.get("_ev") or {}
+                    for k, v in g2.items():
+                        if k.startswith("_") or k in g:
+                            continue
+                        g[k] = v
+                    if ev2:
+                        _e = dict(g.get("_ev") or {})
+                        _e.update({k: v for k, v in ev2.items() if k not in _e})
+                        g["_ev"] = _e
+                    if not _need(sym, g):
                         break
             # (2026-08-15) 표 파서는 **문장 파서가 못 채운 키가 있을 때만** 돌린다 —
             # bs4 구조 파싱은 무겁다(전 종목 상시 실행 시 재파싱이 2시간대로 늘어남 실측).
@@ -274,7 +307,14 @@ def main():
                 g["_ev"] = ev
             d8 = todo[sym].get("_d8")                    # 그 항목의 발표일(기준 분기 판정용)
             ann = f"{d8[:4]}-{d8[4:6]}-{d8[6:8]}" if d8 else None
-            return sym, guidance_gap(sym, g, pool_us, ann)
+            res = guidance_gap(sym, g, pool_us, ann)
+            # (2026-08-21) 보조 첨부까지 뒤졌는데도 **이력상 늘 제시하던 지표**가 비면
+            # 그 사실을 남긴다. 화면에서 빈 칸이 '회사가 안 준 것'인지 '우리가 놓친 것'인지
+            # 구분해 주는 유일한 근거다 — 값을 지어내지 않고 한계를 드러낸다.
+            _m = _need(sym, g)
+            if _m and res:
+                res["g_miss"] = ",".join(sorted(_m))
+            return sym, res
         except Exception:
             return sym, {}
 
