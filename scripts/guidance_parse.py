@@ -1056,7 +1056,14 @@ def parse_guidance(txt, per_hint=None):
                     _oadj = (r"adjusted\s+(?:net\s+income|ebitda\w*|free\s+cash(?:\s+flow)?|"
                              r"operating\s+(?:income|margin|earnings)|revenu\w+|gross\s+(?:margin|profit)|"
                              r"net\s+leverage)")
-                    bas = (_basis(lead) or
+                    # (2026-08-21) **라벨 바로 앞 25자**를 가장 먼저 본다. 표에서 GAAP 행과
+                    # Non-GAAP 행이 잇달아 오면 near(60자)에 두 표기가 함께 잡혀 _basis 가
+                    # None(판정 불가)을 내고, GAAP 값이 기준 미명시로 통과해 조정 컨센과
+                    # 비교됐다. 실측 LQDT: 'Non-GAAP Adjusted EBITDA $22.0 to $25.0
+                    # **GAAP** Diluted EPS $0.30 to $0.39' → GAAP 0.345 가 조정 컨센 0.45
+                    # 대비 −22.5%. 라벨에 직접 붙은 표기가 그 행의 기준이다.
+                    bas = (_basis(txt[max(0, m.start() - 25):m.start()]) or
+                           _basis(lead) or
                            _basis(re.sub(_oadj, " ", near, flags=re.I)) or
                            _basis(re.sub(_oadj, " ", back, flags=re.I)))
                     # (2026-08-15) "…$30.00 to $31.00, **or $34.25 to $35.25 on an adjusted basis**"
