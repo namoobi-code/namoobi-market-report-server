@@ -3301,6 +3301,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         $('rl_main_n').innerHTML=
           `<b>${E6(_rlReg)}</b> · 기준 <b>${E6(d.target.label)}</b> ${last.price?last.price.toLocaleString():'-'} ${E6(d.target.unit)} (${fm(last.t||'')} · ${d.target.smooth}개월 평균)`
           +(ch!=null?` → 12개월 뒤 예측 <b style="color:${ch>=0?'#d9534f':'#2f6fed'}">${P.price[P.price.length-1].toLocaleString()} (${ch>=0?'+':''}${ch.toFixed(1)}%)</b>`:'')
+          +`<br>📅 점선 경계 오른쪽은 <b>미래(예측 구간)</b>라 지표 관측값이 없다 — 지표선은 마지막 관측월에서 끝나고, '시차 적용'을 켠 지표만 자기 선행 개월수만큼 경계 너머로 밀려 그려진다.`
           +`<br>🥇 지표 버튼은 <b>맞힐 가능성이 높은 순</b>으로 정렬돼 있다 — 그 지역 가격과의 상관계수(r) 절대값 순서다. r 이 +면 같이 오르고, −면 반대로 움직인 지표다.`
           +`<br>🕐 <b>시차</b>는 그 지표가 가격보다 몇 개월 앞서 움직였는지를 <b>데이터로 찾은 값</b>이다(0~${d.maxlag}개월 중 상관이 가장 큰 지점). '시차 적용'을 켜면 그만큼 밀어 그려 가격과 겹쳐 보인다.`
           +`<br>📉 예측은 <b>수집한 ${Object.keys(M).length}개 지표를 전 지역 동일하게</b> 넣어 회귀한다(지역 차이는 값·시차·계수에서만 난다). 지표마다 <b>예측 기간보다 긴 시차</b>를 다시 골라 쓰므로 아직 관측되지 않은 값은 쓰지 않는다. 회색 띠는 80% 구간.`
