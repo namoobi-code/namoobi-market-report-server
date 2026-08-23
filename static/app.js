@@ -3375,24 +3375,44 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           }).sort((a,b)=>b.sb-a.sb);
           const fmt=v=>v==null?'—':(v>0?'+':'')+v.toFixed(3);
           let html=`<div style="font-size:12px;font-weight:700;margin-bottom:4px">🧭 이번 예측의 지표 영향 <span class="note">(12개월 예측 기준 · 가중치=발언권 지분)</span></div>`
+            +`<div style="font-size:11px;background:#f8f9fb;border:1px solid #e5e8ec;border-radius:4px;padding:5px 7px;margin-bottom:5px;line-height:1.65;color:#444">`
+            +`<b>β(회귀계수)</b> = 회의에서 실제로 배정된 발언. 36개 지표를 표준화해 한 회귀에 넣고, 과거 20년을 매월 되돌아가 `
+            +`"그때까지 자료만으로 12개월 뒤를 맞히는" 시험에서 <b>오차가 가장 작아지는 계수 조합</b>을 푼 결과다. `
+            +`비슷한 지표끼리 발언을 부풀리지 못하게 벌점(릿지)을 주며, 벌점 강도(λ)도 사람이 아니라 백테스트 성적으로 자동 선택된다. `
+            +`부호 = 이번 예측을 민 방향(<b style="color:#d9534f">+ 상승</b> / <b style="color:#2f6fed">− 하락</b>) — `
+            +`동료가 이미 말한 중복분을 빼고 남는 몫이라, 혼자 볼 때의 r 과 부호가 다를 수 있다. `
+            +`<b>가중치</b> = |β| ÷ Σ|β| — 발언 지분(%).</div>`
             +`<table style="border-collapse:collapse;font-size:11px;width:100%">`
             +`<tr style="background:#f6f7f9"><th style="border:1px solid #e5e8ec;padding:2px 5px;text-align:left">그룹 / 지표</th>`
             +`<th style="border:1px solid #e5e8ec;padding:2px 5px">시차</th>`
             +`<th style="border:1px solid #e5e8ec;padding:2px 5px">r</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:2px 5px">β</th>`
             +`<th style="border:1px solid #e5e8ec;padding:2px 5px">가중치</th></tr>`;
           rows.forEach(({g,ms,sb,gr})=>{
             const gw=100*sb/sumAbsAll;
             html+=`<tr style="background:#eef1f6"><td style="border:1px solid #e5e8ec;padding:2px 5px;font-weight:700">${E6(g)} <span class="note">×${ms.length}</span></td>`
               +`<td style="border:1px solid #e5e8ec"></td>`
               +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;font-weight:700">${ms.length>1?fmt(gr):fmt(gr)}</td>`
+              +(()=>{const nb=ms.reduce((s,u)=>s+u.beta,0),nc=nb>=0?'#d9534f':'#2f6fed';
+                return `<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;font-weight:700;color:${nc}">${fmt(nb)}</td>`;})()
               +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;font-weight:700">${gw.toFixed(1)}%</td></tr>`;
             ms.forEach(u=>{
               const w=100*Math.abs(u.beta)/sumAbsAll, c=u.beta>=0?'#d9534f':'#2f6fed';
               html+=`<tr><td style="border:1px solid #e5e8ec;padding:2px 5px 2px 14px">${E6(u.label)}</td>`
                 +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right">${u.lag}M</td>`
                 +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right">${fmt(u.corr)}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;color:${c}">${fmt(u.beta)}</td>`
                 +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;color:${c}">${w.toFixed(1)}%`
                 +`<span style="display:inline-block;height:7px;width:${Math.min(48,Math.round(w*3))}px;background:${c};opacity:.6;border-radius:2px;margin-left:4px;vertical-align:middle"></span></td></tr>`;
+              /* 개별 지표별 β·가중치 배정 사유 (규칙 기반 자동 문장) */
+              const flip=(u.corr!=null)&&((u.corr>=0)!==(u.beta>=0)), gN=ms.length;
+              let ex;
+              if(flip) ex=`혼자 보면 ${u.corr>=0?'상승':'하락'} 방향(r ${fmt(u.corr)})이지만 같은 얘기를 하는 동료가 많아, 회의에선 그 중복분을 깎는 반대쪽 조정 역할을 배정받음`;
+              else if(w>=8) ex=`12개월 예측에 출전 가능한(시차≥12M) 지표 중 신호가 뚜렷하고 겹치는 동료가 적어 발언권을 크게 받음`;
+              else if(gN>1&&w<3) ex=`같은 그룹 ${gN}개 지표와 정보가 겹쳐 발언을 나눠 가짐 — 신호는 그룹 합계(가중치 소계)로 볼 것`;
+              else if(Math.abs(u.corr||0)>=0.4&&w<5) ex=`단독 신호는 강하지만(r ${fmt(u.corr)}) 다른 지표가 이미 말한 정보와 겹쳐, 새로 보태는 몫이 작음`;
+              else ex=`r ${fmt(u.corr)} 신호 중 다른 지표와 겹치지 않는 몫만큼만 발언권을 받음`;
+              html+=`<tr><td colspan="5" style="border:1px solid #e5e8ec;border-top:none;padding:1px 5px 3px 16px;font-size:10px;color:#8a92a0;line-height:1.5">↳ <b style="color:${c}">${u.beta>=0?'상승':'하락'} 쪽 기여</b> · ${ex}</td></tr>`;
             });
           });
           html+=`</table><div class="note" style="margin-top:4px;line-height:1.7">`

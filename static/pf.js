@@ -124,7 +124,9 @@
     cv.addEventListener('dblclick',()=>{view=null;draw();});
   }
 
-  function fmt(v,d){return v==null?'—':(+v).toFixed(d==null?1:d);}
+  function fmt(v,d){if(v==null)return '—';
+    if(+v>=999)return '<span title="고변동 자산 — 백테스트 오차가 커 신뢰 불가">999+</span>';
+    return (+v).toFixed(d==null?1:d);}
 
   function render(){
     const tg=D.targets[cur]; if(!tg) return;

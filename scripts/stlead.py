@@ -254,6 +254,18 @@ def main():
     _finish(targets_out, alloc_in, ind)
 
 
+def _san_bt(bt):
+    """(2026-08-23) BTC 처럼 고변동 자산은 엔진 내부(비클램프) 예측이 폭주해 백테스트
+    오차가 천문학적 수치(4.5e+40%)로 저장됐다 — 표시 통계를 999% 로 캡(신뢰불가 표식)."""
+    for b in (bt.get("by_h") or {}).values():
+        for f in ("mape", "sd", "naive"):
+            if b.get(f) is not None:
+                b[f] = round(min(b[f], 999.0), 2)
+    if bt.get("mape") is not None:
+        bt["mape"] = round(min(bt["mape"], 999.0), 2)
+    return bt
+
+
 def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
     if True:
         px = yahoo_monthly(sym)
@@ -295,7 +307,7 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
         # ── 예측 + 백테스트
         t_last = len(t) - 1
         fc = forecast(feat, ytr, prices, keys, t_last, horizons=HZ)
-        bt = backtest(feat, ytr, prices, keys)
+        bt = _san_bt(backtest(feat, ytr, prices, keys))
         # 보정 적용 경로 (relead 방식: calib 곱)
         ext = [add_months(t[-1], i + 1) for i in range(HZ)]
         N2 = len(t) + HZ
