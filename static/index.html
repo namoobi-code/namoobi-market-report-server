@@ -537,6 +537,7 @@
       <button class="tab"    data-pane="p_global" style="background:#4338ca;border-color:#4338ca;color:#fff">🌐 Market<small style="color:#e0e7ff">지수·상품·환율·크립토</small></button>
       <button class="tab"    data-pane="p_pf" style="background:#166534;border-color:#166534;color:#fff">💼 Portfolio<small style="color:#bbf7d0">지수 예측·비중 제안</small></button>
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
+      <button class="tab"    data-pane="p_re" style="background:#7c2d12;border-color:#7c2d12;color:#fff">🔮 RE 예측<small style="color:#fed7aa">r가중 합성·조절</small></button>
       <!-- (2026-08-16) 청약 탭 — namoobi 로그인 시에만 노출 (sub.js 가 /api/auth/me 로 표시) -->
       <button class="tab" id="tab_sub" data-pane="p_sub" style="display:none;background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
@@ -1069,6 +1070,28 @@
     </div>
     <div style="margin-top:10px;flex:0 0 auto;max-width:900px">
       <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="pf_bt"></div>
+    </div>
+  </div>
+  <!-- (2026-08-23) 🔮 RE 예측 페인 — scripts/repred.py (매일 08:10) · re.js
+       r-가중 합성(릿지 미사용 — 사용자 지정) · 기사 통설 선행기간 vs 실측 시차 · 가중치/시나리오 조절 -->
+  <div class="pane" id="p_re" style="overflow:auto">
+    <h2>🔮 RE 예측 — 실거래 중위가 장기차트·지평별 r·수동 조절 <em id="re_asof" style="font-weight:400"></em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      한국부동산원 실거래 중위가(2006~·3개월 평균)에 <b>r-가중 합성 예측</b>(지평별로 시차≥h에서 r 최대 시차를 찾고
+      가중치=|r| 비례로 합성 × 백테스트 보정 — <b>릿지 회귀를 쓰지 않는 투명 모델</b>)을 겹친다.
+      지표는 공급/수요·금융/심리/가격/거시/소득 그룹으로 묶고, 기사 통설 선행기간과 실측 시차를 나란히 표시.
+      지표별 가중치 배수(−/＋)·±1σ 시나리오(▲/▼)를 조절하면 예측선이 즉시 재계산된다. 참고용이며 투자권유가 아님.</p>
+    <div id="re_sum" style="margin-bottom:8px"><div class="note">불러오는 중…</div></div>
+    <div id="re_tg" style="margin-bottom:6px"></div>
+    <div id="re_ctl" style="margin-bottom:6px"></div>
+    <div style="display:flex;gap:10px;align-items:stretch;flex:0 0 auto;height:calc(100vh - 175px);min-height:520px">
+      <canvas id="re_cv" style="flex:1 1 auto;min-width:0;height:100%;background:#fff;border:1px solid #e5e8ec;border-radius:8px;cursor:crosshair"></canvas>
+      <div style="flex:0 0 960px;height:100%;overflow:auto;border:1px solid #e5e8ec;border-radius:8px;padding:4px 8px;background:#fff;box-sizing:border-box">
+        <h3 style="margin:6px 0;font-size:13px">선행지표 — 통설 vs 실측 시차 · 지평별 r · 가중치 조절</h3><div id="re_ind"></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;flex:0 0 auto;max-width:960px">
+      <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="re_bt"></div>
     </div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
@@ -1810,7 +1833,8 @@
 <script src="/app.js?v=08231740"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08221206n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
-<script src="/pf.js?v=20260823y"></script><!-- (2026-08-22) Portfolio 탭 -->
+<script src="/pf.js?v=20260823z"></script><!-- (2026-08-22) Portfolio 탭 -->
+<script src="/re.js?v=20260823a"></script><!-- (2026-08-23) RE 예측 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

@@ -201,7 +201,8 @@
     /* (2026-08-23) SHY(미 단기국채)도 조절 가능 행으로 복귀 — 모델 틸트는 없고 기본=제안 */
     const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash'&&!['krb_s','krb_m'].includes(a.key));
     const CUSTOM=[{key:'kr_stock',asset:'국내주식(개별전략)',etf:'직접 운용 — 종목 선정'},
-                  {key:'us_stock',asset:'미국주식(개별전략)',etf:'직접 운용 — 종목 선정'}];
+                  {key:'us_stock',asset:'미국주식(개별전략)',etf:'직접 운용 — 종목 선정'},
+                  {key:'theme',asset:'테마(미래성장)',etf:'직접 운용 — AI·로봇·양자 등 종목/테마ETF'}];
     const gL=a=>{const p=((D.targets[a.key]||{}).pred||{})[12];
       return p?p.g:(a.g12!=null?Math.log(1+a.g12/100):null);};
     const tiltable=rowsA.filter(a=>a.sug!=null&&gL(a)!=null);

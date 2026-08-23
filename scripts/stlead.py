@@ -78,10 +78,11 @@ TARGETS = {
     "tip":    ("TIP", "물가연동채",     "TIP",  0),
     "eem":    ("EEM", "신흥국",        "EEM",  0),
     "vnq":    ("VNQ", "미국 리츠",     "VNQ",  0),
+    "dbc":    ("DBC", "원자재(14종)",   "DBC",  0),
 }
 CASH_BASE = 15
 TILT_ELIG = {"spx", "ndx", "sox", "ks200", "dvy", "gold", "btc", "xle", "tlt",
-             "mgk", "efa", "tip", "eem", "vnq"}
+             "mgk", "efa", "tip", "eem", "vnq", "dbc"}
 CASH_LIKE = {"shy", "krb_s", "krb_m"}            # 현금성 — 비중 제안에서 현금군으로 취급
 
 META = {   # key: (label, group, unit, src)
@@ -140,6 +141,7 @@ KEYS_FOR = {
     "tip":   US_KEYS,
     "eem":   US_KEYS + ["wti"],
     "vnq":   US_KEYS,
+    "dbc":   US_KEYS + ["wti"],
 }
 
 
