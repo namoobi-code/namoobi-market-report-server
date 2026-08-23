@@ -490,6 +490,28 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
               f"MAPE {bt.get('mape')}% · 방향 {bt.get('hit')}%")
 
 
+CRASH_HIST = DB / "stlead_crash_hist.json"
+
+
+def _crash_hist(targets_out):
+    """(2026-08-24) 급락확률 일별 적재 — 매일 크론이 돌 때 {날짜: {지수: p}} 로 쌓고
+    (같은 날 재실행은 덮어씀·최근 400일 보관), 화면용으로 지수별 시계열로 변환해 준다."""
+    try:
+        h = json.loads(CRASH_HIST.read_text(encoding="utf-8")) if CRASH_HIST.exists() else {}
+    except Exception:
+        h = {}
+    today = NOW.strftime("%Y-%m-%d")
+    h[today] = {tk: t["crash"]["p"] for tk, t in targets_out.items() if t.get("crash")}
+    for k in sorted(h)[:-400]:
+        del h[k]
+    CRASH_HIST.write_text(json.dumps(h), encoding="utf-8")
+    out = {}
+    for d2 in sorted(h):
+        for tk, p in h[d2].items():
+            out.setdefault(tk, []).append([d2, p])
+    return out
+
+
 def _finish(targets_out, alloc_in, ind):
     # ── 비중 제안 — 12개월 보정예측의 상대 우열로 코어 ±5%p · 위성 0~+3%p (현금에서)
     alloc = []
@@ -523,6 +545,7 @@ def _finish(targets_out, alloc_in, ind):
         "meta": {k: {"label": v[0], "group": v[1], "unit": v[2], "src": v[3]}
                  for k, v in META.items()},
         "series": {k: pack_series(v) for k, v in ind.items() if v},
+        "crash_hist": _crash_hist(targets_out),
         "targets": targets_out, "alloc": alloc,
         "note": ("예측은 선행지표 시차 릿지회귀(백테스트 보정) 산출물로 참고용이며 "
                  "투자권유가 아님. 비중 제안 = 기본비중 ± 12개월 상대예측 5%p 한도.")},

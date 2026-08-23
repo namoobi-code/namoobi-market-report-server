@@ -43,7 +43,15 @@ JUDGE = "--judge" in sys.argv
 
 # 신규 지표 변환 방식
 R.TRANS["subs"] = "lvl"                  # 경쟁률(배) — 수준 그대로
+R.TRANS["j2m"] = "lvl"                   # 전월세전환율(%) — 수준 그대로
 # cons(금액)는 기본 yoy — TRANS 미등록이면 전년비
+
+# (2026-08-23) 보정계수(calib)는 **적용하지 않는다** — 선택/평가 분리 실측:
+#   앞 24시점에서 calib을 추정해 뒤 24시점을 채점한 결과, 보정 없음(raw)이 전 지역 최선.
+#     서울 raw 6.87%/방향 81% vs calib≥0 9.00% vs 음수허용 14.69% (전국·경기도 동일 순위)
+#   합성 신호의 기울기가 구간(급등→급락→반등)에 따라 뒤집혀, 과거 기울기를 곱하는 것
+#   자체가 해가 된다. 예측선은 원신호 + 3점 평활 + 역사범위(5~95%) 가드만 쓴다.
+#   calib 값은 참고용으로 계속 산출·표시한다(적용만 안 함).
 
 # ── 기사(2026-08 리서치) 프레임: 표시그룹 · 통설 선행기간 · 해석 한 줄 ──
 #    실측 시차와 나란히 보여주기 위한 메타 — 계산에는 쓰지 않는다(계산은 실측만).
@@ -60,6 +68,7 @@ ART = {
     "jeonse":   ("수요·금융", "1~2M", "전세 상승 → 매매 수요 증가 선행(전세→매매 순서)"),
     "jr":       ("수요·금융", "—",    "전세가율 상승 → 갭 축소 → 매수 전환 유인"),
     "wolse":    ("수요·금융", "—",    "보유세 전가가 월세로 먼저 나타남"),
+    "j2m":      ("수요·금융", "—",    "전세→월세 전환 이자율 — 높을수록 월세 부담 커 전세·매매 선호"),
     "mtg_rate": ("수요·금융", "1~3M", "금리 하락 → 구매력 증가 → 상승 압력"),
     "mtg_bal":  ("수요·금융", "—",    "집 사는 데 실제 쓰인 돈의 총량"),
     "rate_kr":  ("수요·금융", "—",    "기준금리 — 주담대 금리의 상류"),
@@ -252,6 +261,17 @@ def main():
         print(f"  cons 건설수주액: {len(mp)}개월 {ks[0]}~{ks[-1]}")
     except Exception as e:
         print("  ⚠ 건설수주액 실패:", str(e)[:80])
+    try:
+        # 전월세전환율 — 신표 DT_30404_N0010 (구표 DT_KAB_11671_N06 은 폐기·빈 응답, 실측 2026-08-23)
+        #   아파트 유형(C1_NM 필터) · 2011.01~ · err31(40,000셀) 회피 위해 4년 조각
+        mp = R.kosis_monthly("408", "DT_30404_N0010", "ALL",
+                             fixed={"objL1": "ALL", "objL2": "ALL"},
+                             flt={"C1_NM": "아파트"}, y0="201101", chunk=4)
+        if mp:
+            extra["j2m"] = mp
+            print(f"  j2m 전월세전환율: 지역 {len(mp)} · 전국 {len(mp.get('전국') or {})}개월")
+    except Exception as e:
+        print("  ⚠ 전월세전환율 실패:", str(e)[:80])
 
     def series(k, reg):
         if k in extra:
@@ -262,7 +282,7 @@ def main():
         return src.get("전국" if k in GL else reg) or src.get("전국")
 
     base_keys = [k for k in rl["meta"]]
-    new_keys = [k for k in ("subs", "cons") if k in extra]
+    new_keys = [k for k in ("subs", "cons", "j2m") if k in extra]
     meta = {}
     for k in base_keys:
         m = dict(rl["meta"][k])
@@ -275,6 +295,10 @@ def main():
     if "cons" in new_keys:
         meta["cons"] = {"label": "건설수주액", "unit": "조원", "group": "공급", "folk": "3~6M",
                         "hint": ART["cons"][2], "src": "한국은행 ECOS 901Y020", "cycle": "M"}
+    if "j2m" in new_keys:
+        meta["j2m"] = {"label": "전월세전환율", "unit": "%", "group": "수요·금융", "folk": "—",
+                       "hint": ART["j2m"][2], "src": "한국부동산원 KOSIS DT_30404_N0010 (아파트)",
+                       "cycle": "M"}
 
     # ── --judge: 신규 지표 편입 판정 ──
     if JUDGE:
@@ -363,7 +387,8 @@ def main():
             g_raw[h] = (g, cont, calib)
         gs, guard = {}, {}
         for h in sorted(g_raw):
-            nb = [g_raw[x][0] * g_raw[x][2] for x in (h - 1, h, h + 1) if x in g_raw]
+            # (2026-08-23) calib 곱하지 않음 — 선택/평가 분리 실측에서 raw 가 전 지역 최선
+            nb = [g_raw[x][0] for x in (h - 1, h, h + 1) if x in g_raw]
             v = sum(nb) / len(nb)
             hist = sorted(math.log(prices[j + h] / prices[j]) for j in range(len(prices) - h)
                           if prices[j] and prices[j + h])

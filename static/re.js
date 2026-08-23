@@ -42,7 +42,7 @@
       for(const k in p.cont) raw+=mulOf(k)*p.cont[k];
       for(const k in (p.unit||{})){const s=scOf(k);
         if(s) raw+=mulOf(k)*s*(p.unit[k]||0);}
-      g1[h]=raw*(p.calib??0);}
+      g1[h]=raw;}   // calib 미적용 — 선택/평가 분리 실측에서 raw 가 전 지역 최선(서버와 동일 규칙)
     const F=P.futX, base=P.last.price, z=1.2816;
     for(const h0 in P.pred){const h=+h0, p=P.pred[h];
       const nb=[h-1,h,h+1].filter(x=>g1[x]!=null).map(x=>g1[x]);
@@ -218,7 +218,8 @@
       <tbody>${body}</tbody></table>
       <div class="note" style="margin:5px 0">실효 Σ가중치 <b style="color:${Math.abs(wSum-1)>.001?'#b45309':'#333'}">${(wSum*100).toFixed(0)}%</b> (기본 100%) — 예측선에 즉시 반영(저장 안 됨·새로고침 시 초기화)</div>
       <div class="note" style="line-height:1.6">💡 <b>이 탭의 예측은 릿지 회귀를 쓰지 않는다</b> — 지평 h 예측 = 그 지평에 출전 가능한(시차≥h) 지표들의
-      "r × 현재 표준화값"을 <b>|r| 비례 가중치</b>로 합성한 값 × 백테스트 보정. 계산이 투명한 대신 비슷한 지표가 많은 그룹의 발언이
+      "r × 현재 표준화값"을 <b>|r| 비례 가중치</b>로 합성한 원신호(+3점 평활·역사범위 가드). 보정계수는 곱하지 않는다 —
+      선택/평가 분리 실측에서 보정이 오히려 성적을 해쳤다(서울 6.87%→9.00%). 계산이 투명한 대신 비슷한 지표가 많은 그룹의 발언이
       그대로 합산된다(중복 자동 차감 없음) — 그룹 소계로 쏠림을 확인할 것. <b>통설 vs 실측 시차</b>가 크게 다르면 통설이 이 지역
       데이터에선 안 맞았다는 뜻. 기사 프레임: 전세→매매(1~2M) · 인허가→입주(6~18M) · 낙찰가율 80%↑ 안정/70%↓ 침체.</div>`;
     $('re_ind').querySelectorAll('[data-mm]').forEach(b=>b.onclick=e=>{e.stopPropagation();
@@ -242,7 +243,7 @@
     $('re_bt').innerHTML=`<div class="note" style="margin-bottom:3px">MAPE·단순예측 오차·보정계수·방향적중 = <b>${E(cur)}</b> 기준 · '전지역' 두 열은 ${D.regions.length}개 시도 평균</div>
       <table><thead><tr><th>지평</th><th style="text-align:right">평균 오차(MAPE)</th>
       <th style="text-align:right" title="'변동 없음' 예측의 오차 — 이보다 작아야 의미">단순예측 오차</th>
-      <th style="text-align:right" title="예측 변화율 대비 실제 실현 비율 — 예측선에 곱해져 있음">보정계수</th>
+      <th style="text-align:right" title="예측 변화율 대비 실제 실현 비율(참고) — 이 탭은 곱하지 않는다(선택/평가 분리 실측에서 보정이 성적을 해침)">보정계수(참고)</th>
       <th style="text-align:right">${E(cur)} 방향적중</th>
       <th style="text-align:right" title="1 − MAPE/단순예측오차">${E(cur)} 스킬</th>
       <th style="text-align:right">전지역 방향</th><th style="text-align:right">전지역 스킬</th></tr></thead><tbody>${

@@ -23,14 +23,18 @@
   };
   const PRESET_MIG={A:'BAL',F:'BAL',B:'DEF',D:'AGG'};   // 구 저장값 이관
   let curPreset='BAL', customW={}, totAmt=50000, amtCur='krw', holdW={};  // holdW=현재 보유금액(만원)
+  let holdProfiles={}, holdId='기본';             // (2026-08-24) 보유금액 ID별 프로필 저장
   try{const sv=JSON.parse(localStorage.getItem('pfBase')||'{}');
     if(PRESETS[sv.p]) curPreset=sv.p;
     else if(PRESET_MIG[sv.p]) curPreset=PRESET_MIG[sv.p];
     if(sv.c&&typeof sv.c==='object') customW=sv.c;
     if(+sv.a>0) totAmt=+sv.a;
     if(sv.u==='usd'||sv.u==='krw') amtCur=sv.u;
-    if(sv.h&&typeof sv.h==='object') holdW=sv.h;}catch(e){}
-  const saveBase=()=>{try{localStorage.setItem('pfBase',JSON.stringify({p:curPreset,c:customW,a:totAmt,u:amtCur,h:holdW}));}catch(e){}};
+    if(sv.h&&typeof sv.h==='object') holdW=sv.h;
+    if(sv.hp&&typeof sv.hp==='object') holdProfiles=sv.hp;
+    if(sv.hid) holdId=sv.hid;
+    if(holdProfiles[holdId]&&!Object.keys(holdW).length) holdW={...holdProfiles[holdId]};}catch(e){}
+  const saveBase=()=>{try{localStorage.setItem('pfBase',JSON.stringify({p:curPreset,c:customW,a:totAmt,u:amtCur,h:holdW,hp:holdProfiles,hid:holdId}));}catch(e){}};
   const fxNow=()=>{const s=(D&&D.series||{}).fx;                 // 최신 원/달러 (ECOS 월평균)
     if(s&&s.v) for(let i=s.v.length-1;i>=0;i--) if(s.v[i]!=null) return s.v[i];
     return 1350;};
@@ -241,6 +245,11 @@
       <button data-cur="krw" style="${bwsty};${amtCur==='krw'?'background:#1f2937;color:#fff;border-color:#1f2937':''}">원</button><button data-cur="usd" style="${bwsty};${amtCur==='usd'?'background:#1f2937;color:#fff;border-color:#1f2937':''}">달러</button>
       <input id="pf_amt" type="number" value="${totAmt}" min="0" step="${amtCur==='usd'?1000:1000}" style="width:100px;padding:2px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:5px;text-align:right">${amtCur==='usd'?'$':'만원'}
       <b>(${amtCur==='usd'?'약 '+(manTotal()/10000).toFixed(2)+'억 · 환율 '+Math.round(fxNow()).toLocaleString():fmtAmt(totAmt)})</b></span>
+      <span style="margin-left:8px;font-size:12px">보유 프로필
+      <input id="pf_hid" value="${E(holdId)}" list="pf_hids" style="width:70px;padding:2px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:5px" title="프로필 이름(계좌별로 여러 개 저장 가능) — 목록에서 선택하면 불러온다">
+      <datalist id="pf_hids">${Object.keys(holdProfiles).map(k=>`<option value="${E(k)}">`).join('')}</datalist>
+      <button id="pf_hsave" style="${bwsty}" title="현재 입력한 보유금액들을 이 ID로 저장 — 이후 자동 사용">저장</button>
+      <button id="pf_hclear" style="${bwsty}" title="현재 입력값 전부 비우기(저장된 프로필은 유지)">초기화</button></span>
       <span class="note">백테스트 2008.01~2026.08 월 리밸런싱·지수 기준(배당 미포함) · 행의 −/＋로 1%p 직접 조절(현금이 잔여 흡수·브라우저에 저장)</span></div>`;
     const gh=(tg2,h)=>{const p=(tg2.pred||{})[h];return p?+(Math.exp(p.g)*100-100).toFixed(1):null;};
     const html=rowsA.map(a=>{
@@ -331,6 +340,16 @@
       if(!inp.value) delete holdW[k];
       else holdW[k]=Math.max(0,amtCur==='usd'?v*fxNow()/10000:v);   // 만원으로 저장
       saveBase(); render();});
+    /* 보유 프로필 저장/불러오기/초기화 */
+    {const hi=$('pf_hid'); if(hi) hi.onchange=()=>{
+      const id=hi.value.trim()||'기본';
+      if(holdProfiles[id]){holdW={...holdProfiles[id]};holdId=id;saveBase();render();}
+      else holdId=id;};}
+    {const hs=$('pf_hsave'); if(hs) hs.onclick=()=>{
+      holdId=($('pf_hid').value.trim())||'기본';
+      holdProfiles[holdId]={...holdW};
+      saveBase(); render();};}
+    {const hc=$('pf_hclear'); if(hc) hc.onclick=()=>{holdW={};saveBase();render();};}
     $('pf_alloc').querySelectorAll('[data-cur]').forEach(b=>b.onclick=()=>{
       const to=b.dataset.cur;
       if(to!==amtCur){                            // 통화 전환 시 금액도 환산해 이어준다
@@ -441,10 +460,27 @@
     const cr=tg.crash;
     const crHtml=cr?(()=>{const ratio=cr.base>0?cr.p/cr.base:1;
       const col=ratio<1?'#16a34a':(ratio<2?'#b45309':'#dc2626');
+      /* (2026-08-24) 일별 적재된 급락확률 추세 스파크라인 */
+      const hist=(D.crash_hist||{})[cur]||[];
+      let spark='';
+      if(hist.length>=2){
+        const W2=240,H2=42,pad=4;
+        const vs=hist.map(x=>x[1]);
+        let lo=Math.min(...vs,cr.base),hi=Math.max(...vs,cr.base);
+        if(hi-lo<1){hi+=1;lo=Math.max(0,lo-1);}
+        const X2=i=>pad+(W2-2*pad)*i/(hist.length-1);
+        const Y2=v=>pad+(H2-2*pad)*(1-(v-lo)/(hi-lo));
+        const pts=hist.map((x,i)=>`${X2(i).toFixed(1)},${Y2(x[1]).toFixed(1)}`).join(' ');
+        spark=`<svg width="${W2}" height="${H2}" style="vertical-align:middle;margin-left:10px;background:#fafbfc;border:1px solid #eef1f4;border-radius:4px">
+          <line x1="${pad}" y1="${Y2(cr.base)}" x2="${W2-pad}" y2="${Y2(cr.base)}" stroke="#c8ced6" stroke-dasharray="3,3"/>
+          <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/>
+          <circle cx="${X2(hist.length-1)}" cy="${Y2(cr.p)}" r="2.5" fill="${col}"/></svg>
+          <span class="note">${hist[0][0].slice(5)}~${hist[hist.length-1][0].slice(5)} 추세 (점선=역사평균)</span>`;
+      }else spark='<span class="note" style="margin-left:8px">추세 그래프는 이력 2일치부터 표시 — 매일 05:20 적재 중</span>';
       return `<div style="border:1px solid #e5e8ec;border-radius:8px;padding:7px 12px;margin-bottom:8px;background:#fff">
       <b>⚠ ${E(tg.label)} 급락 확률</b> <span class="note">(12개월 내 -20% 드로다운 · 로지스틱, VIX·신용스프레드·금리차·실업청구·소비심리 등 ${Object.keys(cr.beta||{}).length}개 지표)</span><br>
       현재 <b style="font-size:16px;color:${col}">${cr.p}%</b>
-      <span class="note">· 역사 평균 ${cr.base}% (표본 ${cr.n}개월 중 급락상태 ${cr.ev}회) · 신호 상위 20% 구간의 실제 급락률 ${cr.top}% — 표본 내 참고치</span></div>`;})():'';
+      <span class="note">· 역사 평균 ${cr.base}% (표본 ${cr.n}개월 중 급락상태 ${cr.ev}회) · 신호 상위 20% 구간의 실제 급락률 ${cr.top}%</span>${spark}</div>`;})():'';
     $('pf_bt').innerHTML=crHtml+`<div class="note" style="margin-bottom:3px">MAPE·단순예측 오차·방향적중·스킬·보정계수 = <b>${E(tg.label)}</b> 기준 · '전지수' 두 열만 12개 자산 평균(신뢰불가 제외)</div>
       <table><thead><tr><th>지평</th><th style="text-align:right" title="선택한 지수의 예측가격이 실제와 평균 몇 % 어긋났나">평균 오차(MAPE)</th>
       <th style="text-align:right" title="'변동 없음'이라고 찍었을 때의 오차 — 이보다 작아야 의미">단순예측 오차</th>
