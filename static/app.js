@@ -3323,6 +3323,86 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         });
         rlDraw(cut(t), hist, fut, ser, T0.length-1-s0);
 
+        /* ── (2026-08-23) 우측 지표 영향 패널 — 사용자 요청:
+           "영향성 있는 지표명·r 리스트업, 유사 지표는 그룹화해 개별r + 통합r, r별 가중치".
+           · 개별 r  : 그 지표의 최적 시차 상관(모델 산출값 그대로)
+           · 통합 r  : 같은 그룹 지표들을 각자 시차로 민 뒤 표준화 평균한 '합성 계열' 과
+                       가격 전년비의 상관 — 그룹이 한 몸처럼 움직일 때의 설명력
+           · 가중치  : 릿지가 학습한 |β| 를 전체 합으로 나눈 비중(%) — 예측을 실제로 움직인 몫 */
+        (function(){
+          const el=$('rl_side'); if(!el) return;
+          const U=(P.used||[]).filter(u=>u.beta!=null);
+          if(!U.length){ el.innerHTML='<div class="note">모델 상세는 다음 재계산부터 표시됩니다.</div>'; return; }
+          const LVL=['rate_kr','rate_us','mtg_rate','csi','supply','cli','khai','khoi','jr','supply_j',
+                     'gap_am','bid_apt_rate','bid_apt_sldrate','bid_all_rate','gap_g'];
+          /* 합성 r 계산 도구 */
+          const yoy=a=>a.map((v,i)=> (i>=12&&v!=null&&a[i-12]!=null&&v>0&&a[i-12]>0)?Math.log(v/a[i-12]):null);
+          const pear=(a,b)=>{const p=[];for(let i=0;i<Math.min(a.length,b.length);i++)if(a[i]!=null&&b[i]!=null)p.push([a[i],b[i]]);
+            const n=p.length; if(n<48) return [null,n];
+            const mx=p.reduce((s,x)=>s+x[0],0)/n, my=p.reduce((s,x)=>s+x[1],0)/n;
+            let xy=0,xx=0,yy=0; p.forEach(([x,y])=>{xy+=(x-mx)*(y-my);xx+=(x-mx)**2;yy+=(y-my)**2;});
+            return [(xx>0&&yy>0)?xy/Math.sqrt(xx*yy):null,n];};
+          const priceMa=GU?((_rlG.price[GU]||{}).ma||[]):((d.price[_rlReg]||{}).ma||[]);
+          const ytr=yoy(priceMa);
+          const sidoOf=GU?P.sido:_rlReg;
+          const rawOf=k=>{
+            if(GU&&(_rlG.d[GU]||{})[k]) return _rlG.d[GU][k];
+            if(GU&&k==='sido_p') return (d.price[P.sido]||{}).ma||[];
+            return (d.d[k]||{})[GLOBRL.includes(k)?'전국':sidoOf]||(d.d[k]||{})['전국']||[];};
+          const tf=(k,a)=>LVL.includes(k)?a.slice():yoy(a);
+          const shift=(a,L)=>L?Array(L).fill(null).concat(a.slice(0,a.length-L)):a.slice();
+          const z=a=>{const v=a.filter(x=>x!=null); if(v.length<24) return null;
+            const mu=v.reduce((s,x)=>s+x,0)/v.length;
+            const sd=Math.sqrt(v.reduce((s,x)=>s+(x-mu)**2,0)/v.length)||1;
+            return a.map(x=>x!=null?(x-mu)/sd:null);};
+          /* 그룹핑 */
+          const G={}; U.forEach(u=>{(G[u.group]=G[u.group]||[]).push(u);});
+          const sumAbsAll=U.reduce((s,u)=>s+Math.abs(u.beta),0)||1;
+          const rows=Object.entries(G).map(([g,ms])=>{
+            const sb=ms.reduce((s,u)=>s+Math.abs(u.beta),0);
+            let gr=null, gn=0;
+            if(ms.length===1){ gr=ms[0].corr; }
+            else{
+              const zs=ms.map(u=>{const a=rawOf(u.key); if(!a.length) return null;
+                return z(shift(tf(u.key,a),u.lag||0));}).filter(Boolean);
+              if(zs.length){
+                const comp=ytr.map((_,i)=>{let s2=0,c=0; zs.forEach(zz=>{if(zz[i]!=null){s2+=zz[i];c++;}});
+                  return c?s2/c:null;});
+                const [r,n]=pear(comp,ytr); gr=r; gn=n;
+              }
+            }
+            return {g,ms:ms.sort((a,b)=>Math.abs(b.beta)-Math.abs(a.beta)),sb,gr,gn};
+          }).sort((a,b)=>b.sb-a.sb);
+          const fmt=v=>v==null?'—':(v>0?'+':'')+v.toFixed(3);
+          let html=`<div style="font-size:12px;font-weight:700;margin-bottom:4px">🧭 이번 예측의 지표 영향 <span class="note">(λ=${P.lam!=null?P.lam:'-'} · 12개월 모델 · 가중치=|β| 비중)</span></div>`
+            +`<table style="border-collapse:collapse;font-size:11px;width:100%">`
+            +`<tr style="background:#f6f7f9"><th style="border:1px solid #e5e8ec;padding:2px 5px;text-align:left">그룹 / 지표</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:2px 5px">시차</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:2px 5px">r</th>`
+            +`<th style="border:1px solid #e5e8ec;padding:2px 5px">가중치</th></tr>`;
+          rows.forEach(({g,ms,sb,gr})=>{
+            const gw=100*sb/sumAbsAll;
+            html+=`<tr style="background:#eef1f6"><td style="border:1px solid #e5e8ec;padding:2px 5px;font-weight:700">${E6(g)} <span class="note">×${ms.length}</span></td>`
+              +`<td style="border:1px solid #e5e8ec"></td>`
+              +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;font-weight:700">${ms.length>1?fmt(gr):fmt(gr)}</td>`
+              +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;font-weight:700">${gw.toFixed(1)}%</td></tr>`;
+            ms.forEach(u=>{
+              const w=100*Math.abs(u.beta)/sumAbsAll, c=u.beta>=0?'#d9534f':'#2f6fed';
+              html+=`<tr><td style="border:1px solid #e5e8ec;padding:2px 5px 2px 14px">${E6(u.label)}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right">${u.lag}M</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right">${fmt(u.corr)}</td>`
+                +`<td style="border:1px solid #e5e8ec;padding:2px 5px;text-align:right;color:${c}">${w.toFixed(1)}%`
+                +`<span style="display:inline-block;height:7px;width:${Math.min(48,Math.round(w*3))}px;background:${c};opacity:.6;border-radius:2px;margin-left:4px;vertical-align:middle"></span></td></tr>`;
+            });
+          });
+          html+=`</table><div class="note" style="margin-top:4px;line-height:1.6">`
+            +`그룹 행의 <b>통합 r</b>은 그 그룹 지표들을 각자 시차로 민 뒤 하나로 합성(표준화 평균)했을 때 가격 전년비와의 상관 — `
+            +`개별 r 보다 낮으면 그룹 안에서 서로 상쇄된다는 뜻이다. `
+            +`<b>가중치</b>는 릿지가 학습한 |β| 의 비중(%)이라 r 순위와 다를 수 있다 — 유사 지표는 릿지가 가중치를 나눠 가져(그룹 ×N), `
+            +`그룹 합계가 곧 그 주제의 실제 영향력이다. `
+            +`※ 이 표는 <b>12개월 지평 모델</b> 기준 — 시차가 12개월보다 짧은 지표(낙찰가율·수급 등)는 여기 없어도 1~11개월 단기 예측에는 쓰인다.</div>`;
+          el.innerHTML=html;
+        })();
         /* 아래 설명 + 백테스트 표 */
         const bt=P.backtest||{}, last=P.last||{};
         const ch=(P.price&&P.price.length&&last.price)?((P.price[P.price.length-1]/last.price-1)*100):null;
