@@ -3374,7 +3374,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             return {g,ms:ms.sort((a,b)=>Math.abs(b.beta)-Math.abs(a.beta)),sb,gr,gn};
           }).sort((a,b)=>b.sb-a.sb);
           const fmt=v=>v==null?'—':(v>0?'+':'')+v.toFixed(3);
-          let html=`<div style="font-size:12px;font-weight:700;margin-bottom:4px">🧭 이번 예측의 지표 영향 <span class="note">(λ=${P.lam!=null?P.lam:'-'} · 12개월 모델 · 가중치=|β| 비중)</span></div>`
+          let html=`<div style="font-size:12px;font-weight:700;margin-bottom:4px">🧭 이번 예측의 지표 영향 <span class="note">(12개월 예측 기준 · 가중치=발언권 지분)</span></div>`
             +`<table style="border-collapse:collapse;font-size:11px;width:100%">`
             +`<tr style="background:#f6f7f9"><th style="border:1px solid #e5e8ec;padding:2px 5px;text-align:left">그룹 / 지표</th>`
             +`<th style="border:1px solid #e5e8ec;padding:2px 5px">시차</th>`
@@ -3395,12 +3395,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                 +`<span style="display:inline-block;height:7px;width:${Math.min(48,Math.round(w*3))}px;background:${c};opacity:.6;border-radius:2px;margin-left:4px;vertical-align:middle"></span></td></tr>`;
             });
           });
-          html+=`</table><div class="note" style="margin-top:4px;line-height:1.6">`
-            +`그룹 행의 <b>통합 r</b>은 그 그룹 지표들을 각자 시차로 민 뒤 하나로 합성(표준화 평균)했을 때 가격 전년비와의 상관 — `
-            +`개별 r 보다 낮으면 그룹 안에서 서로 상쇄된다는 뜻이다. `
-            +`<b>가중치</b>는 릿지가 학습한 |β| 의 비중(%)이라 r 순위와 다를 수 있다 — 유사 지표는 릿지가 가중치를 나눠 가져(그룹 ×N), `
-            +`그룹 합계가 곧 그 주제의 실제 영향력이다. `
-            +`※ 이 표는 <b>12개월 지평 모델</b> 기준 — 시차가 12개월보다 짧은 지표(낙찰가율·수급 등)는 여기 없어도 1~11개월 단기 예측에는 쓰인다.</div>`;
+          html+=`</table><div class="note" style="margin-top:4px;line-height:1.7">`
+            +`💡 <b>읽는 법 — 회의에 비유하면:</b> <b>r</b> 은 그 지표를 <b>1:1 면접</b>했을 때의 점수(혼자 놓고 보면 가격과 얼마나 비슷하게 움직였나), `
+            +`<b>가중치</b>는 36개 지표가 다 모인 <b>회의에서의 실제 발언 시간</b>이다. 발언권은 컴퓨터가 과거 20년치를 채점해 자동으로 나눈다 — `
+            +`다른 지표가 이미 말한 정보를 빼고 <b>새로 보태는 만큼</b> 커진다. `
+            +`그래서 같은 말을 하는 지표들(통합 r 이 높은 그룹)은 발언 시간을 나눠 갖고, `
+            +`제각각 다른 관점을 말하는 그룹은 합창(통합 r)은 엉성해도 각자 솔로가 쓸모 있어 발언 시간 합계가 커진다. `
+            +`<b>통합 r</b> = 그룹을 한목소리로 합쳤을 때의 면접 점수. `
+            +`※ 12개월 예측 기준 — 시차가 12개월보다 짧은 지표(낙찰가율·수급 등)는 이 표에 없어도 1~11개월 단기 예측에는 쓰인다.</div>`;
           el.innerHTML=html;
         })();
         /* 아래 설명 + 백테스트 표 */

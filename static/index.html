@@ -532,6 +532,7 @@
       <button id="btn_calendar" class="tab" data-pane="p_cal" style="background:#0e7490;border-color:#0e7490;color:#fff">📅 Calendar<small style="color:#cffafe">주요 이벤트</small></button>
       <button class="tab"    data-pane="p_global" style="background:#4338ca;border-color:#4338ca;color:#fff">🌐 Market<small style="color:#e0e7ff">지수·상품·환율·크립토</small></button>
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
+      <button class="tab"    data-pane="p_pf" style="background:#166534;border-color:#166534;color:#fff">💼 Portfolio<small style="color:#bbf7d0">지수 예측·비중 제안</small></button>
       <!-- (2026-08-16) 청약 탭 — namoobi 로그인 시에만 노출 (sub.js 가 /api/auth/me 로 표시) -->
       <button class="tab" id="tab_sub" data-pane="p_sub" style="display:none;background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
@@ -1041,6 +1042,22 @@
       <b>주담대 금리</b>는 전망CSI와 대체로 역방향(금리↓ → 매수심리↑).
       <b>매매·전세지수</b>는 실제 가격의 확정치(월간·발표 지연 약 1개월) — 서울 아파트가 전국보다 먼저 움직이는 경향.
       전세지수 상승 + 매매 횡보는 갭 축소(매매 전환 압력) 신호로 참고. 리서치용이며 투자권유가 아님.
+    </div>
+  </div>
+  <!-- (2026-08-22) 💼 Portfolio 페인 — scripts/stlead.py (매일 05:20) · pf.js -->
+  <div class="pane" id="p_pf" style="overflow:auto">
+    <h2>💼 Portfolio — 지수 장기차트·선행지표 r·예측·비중 <em id="pf_asof" style="font-weight:400"></em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      각 지수의 <b>존재하는 최대 과거</b>(S&P500 1927~·나스닥100 1985~·반도체 1993~·코스피200 1996~·DVY 2003~ 등)를
+      월봉으로 그리고, 부동산 탭과 같은 엔진(시차 탐색 → 릿지 회귀 → 워크포워드 백테스트 보정)으로
+      <b>24개월 예측</b>을 겹친다. 지표 r값(개별·그룹 통합)과 백테스트 성적을 그대로 공개 — 참고용이며 투자권유가 아님.</p>
+    <div id="pf_alloc" style="margin-bottom:10px"><div class="note">불러오는 중…</div></div>
+    <div id="pf_tg" style="margin-bottom:6px"></div>
+    <div id="pf_ctl" style="margin-bottom:6px"></div>
+    <canvas id="pf_cv" style="width:100%;height:520px;background:#fff;border:1px solid #e5e8ec;border-radius:8px;cursor:crosshair"></canvas>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:flex-start">
+      <div style="flex:1;min-width:460px"><h3 style="margin:4px 0">선행지표 상관(r)·시차·가중치</h3><div id="pf_ind"></div></div>
+      <div style="flex:0 0 420px"><h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="pf_bt"></div></div>
     </div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
@@ -1779,9 +1796,10 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=08231408s"></script>
+<script src="/app.js?v=08231418e"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08221206n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
+<script src="/pf.js?v=20260822a"></script><!-- (2026-08-22) Portfolio 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
