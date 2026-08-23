@@ -11,15 +11,21 @@
      m_k = 가중치 배수(기본 1, ±0.1), s_k = 시나리오(+1 지표 1σ 오름 / -1 내림 / 0 기본) */
   /* (2026-08-23) 기본 비중 프리셋 — 2006.12~2026.08 월 리밸런싱 백테스트 실측(지수 기준·배당 미포함).
      사용자가 선택하고, 행별 −/＋(1%p)로 직접 조절도 가능. 현금은 잔여. localStorage 저장. */
+  /* (2026-08-23) 18자산 체계로 프리셋 재설계 — 2008.01~2026.08(금융위기 포함) 백테스트 확정.
+     구 A 현행(11.3%/-38)은 균형·공격 사이 애매 포지션이라 제거 */
   const PRESETS={
-    A:{label:'A 현행',   stat:'연 10.5% · 낙폭 -42%', w:{spx:35,ndx:20,sox:10,ks200:10,dvy:10}},
-    F:{label:'F 균형+금', stat:'연 11.0% · 낙폭 -42%', w:{spx:35,ndx:20,sox:10,ks200:10,dvy:10,gold:5}},
-    B:{label:'B 방어',   stat:'연 9.6% · 낙폭 -33%',  w:{spx:30,ndx:15,sox:5,ks200:10,dvy:10,gold:10,tlt:5}},
-    D:{label:'D 공격',   stat:'연 13.0% · 낙폭 -44%', w:{ndx:40,spx:25,sox:15,ks200:10}},
+    BAL:{label:'균형', stat:'연 9.6% · 낙폭 -34%',
+      w:{spx:28,ndx:15,sox:5,ks200:8,dvy:7,gold:10,efa:6,tip:5,vnq:3}},
+    DEF:{label:'방어', stat:'연 6.6% · 낙폭 -26%',
+      w:{spx:25,ndx:5,ks200:5,dvy:10,gold:12,tlt:8,tip:10,efa:8}},
+    AGG:{label:'공격', stat:'연 13.3% · 낙폭 -38%',
+      w:{ndx:30,mgk:10,sox:15,spx:15,ks200:10,eem:5,gold:5}},
   };
-  let curPreset='A', customW={}, totAmt=50000, amtCur='krw';  // 총액(krw=만원 · usd=$)
+  const PRESET_MIG={A:'BAL',F:'BAL',B:'DEF',D:'AGG'};   // 구 저장값 이관
+  let curPreset='BAL', customW={}, totAmt=50000, amtCur='krw';  // 총액(krw=만원 · usd=$)
   try{const sv=JSON.parse(localStorage.getItem('pfBase')||'{}');
     if(PRESETS[sv.p]) curPreset=sv.p;
+    else if(PRESET_MIG[sv.p]) curPreset=PRESET_MIG[sv.p];
     if(sv.c&&typeof sv.c==='object') customW=sv.c;
     if(+sv.a>0) totAmt=+sv.a;
     if(sv.u==='usd'||sv.u==='krw') amtCur=sv.u;}catch(e){}
@@ -217,7 +223,7 @@
       <button data-cur="krw" style="${bwsty};${amtCur==='krw'?'background:#1f2937;color:#fff;border-color:#1f2937':''}">원</button><button data-cur="usd" style="${bwsty};${amtCur==='usd'?'background:#1f2937;color:#fff;border-color:#1f2937':''}">달러</button>
       <input id="pf_amt" type="number" value="${totAmt}" min="0" step="${amtCur==='usd'?1000:1000}" style="width:100px;padding:2px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:5px;text-align:right">${amtCur==='usd'?'$':'만원'}
       <b>(${amtCur==='usd'?'약 '+(manTotal()/10000).toFixed(2)+'억 · 환율 '+Math.round(fxNow()).toLocaleString():fmtAmt(totAmt)})</b></span>
-      <span class="note">백테스트 2006.12~2026.08 월 리밸런싱·지수 기준(배당 미포함) · 행의 −/＋로 1%p 직접 조절(현금이 잔여 흡수·브라우저에 저장)</span></div>`;
+      <span class="note">백테스트 2008.01~2026.08 월 리밸런싱·지수 기준(배당 미포함) · 행의 −/＋로 1%p 직접 조절(현금이 잔여 흡수·브라우저에 저장)</span></div>`;
     const gh=(tg2,h)=>{const p=(tg2.pred||{})[h];return p?+(Math.exp(p.g)*100-100).toFixed(1):null;};
     const html=rowsA.map(a=>{
       const tg=D.targets[a.key]||{};
