@@ -190,7 +190,11 @@
     $('pf_ind').innerHTML=`<table><thead><tr><th>지표 <span class="note">(클릭=차트 겹쳐보기)</span></th><th>그룹</th>
       <th style="text-align:right" title="지표가 몇 개월 선행하는지 — 전 구간 상관 최대 시차">시차</th>
       <th style="text-align:right" title="시차 적용 후 지수 전년비 성장률과의 상관계수">r</th>
-      <th style="text-align:right" title="|r| 정규화 — 예측 회귀에서의 상대 영향력 표시용(실제 계수는 지평별 릿지가 산출)">가중치</th></tr></thead><tbody>${body}</tbody></table>`;
+      <th style="text-align:right" title="|r| 정규화 — 예측 회귀에서의 상대 영향력 표시용(실제 계수는 지평별 릿지가 산출)">가중치</th></tr></thead><tbody>${body}</tbody></table>
+      <div class="note" style="margin-top:4px;line-height:1.6">💡 <b>시차 0개월 = 동행지표</b>다(선행 아님). 실물·심리 지표가 0인 이유:
+      <b>주가 자체가 경기 선행지표</b>라 실물이 주가를 앞서지 못하고 같이 움직인다. 표의 시차·r 은 전 구간 최적값이고,
+      실제 h개월 예측에는 시차 h개월 이상 구간에서 재탐색한 값만 출전한다 — 동행지표는 그만큼 영향력이 줄고,
+      M2·금리처럼 진짜 선행하는 지표가 먼 지평을 주도한다.</div>`;
     $('pf_ind').querySelectorAll('[data-i]').forEach(tr=>tr.onclick=()=>{
       const k=tr.dataset.i;
       sel=sel.includes(k)?sel.filter(x=>x!==k):(sel.length>=6?sel:[...sel,k]);
