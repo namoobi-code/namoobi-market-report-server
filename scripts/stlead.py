@@ -72,9 +72,16 @@ TARGETS = {
     "shy":    ("SHY",       "미 단기국채",    "SHY",         0),
     "krb_s":  ("153130.KS", "국내 단기채권",  "KODEX 단기채권", 0),
     "krb_m":  ("157450.KS", "국내 단기통안채", "TIGER 단기통안채", 0),
+    # (2026-08-23) 분산 확장 — MAGS 는 2023 상장(40개월)이라 엔진 요건 미달 → MGK 로 대체
+    "mgk":    ("MGK", "메가캡 성장",    "MGK (Mag7 ~60%)", 0),
+    "efa":    ("EFA", "선진국(ex-US)", "EFA",  0),
+    "tip":    ("TIP", "물가연동채",     "TIP",  0),
+    "eem":    ("EEM", "신흥국",        "EEM",  0),
+    "vnq":    ("VNQ", "미국 리츠",     "VNQ",  0),
 }
 CASH_BASE = 15
-TILT_ELIG = {"spx", "ndx", "sox", "ks200", "dvy", "gold", "btc", "xle", "tlt"}
+TILT_ELIG = {"spx", "ndx", "sox", "ks200", "dvy", "gold", "btc", "xle", "tlt",
+             "mgk", "efa", "tip", "eem", "vnq"}
 CASH_LIKE = {"shy", "krb_s", "krb_m"}            # 현금성 — 비중 제안에서 현금군으로 취급
 
 META = {   # key: (label, group, unit, src)
@@ -128,6 +135,11 @@ KEYS_FOR = {
     "shy":   US_KEYS,
     "krb_s": KR_KEYS,
     "krb_m": KR_KEYS,
+    "mgk":   US_KEYS + ["semi_ip"],
+    "efa":   US_KEYS,
+    "tip":   US_KEYS,
+    "eem":   US_KEYS + ["wti"],
+    "vnq":   US_KEYS,
 }
 
 
