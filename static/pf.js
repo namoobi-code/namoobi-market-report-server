@@ -304,7 +304,8 @@
         if(b2.hit!=null) hi.push(b2.hit);}
       return {sk:sk.length?sk.reduce((a,c)=>a+c,0)/sk.length:null,
               hi:hi.length?hi.reduce((a,c)=>a+c,0)/hi.length:null};};
-    $('pf_bt').innerHTML=`<table><thead><tr><th>지평</th><th style="text-align:right">평균 오차(MAPE)</th>
+    $('pf_bt').innerHTML=`<div class="note" style="margin-bottom:3px">MAPE·단순예측 오차·방향적중·스킬·보정계수 = <b>${E(tg.label)}</b> 기준 · '전지수' 두 열만 12개 자산 평균(신뢰불가 제외)</div>
+      <table><thead><tr><th>지평</th><th style="text-align:right" title="선택한 지수의 예측가격이 실제와 평균 몇 % 어긋났나">평균 오차(MAPE)</th>
       <th style="text-align:right" title="'변동 없음'이라고 찍었을 때의 오차 — 이보다 작아야 의미">단순예측 오차</th>
       <th style="text-align:right" title="선택한 지수의 오를지/내릴지 방향 적중">${E(tg.label)} 방향적중</th>
       <th style="text-align:right" title="스킬 = 1 − MAPE/단순예측오차. 0=게으른 예측과 동일, 0.5=오차 절반 감소">${E(tg.label)} 스킬</th>
