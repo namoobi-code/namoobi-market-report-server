@@ -194,8 +194,12 @@
 
   function render(){
     const tg=D.targets[cur]; if(!tg) return;
-    /* ── ① 비중 제안 (맨 위) — 프리셋/직접조절 기본비중 + 예측 틸트를 매번 재계산 ── */
-    const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash');
+    /* ── ① 비중 제안 (맨 위) — 프리셋/직접조절 기본비중 + 예측 틸트를 매번 재계산 ──
+       (2026-08-23) 현금성 국채 행(SHY·국내단기채·통안채)은 '현금·단기채'에 이미 포함이라
+       표에서 제거(차트 칩에는 유지) · 개별종목 전략 슬롯 2개 추가(예측 없음·비중만) */
+    const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash'&&a.sug!=null);
+    const CUSTOM=[{key:'kr_stock',asset:'국내주식(개별전략)',etf:'직접 운용 — 종목 선정'},
+                  {key:'us_stock',asset:'미국주식(개별전략)',etf:'직접 운용 — 종목 선정'}];
     const gL=a=>{const p=((D.targets[a.key]||{}).pred||{})[12];
       return p?p.g:(a.g12!=null?Math.log(1+a.g12/100):null);};
     const tiltable=rowsA.filter(a=>a.sug!=null&&gL(a)!=null);
@@ -238,7 +242,17 @@
       <td class="num">${pv(g24)}</td>
       <td class="num"><b>${sug==null?'현금군':sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td>
       <td class="num">${sug==null?'—':'<b>'+fmtAmt(manTotal()*sug/100)+'</b>'}</td></tr>`;}).join('');
-    const cashBase=Math.max(0,100-rowsA.reduce((s,a)=>s+(a.sug!=null?baseOf(a.key):0),0));
+    /* 개별전략 행 — 예측 없음, 기본비중 = 제안비중 (모델이 관여하지 않는 슬롯) */
+    const customRows=CUSTOM.map(c=>{
+      const bw=baseOf(c.key); tot+=bw;
+      return `<tr><td><b>${E(c.asset)}</b></td><td>${E(c.etf)}</td>
+      <td class="num" style="white-space:nowrap"><button data-bw="${c.key}" data-d="-1" style="${bwsty}">−</button> <b${customW[c.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${c.key}" data-d="1" style="${bwsty}">＋</button></td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num"><b>${bw}%</b></td>
+      <td class="num"><b>${fmtAmt(manTotal()*bw/100)}</b></td></tr>`;}).join('');
+    const cashBase=Math.max(0,100-rowsA.reduce((s,a)=>s+baseOf(a.key),0)
+      -CUSTOM.reduce((s,c)=>s+baseOf(c.key),0));
     $('pf_alloc').innerHTML=presetBar+`<table><thead><tr><th>자산</th><th>매수 상품</th>
       <th style="text-align:right">기본 비중</th>
       <th style="text-align:right">1M 예측</th><th style="text-align:right">3M 예측</th><th style="text-align:right">6M 예측</th>
@@ -246,8 +260,8 @@
       <th style="text-align:right">18M 예측</th>
       <th style="text-align:right">24M 예측</th>
       <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th>
-      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th></tr></thead><tbody>${html}
-      <tr><td><b>현금·단기채</b></td><td>파킹/머니마켓</td><td class="num">${cashBase}%</td>
+      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th></tr></thead><tbody>${html}${customRows}
+      <tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (SHY·KODEX단기채·통안채 등)</td><td class="num">${cashBase}%</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td>
       <td class="num"><b>${fmtAmt(manTotal()*Math.max(0,100-tot)/100)}</b></td></tr></tbody></table>
