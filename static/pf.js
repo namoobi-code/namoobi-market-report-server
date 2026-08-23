@@ -168,33 +168,40 @@
     const lead=tg.lead||{};
     const rc=v=>`<span style="color:${Math.abs(v)>=.5?(v>0?'#0f766e':'#b91c1c'):'#666'};font-weight:${Math.abs(v)>=.5?700:400}">${(+v).toFixed(3)}</span>`;
     /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
+    const has12=Object.values(lead).some(l=>l.r12!=null);   // 구 JSON 호환
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
       return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}">
       <td style="padding-left:${ind?22:8}px">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)} <span class="note">${E(m.src||'')}</span></td>
       <td>${E(m.group||'')}</td><td class="num">${l.lag}개월</td>
-      <td class="num">${rc(l.corr)}</td><td class="num">${(l.w*100).toFixed(1)}%</td></tr>`;};
+      <td class="num">${rc(l.corr)}</td>${has12?`<td class="num">${l.lag12!=null?l.lag12+'개월':'—'}</td>
+      <td class="num">${l.r12!=null?rc(l.r12):'—'}</td>
+      <td class="num"><b>${l.w12!=null?(l.w12*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`}</tr>`;};
     const gArr=(tg.groups||[]).slice().sort((a,b)=>Math.abs(b.corr)-Math.abs(a.corr));
     const used=new Set();
     let body=gArr.map(g=>{
       const mem=g.members.filter(k=>lead[k]).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
       mem.forEach(k=>used.add(k));
+      const pad=has12?'<td class="num">—</td><td class="num">—</td><td class="num">—</td>':'<td class="num">—</td>';
       return `<tr style="background:#f4f6f8"><td><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개 합성 — 아래 개별</span></td>
-        <td>${E(g.name)}</td><td class="num">${g.lag}개월</td><td class="num">${rc(g.corr)}</td><td class="num">—</td></tr>`
+        <td>${E(g.name)}</td><td class="num">${g.lag}개월</td><td class="num">${rc(g.corr)}</td>${pad}</tr>`
         +mem.map(k=>indRow(k,true)).join('');
     }).join('');
     const rest=Object.keys(lead).filter(k=>!used.has(k))
       .sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
     if(rest.length)
-      body+=`<tr style="background:#f4f6f8"><td colspan="5"><b>▣ 단독 지표</b> <span class="note">그룹 미구성(2개 미만)</span></td></tr>`
+      body+=`<tr style="background:#f4f6f8"><td colspan="${has12?7:5}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성(2개 미만)</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
     $('pf_ind').innerHTML=`<table><thead><tr><th>지표 <span class="note">(클릭=차트 겹쳐보기)</span></th><th>그룹</th>
-      <th style="text-align:right" title="지표가 몇 개월 선행하는지 — 전 구간 상관 최대 시차">시차</th>
-      <th style="text-align:right" title="시차 적용 후 지수 전년비 성장률과의 상관계수">r</th>
-      <th style="text-align:right" title="|r| 정규화 — 예측 회귀에서의 상대 영향력 표시용(실제 계수는 지평별 릿지가 산출)">가중치</th></tr></thead><tbody>${body}</tbody></table>
-      <div class="note" style="margin-top:4px;line-height:1.6">💡 <b>시차 0개월 = 동행지표</b>다(선행 아님). 실물·심리 지표가 0인 이유:
-      <b>주가 자체가 경기 선행지표</b>라 실물이 주가를 앞서지 못하고 같이 움직인다. 표의 시차·r 은 전 구간 최적값이고,
-      실제 h개월 예측에는 시차 h개월 이상 구간에서 재탐색한 값만 출전한다 — 동행지표는 그만큼 영향력이 줄고,
-      M2·금리처럼 진짜 선행하는 지표가 먼 지평을 주도한다.</div>`;
+      <th style="text-align:right" title="전 구간 상관 최대 시차 — 0개월이면 동행지표(현재 확인용, 선행 아님)">시차</th>
+      <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${has12?`
+      <th style="text-align:right" title="12개월 예측에 출전 가능한 시차(≥12개월) 중 상관 최대 지점">12M시차</th>
+      <th style="text-align:right" title="12개월 이상 선행 구간에서의 상관 — 동행지표는 여기서 뚝 떨어진다">12M r</th>
+      <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력">예측 가중치</th>`:`
+      <th style="text-align:right">가중치</th>`}</tr></thead><tbody>${body}</tbody></table>
+      <div class="note" style="margin-top:4px;line-height:1.6">💡 <b>시차·r</b> 은 "몇 개월 밀면 가장 닮나"(진단용) — 시차 0이면 <b>동행지표</b>라 지금 상황 확인엔 좋지만
+      미래 예측엔 못 쓴다(주가 자체가 경기 선행지표라 실물·심리가 주가를 못 앞선다).
+      <b>12M시차·12M r·예측 가중치</b>가 실제 12개월 예측 기준이다: 12개월 이상 선행 구간에서만 다시 잰 상관이라,
+      동행지표는 여기서 값이 뚝 떨어지고 M2·금리처럼 진짜 선행하는 지표가 커진다 — 두 열을 비교해 보면 차이가 보인다.</div>`;
     $('pf_ind').querySelectorAll('[data-i]').forEach(tr=>tr.onclick=()=>{
       const k=tr.dataset.i;
       sel=sel.includes(k)?sel.filter(x=>x!==k):(sel.length>=6?sel:[...sel,k]);

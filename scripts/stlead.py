@@ -285,9 +285,17 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
         keys = [k for k in keys if sum(1 for v in feat[k] if v is not None) >= 60]
         # ── 개별 r·시차 (전 구간)
         lead = lags_for(feat, ytr, keys)
-        wsum = sum(abs(lead[k]["corr"]) for k in keys) or 1.0
+        # (2026-08-23) 표시용 가중치를 '12개월 예측 기준'으로 — 전구간 최적 r(시차 0 포함)로
+        # 가중치를 매기면 동행지표(소매판매 등)가 크게 보여 "예측 기여"로 오해된다(사용자 지적).
+        # 12M 예측에 실제 출전하는 시차(≥12개월)에서의 r 로 별도 산출한다.
         for k in keys:
-            lead[k]["w"] = round(abs(lead[k]["corr"]) / wsum, 3)   # 표시용 가중치
+            L12, c12 = relead.best_lag_ge(feat[k], ytr, 12)
+            lead[k]["lag12"], lead[k]["r12"] = L12, round(c12, 3)
+        wsum = sum(abs(lead[k]["corr"]) for k in keys) or 1.0
+        w12s = sum(abs(lead[k]["r12"]) for k in keys) or 1.0
+        for k in keys:
+            lead[k]["w"] = round(abs(lead[k]["corr"]) / wsum, 3)
+            lead[k]["w12"] = round(abs(lead[k]["r12"]) / w12s, 3)
         # ── 그룹 합성 r — 구성원 z점수 평균 → 시차 재탐색
         groups = []
         for g in GROUPS:
