@@ -291,14 +291,19 @@
     bindChart(); draw();
   }
 
+  const PFV='i';                                  // 진단 배지용 버전
   function init(){
     if(_init) return; _init=true;
-    fetch('/api/db/stlead').then(r=>r.ok?r.json():null).then(d=>{
+    fetch('/api/db/stlead',{cache:'reload'}).then(r=>r.ok?r.json():null).then(d=>{
       if(!d||!d.targets||!Object.keys(d.targets).length){
         $('pf_alloc').innerHTML='<div class="note">수집 대기 중 — stlead.py 첫 실행이 끝나면 표시됩니다(매일 05:20 자동 갱신).</div>'; return;}
       D=d; if(!D.targets[cur]) cur=Object.keys(D.targets)[0];
-      {const e=$('pf_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
-      render();
+      {const e=$('pf_asof');
+       const hasC=!!(((D.targets.spx||{}).pred||{})[12]||{}).cont;
+       if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''} · pf v=${PFV} · 조절데이터 ${hasC?'O':'X'}`;}
+      try{render();}catch(err){
+        $('pf_alloc').innerHTML=`<div style="color:#b91c1c;font-weight:700">렌더 오류: ${E(err&&err.message||err)}<br><span class="note">${E((err&&err.stack||'').slice(0,300))}</span></div>`;
+        throw err;}
     }).catch(()=>{$('pf_alloc').innerHTML='<div class="note">불러오기 실패 — 새로고침 해주세요.</div>';});
   }
   const tb=document.querySelector('.tab[data-pane="p_pf"]');

@@ -3381,7 +3381,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             +`비슷한 지표끼리 발언을 부풀리지 못하게 벌점(릿지)을 주며, 벌점 강도(λ)도 사람이 아니라 백테스트 성적으로 자동 선택된다. `
             +`부호 = 이번 예측을 민 방향(<b style="color:#d9534f">+ 상승</b> / <b style="color:#2f6fed">− 하락</b>) — `
             +`동료가 이미 말한 중복분을 빼고 남는 몫이라, 혼자 볼 때의 r 과 부호가 다를 수 있다. `
-            +`<b>가중치</b> = |β| ÷ Σ|β| — 발언 지분(%).</div>`
+            +`<b>가중치</b> = |β| ÷ Σ|β| — 발언 지분(%). `
+            +`단 β 크기는 재학습 시점마다 다소 출렁이므로(부호·순위는 안정, 실측 2026-08-23) `
+            +`가중치 %는 소수점보다 <b>순위와 상·하위 구분</b>으로 읽는 것이 안전하다.</div>`
             +`<table style="border-collapse:collapse;font-size:11px;width:100%">`
             +`<tr style="background:#f6f7f9"><th style="border:1px solid #e5e8ec;padding:2px 5px;text-align:left">그룹 / 지표</th>`
             +`<th style="border:1px solid #e5e8ec;padding:2px 5px">시차</th>`
