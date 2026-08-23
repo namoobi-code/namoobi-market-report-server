@@ -283,7 +283,9 @@
         amtCur=to; saveBase(); render();}});
     /* ── ② 지수 칩 + 컨트롤 ── */
     const btn=(on,txt,attr)=>`<button ${attr||''} style="padding:3px 9px;font-size:11.5px;border:1px solid ${on?'#1f2937':'#d7dce3'};border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#444'}">${txt}</button>`;
-    $('pf_tg').innerHTML=Object.entries(D.targets).map(([k,v])=>btn(k===cur,E(v.label),`data-k="${k}"`)).join(' ');
+    /* (2026-08-23) 국내 단기채권·통안채 칩 제거 — 현금성이라 차트 정보가치 없음(데이터는 유지) */
+    $('pf_tg').innerHTML=Object.entries(D.targets).filter(([k])=>!['krb_s','krb_m'].includes(k))
+      .map(([k,v])=>btn(k===cur,E(v.label),`data-k="${k}"`)).join(' ');
     $('pf_tg').querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{cur=b.dataset.k;sel=[];view=null;render();});
     const N=tg.t.length;
     const spans={'전체':N,'30년':384,'10년':144,'5년':84};
