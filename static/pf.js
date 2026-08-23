@@ -166,7 +166,10 @@
     $('pf_pred').onclick=()=>{showPred=!showPred;render();};
     /* ── ③ 지표 표 (그룹 통합 r + 개별 r·가중치) ── */
     const lead=tg.lead||{};
-    const rc=v=>`<span style="color:${Math.abs(v)>=.5?(v>0?'#0f766e':'#b91c1c'):'#666'};font-weight:${Math.abs(v)>=.5?700:400}">${(+v).toFixed(3)}</span>`;
+    /* (2026-08-23) r 색 = 미국식 주가 색 — 양수(지표↑=주가↑) 초록, 음수(지표↑=주가↓) 빨강.
+       |r|<0.2 는 옅게(사실상 무상관), ≥0.5 는 굵게 */
+    const rc=v=>{const a=Math.abs(v);
+      return `<span style="color:${v>0?'#16a34a':(v<0?'#dc2626':'#666')};opacity:${a<.2?.45:1};font-weight:${a>=.5?700:400}">${(+v).toFixed(3)}</span>`;};
     /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
     const has12=Object.values(lead).some(l=>l.r12!=null);   // 구 JSON 호환
     /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
