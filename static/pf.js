@@ -218,7 +218,7 @@
     /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
     const has12=Object.values(lead).some(l=>l.r12!=null);   // 구 JSON 호환
     const hasAdj=!!(((tg.pred||{})[12]||{}).cont);          // 기여도 있는 JSON 만 조절 가능
-    const bsty='padding:0 5px;font-size:11px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
+    const bsty='padding:0 3px;font-size:10.5px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
     /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
       const mv=mulOf(cur,k), sv=scOf(cur,k);
