@@ -43,7 +43,7 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import relead                                    # 엔진 재사용 (함수 단위)
 from relead import (yoy_log, step_log, best_lag, ridge_fit,  # noqa: F401
-                    forecast, lags_for, backtest, add_months, num)
+                    forecast, lags_for, backtest, add_months, num, build_xy)
 import nmr_fred
 
 DB = BASE / "data" / "db"
@@ -242,7 +242,19 @@ def pack_series(mp):
     return {"t0": t0, "v": out}
 
 
+FAST = "--fast" in sys.argv                      # 백테스트 생략, 기존 JSON 의 bt 재사용
+OLD_BT = {}
+
+
 def main():
+    if FAST and OUT.exists():
+        try:
+            for k, v in json.loads(OUT.read_text(encoding="utf-8"))["targets"].items():
+                if v.get("bt"):
+                    OLD_BT[k] = v["bt"]
+            print(f"[st] --fast: 기존 백테스트 {len(OLD_BT)}개 재사용")
+        except Exception:
+            pass
     ind = collect_indicators()
     targets_out, alloc_in = {}, {}
     for tk, (sym, label, etf, base_w) in TARGETS.items():
@@ -315,7 +327,29 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
         # ── 예측 + 백테스트
         t_last = len(t) - 1
         fc = forecast(feat, ytr, prices, keys, t_last, horizons=HZ)
-        bt = _san_bt(backtest(feat, ytr, prices, keys))
+        # (2026-08-23) 지표별 기여도 분해 — 화면의 '가중치 조절' 기능용.
+        #   표준화 릿지에서 g = ym + Σ β_j·z_j 이므로, fc 가 돌려준 β·시차로 X 를
+        #   다시 만들어 mu/sd/ym 만 산출하면 재적합 없이 기여도 c_j = β_j·z_j 를 얻는다.
+        #   클라이언트는 g' = calib×(ym + Σ m_j·c_j) 로 배수 m_j 를 곱해 정확히 재계산.
+        for h, r in fc.items():
+            try:
+                use = list(r["betas"].keys())
+                lagsd = {k: {"lag": r["lags"][k], "corr": r["corrs"][k]} for k in use}
+                X, Y, _ = build_xy(feat, step_log(prices, h), h, lagsd, use, force=use)
+                if not X:
+                    continue
+                n, p = len(X), len(use)
+                mu = [sum(row[j] for row in X) / n for j in range(p)]
+                sd = [math.sqrt(sum((row[j] - mu[j]) ** 2 for row in X) / n) or 1.0
+                      for j in range(p)]
+                ym = sum(Y) / n
+                rowv = [feat[k][t_last - (lagsd[k]["lag"] - h)] for k in use]
+                r["_ym"] = ym
+                r["_cont"] = {k: round(r["betas"][k] * (rowv[j] - mu[j]) / sd[j], 5)
+                              for j, k in enumerate(use)}
+            except Exception:
+                pass
+        bt = OLD_BT.get(tk) if FAST and OLD_BT.get(tk) else _san_bt(backtest(feat, ytr, prices, keys))
         # 보정 적용 경로 (relead 방식: calib 곱)
         ext = [add_months(t[-1], i + 1) for i in range(HZ)]
         N2 = len(t) + HZ
@@ -325,9 +359,11 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
         for h, r in fc.items():
             b = bt["by_h"].get(h) or {}
             calib = b.get("calib", 1.0) or 0.0
+            # 기여도 분해가 있으면 raw = ym + Σcont 로 일관 계산(가중치 조절과 기준 일치)
+            raw = (r["_ym"] + sum(r["_cont"].values())) if "_cont" in r else r["growth"]
             # (2026-08-23) BTC 같은 고변동 자산은 보정 전 성장률·백테스트 sd 가 폭주해
             # exp 오버플로가 났다(실측) → 로그성장 ±1.2(≈-70%~+230%)·sd 100% 로 클램프
-            g = max(-1.2, min(1.2, r["growth"] * calib))
+            g = max(-1.2, min(1.2, raw * calib))
             p = prices[t_last] * math.exp(g)
             sd = min(1.0, (b.get("sd") or 5.0) / 100)
             j = t_last + h
@@ -335,6 +371,14 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
             fut["lo"][j] = round(p * math.exp(-1.28 * sd), 2)
             fut["hi"][j] = round(p * math.exp(1.28 * sd), 2)
             pred[h] = {"g": round(g, 4), "price": round(p, 2)}
+            if "_cont" in r:                       # 가중치 조절·시나리오용
+                # g' = clamp(calib × (base + Σ m_k·(cont_k + s_k·β_k)))
+                #   m_k=가중치 배수, s_k=시나리오(지표 ±1σ 가정: +1 오름/-1 내림/0 기본)
+                pred[h]["base"] = round(r["_ym"], 5)
+                pred[h]["cont"] = r["_cont"]
+                pred[h]["beta"] = {k: r["betas"][k] for k in r["_cont"]}
+                pred[h]["calib"] = round(calib, 3)
+                pred[h]["bsd"] = round(sd, 4)
         targets_out[tk] = {
             "label": label, "sym": sym, "etf": etf, "base": base_w,
             "t": t + ext, "past": t_last,

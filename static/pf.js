@@ -6,6 +6,33 @@
   const $=id=>document.getElementById(id);
   const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   let D=null,_init=false,cur='spx',logY=true,showPred=true,sel=[],view=null,drag=null;
+  /* (2026-08-23) 가중치 조절·시나리오 — 서버가 저장한 지표별 기여도(cont)·β 로
+     g' = calib × (base + Σ m_k·(cont_k + s_k·β_k)) 를 클라이언트에서 정확히 재계산.
+     m_k = 가중치 배수(기본 1, ±0.1), s_k = 시나리오(+1 지표 1σ 오름 / -1 내림 / 0 기본) */
+  let mulAll={}, scAll={};
+  const mulOf=(tk,k)=>((mulAll[tk]||{})[k]??1);
+  const scOf=(tk,k)=>((scAll[tk]||{})[k]??0);
+  const isAdj=tk=>Object.values(mulAll[tk]||{}).some(v=>v!==1)||Object.values(scAll[tk]||{}).some(v=>v!==0);
+
+  function applyAdjust(tk){
+    const tg=D.targets[tk]; if(!tg||!tg.pred) return;
+    if(!tg._p0){tg._p0=JSON.parse(JSON.stringify(tg.pred));tg._f0=JSON.parse(JSON.stringify(tg.fut));}
+    const m=mulAll[tk]||{}, s=scAll[tk]||{}, basePx=tg.hist[tg.past];
+    for(const h in tg._p0){const p0=tg._p0[h];
+      if(!p0.cont){tg.pred[h]=p0;continue;}
+      let raw=p0.base;
+      for(const k in p0.cont) raw+=(m[k]??1)*(p0.cont[k]+((s[k]??0)*(p0.beta?.[k]??0)));
+      const g=Math.max(-1.2,Math.min(1.2,raw*(p0.calib??1)));
+      const pr=basePx*Math.exp(g), sd=p0.bsd??0.05, j=tg.past+ +h;
+      tg.pred[h]={...p0,g:+g.toFixed(4),price:+pr.toFixed(2)};
+      tg.fut.price[j]=+pr.toFixed(2);
+      tg.fut.lo[j]=+(pr*Math.exp(-1.28*sd)).toFixed(2);
+      tg.fut.hi[j]=+(pr*Math.exp(1.28*sd)).toFixed(2);
+    }
+  }
+  function resetAdjust(tk){delete mulAll[tk];delete scAll[tk];
+    const tg=D.targets[tk];
+    if(tg&&tg._p0){tg.pred=JSON.parse(JSON.stringify(tg._p0));tg.fut=JSON.parse(JSON.stringify(tg._f0));}}
   const COLS=['#b45309','#0e7490','#7c3aed','#be185d','#166534','#4338ca','#dc2626'];
   const AXW=58;
 
@@ -108,6 +135,8 @@
 
   function bindChart(){
     const cv=$('pf_cv'); if(!cv||cv._pf) return; cv._pf=1;
+    /* (2026-08-23) 레이아웃 확정 전에 그려져 차트가 작게 남는 문제 — 크기 변화를 감지해 재드로우 */
+    if(window.ResizeObserver){const ro=new ResizeObserver(()=>{if(D)draw();});ro.observe(cv);}
     cv.addEventListener('wheel',e=>{e.preventDefault();
       const r=cv.getBoundingClientRect(), fx=(e.clientX-r.left)/r.width;
       const [a,b]=view, M=b-a, c=a+M*fx, f=e.deltaY>0?1.2:1/1.2;
@@ -130,25 +159,41 @@
 
   function render(){
     const tg=D.targets[cur]; if(!tg) return;
-    /* ── ① 비중 제안 (맨 위) ── */
+    /* ── ① 비중 제안 (맨 위) — 조절이 반영되도록 targets.pred 에서 매번 재계산 ── */
+    const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash');
+    const gL=a=>{const p=((D.targets[a.key]||{}).pred||{})[12];
+      return p?p.g:(a.g12!=null?Math.log(1+a.g12/100):null);};
+    const tiltable=rowsA.filter(a=>a.sug!=null&&gL(a)!=null);
+    const avg=tiltable.length?tiltable.reduce((s,a)=>s+gL(a),0)/tiltable.length:0;
+    let tot=0;
+    const html=rowsA.map(a=>{
+      const tg=D.targets[a.key]||{};
+      const p12=(tg.pred||{})[12], p24=(tg.pred||{})[24];
+      const g12=p12?+(Math.exp(p12.g)*100-100).toFixed(1):a.g12;
+      const g24=p24?+(Math.exp(p24.g)*100-100).toFixed(1):a.g24;
+      let sug=null,tilt=null;
+      if(a.sug!=null&&gL(a)!=null){
+        const cap=a.base>0?5:3, lo=a.base>0?-5:0;
+        tilt=Math.max(lo,Math.min(cap,Math.round((gL(a)-avg)*40)));
+        sug=Math.max(0,a.base+tilt); tot+=sug;
+      }
+      const bad=g12!=null&&((tg.bt||{}).mape==null||(tg.bt||{}).mape>50);
+      const adj=isAdj(a.key);
+      const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}${adj?';text-decoration:underline dotted':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':(adj?'title="가중치·시나리오 조절 반영값"':'')}>${bad?'⚠ ':''}${adj?'✎ ':''}${v>0?'+':''}${v}%</span>`;
+      return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
+      <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
+      <td class="num">${a.base==null?'—':a.base+'%'}</td>
+      <td class="num" style="color:${g12>0?'#0f766e':(g12<0?'#b91c1c':'#666')}">${pv(g12)}</td>
+      <td class="num">${pv(g24)}</td>
+      <td class="num"><b>${sug==null?'현금군':sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td></tr>`;}).join('');
+    const cashBase=((D.alloc||[]).find(a=>a.key==='cash')||{}).base??15;
     $('pf_alloc').innerHTML=`<table><thead><tr><th>자산</th><th>매수 상품</th>
       <th style="text-align:right">기본 비중</th>
-      <th style="text-align:right" title="선행지표 릿지회귀 · 백테스트 보정계수 적용 후">12M 예측</th>
+      <th style="text-align:right" title="선행지표 릿지회귀 · 백테스트 보정계수 적용 후 (✎=조절 반영)">12M 예측</th>
       <th style="text-align:right">24M 예측</th>
-      <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th></tr></thead><tbody>${
-      (D.alloc||[]).map(a=>{
-        const tilt=(a.sug!=null&&a.base!=null)?a.sug-a.base:null;
-        /* (2026-08-23) 백테스트 MAPE 50% 초과 자산(BTC 등)은 예측을 흐리게+⚠ — 표본이
-           짧아 통계적으로 무의미(실측: BTC 24M -47%는 반감기 사이클 그림자 학습 의심) */
-        const tgb=(D.targets[a.key]||{}).bt||{};
-        const bad=a.g12!=null&&(tgb.mape==null||tgb.mape>50);
-        const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':''}>${bad?'⚠ ':''}${v>0?'+':''}${v}%</span>`;
-        return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
-        <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
-        <td class="num">${a.base==null?'—':a.base+'%'}</td>
-        <td class="num" style="color:${a.g12>0?'#0f766e':(a.g12<0?'#b91c1c':'#666')}">${pv(a.g12)}</td>
-        <td class="num">${pv(a.g24)}</td>
-        <td class="num"><b>${a.sug==null?'현금군':a.sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td></tr>`;}).join('')}</tbody></table>
+      <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th></tr></thead><tbody>${html}
+      <tr><td><b>현금·단기채</b></td><td>파킹/머니마켓</td><td class="num">${cashBase}%</td>
+      <td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td></tr></tbody></table>
       <div class="note" style="margin-top:5px">${E(D.note||'')}</div>`;
     $('pf_alloc').querySelectorAll('[data-tk]').forEach(tr=>tr.onclick=()=>{cur=tr.dataset.tk;sel=[];view=null;render();});
     /* ── ② 지수 칩 + 컨트롤 ── */
@@ -172,20 +217,27 @@
       return `<span style="color:${v>0?'#16a34a':(v<0?'#dc2626':'#666')};opacity:${a<.2?.45:1};font-weight:${a>=.5?700:400}">${(+v).toFixed(3)}</span>`;};
     /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
     const has12=Object.values(lead).some(l=>l.r12!=null);   // 구 JSON 호환
+    const hasAdj=!!(((tg.pred||{})[12]||{}).cont);          // 기여도 있는 JSON 만 조절 가능
+    const bsty='padding:0 5px;font-size:11px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
     /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
+      const mv=mulOf(cur,k), sv=scOf(cur,k);
+      const adjCell=hasAdj?`<td class="num" style="white-space:nowrap">
+        <button data-mm="${k}" data-d="-1" style="${bsty}" title="가중치 -0.1">−</button><b style="color:${mv!==1?'#b45309':'#333'}">${mv.toFixed(1)}</b><button data-mm="${k}" data-d="1" style="${bsty}" title="가중치 +0.1">＋</button>
+        <button data-ms="${k}" data-s="1" style="${bsty};${sv===1?'background:#16a34a;color:#fff;border-color:#16a34a':''}" title="이 지표가 1σ 오른다고 가정">▲</button><button data-ms="${k}" data-s="-1" style="${bsty};${sv===-1?'background:#dc2626;color:#fff;border-color:#dc2626':''}" title="이 지표가 1σ 내린다고 가정">▼</button></td>`:'';
       return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}" title="${E(m.src||'')}">
       <td style="padding-left:${ind?16:4}px;white-space:nowrap">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)}</td>
       <td class="num">${l.lag}M</td>
       <td class="num">${rc(l.corr)}</td>${has12?`<td class="num">${l.lag12!=null?l.lag12+'M':'—'}</td>
       <td class="num">${l.r12!=null?rc(l.r12):'—'}</td>
-      <td class="num"><b>${l.w12!=null?(l.w12*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`}</tr>`;};
+      <td class="num"><b style="color:${mv!==1?'#b45309':''}">${l.w12!=null?(l.w12*mv*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`}${adjCell}</tr>`;};
     const gArr=(tg.groups||[]).slice().sort((a,b)=>Math.abs(b.corr)-Math.abs(a.corr));
     const used=new Set();
     let body=gArr.map(g=>{
       const mem=g.members.filter(k=>lead[k]).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
       mem.forEach(k=>used.add(k));
-      const pad=has12?'<td class="num">—</td><td class="num">—</td><td class="num">—</td>':'<td class="num">—</td>';
+      const NC=(has12?6:4)+(hasAdj?1:0);
+      const pad=('<td class="num">—</td>').repeat(NC-3);
       return `<tr style="background:#f4f6f8"><td style="white-space:nowrap"><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개</span></td>
         <td class="num">${g.lag}M</td><td class="num">${rc(g.corr)}</td>${pad}</tr>`
         +mem.map(k=>indRow(k,true)).join('');
@@ -193,15 +245,19 @@
     const rest=Object.keys(lead).filter(k=>!used.has(k))
       .sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
     if(rest.length)
-      body+=`<tr style="background:#f4f6f8"><td colspan="${has12?6:4}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
+      body+=`<tr style="background:#f4f6f8"><td colspan="${(has12?6:4)+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
+    const wSum=has12?Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(cur,k),0):1;
     $('pf_ind').innerHTML=`<table style="font-size:11px"><thead><tr><th title="클릭=차트 겹쳐보기 · 마우스 올리면 출처">지표</th>
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용, 선행 아님)">시차</th>
       <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${has12?`
       <th style="text-align:right" title="12개월 예측에 출전 가능한 시차(≥12개월) 중 상관 최대 지점">12M</th>
       <th style="text-align:right" title="12개월 이상 선행 구간에서의 상관 — 동행지표는 여기서 뚝 떨어진다">12M r</th>
-      <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력">가중치</th>`:`
-      <th style="text-align:right">가중치</th>`}</tr></thead><tbody>${body}</tbody></table>
+      <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력. 조절 배수 반영">가중치</th>`:`
+      <th style="text-align:right">가중치</th>`}${hasAdj?`
+      <th style="text-align:right" title="−/＋ = 가중치 배수 ±0.1 (예측 기여를 그 배수만큼) · ▲/▼ = 이 지표가 1σ 오름/내림 가정 시나리오. 바꾸면 차트 예측선·비중 제안이 즉시 재계산">조절</th>`:''}</tr></thead><tbody>${body}</tbody></table>${
+      hasAdj?`<div class="note" style="margin:5px 0">실효 Σ가중치 <b style="color:${Math.abs(wSum-1)>.001?'#b45309':'#333'}">${(wSum*100).toFixed(0)}%</b> (기본 100%)
+      · <button id="pf_rst" style="${bsty}">조절 초기화</button> — 예측선·비중 제안에 즉시 반영됨(저장 안 됨·새로고침 시 초기화)</div>`:''}
       <div class="note" style="margin-top:4px;line-height:1.6">💡 <b>시차·r</b> 은 "몇 개월 밀면 가장 닮나"(진단용) — 시차 0이면 <b>동행지표</b>라 지금 상황 확인엔 좋지만
       미래 예측엔 못 쓴다(주가 자체가 경기 선행지표라 실물·심리가 주가를 못 앞선다).
       <b>12M시차·12M r·예측 가중치</b>가 실제 12개월 예측 기준이다: 12개월 이상 선행 구간에서만 다시 잰 상관이라,
@@ -210,6 +266,18 @@
       const k=tr.dataset.i;
       sel=sel.includes(k)?sel.filter(x=>x!==k):(sel.length>=6?sel:[...sel,k]);
       render();});
+    /* 조절 버튼 — 행 클릭(오버레이 토글)과 분리 */
+    $('pf_ind').querySelectorAll('[data-mm]').forEach(b=>b.onclick=e=>{e.stopPropagation();
+      const k=b.dataset.mm, d=+b.dataset.d;
+      mulAll[cur]=mulAll[cur]||{};
+      mulAll[cur][k]=Math.max(0,Math.min(3,+((mulOf(cur,k)+d*0.1).toFixed(1))));
+      applyAdjust(cur); render();});
+    $('pf_ind').querySelectorAll('[data-ms]').forEach(b=>b.onclick=e=>{e.stopPropagation();
+      const k=b.dataset.ms, s=+b.dataset.s;
+      scAll[cur]=scAll[cur]||{};
+      scAll[cur][k]=(scOf(cur,k)===s)?0:s;         // 같은 버튼 다시 누르면 해제
+      applyAdjust(cur); render();});
+    {const rb=$('pf_rst'); if(rb) rb.onclick=()=>{resetAdjust(cur);render();};}
     /* ── ④ 백테스트 표 ── */
     const bh=(tg.bt||{}).by_h||{};
     $('pf_bt').innerHTML=`<table><thead><tr><th>지평</th><th style="text-align:right">평균 오차(MAPE)</th>
