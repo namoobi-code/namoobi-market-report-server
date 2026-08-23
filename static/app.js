@@ -1250,7 +1250,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_sub'];  // p_sub: (2026-08-16) 청약 탭 (sub.js)
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_sub','p_pf'];  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
