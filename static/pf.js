@@ -270,7 +270,7 @@
       <th style="text-align:right" title="${h}개월 이상 선행 구간에서의 상관 — 동행지표는 먼 지평에서 뚝 떨어진다">${h}M r</th>`).join('')}${has12?`
       <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력. 조절 배수 반영">가중치</th>`:`
       <th style="text-align:right">가중치</th>`}${hasAdj?`
-      <th style="text-align:right" title="−/＋ = 가중치 배수 ±0.1 (예측 기여를 그 배수만큼) · ▲/▼ = 이 지표가 1σ 오름/내림 가정 시나리오. 바꾸면 차트 예측선·비중 제안이 즉시 재계산">조절</th>`:''}</tr></thead><tbody>${body}</tbody></table>${
+      <th style="text-align:right;white-space:nowrap" title="가중치조절(−/＋) = 배수 ±0.1, 예측 기여를 그 배수만큼 · 지표값조절(▲/▼) = 이 지표가 1σ 오름/내림 가정 시나리오. 바꾸면 차트 예측선·비중 제안이 즉시 재계산">가중치조절 | 지표값조절</th>`:''}</tr></thead><tbody>${body}</tbody></table>${
       hasAdj?`<div class="note" style="margin:5px 0">실효 Σ가중치 <b style="color:${Math.abs(wSum-1)>.001?'#b45309':'#333'}">${(wSum*100).toFixed(0)}%</b> (기본 100%)
       · <button id="pf_rst" style="${bsty}">조절 초기화</button> — 예측선·비중 제안에 즉시 반영됨(저장 안 됨·새로고침 시 초기화)</div>`:''}
       <div class="note" style="margin-top:4px;line-height:1.6">💡 <b>시차·r</b> 은 "몇 개월 밀면 가장 닮나"(진단용) — 시차 0이면 <b>동행지표</b>라 지금 상황 확인엔 좋지만
