@@ -33,6 +33,7 @@
       return '$'+(usd>=1e6?(usd/1e6).toFixed(2)+'M':Math.round(usd).toLocaleString());}
     return man>=10000?(man/10000).toFixed(2).replace(/\.?0+$/,'')+'억':Math.round(man).toLocaleString()+'만';};
   const baseOf=k=>customW[k]??(PRESETS[curPreset].w[k]??0);
+  let lastCash=15;                                // 렌더 시점의 현금 잔여값(조절 시작점)
 
   /* (2026-08-23) 조절은 지표 키 기준 **전역** — 같은 지표를 쓰는 모든 지수에 동시 적용
      (예: CPI ▲ 를 켜면 S&P500·나스닥·금·채권 등 CPI 가 들어가는 모든 예측이 재계산) */
@@ -197,7 +198,8 @@
     /* ── ① 비중 제안 (맨 위) — 프리셋/직접조절 기본비중 + 예측 틸트를 매번 재계산 ──
        (2026-08-23) 현금성 국채 행(SHY·국내단기채·통안채)은 '현금·단기채'에 이미 포함이라
        표에서 제거(차트 칩에는 유지) · 개별종목 전략 슬롯 2개 추가(예측 없음·비중만) */
-    const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash'&&a.sug!=null);
+    /* (2026-08-23) SHY(미 단기국채)도 조절 가능 행으로 복귀 — 모델 틸트는 없고 기본=제안 */
+    const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash'&&!['krb_s','krb_m'].includes(a.key));
     const CUSTOM=[{key:'kr_stock',asset:'국내주식(개별전략)',etf:'직접 운용 — 종목 선정'},
                   {key:'us_stock',asset:'미국주식(개별전략)',etf:'직접 운용 — 종목 선정'}];
     const gL=a=>{const p=((D.targets[a.key]||{}).pred||{})[12];
@@ -222,26 +224,26 @@
       const g1=gh(tg,1), g3=gh(tg,3), g6=gh(tg,6);
       const g12=p12?+(Math.exp(p12.g)*100-100).toFixed(1):a.g12;
       const g24=p24?+(Math.exp(p24.g)*100-100).toFixed(1):a.g24;
-      const bw=a.sug!=null?baseOf(a.key):null;    // 현금성(현금군)은 조절 대상 아님
-      let sug=null,tilt=null;
-      if(a.sug!=null&&gL(a)!=null){
+      const bw=baseOf(a.key);
+      let sug,tilt=null;
+      if(a.sug!=null&&gL(a)!=null){               // 모델 틸트 대상
         const cap=bw>0?5:3, lo=bw>0?-5:0;
         tilt=Math.max(lo,Math.min(cap,Math.round((gL(a)-avg)*40)));
-        sug=Math.max(0,bw+tilt); tot+=sug;
-      }
+        sug=Math.max(0,bw+tilt);
+      }else sug=bw;                               // SHY 등 — 기본=제안(모델 미관여)
+      tot+=sug;
       const bad=g12!=null&&((tg.bt||{}).mape==null||(tg.bt||{}).mape>50);
       const adj=isAdj(a.key);
       const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}${adj?';text-decoration:underline dotted':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':(adj?'title="가중치·시나리오 조절 반영값"':'')}>${bad?'⚠ ':''}${adj?'✎ ':''}${v>0?'+':''}${v}%</span>`;
       return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
       <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
-      <td class="num" style="white-space:nowrap">${bw==null?'—':
-        `<button data-bw="${a.key}" data-d="-1" style="${bwsty}" onclick="event.stopPropagation()">−</button> <b${customW[a.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${a.key}" data-d="1" style="${bwsty}" onclick="event.stopPropagation()">＋</button>`}</td>
+      <td class="num" style="white-space:nowrap"><button data-bw="${a.key}" data-d="-1" style="${bwsty}" onclick="event.stopPropagation()">−</button> <b${customW[a.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${a.key}" data-d="1" style="${bwsty}" onclick="event.stopPropagation()">＋</button></td>
       <td class="num">${pv(g1)}</td><td class="num">${pv(g3)}</td><td class="num">${pv(g6)}</td>
       <td class="num" style="color:${g12>0?'#0f766e':(g12<0?'#b91c1c':'#666')}">${pv(g12)}</td>
       <td class="num">${pv(gh(tg,18))}</td>
       <td class="num">${pv(g24)}</td>
-      <td class="num"><b>${sug==null?'현금군':sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td>
-      <td class="num">${sug==null?'—':'<b>'+fmtAmt(manTotal()*sug/100)+'</b>'}</td></tr>`;}).join('');
+      <td class="num"><b>${sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td>
+      <td class="num"><b>${fmtAmt(manTotal()*sug/100)}</b></td></tr>`;}).join('');
     /* 개별전략 행 — 예측 없음, 기본비중 = 제안비중 (모델이 관여하지 않는 슬롯) */
     const customRows=CUSTOM.map(c=>{
       const bw=baseOf(c.key); tot+=bw;
@@ -260,11 +262,19 @@
       <th style="text-align:right">18M 예측</th>
       <th style="text-align:right">24M 예측</th>
       <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th>
-      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th></tr></thead><tbody>${html}${customRows}
-      <tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (SHY·KODEX단기채·통안채 등)</td><td class="num">${cashBase}%</td>
+      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th></tr></thead><tbody>${html}${customRows}${(()=>{
+      /* 현금 행 — 기본은 잔여(100-Σ) 자동, −/＋ 누르면 수동 고정(합계 검증 표시) */
+      const cashSug=customW.cash!=null?customW.cash:Math.max(0,100-tot);
+      lastCash=cashSug;                           // 현금 −/＋ 시작점 갱신
+      const sumAll=tot+cashSug;
+      return `<tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (KODEX단기채·통안채 등)</td>
+      <td class="num" style="white-space:nowrap"><button data-bw="cash" data-d="-1" style="${bwsty}">−</button> <b${customW.cash!=null?' style="color:#b45309"':''}>${customW.cash!=null?customW.cash:cashBase}%</b> <button data-bw="cash" data-d="1" style="${bwsty}">＋</button> ${customW.cash==null?'<span class="note">잔여 자동</span>':''}</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
-      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td>
-      <td class="num"><b>${fmtAmt(manTotal()*Math.max(0,100-tot)/100)}</b></td></tr></tbody></table>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${cashSug}%</b></td>
+      <td class="num"><b>${fmtAmt(manTotal()*cashSug/100)}</b></td></tr>
+      <tr style="background:#f4f6f8"><td colspan="9" style="text-align:right"><b>제안 합계</b></td>
+      <td class="num"><b style="color:${sumAll===100?'#166534':'#dc2626'}">${sumAll}%</b>${sumAll!==100?' <span class="note" style="color:#dc2626">≠100% — 비중을 맞춰주세요</span>':''}</td>
+      <td class="num"><b>${fmtAmt(manTotal()*sumAll/100)}</b></td></tr>`;})()}</tbody></table>
       <div class="note" style="margin-top:5px">${E(D.note||'')}</div>`;
     $('pf_alloc').querySelectorAll('[data-tk]').forEach(tr=>tr.onclick=()=>{cur=tr.dataset.tk;sel=[];view=null;render();});
     /* 프리셋·기본비중 조절 */
@@ -272,7 +282,8 @@
       curPreset=b.dataset.ps; customW={}; saveBase(); render();});
     $('pf_alloc').querySelectorAll('[data-bw]').forEach(b=>b.onclick=e=>{e.stopPropagation();
       const k=b.dataset.bw, d=+b.dataset.d;
-      customW[k]=Math.max(0,Math.min(60,baseOf(k)+d));
+      const cur0=k==='cash'?(customW.cash??lastCash):baseOf(k);   // 현금은 잔여값에서 출발
+      customW[k]=Math.max(0,Math.min(60,cur0+d));
       saveBase(); render();});
     {const rb=$('pf_bwrst'); if(rb) rb.onclick=()=>{customW={};saveBase();render();};}
     {const ai=$('pf_amt'); if(ai) ai.onchange=()=>{totAmt=Math.max(0,+ai.value||0);saveBase();render();};}
