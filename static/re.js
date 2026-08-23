@@ -10,7 +10,7 @@
   let D=null,_init=false,cur='서울',logY=false,showPred=true,view=null,drag=null;
   let mulAll={},scAll={};                       // 조절은 지표 키 기준 전역(모든 지역 동시)
   const mulOf=k=>mulAll[k]??1, scOf=k=>scAll[k]??0;
-  const HZS=[1,3,6,12,18,24];
+  const HZS=[1,3,6,12,18,24,30];   // (2026-08-23) 부동산 장주기: 1M 유지 + 30M 추가 (사용자 확정)
   const fm=t=>`${String(t).slice(0,4)}.${String(t).slice(4)}`;
 
   /* ── 지역별 차트 배열 캐시: TT=t+ext, hist, fut(전장) ── */

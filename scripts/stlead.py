@@ -251,14 +251,15 @@ CRASH_DD = 0.80                                   # -20% 드로다운
 CRASH_HZ = 12                                     # 12개월 창
 
 
-def crash_prob(feat, prices, keys):
-    """순수 파이썬 로지스틱(표준화+GD+L2). 반환: 현재확률·역사기저율·상위20% 신호 적중률."""
+def crash_prob(feat, prices, keys, months=None):
+    """순수 파이썬 로지스틱(표준화+GD+L2). 반환: 현재확률·역사기저율·상위20% 신호 적중률
+    + 최근 10년 월별 소급 확률(hist — 표본 내 재현이라 참고용, 추세 그래프용)."""
     use = [k for k in CRASH_KEYS if k in keys
            and sum(1 for v in feat[k] if v is not None) >= 120]
     if len(use) < 5:
         return None
     N = len(prices)
-    X, y = [], []
+    X, y, idxs = [], [], []
     for i in range(N - CRASH_HZ):
         if not prices[i]:
             continue
@@ -276,6 +277,11 @@ def crash_prob(feat, prices, keys):
         if ok:
             X.append(row)
             y.append(1 if min(fut) / prices[i] <= CRASH_DD else 0)
+            idxs.append(i)
+    if len(X) >= 120 and sum(y) < 5:
+        # (2026-08-24) 표본은 충분한데 급락 사례가 5건 미만 = 이 자산은 -20% 급락을
+        # 사실상 안 하는 자산(SHY 최대낙폭 -5%·TIP -13%) — '데이터 부족'과 구분해 표시
+        return {"na": 1, "ev": sum(y), "n": len(X)}
     if len(X) < 120 or sum(y) < 5:
         return None
     n, p = len(X), len(use)
@@ -315,8 +321,13 @@ def crash_prob(feat, prices, keys):
         if v is None:
             return None
         row_now.append(v)
+    # (2026-08-24) 월별 소급 이력(최근 120개월) — 추세 스파크라인용. 표본 내 재현이라 참고치.
+    hist = []
+    if months:
+        for j in range(max(0, n - 120), n):
+            hist.append([str(months[idxs[j]]), round(prob(X[j]) * 100, 1)])
     return {"p": round(prob(row_now) * 100, 1), "base": round(base * 100, 1),
-            "top": round(top_rate * 100, 1), "n": n, "ev": sum(y),
+            "top": round(top_rate * 100, 1), "n": n, "ev": sum(y), "hist": hist,
             "beta": {k: round(w[j], 3) for j, k in enumerate(use)}}
 
 
@@ -474,7 +485,7 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
                 pred[h]["bsd"] = round(sd, 4)
         crash = None
         try:
-            crash = crash_prob(feat, prices, keys)
+            crash = crash_prob(feat, prices, keys, months=t)
         except Exception as e:
             print(f"    ⚠ 급락모델: {str(e)[:60]}")
         targets_out[tk] = {
@@ -501,7 +512,8 @@ def _crash_hist(targets_out):
     except Exception:
         h = {}
     today = NOW.strftime("%Y-%m-%d")
-    h[today] = {tk: t["crash"]["p"] for tk, t in targets_out.items() if t.get("crash")}
+    h[today] = {tk: t["crash"]["p"] for tk, t in targets_out.items()
+                if t.get("crash") and "p" in t["crash"]}
     for k in sorted(h)[:-400]:
         del h[k]
     CRASH_HIST.write_text(json.dumps(h), encoding="utf-8")
