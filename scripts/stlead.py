@@ -62,7 +62,8 @@ TARGETS = {
     "spx":    ("^GSPC",     "S&P500",        "SPYM",       35),
     "ndx":    ("^NDX",      "나스닥100",      "QQQM",       20),
     "sox":    ("^SOX",      "필라델피아반도체", "SOXX",       10),
-    "ks200":  ("^KS200",    "코스피200",      "KODEX 200",  10),
+    # (2026-08-23) ^KS200 은 야후에서 전 구간 빈 응답(실측) → KODEX 200 ETF 로 대체(2002~)
+    "ks200":  ("069500.KS", "코스피200(KODEX)", "KODEX 200", 10),
     "dvy":    ("DVY",       "배당(DVY)",      "SCHD/DVY",   10),
     "gold":   ("GC=F",      "금(선물)",       "GLD/KRX금",   0),
     "btc":    ("BTC-USD",   "비트코인",       "현물(거래소)", 0),
@@ -246,10 +247,19 @@ def main():
     targets_out, alloc_in = {}, {}
     for tk, (sym, label, etf, base_w) in TARGETS.items():
         print(f"[st] ── {label} ({sym})")
+        try:
+            _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in)
+        except Exception as e:                     # 한 자산의 사고가 전체를 죽이지 않게
+            print(f"    ⚠ {label} 실패: {type(e).__name__} {str(e)[:80]}")
+    _finish(targets_out, alloc_in, ind)
+
+
+def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
+    if True:
         px = yahoo_monthly(sym)
         if len(px) < 120:
             print("    ⚠ 시세 부족 — 건너뜀")
-            continue
+            return
         t = sorted(px)
         prices = [px[ym] for ym in t]
         ytr = yoy_log(prices)
@@ -295,9 +305,11 @@ def main():
         for h, r in fc.items():
             b = bt["by_h"].get(h) or {}
             calib = b.get("calib", 1.0) or 0.0
-            g = r["growth"] * calib
+            # (2026-08-23) BTC 같은 고변동 자산은 보정 전 성장률·백테스트 sd 가 폭주해
+            # exp 오버플로가 났다(실측) → 로그성장 ±1.2(≈-70%~+230%)·sd 100% 로 클램프
+            g = max(-1.2, min(1.2, r["growth"] * calib))
             p = prices[t_last] * math.exp(g)
-            sd = (b.get("sd") or 5.0) / 100
+            sd = min(1.0, (b.get("sd") or 5.0) / 100)
             j = t_last + h
             fut["price"][j] = round(p, 2)
             fut["lo"][j] = round(p * math.exp(-1.28 * sd), 2)
@@ -313,6 +325,9 @@ def main():
         print(f"    {t[0]}~{t[-1]} {len(t)}개월 · 지표 {len(keys)} · "
               f"12M {math.exp(alloc_in[tk] or 0) * 100 - 100:+.1f}% · "
               f"MAPE {bt.get('mape')}% · 방향 {bt.get('hit')}%")
+
+
+def _finish(targets_out, alloc_in, ind):
     # ── 비중 제안 — 12개월 보정예측의 상대 우열로 코어 ±5%p · 위성 0~+3%p (현금에서)
     alloc = []
     core = {k: g for k, g in alloc_in.items() if k in TILT_ELIG and k in targets_out}
