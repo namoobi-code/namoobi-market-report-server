@@ -55,10 +55,11 @@
   function draw(){
     const cv=$('pf_cv'); if(!cv||!D) return;
     const tg=D.targets[cur]; if(!tg) return;
-    /* (2026-08-23) 캔버스가 CSS height:100% 를 무시하고 짧게 남는 문제(실측) —
-       부모 행(뷰포트 채움 flex)의 높이를 직접 읽어 픽셀로 강제한다 */
-    const H=(cv.parentElement&&cv.parentElement.clientHeight)||cv.clientHeight||520;
+    /* (2026-08-23) CSS(calc·100%·flex) 조합이 브라우저에서 계속 어긋남(실측 3회) —
+       뷰포트 높이에서 직접 계산해 캔버스와 지표표 박스에 픽셀로 강제한다 */
+    const H=Math.max(520, (window.innerHeight||900)-200);
     cv.style.height=H+'px';
+    {const box=$('pf_ind')&&$('pf_ind').parentElement; if(box) box.style.height=H+'px';}
     const W=cv.clientWidth||1000; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const t=tg.t,N=t.length;

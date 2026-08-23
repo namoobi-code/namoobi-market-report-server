@@ -62,6 +62,8 @@
   #rl_main{height:520px!important;max-height:none!important}
   #tr_nv_cv{height:520px!important;max-height:none!important} /* 네이버 쇼핑 클릭추이 — 동일 캡 해제 */
   #ap_main{height:520px!important;max-height:none!important}   /* 단지별 실거래 대형차트 — 동일 캡 해제 */
+  /* (2026-08-23) Portfolio 차트 — 동일 캡 해제 + 뷰포트 채움 (JS 3회 수정이 다 이 전역 캡에 눌렸었다) */
+  #pf_cv{height:calc(100vh - 200px)!important;min-height:520px!important;max-height:none!important}
   #ms_unsold,#ms_pipe{height:300px!important;max-height:none!important} /* 주택 공급 차트 — 동일 캡 해제 */
   #et_main{height:340px!important;max-height:none!important}            /* 비아파트 실거래 — 동일 캡 해제 */
   #ah_main{height:320px!important;max-height:none!important}            /* 청약경쟁률 — 동일 캡 해제 */
@@ -1806,7 +1808,7 @@
 <script src="/app.js?v=08231740"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08221206n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
-<script src="/pf.js?v=20260823k"></script><!-- (2026-08-22) Portfolio 탭 -->
+<script src="/pf.js?v=20260823l"></script><!-- (2026-08-22) Portfolio 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
