@@ -257,6 +257,8 @@ def policyrates():
 # (2026-08-14) 번들 비대화 차단 — 38.9MB/6.4초까지 커져 대시보드 6장(크립토) 등이 로딩 전 빈칸으로 보였다.
 #   아래 대형 DB 는 화면에서 /api/db/<name> 개별 조회로만 쓰이므로 번들에서 제외한다(기능 손실 없음).
 BUNDLE_SKIP = {"screener_pool", "tp_history", "us_krname", "etf_holdings", "relead", "releadg",
+               "repred",   # (2026-08-23) RE 예측 탭 — re.js 가 /api/db/repred 로 직접 부른다
+
                "global_hist", "kr_seg_db", "rtms", "rtms_etc", "stock_deriv", "etf_pool",
                "earnings_live_us", "frgn_hist", "appe_series", "ta_state_us", "ta_state_kr",
                # (2026-08-23) 번들 12.2MB 경보 — 가이던스 이력·프로필 DB 신설로 임계(12MB)
