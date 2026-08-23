@@ -169,11 +169,12 @@
     const rc=v=>`<span style="color:${Math.abs(v)>=.5?(v>0?'#0f766e':'#b91c1c'):'#666'};font-weight:${Math.abs(v)>=.5?700:400}">${(+v).toFixed(3)}</span>`;
     /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
     const has12=Object.values(lead).some(l=>l.r12!=null);   // 구 JSON 호환
+    /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
-      return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}">
-      <td style="padding-left:${ind?22:8}px">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)} <span class="note">${E(m.src||'')}</span></td>
-      <td>${E(m.group||'')}</td><td class="num">${l.lag}개월</td>
-      <td class="num">${rc(l.corr)}</td>${has12?`<td class="num">${l.lag12!=null?l.lag12+'개월':'—'}</td>
+      return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}" title="${E(m.src||'')}">
+      <td style="padding-left:${ind?16:4}px;white-space:nowrap">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)}</td>
+      <td class="num">${l.lag}M</td>
+      <td class="num">${rc(l.corr)}</td>${has12?`<td class="num">${l.lag12!=null?l.lag12+'M':'—'}</td>
       <td class="num">${l.r12!=null?rc(l.r12):'—'}</td>
       <td class="num"><b>${l.w12!=null?(l.w12*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`}</tr>`;};
     const gArr=(tg.groups||[]).slice().sort((a,b)=>Math.abs(b.corr)-Math.abs(a.corr));
@@ -182,21 +183,21 @@
       const mem=g.members.filter(k=>lead[k]).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
       mem.forEach(k=>used.add(k));
       const pad=has12?'<td class="num">—</td><td class="num">—</td><td class="num">—</td>':'<td class="num">—</td>';
-      return `<tr style="background:#f4f6f8"><td><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개 합성 — 아래 개별</span></td>
-        <td>${E(g.name)}</td><td class="num">${g.lag}개월</td><td class="num">${rc(g.corr)}</td>${pad}</tr>`
+      return `<tr style="background:#f4f6f8"><td style="white-space:nowrap"><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개</span></td>
+        <td class="num">${g.lag}M</td><td class="num">${rc(g.corr)}</td>${pad}</tr>`
         +mem.map(k=>indRow(k,true)).join('');
     }).join('');
     const rest=Object.keys(lead).filter(k=>!used.has(k))
       .sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
     if(rest.length)
-      body+=`<tr style="background:#f4f6f8"><td colspan="${has12?7:5}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성(2개 미만)</span></td></tr>`
+      body+=`<tr style="background:#f4f6f8"><td colspan="${has12?6:4}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
-    $('pf_ind').innerHTML=`<table><thead><tr><th>지표 <span class="note">(클릭=차트 겹쳐보기)</span></th><th>그룹</th>
-      <th style="text-align:right" title="전 구간 상관 최대 시차 — 0개월이면 동행지표(현재 확인용, 선행 아님)">시차</th>
+    $('pf_ind').innerHTML=`<table style="font-size:11px"><thead><tr><th title="클릭=차트 겹쳐보기 · 마우스 올리면 출처">지표</th>
+      <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용, 선행 아님)">시차</th>
       <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${has12?`
-      <th style="text-align:right" title="12개월 예측에 출전 가능한 시차(≥12개월) 중 상관 최대 지점">12M시차</th>
+      <th style="text-align:right" title="12개월 예측에 출전 가능한 시차(≥12개월) 중 상관 최대 지점">12M</th>
       <th style="text-align:right" title="12개월 이상 선행 구간에서의 상관 — 동행지표는 여기서 뚝 떨어진다">12M r</th>
-      <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력">예측 가중치</th>`:`
+      <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력">가중치</th>`:`
       <th style="text-align:right">가중치</th>`}</tr></thead><tbody>${body}</tbody></table>
       <div class="note" style="margin-top:4px;line-height:1.6">💡 <b>시차·r</b> 은 "몇 개월 밀면 가장 닮나"(진단용) — 시차 0이면 <b>동행지표</b>라 지금 상황 확인엔 좋지만
       미래 예측엔 못 쓴다(주가 자체가 경기 선행지표라 실물·심리가 주가를 못 앞선다).
