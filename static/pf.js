@@ -260,8 +260,14 @@
       const bad=g12!=null&&((tg.bt||{}).mape==null||(tg.bt||{}).mape>50);
       const adj=isAdj(a.key);
       const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}${adj?';text-decoration:underline dotted':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':(adj?'title="가중치·시나리오 조절 반영값"':'')}>${bad?'⚠ ':''}${adj?'✎ ':''}${v>0?'+':''}${v}%</span>`;
+      /* (2026-08-24) 급락 확률(현재·역사평균) 열 — 로지스틱 모델 산출 */
+      const cr2=tg.crash;
+      const crCell=cr2?(()=>{const ratio=cr2.base>0?cr2.p/cr2.base:1;
+        const col=ratio<1?'#16a34a':(ratio<2?'#b45309':'#dc2626');
+        return `<td class="num"><b style="color:${col}" title="12개월 내 -20% 드로다운 확률 (로지스틱 · 역사평균 대비 ${ratio.toFixed(1)}배)">${cr2.p}%</b></td><td class="num"><span class="note">${cr2.base}%</span></td>`;})()
+        :'<td class="num">—</td><td class="num">—</td>';
       return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
-      <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
+      <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>${crCell}
       <td class="num" style="white-space:nowrap"><button data-bw="${a.key}" data-d="-1" style="${bwsty}" onclick="event.stopPropagation()">−</button> <b${customW[a.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${a.key}" data-d="1" style="${bwsty}" onclick="event.stopPropagation()">＋</button></td>
       <td class="num">${pv(g1)}</td><td class="num">${pv(g3)}</td><td class="num">${pv(g6)}</td>
       <td class="num" style="color:${g12>0?'#0f766e':(g12<0?'#b91c1c':'#666')}">${pv(g12)}</td>
@@ -272,7 +278,7 @@
     /* 개별전략 행 — 예측 없음, 기본비중 = 제안비중 (모델이 관여하지 않는 슬롯) */
     const customRows=CUSTOM.map(c=>{
       const bw=baseOf(c.key); tot+=bw;
-      return `<tr><td><b>${E(c.asset)}</b></td><td>${E(c.etf)}</td>
+      return `<tr><td><b>${E(c.asset)}</b></td><td>${E(c.etf)}</td><td class="num">—</td><td class="num">—</td>
       <td class="num" style="white-space:nowrap"><button data-bw="${c.key}" data-d="-1" style="${bwsty}">−</button> <b${customW[c.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${c.key}" data-d="1" style="${bwsty}">＋</button></td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
@@ -281,6 +287,8 @@
     const cashBase=Math.max(0,100-rowsA.reduce((s,a)=>s+baseOf(a.key),0)
       -CUSTOM.reduce((s,c)=>s+baseOf(c.key),0));
     $('pf_alloc').innerHTML=presetBar+`<table><thead><tr><th>자산</th><th>매수 상품</th>
+      <th style="text-align:right" title="12개월 내 -20% 드로다운 확률 — 로지스틱(VIX·신용스프레드·금리차·실업청구 등)">급락확률</th>
+      <th style="text-align:right" title="역사 평균 급락 확률 — 현재값이 이보다 높으면 경계">역사평균</th>
       <th style="text-align:right">기본 비중</th>
       <th style="text-align:right">1M 예측</th><th style="text-align:right">3M 예측</th><th style="text-align:right">6M 예측</th>
       <th style="text-align:right" title="선행지표 릿지회귀 · 백테스트 보정계수 적용 후 (✎=조절 반영)">12M 예측</th>
@@ -294,14 +302,14 @@
       const cashSug=customW.cash!=null?customW.cash:Math.max(0,100-tot);
       lastCash=cashSug;                           // 현금 −/＋ 시작점 갱신
       const sumAll=tot+cashSug;
-      return `<tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (KODEX단기채·통안채 등)</td>
+      return `<tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (KODEX단기채·통안채 등)</td><td class="num">—</td><td class="num">—</td>
       <td class="num" style="white-space:nowrap"><button data-bw="cash" data-d="-1" style="${bwsty}">−</button> <b${customW.cash!=null?' style="color:#b45309"':''}>${customW.cash!=null?customW.cash:cashBase}%</b> <button data-bw="cash" data-d="1" style="${bwsty}">＋</button> ${customW.cash==null?'<span class="note">잔여 자동</span>':''}</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${cashSug}%</b></td>
       <td class="num"><b>${fmtAmt(manTotal()*cashSug/100)}</b></td>${holdCell('cash')}${diffCell('cash',manTotal()*cashSug/100)}</tr>
       ${(()=>{const held=Object.values(holdW).reduce((s,v)=>s+(+v||0),0);
         const dsum=manTotal()*sumAll/100-held;
-        return `<tr style="background:#f4f6f8"><td colspan="9" style="text-align:right"><b>제안 합계</b></td>
+        return `<tr style="background:#f4f6f8"><td colspan="11" style="text-align:right"><b>제안 합계</b></td>
       <td class="num"><b style="color:${sumAll===100?'#166534':'#dc2626'}">${sumAll}%</b>${sumAll!==100?' <span class="note" style="color:#dc2626">≠100%</span>':''}</td>
       <td class="num"><b>${fmtAmt(manTotal()*sumAll/100)}</b></td>
       <td class="num"><b title="입력한 현재 보유 합계">${held?fmtAmt(held):'—'}</b></td>
