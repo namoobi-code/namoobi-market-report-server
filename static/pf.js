@@ -138,11 +138,16 @@
       <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th></tr></thead><tbody>${
       (D.alloc||[]).map(a=>{
         const tilt=(a.sug!=null&&a.base!=null)?a.sug-a.base:null;
+        /* (2026-08-23) 백테스트 MAPE 50% 초과 자산(BTC 등)은 예측을 흐리게+⚠ — 표본이
+           짧아 통계적으로 무의미(실측: BTC 24M -47%는 반감기 사이클 그림자 학습 의심) */
+        const tgb=(D.targets[a.key]||{}).bt||{};
+        const bad=a.g12!=null&&(tgb.mape==null||tgb.mape>50);
+        const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':''}>${bad?'⚠ ':''}${v>0?'+':''}${v}%</span>`;
         return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
         <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
         <td class="num">${a.base==null?'—':a.base+'%'}</td>
-        <td class="num" style="color:${a.g12>0?'#0f766e':(a.g12<0?'#b91c1c':'#666')}">${a.g12==null?'—':(a.g12>0?'+':'')+a.g12+'%'}</td>
-        <td class="num">${a.g24==null?'—':(a.g24>0?'+':'')+a.g24+'%'}</td>
+        <td class="num" style="color:${a.g12>0?'#0f766e':(a.g12<0?'#b91c1c':'#666')}">${pv(a.g12)}</td>
+        <td class="num">${pv(a.g24)}</td>
         <td class="num"><b>${a.sug==null?'현금군':a.sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td></tr>`;}).join('')}</tbody></table>
       <div class="note" style="margin-top:5px">${E(D.note||'')}</div>`;
     $('pf_alloc').querySelectorAll('[data-tk]').forEach(tr=>tr.onclick=()=>{cur=tr.dataset.tk;sel=[];view=null;render();});
