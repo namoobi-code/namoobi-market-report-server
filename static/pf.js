@@ -55,7 +55,11 @@
   function draw(){
     const cv=$('pf_cv'); if(!cv||!D) return;
     const tg=D.targets[cur]; if(!tg) return;
-    const W=cv.clientWidth||1000,H=cv.clientHeight||520; cv.width=W; cv.height=H;
+    /* (2026-08-23) 캔버스가 CSS height:100% 를 무시하고 짧게 남는 문제(실측) —
+       부모 행(뷰포트 채움 flex)의 높이를 직접 읽어 픽셀로 강제한다 */
+    const H=(cv.parentElement&&cv.parentElement.clientHeight)||cv.clientHeight||520;
+    cv.style.height=H+'px';
+    const W=cv.clientWidth||1000; cv.width=W; cv.height=H;
     const x=cv.getContext('2d'); x.clearRect(0,0,W,H);
     const t=tg.t,N=t.length;
     if(!view) view=[0,N-1];
