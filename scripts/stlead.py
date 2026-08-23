@@ -122,7 +122,8 @@ US_KEYS = ["cpi", "ppi", "pce", "ffr", "us10y", "us2y", "t10y2y", "payems",
            "unrate", "claims", "gdp", "indpro", "retail", "houst", "m2",
            "vix", "umcsent", "dxy", "baa10y"]
 KR_KEYS = ["ffr", "us10y", "t10y2y", "vix", "dxy", "m2", "indpro",
-           "rate_kr", "m2_kr", "fx", "cli_kr", "spx_ind"]
+           "rate_kr", "m2_kr", "fx", "cli_kr", "spx_ind",
+           "baa10y", "claims", "umcsent", "cpi", "unrate"]   # 급락모델·위기전이 지표
 KEYS_FOR = {
     "spx":   US_KEYS,
     "ndx":   US_KEYS + ["semi_ip"],
@@ -240,6 +241,83 @@ def zscore(seq):
     mu = sum(v) / len(v)
     sd = math.sqrt(sum((x - mu) ** 2 for x in v) / len(v)) or 1.0
     return [None if x is None else (x - mu) / sd for x in seq]
+
+
+# (2026-08-23) 급락 확률 모델 — 평균 경로 회귀는 원리적으로 꼬리 사건을 못 맞추므로,
+# "향후 12개월 내 현재가 대비 -20% 드로다운 발생 여부"를 타깃으로 한 로지스틱을 별도로 둔다.
+# 지표는 급락과 연관 큰 것만(VIX·신용스프레드·장단기금리차·실업청구·소비심리·금리·물가·M2·실업률).
+CRASH_KEYS = ["vix", "baa10y", "t10y2y", "claims", "umcsent", "ffr", "cpi", "m2", "unrate"]
+CRASH_DD = 0.80                                   # -20% 드로다운
+CRASH_HZ = 12                                     # 12개월 창
+
+
+def crash_prob(feat, prices, keys):
+    """순수 파이썬 로지스틱(표준화+GD+L2). 반환: 현재확률·역사기저율·상위20% 신호 적중률."""
+    use = [k for k in CRASH_KEYS if k in keys
+           and sum(1 for v in feat[k] if v is not None) >= 120]
+    if len(use) < 5:
+        return None
+    N = len(prices)
+    X, y = [], []
+    for i in range(N - CRASH_HZ):
+        if not prices[i]:
+            continue
+        fut = [p for p in prices[i + 1:i + 1 + CRASH_HZ] if p]
+        if len(fut) < CRASH_HZ:
+            continue
+        row = []
+        ok = True
+        for k in use:
+            v = feat[k][i]
+            if v is None:
+                ok = False
+                break
+            row.append(v)
+        if ok:
+            X.append(row)
+            y.append(1 if min(fut) / prices[i] <= CRASH_DD else 0)
+    if len(X) < 120 or sum(y) < 5:
+        return None
+    n, p = len(X), len(use)
+    mu = [sum(r[j] for r in X) / n for j in range(p)]
+    sd = [math.sqrt(sum((r[j] - mu[j]) ** 2 for r in X) / n) or 1.0 for j in range(p)]
+    Z = [[(r[j] - mu[j]) / sd[j] for j in range(p)] for r in X]
+    w = [0.0] * p
+    b = 0.0
+    lr, l2 = 0.5, 1e-2
+    for _ in range(400):                          # 경사하강 (표본 수백 × 9변수라 즉시 수렴)
+        gw = [l2 * w[j] for j in range(p)]
+        gb = 0.0
+        for i in range(n):
+            z = b + sum(w[j] * Z[i][j] for j in range(p))
+            e = 1 / (1 + math.exp(-max(-30, min(30, z)))) - y[i]
+            for j in range(p):
+                gw[j] += e * Z[i][j] / n
+            gb += e / n
+        w = [w[j] - lr * gw[j] for j in range(p)]
+        b -= lr * gb
+    def prob(row):
+        z = b + sum(w[j] * (row[j] - mu[j]) / sd[j] for j in range(p))
+        return 1 / (1 + math.exp(-max(-30, min(30, z))))
+    # 상위 20% 신호 구간의 실제 급락 비율(리프트) — 표본 내 검증(참고용)
+    ps = sorted(((prob(X[i]), y[i]) for i in range(n)), reverse=True)
+    top = ps[:max(1, n // 5)]
+    base = sum(y) / n
+    top_rate = sum(t[1] for t in top) / len(top)
+    # 현재 입력 — 지표별 마지막 관측(발표 지연 3개월 내 이월)
+    row_now = []
+    for k in use:
+        v = None
+        for j in range(len(feat[k]) - 1, max(-1, len(feat[k]) - 4), -1):
+            if feat[k][j] is not None:
+                v = feat[k][j]
+                break
+        if v is None:
+            return None
+        row_now.append(v)
+    return {"p": round(prob(row_now) * 100, 1), "base": round(base * 100, 1),
+            "top": round(top_rate * 100, 1), "n": n, "ev": sum(y),
+            "beta": {k: round(w[j], 3) for j, k in enumerate(use)}}
 
 
 def pack_series(mp):
@@ -394,11 +472,17 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
                 pred[h]["beta"] = {k: r["betas"][k] for k in r["_cont"]}
                 pred[h]["calib"] = round(calib, 3)
                 pred[h]["bsd"] = round(sd, 4)
+        crash = None
+        try:
+            crash = crash_prob(feat, prices, keys)
+        except Exception as e:
+            print(f"    ⚠ 급락모델: {str(e)[:60]}")
         targets_out[tk] = {
             "label": label, "sym": sym, "etf": etf, "base": base_w,
             "t": t + ext, "past": t_last,
             "hist": [round(v, 2) for v in prices] + [None] * HZ,
             "fut": fut, "lead": lead, "groups": groups, "bt": bt, "pred": pred,
+            "crash": crash,
         }
         alloc_in[tk] = pred.get(12, {}).get("g", 0.0)
         print(f"    {t[0]}~{t[-1]} {len(t)}개월 · 지표 {len(keys)} · "

@@ -22,14 +22,15 @@
       w:{ndx:30,mgk:10,sox:15,spx:15,ks200:10,eem:5,gold:5}},
   };
   const PRESET_MIG={A:'BAL',F:'BAL',B:'DEF',D:'AGG'};   // 구 저장값 이관
-  let curPreset='BAL', customW={}, totAmt=50000, amtCur='krw';  // 총액(krw=만원 · usd=$)
+  let curPreset='BAL', customW={}, totAmt=50000, amtCur='krw', holdW={};  // holdW=현재 보유금액(만원)
   try{const sv=JSON.parse(localStorage.getItem('pfBase')||'{}');
     if(PRESETS[sv.p]) curPreset=sv.p;
     else if(PRESET_MIG[sv.p]) curPreset=PRESET_MIG[sv.p];
     if(sv.c&&typeof sv.c==='object') customW=sv.c;
     if(+sv.a>0) totAmt=+sv.a;
-    if(sv.u==='usd'||sv.u==='krw') amtCur=sv.u;}catch(e){}
-  const saveBase=()=>{try{localStorage.setItem('pfBase',JSON.stringify({p:curPreset,c:customW,a:totAmt,u:amtCur}));}catch(e){}};
+    if(sv.u==='usd'||sv.u==='krw') amtCur=sv.u;
+    if(sv.h&&typeof sv.h==='object') holdW=sv.h;}catch(e){}
+  const saveBase=()=>{try{localStorage.setItem('pfBase',JSON.stringify({p:curPreset,c:customW,a:totAmt,u:amtCur,h:holdW}));}catch(e){}};
   const fxNow=()=>{const s=(D&&D.series||{}).fx;                 // 최신 원/달러 (ECOS 월평균)
     if(s&&s.v) for(let i=s.v.length-1;i>=0;i--) if(s.v[i]!=null) return s.v[i];
     return 1350;};
@@ -38,6 +39,15 @@
     if(amtCur==='usd'){const usd=man*10000/fxNow();
       return '$'+(usd>=1e6?(usd/1e6).toFixed(2)+'M':Math.round(usd).toLocaleString());}
     return man>=10000?(man/10000).toFixed(2).replace(/\.?0+$/,'')+'억':Math.round(man).toLocaleString()+'만';};
+  /* (2026-08-23) 현재 보유금액 입력 → 제안 대비 매매 필요액. 입력·저장은 만원 기준(달러 모드면 $ 환산 표시) */
+  const holdCell=k=>{const v=holdW[k];
+    const disp=v==null?'':(amtCur==='usd'?Math.round(v*10000/fxNow()):Math.round(v));
+    return `<td class="num"><input data-hd="${k}" type="number" value="${disp}" placeholder="보유액" style="width:78px;padding:1px 4px;font-size:11px;border:1px solid #d7dce3;border-radius:4px;text-align:right" onclick="event.stopPropagation()"></td>`;};
+  const diffCell=(k,sugMan)=>{const v=holdW[k];
+    if(v==null||sugMan==null) return '<td class="num">—</td>';
+    const d=sugMan-v;
+    if(Math.abs(d)<1) return '<td class="num"><span style="color:#666">✓ 맞음</span></td>';
+    return `<td class="num"><b style="color:${d>0?'#16a34a':'#dc2626'}">${d>0?'+':'−'}${fmtAmt(Math.abs(d))} ${d>0?'매수':'매도'}</b></td>`;};
   const baseOf=k=>customW[k]??(PRESETS[curPreset].w[k]??0);
   let lastCash=15;                                // 렌더 시점의 현금 잔여값(조절 시작점)
 
@@ -67,6 +77,14 @@
     }
   }
   function applyAdjustAll(){for(const tk in D.targets) applyAdjust(tk);}
+  /* (2026-08-23) 위기 시나리오 프리셋 — 급락 국면의 전형 신호 조합을 원클릭 적용(전 지수) */
+  const CRISIS={vix:1,baa10y:1,t10y2y:-1,claims:1,umcsent:-1};
+  const crisisOn=()=>Object.entries(CRISIS).every(([k,s])=>scAll[k]===s);
+  function toggleCrisis(){
+    if(crisisOn()) for(const k in CRISIS) delete scAll[k];
+    else for(const k in CRISIS) scAll[k]=CRISIS[k];
+    applyAdjustAll();
+  }
   function resetAdjust(){mulAll={};scAll={};
     for(const tk in D.targets){const tg=D.targets[tk];
       if(tg&&tg._p0){tg.pred=JSON.parse(JSON.stringify(tg._p0));tg.fut=JSON.parse(JSON.stringify(tg._f0));}}}
@@ -250,7 +268,7 @@
       <td class="num">${pv(gh(tg,18))}</td>
       <td class="num">${pv(g24)}</td>
       <td class="num"><b>${sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td>
-      <td class="num"><b>${fmtAmt(manTotal()*sug/100)}</b></td></tr>`;}).join('');
+      <td class="num"><b>${fmtAmt(manTotal()*sug/100)}</b></td>${holdCell(a.key)}${diffCell(a.key,manTotal()*sug/100)}</tr>`;}).join('');
     /* 개별전략 행 — 예측 없음, 기본비중 = 제안비중 (모델이 관여하지 않는 슬롯) */
     const customRows=CUSTOM.map(c=>{
       const bw=baseOf(c.key); tot+=bw;
@@ -259,7 +277,7 @@
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num"><b>${bw}%</b></td>
-      <td class="num"><b>${fmtAmt(manTotal()*bw/100)}</b></td></tr>`;}).join('');
+      <td class="num"><b>${fmtAmt(manTotal()*bw/100)}</b></td>${holdCell(c.key)}${diffCell(c.key,manTotal()*bw/100)}</tr>`;}).join('');
     const cashBase=Math.max(0,100-rowsA.reduce((s,a)=>s+baseOf(a.key),0)
       -CUSTOM.reduce((s,c)=>s+baseOf(c.key),0));
     $('pf_alloc').innerHTML=presetBar+`<table><thead><tr><th>자산</th><th>매수 상품</th>
@@ -269,7 +287,9 @@
       <th style="text-align:right">18M 예측</th>
       <th style="text-align:right">24M 예측</th>
       <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th>
-      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th></tr></thead><tbody>${html}${customRows}${(()=>{
+      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th>
+      <th style="text-align:right" title="현재 보유 금액 입력(만원 · 달러 모드면 $) — 브라우저에 저장">현재 금액</th>
+      <th style="text-align:right" title="제안 금액 − 현재 금액 = 리밸런싱 주문액">매매 필요</th></tr></thead><tbody>${html}${customRows}${(()=>{
       /* 현금 행 — 기본은 잔여(100-Σ) 자동, −/＋ 누르면 수동 고정(합계 검증 표시) */
       const cashSug=customW.cash!=null?customW.cash:Math.max(0,100-tot);
       lastCash=cashSug;                           // 현금 −/＋ 시작점 갱신
@@ -278,10 +298,14 @@
       <td class="num" style="white-space:nowrap"><button data-bw="cash" data-d="-1" style="${bwsty}">−</button> <b${customW.cash!=null?' style="color:#b45309"':''}>${customW.cash!=null?customW.cash:cashBase}%</b> <button data-bw="cash" data-d="1" style="${bwsty}">＋</button> ${customW.cash==null?'<span class="note">잔여 자동</span>':''}</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${cashSug}%</b></td>
-      <td class="num"><b>${fmtAmt(manTotal()*cashSug/100)}</b></td></tr>
-      <tr style="background:#f4f6f8"><td colspan="9" style="text-align:right"><b>제안 합계</b></td>
-      <td class="num"><b style="color:${sumAll===100?'#166534':'#dc2626'}">${sumAll}%</b>${sumAll!==100?' <span class="note" style="color:#dc2626">≠100% — 비중을 맞춰주세요</span>':''}</td>
-      <td class="num"><b>${fmtAmt(manTotal()*sumAll/100)}</b></td></tr>`;})()}</tbody></table>
+      <td class="num"><b>${fmtAmt(manTotal()*cashSug/100)}</b></td>${holdCell('cash')}${diffCell('cash',manTotal()*cashSug/100)}</tr>
+      ${(()=>{const held=Object.values(holdW).reduce((s,v)=>s+(+v||0),0);
+        const dsum=manTotal()*sumAll/100-held;
+        return `<tr style="background:#f4f6f8"><td colspan="9" style="text-align:right"><b>제안 합계</b></td>
+      <td class="num"><b style="color:${sumAll===100?'#166534':'#dc2626'}">${sumAll}%</b>${sumAll!==100?' <span class="note" style="color:#dc2626">≠100%</span>':''}</td>
+      <td class="num"><b>${fmtAmt(manTotal()*sumAll/100)}</b></td>
+      <td class="num"><b title="입력한 현재 보유 합계">${held?fmtAmt(held):'—'}</b></td>
+      <td class="num">${held?`<b style="color:${dsum>0?'#16a34a':'#dc2626'}" title="제안 합계 − 현재 보유 합계">${dsum>0?'+':'−'}${fmtAmt(Math.abs(dsum))}</b>`:'—'}</td></tr>`;})()}`;})()}</tbody></table>
       <div class="note" style="margin-top:5px">${E(D.note||'')}</div>`;
     $('pf_alloc').querySelectorAll('[data-tk]').forEach(tr=>tr.onclick=()=>{cur=tr.dataset.tk;sel=[];view=null;render();});
     /* 프리셋·기본비중 조절 */
@@ -294,6 +318,11 @@
       saveBase(); render();});
     {const rb=$('pf_bwrst'); if(rb) rb.onclick=()=>{customW={};saveBase();render();};}
     {const ai=$('pf_amt'); if(ai) ai.onchange=()=>{totAmt=Math.max(0,+ai.value||0);saveBase();render();};}
+    $('pf_alloc').querySelectorAll('[data-hd]').forEach(inp=>inp.onchange=()=>{
+      const k=inp.dataset.hd, v=+inp.value;
+      if(!inp.value) delete holdW[k];
+      else holdW[k]=Math.max(0,amtCur==='usd'?v*fxNow()/10000:v);   // 만원으로 저장
+      saveBase(); render();});
     $('pf_alloc').querySelectorAll('[data-cur]').forEach(b=>b.onclick=()=>{
       const to=b.dataset.cur;
       if(to!==amtCur){                            // 통화 전환 시 금액도 환산해 이어준다
@@ -356,7 +385,9 @@
       body+=`<tr style="background:#f4f6f8"><td colspan="${3+HZS.length*2+1+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
     const wSum=has12?Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(k),0):1;
-    $('pf_ind').innerHTML=`${hasAdj?`<div style="text-align:right;margin:1px 0"><button id="pf_rst2" style="${bsty}" title="가중치 배수·지표값 시나리오를 모두 원상복구 (전 지수 반영)">⟲ 조절 전체 초기화</button></div>`:''}
+    $('pf_ind').innerHTML=`${hasAdj?`<div style="text-align:right;margin:1px 0">
+      <button id="pf_crisis" style="${bsty};${crisisOn()?'background:#dc2626;color:#fff;border-color:#dc2626':''}" title="위기 국면 전형 신호를 한 번에 가정: VIX▲ · 신용스프레드▲ · 장단기금리차▼ · 실업청구▲ · 소비심리▼ (각 1σ, 전 지수 예측·비중 반영. 다시 누르면 해제)">⚠ 위기 시나리오</button>
+      <button id="pf_rst2" style="${bsty}" title="가중치 배수·지표값 시나리오를 모두 원상복구 (전 지수 반영)">⟲ 조절 전체 초기화</button></div>`:''}
       <table style="font-size:11px"><thead><tr><th title="클릭=차트 겹쳐보기 · 마우스 올리면 출처">지표</th>
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용, 선행 아님)">시차</th>
       <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${
@@ -386,6 +417,7 @@
       applyAdjustAll(); render();});
     {const rb=$('pf_rst'); if(rb) rb.onclick=()=>{resetAdjust();render();};}
     {const rb=$('pf_rst2'); if(rb) rb.onclick=()=>{resetAdjust();render();};}
+    {const cb=$('pf_crisis'); if(cb) cb.onclick=()=>{toggleCrisis();render();};}
     /* ── ④ 백테스트 표 ── */
     const bh=(tg.bt||{}).by_h||{};
     /* (2026-08-23) 전 지수 평균 스킬·방향 — 신뢰불가 자산(MAPE>50%, BTC 등)은 평균에서 제외 */
@@ -397,7 +429,15 @@
         if(b2.hit!=null) hi.push(b2.hit);}
       return {sk:sk.length?sk.reduce((a,c)=>a+c,0)/sk.length:null,
               hi:hi.length?hi.reduce((a,c)=>a+c,0)/hi.length:null};};
-    $('pf_bt').innerHTML=`<div class="note" style="margin-bottom:3px">MAPE·단순예측 오차·방향적중·스킬·보정계수 = <b>${E(tg.label)}</b> 기준 · '전지수' 두 열만 12개 자산 평균(신뢰불가 제외)</div>
+    /* (2026-08-23) 급락 확률 게이지 — 로지스틱(12개월 내 -20% 드로다운), 평균경로 예측과 별도 */
+    const cr=tg.crash;
+    const crHtml=cr?(()=>{const ratio=cr.base>0?cr.p/cr.base:1;
+      const col=ratio<1?'#16a34a':(ratio<2?'#b45309':'#dc2626');
+      return `<div style="border:1px solid #e5e8ec;border-radius:8px;padding:7px 12px;margin-bottom:8px;background:#fff">
+      <b>⚠ ${E(tg.label)} 급락 확률</b> <span class="note">(12개월 내 -20% 드로다운 · 로지스틱, VIX·신용스프레드·금리차·실업청구·소비심리 등 ${Object.keys(cr.beta||{}).length}개 지표)</span><br>
+      현재 <b style="font-size:16px;color:${col}">${cr.p}%</b>
+      <span class="note">· 역사 평균 ${cr.base}% (표본 ${cr.n}개월 중 급락상태 ${cr.ev}회) · 신호 상위 20% 구간의 실제 급락률 ${cr.top}% — 표본 내 참고치</span></div>`;})():'';
+    $('pf_bt').innerHTML=crHtml+`<div class="note" style="margin-bottom:3px">MAPE·단순예측 오차·방향적중·스킬·보정계수 = <b>${E(tg.label)}</b> 기준 · '전지수' 두 열만 12개 자산 평균(신뢰불가 제외)</div>
       <table><thead><tr><th>지평</th><th style="text-align:right" title="선택한 지수의 예측가격이 실제와 평균 몇 % 어긋났나">평균 오차(MAPE)</th>
       <th style="text-align:right" title="'변동 없음'이라고 찍었을 때의 오차 — 이보다 작아야 의미">단순예측 오차</th>
       <th style="text-align:right" title="예측 변화율 대비 실제 실현 비율 — 예측선에 곱해져 있음">보정계수</th>
