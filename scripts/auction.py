@@ -277,6 +277,38 @@ def main():
                            for t in ts] for r in regs}
     out["labels"]["open_all"] = "경매 개시(임의+강제)"
 
+    # ── (2026-08-23) 기존 파일 병합 — 일일 실행이 백필을 덮어쓰는 사고 방지 ──
+    #   등기 API 는 최근 3년, 법원 매각통계 일일 모드는 4년치만 받는다. 겹치는 달은
+    #   새 값을 쓰고, 이번에 못 받은 과거 달은 기존 파일 값을 보존한다.
+    #   실측 사고(2026-08-23): 크론이 --full 백필(2010~, 106KB)을 2022~ 30KB 로 덮어써
+    #   낙찰가율 시차 탐색이 표본 부족(53개월·최소겹침 48)으로 0~5개월에 갇혔다
+    #   → 시차 5M·r -0.39 오염(원래 2010~ 전체로는 r +0.613).
+    old = {}
+    if OUT.exists():
+        try:
+            old = json.loads(OUT.read_text(encoding="utf-8"))
+        except Exception:
+            old = {}
+    oldt = old.get("t") or []
+    if oldt and ts:
+        mts = sorted(set(oldt) | set(ts))
+        oidx = {t: i for i, t in enumerate(oldt)}
+        nidx = {t: i for i, t in enumerate(ts)}
+        is_series = lambda v: isinstance(v, dict) and any(isinstance(x, list) for x in v.values())
+        for k in {k for k, v in old.items() if is_series(v)} | {k for k, v in out.items() if is_series(v)}:
+            ov, nv = old.get(k) or {}, out.get(k) or {}
+            merged = {}
+            for r in set(ov) | set(nv):
+                oa, na = ov.get(r) or [], nv.get(r) or []
+                merged[r] = [na[nidx[t]] if (t in nidx and nidx[t] < len(na) and na[nidx[t]] is not None)
+                             else (oa[oidx[t]] if (t in oidx and oidx[t] < len(oa)) else None)
+                             for t in mts]
+            out[k] = merged
+        lb = dict(old.get("labels") or {})
+        lb.update(out.get("labels") or {})
+        out["labels"] = lb
+        out["t"] = ts = mts
+
     DB.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     a = out["open_all"]["전국"]
