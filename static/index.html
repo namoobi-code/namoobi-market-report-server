@@ -1056,9 +1056,10 @@
     <div id="pf_ctl" style="margin-bottom:6px"></div>
     <!-- (2026-08-23) 차트 오른쪽에 지표 표 — 가로 flex. flex:0 0 auto/min-height 는
          .pane(세로 flex)이 자식을 압축해 높이가 무시되는 문제(실측) 방지 -->
-    <div style="display:flex;gap:10px;align-items:stretch;flex:0 0 auto">
-      <canvas id="pf_cv" style="flex:1 1 auto;min-width:0;height:520px;min-height:520px;background:#fff;border:1px solid #e5e8ec;border-radius:8px;cursor:crosshair"></canvas>
-      <div style="flex:0 0 430px;height:520px;overflow:auto;border:1px solid #e5e8ec;border-radius:8px;padding:4px 8px;background:#fff">
+<!-- (2026-08-23) 높이 = 뷰포트 채움: 스크롤해서 차트를 맨 위에 두면 화면 아래 끝까지 찬다 -->
+    <div style="display:flex;gap:10px;align-items:stretch;flex:0 0 auto;height:calc(100vh - 175px);min-height:520px">
+      <canvas id="pf_cv" style="flex:1 1 auto;min-width:0;height:100%;background:#fff;border:1px solid #e5e8ec;border-radius:8px;cursor:crosshair"></canvas>
+      <div style="flex:0 0 430px;height:100%;overflow:auto;border:1px solid #e5e8ec;border-radius:8px;padding:4px 8px;background:#fff;box-sizing:border-box">
         <h3 style="margin:6px 0;font-size:13px">선행지표 상관(r)·시차·가중치</h3><div id="pf_ind"></div>
       </div>
     </div>
