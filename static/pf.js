@@ -9,19 +9,23 @@
   /* (2026-08-23) 가중치 조절·시나리오 — 서버가 저장한 지표별 기여도(cont)·β 로
      g' = calib × (base + Σ m_k·(cont_k + s_k·β_k)) 를 클라이언트에서 정확히 재계산.
      m_k = 가중치 배수(기본 1, ±0.1), s_k = 시나리오(+1 지표 1σ 오름 / -1 내림 / 0 기본) */
+  /* (2026-08-23) 조절은 지표 키 기준 **전역** — 같은 지표를 쓰는 모든 지수에 동시 적용
+     (예: CPI ▲ 를 켜면 S&P500·나스닥·금·채권 등 CPI 가 들어가는 모든 예측이 재계산) */
   let mulAll={}, scAll={};
-  const mulOf=(tk,k)=>((mulAll[tk]||{})[k]??1);
-  const scOf=(tk,k)=>((scAll[tk]||{})[k]??0);
-  const isAdj=tk=>Object.values(mulAll[tk]||{}).some(v=>v!==1)||Object.values(scAll[tk]||{}).some(v=>v!==0);
+  const mulOf=k=>mulAll[k]??1;
+  const scOf=k=>scAll[k]??0;
+  const isAdj=tk=>{const tg=D.targets[tk]||{};
+    const p=((tg._p0||tg.pred||{})[12]||{}).cont;
+    return !!p&&Object.keys(p).some(k=>mulOf(k)!==1||scOf(k)!==0);};
 
   function applyAdjust(tk){
     const tg=D.targets[tk]; if(!tg||!tg.pred) return;
     if(!tg._p0){tg._p0=JSON.parse(JSON.stringify(tg.pred));tg._f0=JSON.parse(JSON.stringify(tg.fut));}
-    const m=mulAll[tk]||{}, s=scAll[tk]||{}, basePx=tg.hist[tg.past];
+    const basePx=tg.hist[tg.past];
     for(const h in tg._p0){const p0=tg._p0[h];
       if(!p0.cont){tg.pred[h]=p0;continue;}
       let raw=p0.base;
-      for(const k in p0.cont) raw+=(m[k]??1)*(p0.cont[k]+((s[k]??0)*(p0.beta?.[k]??0)));
+      for(const k in p0.cont) raw+=mulOf(k)*(p0.cont[k]+(scOf(k)*(p0.beta?.[k]??0)));
       const g=Math.max(-1.2,Math.min(1.2,raw*(p0.calib??1)));
       const pr=basePx*Math.exp(g), sd=p0.bsd??0.05, j=tg.past+ +h;
       tg.pred[h]={...p0,g:+g.toFixed(4),price:+pr.toFixed(2)};
@@ -30,9 +34,10 @@
       tg.fut.hi[j]=+(pr*Math.exp(1.28*sd)).toFixed(2);
     }
   }
-  function resetAdjust(tk){delete mulAll[tk];delete scAll[tk];
-    const tg=D.targets[tk];
-    if(tg&&tg._p0){tg.pred=JSON.parse(JSON.stringify(tg._p0));tg.fut=JSON.parse(JSON.stringify(tg._f0));}}
+  function applyAdjustAll(){for(const tk in D.targets) applyAdjust(tk);}
+  function resetAdjust(){mulAll={};scAll={};
+    for(const tk in D.targets){const tg=D.targets[tk];
+      if(tg&&tg._p0){tg.pred=JSON.parse(JSON.stringify(tg._p0));tg.fut=JSON.parse(JSON.stringify(tg._f0));}}}
   const COLS=['#b45309','#0e7490','#7c3aed','#be185d','#166534','#4338ca','#dc2626'];
   const AXW=58;
 
@@ -235,7 +240,7 @@
     const bsty='padding:0 3px;font-size:10.5px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
     /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
-      const mv=mulOf(cur,k), sv=scOf(cur,k);
+      const mv=mulOf(k), sv=scOf(k);
       const hzCells=HZS.map(h=>`<td class="num">${l['lag'+h]!=null?l['lag'+h]+'M':'—'}</td>
         <td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`).join('');
       const adjCell=hasAdj?`<td class="num" style="white-space:nowrap">
@@ -262,8 +267,9 @@
     if(rest.length)
       body+=`<tr style="background:#f4f6f8"><td colspan="${3+HZS.length*2+1+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
-    const wSum=has12?Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(cur,k),0):1;
-    $('pf_ind').innerHTML=`<table style="font-size:11px"><thead><tr><th title="클릭=차트 겹쳐보기 · 마우스 올리면 출처">지표</th>
+    const wSum=has12?Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(k),0):1;
+    $('pf_ind').innerHTML=`${hasAdj?`<div style="text-align:right;margin:1px 0"><button id="pf_rst2" style="${bsty}" title="가중치 배수·지표값 시나리오를 모두 원상복구 (전 지수 반영)">⟲ 조절 전체 초기화</button></div>`:''}
+      <table style="font-size:11px"><thead><tr><th title="클릭=차트 겹쳐보기 · 마우스 올리면 출처">지표</th>
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용, 선행 아님)">시차</th>
       <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${
       HZS.map(h=>`<th style="text-align:right" title="${h}개월 예측에 출전 가능한 시차(≥${h}개월) 중 상관 최대 지점">${h}M</th>
@@ -284,15 +290,14 @@
     /* 조절 버튼 — 행 클릭(오버레이 토글)과 분리 */
     $('pf_ind').querySelectorAll('[data-mm]').forEach(b=>b.onclick=e=>{e.stopPropagation();
       const k=b.dataset.mm, d=+b.dataset.d;
-      mulAll[cur]=mulAll[cur]||{};
-      mulAll[cur][k]=Math.max(0,Math.min(3,+((mulOf(cur,k)+d*0.1).toFixed(1))));
-      applyAdjust(cur); render();});
+      mulAll[k]=Math.max(0,Math.min(3,+((mulOf(k)+d*0.1).toFixed(1))));
+      applyAdjustAll(); render();});               // 전 지수 동시 재계산
     $('pf_ind').querySelectorAll('[data-ms]').forEach(b=>b.onclick=e=>{e.stopPropagation();
       const k=b.dataset.ms, s=+b.dataset.s;
-      scAll[cur]=scAll[cur]||{};
-      scAll[cur][k]=(scOf(cur,k)===s)?0:s;         // 같은 버튼 다시 누르면 해제
-      applyAdjust(cur); render();});
-    {const rb=$('pf_rst'); if(rb) rb.onclick=()=>{resetAdjust(cur);render();};}
+      scAll[k]=(scOf(k)===s)?0:s;                  // 같은 버튼 다시 누르면 해제
+      applyAdjustAll(); render();});
+    {const rb=$('pf_rst'); if(rb) rb.onclick=()=>{resetAdjust();render();};}
+    {const rb=$('pf_rst2'); if(rb) rb.onclick=()=>{resetAdjust();render();};}
     /* ── ④ 백테스트 표 ── */
     const bh=(tg.bt||{}).by_h||{};
     /* (2026-08-23) 전 지수 평균 스킬·방향 — 신뢰불가 자산(MAPE>50%, BTC 등)은 평균에서 제외 */
