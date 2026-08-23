@@ -269,13 +269,23 @@
       const bad=g12!=null&&((tg.bt||{}).mape==null||(tg.bt||{}).mape>50);
       const adj=isAdj(a.key);
       const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}${adj?';text-decoration:underline dotted':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':(adj?'title="가중치·시나리오 조절 반영값"':'')}>${bad?'⚠ ':''}${adj?'✎ ':''}${v>0?'+':''}${v}%</span>`;
-      /* (2026-08-24) 급락 확률(현재·역사평균) 열 — 로지스틱 모델 산출 */
+      /* (2026-08-24) 급락 확률(현재·추세·역사평균) 열 — 로지스틱 모델 산출 + 일별 적재 스파크라인 */
       const cr2=tg.crash;
-      const crCell=cr2&&cr2.na?`<td class="num" colspan="2"><span class="note" title="표본 ${cr2.n}개월 동안 12개월 내 -20% 드로다운이 ${cr2.ev}회뿐 — 이 자산은 정의상 '급락'을 사실상 하지 않음(채권류)">급락이력 없음</span></td>`
+      const dsp=(()=>{const h=((D.crash_hist||{})[a.key]||[]);
+        if(h.length<2)return `<span class="note" title="일별 이력 ${h.length}일치 — 2일치부터 그래프 표시 (매일 05:20 적재 중)">적재중</span>`;
+        const W=76,H=20,p=2,vs=h.map(x=>x[1]);
+        let lo=Math.min(...vs),hi=Math.max(...vs);
+        if(hi-lo<0.2){const m=(hi+lo)/2;lo=m-0.1;hi=m+0.1;}
+        const X=i=>p+(W-2*p)*i/(h.length-1),Y=v=>p+(H-2*p)*(1-(v-lo)/(hi-lo));
+        const up=h[h.length-1][1]>h[0][1];
+        return `<svg width="${W}" height="${H}" style="vertical-align:middle" title="${h[0][0]}~${h[h.length-1][0]} 일별 급락확률 추세">
+          <polyline points="${h.map((x,i)=>X(i).toFixed(1)+','+Y(x[1]).toFixed(1)).join(' ')}" fill="none" stroke="${up?'#dc2626':'#16a34a'}" stroke-width="1.2"/>
+          <circle cx="${X(h.length-1)}" cy="${Y(h[h.length-1][1])}" r="1.8" fill="${up?'#dc2626':'#16a34a'}"/></svg>`;})();
+      const crCell=cr2&&cr2.na?`<td class="num" colspan="3"><span class="note" title="표본 ${cr2.n}개월 동안 12개월 내 -20% 드로다운이 ${cr2.ev}회뿐 — 이 자산은 정의상 '급락'을 사실상 하지 않음(채권류)">급락이력 없음</span></td>`
       :cr2?(()=>{const ratio=cr2.base>0?cr2.p/cr2.base:1;
         const col=ratio<1?'#16a34a':(ratio<2?'#b45309':'#dc2626');
-        return `<td class="num"><b style="color:${col}" title="12개월 내 -20% 드로다운 확률 (로지스틱 · 역사평균 대비 ${ratio.toFixed(1)}배)">${cr2.p}%</b></td><td class="num"><span class="note">${cr2.base}%</span></td>`;})()
-        :'<td class="num">—</td><td class="num">—</td>';
+        return `<td class="num"><b style="color:${col}" title="12개월 내 -20% 드로다운 확률 (로지스틱 · 역사평균 대비 ${ratio.toFixed(1)}배)">${cr2.p}%</b></td><td class="num">${dsp}</td><td class="num"><span class="note">${cr2.base}%</span></td>`;})()
+        :'<td class="num">—</td><td class="num">—</td><td class="num">—</td>';
       return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
       <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>${crCell}
       <td class="num" style="white-space:nowrap"><button data-bw="${a.key}" data-d="-1" style="${bwsty}" onclick="event.stopPropagation()">−</button> <b${customW[a.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${a.key}" data-d="1" style="${bwsty}" onclick="event.stopPropagation()">＋</button></td>
@@ -288,7 +298,7 @@
     /* 개별전략 행 — 예측 없음, 기본비중 = 제안비중 (모델이 관여하지 않는 슬롯) */
     const customRows=CUSTOM.map(c=>{
       const bw=baseOf(c.key); tot+=bw;
-      return `<tr><td><b>${E(c.asset)}</b></td><td>${E(c.etf)}</td><td class="num">—</td><td class="num">—</td>
+      return `<tr><td><b>${E(c.asset)}</b></td><td>${E(c.etf)}</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num" style="white-space:nowrap"><button data-bw="${c.key}" data-d="-1" style="${bwsty}">−</button> <b${customW[c.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${c.key}" data-d="1" style="${bwsty}">＋</button></td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
@@ -298,6 +308,7 @@
       -CUSTOM.reduce((s,c)=>s+baseOf(c.key),0));
     $('pf_alloc').innerHTML=presetBar+`<table><thead><tr><th>자산</th><th>매수 상품</th>
       <th style="text-align:right" title="12개월 내 -20% 드로다운 확률 — 로지스틱(VIX·신용스프레드·금리차·실업청구 등)">급락확률</th>
+      <th style="text-align:right" title="일별 적재된 급락확률 추세 (매일 05:20 저장 · 2일치부터 표시)">추세</th>
       <th style="text-align:right" title="역사 평균 급락 확률 — 현재값이 이보다 높으면 경계">역사평균</th>
       <th style="text-align:right">기본 비중</th>
       <th style="text-align:right">1M 예측</th><th style="text-align:right">3M 예측</th><th style="text-align:right">6M 예측</th>
@@ -312,7 +323,7 @@
       const cashSug=customW.cash!=null?customW.cash:Math.max(0,100-tot);
       lastCash=cashSug;                           // 현금 −/＋ 시작점 갱신
       const sumAll=tot+cashSug;
-      return `<tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (KODEX단기채·통안채 등)</td><td class="num">—</td><td class="num">—</td>
+      return `<tr><td><b>현금·단기채</b></td><td>파킹/머니마켓 (KODEX단기채·통안채 등)</td><td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num" style="white-space:nowrap"><button data-bw="cash" data-d="-1" style="${bwsty}">−</button> <b${customW.cash!=null?' style="color:#b45309"':''}>${customW.cash!=null?customW.cash:cashBase}%</b> <button data-bw="cash" data-d="1" style="${bwsty}">＋</button> ${customW.cash==null?'<span class="note">잔여 자동</span>':''}</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${cashSug}%</b></td>
@@ -463,10 +474,8 @@
       <b>⚠ ${E(tg.label)} 급락 확률</b> <span class="note">— 표본 ${cr.n}개월 동안 12개월 내 -20% 드로다운이 ${cr.ev}회뿐이라 모델 불필요(이 자산은 정의상 급락을 사실상 하지 않음)</span></div>`
     :cr?(()=>{const ratio=cr.base>0?cr.p/cr.base:1;
       const col=ratio<1?'#16a34a':(ratio<2?'#b45309':'#dc2626');
-      /* (2026-08-24) 추세 스파크라인 — 월별 소급(모델 재현) + 일별 적재를 이어 그린다 */
-      const mh=(cr.hist||[]).map(x=>[x[0].slice(0,4)+'-'+x[0].slice(4,6),x[1]]);
-      const dh=((D.crash_hist||{})[cur]||[]).filter(x=>!mh.length||x[0].slice(0,7)>mh[mh.length-1][0]);
-      const hist=[...mh,...dh];
+      /* (2026-08-24) 추세 스파크라인 — 매일 05:20 적재되는 일별 확률 시계열 */
+      const hist=((D.crash_hist||{})[cur]||[]);
       let spark='';
       if(hist.length>=2){
         const W2=300,H2=42,pad=4;
@@ -480,7 +489,7 @@
           <line x1="${pad}" y1="${Y2(cr.base)}" x2="${W2-pad}" y2="${Y2(cr.base)}" stroke="#c8ced6" stroke-dasharray="3,3"/>
           <polyline points="${pts}" fill="none" stroke="${col}" stroke-width="1.6"/>
           <circle cx="${X2(hist.length-1)}" cy="${Y2(hist[hist.length-1][1])}" r="2.5" fill="${col}"/></svg>
-          <span class="note">${hist[0][0]}~${hist[hist.length-1][0]} 월별 추세(모델 소급·참고치, 점선=역사평균) · 이후 일별 적재로 이어짐</span>`;
+          <span class="note">${hist[0][0]}~${hist[hist.length-1][0]} 일별 추세 (매일 05:20 적재 · 점선=역사평균)</span>`;
       }else spark='<span class="note" style="margin-left:8px">추세 그래프는 이력 2일치부터 표시 — 매일 05:20 적재 중</span>';
       return `<div style="border:1px solid #e5e8ec;border-radius:8px;padding:7px 12px;margin-bottom:8px;background:#fff">
       <b>⚠ ${E(tg.label)} 급락 확률</b> <span class="note">(12개월 내 -20% 드로다운 · 로지스틱, VIX·신용스프레드·금리차·실업청구·소비심리 등 ${Object.keys(cr.beta||{}).length}개 지표)</span><br>
