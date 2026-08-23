@@ -1054,11 +1054,16 @@
     <div id="pf_alloc" style="margin-bottom:10px"><div class="note">불러오는 중…</div></div>
     <div id="pf_tg" style="margin-bottom:6px"></div>
     <div id="pf_ctl" style="margin-bottom:6px"></div>
-    <!-- flex:0 0 auto — .pane(세로 flex)이 직계 자식을 압축해 높이가 무시되는 문제(실측) 방지 -->
-    <canvas id="pf_cv" style="width:100%;height:520px;min-height:520px;flex:0 0 auto;background:#fff;border:1px solid #e5e8ec;border-radius:8px;cursor:crosshair"></canvas>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;align-items:flex-start">
-      <div style="flex:1;min-width:460px"><h3 style="margin:4px 0">선행지표 상관(r)·시차·가중치</h3><div id="pf_ind"></div></div>
-      <div style="flex:0 0 420px"><h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="pf_bt"></div></div>
+    <!-- (2026-08-23) 차트 오른쪽에 지표 표 — 가로 flex. flex:0 0 auto/min-height 는
+         .pane(세로 flex)이 자식을 압축해 높이가 무시되는 문제(실측) 방지 -->
+    <div style="display:flex;gap:10px;align-items:stretch;flex:0 0 auto">
+      <canvas id="pf_cv" style="flex:1 1 auto;min-width:0;height:520px;min-height:520px;background:#fff;border:1px solid #e5e8ec;border-radius:8px;cursor:crosshair"></canvas>
+      <div style="flex:0 0 560px;height:520px;overflow:auto;border:1px solid #e5e8ec;border-radius:8px;padding:4px 10px;background:#fff">
+        <h3 style="margin:6px 0">선행지표 상관(r)·시차·가중치</h3><div id="pf_ind"></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;flex:0 0 auto;max-width:900px">
+      <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="pf_bt"></div>
     </div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
