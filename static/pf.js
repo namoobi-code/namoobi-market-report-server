@@ -171,9 +171,11 @@
     const tiltable=rowsA.filter(a=>a.sug!=null&&gL(a)!=null);
     const avg=tiltable.length?tiltable.reduce((s,a)=>s+gL(a),0)/tiltable.length:0;
     let tot=0;
+    const gh=(tg2,h)=>{const p=(tg2.pred||{})[h];return p?+(Math.exp(p.g)*100-100).toFixed(1):null;};
     const html=rowsA.map(a=>{
       const tg=D.targets[a.key]||{};
       const p12=(tg.pred||{})[12], p24=(tg.pred||{})[24];
+      const g1=gh(tg,1), g3=gh(tg,3), g6=gh(tg,6);
       const g12=p12?+(Math.exp(p12.g)*100-100).toFixed(1):a.g12;
       const g24=p24?+(Math.exp(p24.g)*100-100).toFixed(1):a.g24;
       let sug=null,tilt=null;
@@ -188,17 +190,22 @@
       return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
       <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
       <td class="num">${a.base==null?'—':a.base+'%'}</td>
+      <td class="num">${pv(g1)}</td><td class="num">${pv(g3)}</td><td class="num">${pv(g6)}</td>
       <td class="num" style="color:${g12>0?'#0f766e':(g12<0?'#b91c1c':'#666')}">${pv(g12)}</td>
+      <td class="num">${pv(gh(tg,18))}</td>
       <td class="num">${pv(g24)}</td>
       <td class="num"><b>${sug==null?'현금군':sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td></tr>`;}).join('');
     const cashBase=((D.alloc||[]).find(a=>a.key==='cash')||{}).base??15;
     $('pf_alloc').innerHTML=`<table><thead><tr><th>자산</th><th>매수 상품</th>
       <th style="text-align:right">기본 비중</th>
+      <th style="text-align:right">1M 예측</th><th style="text-align:right">3M 예측</th><th style="text-align:right">6M 예측</th>
       <th style="text-align:right" title="선행지표 릿지회귀 · 백테스트 보정계수 적용 후 (✎=조절 반영)">12M 예측</th>
+      <th style="text-align:right">18M 예측</th>
       <th style="text-align:right">24M 예측</th>
       <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th></tr></thead><tbody>${html}
       <tr><td><b>현금·단기채</b></td><td>파킹/머니마켓</td><td class="num">${cashBase}%</td>
-      <td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td></tr></tbody></table>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td></tr></tbody></table>
       <div class="note" style="margin-top:5px">${E(D.note||'')}</div>`;
     $('pf_alloc').querySelectorAll('[data-tk]').forEach(tr=>tr.onclick=()=>{cur=tr.dataset.tk;sel=[];view=null;render();});
     /* ── ② 지수 칩 + 컨트롤 ── */
@@ -222,26 +229,29 @@
       return `<span style="color:${v>0?'#16a34a':(v<0?'#dc2626':'#666')};opacity:${a<.2?.45:1};font-weight:${a>=.5?700:400}">${(+v).toFixed(3)}</span>`;};
     /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
     const has12=Object.values(lead).some(l=>l.r12!=null);   // 구 JSON 호환
+    const hasH=Object.values(lead).some(l=>l.r1!=null);     // 1·3·6M 열 있는 JSON
+    const HZS=[1,3,6,12,18,24].filter(h=>Object.values(lead).some(l=>l['r'+h]!=null));
     const hasAdj=!!(((tg.pred||{})[12]||{}).cont);          // 기여도 있는 JSON 만 조절 가능
     const bsty='padding:0 3px;font-size:10.5px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
     /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
       const mv=mulOf(cur,k), sv=scOf(cur,k);
+      const hzCells=HZS.map(h=>`<td class="num">${l['lag'+h]!=null?l['lag'+h]+'M':'—'}</td>
+        <td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`).join('');
       const adjCell=hasAdj?`<td class="num" style="white-space:nowrap">
         <button data-mm="${k}" data-d="-1" style="${bsty}" title="가중치 -0.1">−</button><b style="color:${mv!==1?'#b45309':'#333'}">${mv.toFixed(1)}</b><button data-mm="${k}" data-d="1" style="${bsty}" title="가중치 +0.1">＋</button>
         <button data-ms="${k}" data-s="1" style="${bsty};${sv===1?'background:#16a34a;color:#fff;border-color:#16a34a':''}" title="이 지표가 1σ 오른다고 가정">▲</button><button data-ms="${k}" data-s="-1" style="${bsty};${sv===-1?'background:#dc2626;color:#fff;border-color:#dc2626':''}" title="이 지표가 1σ 내린다고 가정">▼</button></td>`:'';
       return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}" title="${E(m.src||'')}">
       <td style="padding-left:${ind?16:4}px;white-space:nowrap">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)}</td>
       <td class="num">${l.lag}M</td>
-      <td class="num">${rc(l.corr)}</td>${has12?`<td class="num">${l.lag12!=null?l.lag12+'M':'—'}</td>
-      <td class="num">${l.r12!=null?rc(l.r12):'—'}</td>
+      <td class="num">${rc(l.corr)}</td>${hzCells}${HZS.length?`
       <td class="num"><b style="color:${mv!==1?'#b45309':''}">${l.w12!=null?(l.w12*mv*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`}${adjCell}</tr>`;};
     const gArr=(tg.groups||[]).slice().sort((a,b)=>Math.abs(b.corr)-Math.abs(a.corr));
     const used=new Set();
     let body=gArr.map(g=>{
       const mem=g.members.filter(k=>lead[k]).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
       mem.forEach(k=>used.add(k));
-      const NC=(has12?6:4)+(hasAdj?1:0);
+      const NC=3+HZS.length*2+1+(hasAdj?1:0);
       const pad=('<td class="num">—</td>').repeat(NC-3);
       return `<tr style="background:#f4f6f8"><td style="white-space:nowrap"><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개</span></td>
         <td class="num">${g.lag}M</td><td class="num">${rc(g.corr)}</td>${pad}</tr>`
@@ -250,14 +260,14 @@
     const rest=Object.keys(lead).filter(k=>!used.has(k))
       .sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
     if(rest.length)
-      body+=`<tr style="background:#f4f6f8"><td colspan="${(has12?6:4)+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
+      body+=`<tr style="background:#f4f6f8"><td colspan="${3+HZS.length*2+1+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
     const wSum=has12?Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(cur,k),0):1;
     $('pf_ind').innerHTML=`<table style="font-size:11px"><thead><tr><th title="클릭=차트 겹쳐보기 · 마우스 올리면 출처">지표</th>
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용, 선행 아님)">시차</th>
-      <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${has12?`
-      <th style="text-align:right" title="12개월 예측에 출전 가능한 시차(≥12개월) 중 상관 최대 지점">12M</th>
-      <th style="text-align:right" title="12개월 이상 선행 구간에서의 상관 — 동행지표는 여기서 뚝 떨어진다">12M r</th>
+      <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${
+      HZS.map(h=>`<th style="text-align:right" title="${h}개월 예측에 출전 가능한 시차(≥${h}개월) 중 상관 최대 지점">${h}M</th>
+      <th style="text-align:right" title="${h}개월 이상 선행 구간에서의 상관 — 동행지표는 먼 지평에서 뚝 떨어진다">${h}M r</th>`).join('')}${has12?`
       <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력. 조절 배수 반영">가중치</th>`:`
       <th style="text-align:right">가중치</th>`}${hasAdj?`
       <th style="text-align:right" title="−/＋ = 가중치 배수 ±0.1 (예측 기여를 그 배수만큼) · ▲/▼ = 이 지표가 1σ 오름/내림 가정 시나리오. 바꾸면 차트 예측선·비중 제안이 즉시 재계산">조절</th>`:''}</tr></thead><tbody>${body}</tbody></table>${

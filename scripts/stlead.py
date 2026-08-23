@@ -299,10 +299,11 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
         lead = lags_for(feat, ytr, keys)
         # (2026-08-23) 표시용 가중치를 '12개월 예측 기준'으로 — 전구간 최적 r(시차 0 포함)로
         # 가중치를 매기면 동행지표(소매판매 등)가 크게 보여 "예측 기여"로 오해된다(사용자 지적).
-        # 12M 예측에 실제 출전하는 시차(≥12개월)에서의 r 로 별도 산출한다.
+        # 지평별(1·3·6·12M) 출전 시차(≥h)에서의 r 을 각각 산출해 표에 보여준다.
         for k in keys:
-            L12, c12 = relead.best_lag_ge(feat[k], ytr, 12)
-            lead[k]["lag12"], lead[k]["r12"] = L12, round(c12, 3)
+            for hh in (1, 3, 6, 12, 18, 24):
+                Lh, ch = relead.best_lag_ge(feat[k], ytr, hh)
+                lead[k][f"lag{hh}"], lead[k][f"r{hh}"] = Lh, round(ch, 3)
         wsum = sum(abs(lead[k]["corr"]) for k in keys) or 1.0
         w12s = sum(abs(lead[k]["r12"]) for k in keys) or 1.0
         for k in keys:
