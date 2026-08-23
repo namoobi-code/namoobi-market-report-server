@@ -161,20 +161,31 @@
     $('pf_pred').onclick=()=>{showPred=!showPred;render();};
     /* ── ③ 지표 표 (그룹 통합 r + 개별 r·가중치) ── */
     const lead=tg.lead||{};
-    const rows=Object.keys(lead).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
     const rc=v=>`<span style="color:${Math.abs(v)>=.5?(v>0?'#0f766e':'#b91c1c'):'#666'};font-weight:${Math.abs(v)>=.5?700:400}">${(+v).toFixed(3)}</span>`;
+    /* (2026-08-23) 통합 행 바로 아래에 그 그룹의 개별 지표를 들여쓰기로 붙인다 */
+    const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
+      return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}">
+      <td style="padding-left:${ind?22:8}px">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)} <span class="note">${E(m.src||'')}</span></td>
+      <td>${E(m.group||'')}</td><td class="num">${l.lag}개월</td>
+      <td class="num">${rc(l.corr)}</td><td class="num">${(l.w*100).toFixed(1)}%</td></tr>`;};
+    const gArr=(tg.groups||[]).slice().sort((a,b)=>Math.abs(b.corr)-Math.abs(a.corr));
+    const used=new Set();
+    let body=gArr.map(g=>{
+      const mem=g.members.filter(k=>lead[k]).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
+      mem.forEach(k=>used.add(k));
+      return `<tr style="background:#f4f6f8"><td><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개 합성 — 아래 개별</span></td>
+        <td>${E(g.name)}</td><td class="num">${g.lag}개월</td><td class="num">${rc(g.corr)}</td><td class="num">—</td></tr>`
+        +mem.map(k=>indRow(k,true)).join('');
+    }).join('');
+    const rest=Object.keys(lead).filter(k=>!used.has(k))
+      .sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
+    if(rest.length)
+      body+=`<tr style="background:#f4f6f8"><td colspan="5"><b>▣ 단독 지표</b> <span class="note">그룹 미구성(2개 미만)</span></td></tr>`
+        +rest.map(k=>indRow(k,true)).join('');
     $('pf_ind').innerHTML=`<table><thead><tr><th>지표 <span class="note">(클릭=차트 겹쳐보기)</span></th><th>그룹</th>
       <th style="text-align:right" title="지표가 몇 개월 선행하는지 — 전 구간 상관 최대 시차">시차</th>
       <th style="text-align:right" title="시차 적용 후 지수 전년비 성장률과의 상관계수">r</th>
-      <th style="text-align:right" title="|r| 정규화 — 예측 회귀에서의 상대 영향력 표시용(실제 계수는 지평별 릿지가 산출)">가중치</th></tr></thead><tbody>${
-      (tg.groups||[]).map(g=>`<tr style="background:#f4f6f8"><td><b>▣ ${E(g.name)} 통합</b> <span class="note">${g.members.length}개 합성</span></td>
-        <td>${E(g.name)}</td><td class="num">${g.lag}개월</td><td class="num">${rc(g.corr)}</td><td class="num">—</td></tr>`).join('')
-      }${rows.map(k=>{const l=lead[k],m=D.meta[k]||{};
-        const on=sel.includes(k);
-        return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}">
-        <td>${on?'✔ ':''}${E(m.label||k)} <span class="note">${E(m.src||'')}</span></td>
-        <td>${E(m.group||'')}</td><td class="num">${l.lag}개월</td>
-        <td class="num">${rc(l.corr)}</td><td class="num">${(l.w*100).toFixed(1)}%</td></tr>`;}).join('')}</tbody></table>`;
+      <th style="text-align:right" title="|r| 정규화 — 예측 회귀에서의 상대 영향력 표시용(실제 계수는 지평별 릿지가 산출)">가중치</th></tr></thead><tbody>${body}</tbody></table>`;
     $('pf_ind').querySelectorAll('[data-i]').forEach(tr=>tr.onclick=()=>{
       const k=tr.dataset.i;
       sel=sel.includes(k)?sel.filter(x=>x!==k):(sel.length>=6?sel:[...sel,k]);
