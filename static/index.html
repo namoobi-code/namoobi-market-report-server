@@ -64,6 +64,8 @@
   #ap_main{height:520px!important;max-height:none!important}   /* 단지별 실거래 대형차트 — 동일 캡 해제 */
   /* (2026-08-23) Portfolio 차트 — 동일 캡 해제 + 뷰포트 채움 (JS 3회 수정이 다 이 전역 캡에 눌렸었다) */
   #pf_cv{height:calc(100vh - 200px)!important;min-height:520px!important;max-height:none!important}
+  /* (2026-08-23) 지표표 압축 — 지평 열 12개 추가로 가로 스크롤 발생 → 셀 패딩·폰트 축소 */
+  #pf_ind td,#pf_ind th{padding:3px 4px!important;font-size:10.5px!important;white-space:nowrap}
   #ms_unsold,#ms_pipe{height:300px!important;max-height:none!important} /* 주택 공급 차트 — 동일 캡 해제 */
   #et_main{height:340px!important;max-height:none!important}            /* 비아파트 실거래 — 동일 캡 해제 */
   #ah_main{height:320px!important;max-height:none!important}            /* 청약경쟁률 — 동일 캡 해제 */
