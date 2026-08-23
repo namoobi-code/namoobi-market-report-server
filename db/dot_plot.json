@@ -1,8 +1,7 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-22",
+ "as_of": "2026-08-23",
  "data": {
-  "summary": "2026년 6월 SEP(점도표)에서 2026년말 중간값이 3월 3.4%→3.8%로 매파적 상향(18명 중 9명 연내 1회 이상 인상 전망). 2027·2028년말·장기중립은 비교적 안정.",
   "rows": [
    {
     "year": "2026년말",
@@ -29,15 +28,8 @@
     "change": ""
    }
   ],
-  "policy_rate": "3.50~3.75%(2026-07-29 FOMC 동결, 5회 연속)",
-  "next_meeting": "2026-09-15~16(SEP 점도표 발표 예정)",
-  "sources": [
-   {
-    "source": "federalreserve.gov FOMC statement·SEP 2026-06-17"
-   },
-   {
-    "source": "federalreserve.gov FOMC statement·SEP 2026-03-18"
-   }
-  ]
+  "asof": "2026-06-17",
+  "source": "federalreserve.gov FOMC SEP 2026-06-17(jun), FOMC SEP 2026-03-18(mar)",
+  "note": "2026년 6월 SEP(최신, 다음 SEP는 2026-09-15~16 회의에서 발표 예정)에서 2026년말 중간값이 3월 3.4%→6월 3.8%로 매파적 상향(18명 중 9명 연내 1회 이상 인상 전망, Kevin Warsh 신임 의장 첫 회의). 2027·2028년말·장기중립은 비교적 안정적."
  }
 }
