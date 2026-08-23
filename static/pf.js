@@ -9,6 +9,31 @@
   /* (2026-08-23) 가중치 조절·시나리오 — 서버가 저장한 지표별 기여도(cont)·β 로
      g' = calib × (base + Σ m_k·(cont_k + s_k·β_k)) 를 클라이언트에서 정확히 재계산.
      m_k = 가중치 배수(기본 1, ±0.1), s_k = 시나리오(+1 지표 1σ 오름 / -1 내림 / 0 기본) */
+  /* (2026-08-23) 기본 비중 프리셋 — 2006.12~2026.08 월 리밸런싱 백테스트 실측(지수 기준·배당 미포함).
+     사용자가 선택하고, 행별 −/＋(1%p)로 직접 조절도 가능. 현금은 잔여. localStorage 저장. */
+  const PRESETS={
+    A:{label:'A 현행',   stat:'연 10.5% · 낙폭 -42%', w:{spx:35,ndx:20,sox:10,ks200:10,dvy:10}},
+    F:{label:'F 균형+금', stat:'연 11.0% · 낙폭 -42%', w:{spx:35,ndx:20,sox:10,ks200:10,dvy:10,gold:5}},
+    B:{label:'B 방어',   stat:'연 9.6% · 낙폭 -33%',  w:{spx:30,ndx:15,sox:5,ks200:10,dvy:10,gold:10,tlt:5}},
+    D:{label:'D 공격',   stat:'연 13.0% · 낙폭 -44%', w:{ndx:40,spx:25,sox:15,ks200:10}},
+  };
+  let curPreset='A', customW={}, totAmt=50000, amtCur='krw';  // 총액(krw=만원 · usd=$)
+  try{const sv=JSON.parse(localStorage.getItem('pfBase')||'{}');
+    if(PRESETS[sv.p]) curPreset=sv.p;
+    if(sv.c&&typeof sv.c==='object') customW=sv.c;
+    if(+sv.a>0) totAmt=+sv.a;
+    if(sv.u==='usd'||sv.u==='krw') amtCur=sv.u;}catch(e){}
+  const saveBase=()=>{try{localStorage.setItem('pfBase',JSON.stringify({p:curPreset,c:customW,a:totAmt,u:amtCur}));}catch(e){}};
+  const fxNow=()=>{const s=(D&&D.series||{}).fx;                 // 최신 원/달러 (ECOS 월평균)
+    if(s&&s.v) for(let i=s.v.length-1;i>=0;i--) if(s.v[i]!=null) return s.v[i];
+    return 1350;};
+  const manTotal=()=>amtCur==='usd'?totAmt*fxNow()/10000:totAmt; // 총액을 만원으로 환산
+  const fmtAmt=man=>{
+    if(amtCur==='usd'){const usd=man*10000/fxNow();
+      return '$'+(usd>=1e6?(usd/1e6).toFixed(2)+'M':Math.round(usd).toLocaleString());}
+    return man>=10000?(man/10000).toFixed(2).replace(/\.?0+$/,'')+'억':Math.round(man).toLocaleString()+'만';};
+  const baseOf=k=>customW[k]??(PRESETS[curPreset].w[k]??0);
+
   /* (2026-08-23) 조절은 지표 키 기준 **전역** — 같은 지표를 쓰는 모든 지수에 동시 적용
      (예: CPI ▲ 를 켜면 S&P500·나스닥·금·채권 등 CPI 가 들어가는 모든 예측이 재계산) */
   let mulAll={}, scAll={};
@@ -169,13 +194,23 @@
 
   function render(){
     const tg=D.targets[cur]; if(!tg) return;
-    /* ── ① 비중 제안 (맨 위) — 조절이 반영되도록 targets.pred 에서 매번 재계산 ── */
+    /* ── ① 비중 제안 (맨 위) — 프리셋/직접조절 기본비중 + 예측 틸트를 매번 재계산 ── */
     const rowsA=(D.alloc||[]).filter(a=>a.key!=='cash');
     const gL=a=>{const p=((D.targets[a.key]||{}).pred||{})[12];
       return p?p.g:(a.g12!=null?Math.log(1+a.g12/100):null);};
     const tiltable=rowsA.filter(a=>a.sug!=null&&gL(a)!=null);
     const avg=tiltable.length?tiltable.reduce((s,a)=>s+gL(a),0)/tiltable.length:0;
     let tot=0;
+    const bwsty='padding:0 4px;font-size:10.5px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
+    const presetBar=`<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-weight:700;font-size:12px">기본 비중 프리셋</span>${
+      Object.entries(PRESETS).map(([k,p])=>`<button data-ps="${k}" style="padding:3px 9px;font-size:11.5px;border:1px solid ${k===curPreset?'#166534':'#d7dce3'};border-radius:6px;cursor:pointer;background:${k===curPreset?'#166534':'#fff'};color:${k===curPreset?'#fff':'#444'}">${p.label} <span style="opacity:.75;font-size:10px">${p.stat}</span></button>`).join('')}
+      ${Object.keys(customW).length?`<span class="note">✎ 직접조절 중</span> <button id="pf_bwrst" style="${bwsty}">프리셋값으로</button>`:''}
+      <span style="margin-left:8px;font-size:12px">총 금액
+      <button data-cur="krw" style="${bwsty};${amtCur==='krw'?'background:#1f2937;color:#fff;border-color:#1f2937':''}">원</button><button data-cur="usd" style="${bwsty};${amtCur==='usd'?'background:#1f2937;color:#fff;border-color:#1f2937':''}">달러</button>
+      <input id="pf_amt" type="number" value="${totAmt}" min="0" step="${amtCur==='usd'?1000:1000}" style="width:100px;padding:2px 6px;font-size:12px;border:1px solid #d7dce3;border-radius:5px;text-align:right">${amtCur==='usd'?'$':'만원'}
+      <b>(${amtCur==='usd'?'약 '+(manTotal()/10000).toFixed(2)+'억 · 환율 '+Math.round(fxNow()).toLocaleString():fmtAmt(totAmt)})</b></span>
+      <span class="note">백테스트 2006.12~2026.08 월 리밸런싱·지수 기준(배당 미포함) · 행의 −/＋로 1%p 직접 조절(현금이 잔여 흡수·브라우저에 저장)</span></div>`;
     const gh=(tg2,h)=>{const p=(tg2.pred||{})[h];return p?+(Math.exp(p.g)*100-100).toFixed(1):null;};
     const html=rowsA.map(a=>{
       const tg=D.targets[a.key]||{};
@@ -183,36 +218,55 @@
       const g1=gh(tg,1), g3=gh(tg,3), g6=gh(tg,6);
       const g12=p12?+(Math.exp(p12.g)*100-100).toFixed(1):a.g12;
       const g24=p24?+(Math.exp(p24.g)*100-100).toFixed(1):a.g24;
+      const bw=a.sug!=null?baseOf(a.key):null;    // 현금성(현금군)은 조절 대상 아님
       let sug=null,tilt=null;
       if(a.sug!=null&&gL(a)!=null){
-        const cap=a.base>0?5:3, lo=a.base>0?-5:0;
+        const cap=bw>0?5:3, lo=bw>0?-5:0;
         tilt=Math.max(lo,Math.min(cap,Math.round((gL(a)-avg)*40)));
-        sug=Math.max(0,a.base+tilt); tot+=sug;
+        sug=Math.max(0,bw+tilt); tot+=sug;
       }
       const bad=g12!=null&&((tg.bt||{}).mape==null||(tg.bt||{}).mape>50);
       const adj=isAdj(a.key);
       const pv=v=>v==null?'—':`<span style="${bad?'opacity:.35':''}${adj?';text-decoration:underline dotted':''}" ${bad?'title="백테스트 오차가 커 신뢰 불가 — 참고하지 말 것"':(adj?'title="가중치·시나리오 조절 반영값"':'')}>${bad?'⚠ ':''}${adj?'✎ ':''}${v>0?'+':''}${v}%</span>`;
       return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
       <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>
-      <td class="num">${a.base==null?'—':a.base+'%'}</td>
+      <td class="num" style="white-space:nowrap">${bw==null?'—':
+        `<button data-bw="${a.key}" data-d="-1" style="${bwsty}" onclick="event.stopPropagation()">−</button> <b${customW[a.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${a.key}" data-d="1" style="${bwsty}" onclick="event.stopPropagation()">＋</button>`}</td>
       <td class="num">${pv(g1)}</td><td class="num">${pv(g3)}</td><td class="num">${pv(g6)}</td>
       <td class="num" style="color:${g12>0?'#0f766e':(g12<0?'#b91c1c':'#666')}">${pv(g12)}</td>
       <td class="num">${pv(gh(tg,18))}</td>
       <td class="num">${pv(g24)}</td>
-      <td class="num"><b>${sug==null?'현금군':sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td></tr>`;}).join('');
-    const cashBase=((D.alloc||[]).find(a=>a.key==='cash')||{}).base??15;
-    $('pf_alloc').innerHTML=`<table><thead><tr><th>자산</th><th>매수 상품</th>
+      <td class="num"><b>${sug==null?'현금군':sug+'%'}</b>${tilt?` <span class="note">(${tilt>0?'+':''}${tilt})</span>`:''}</td>
+      <td class="num">${sug==null?'—':'<b>'+fmtAmt(manTotal()*sug/100)+'</b>'}</td></tr>`;}).join('');
+    const cashBase=Math.max(0,100-rowsA.reduce((s,a)=>s+(a.sug!=null?baseOf(a.key):0),0));
+    $('pf_alloc').innerHTML=presetBar+`<table><thead><tr><th>자산</th><th>매수 상품</th>
       <th style="text-align:right">기본 비중</th>
       <th style="text-align:right">1M 예측</th><th style="text-align:right">3M 예측</th><th style="text-align:right">6M 예측</th>
       <th style="text-align:right" title="선행지표 릿지회귀 · 백테스트 보정계수 적용 후 (✎=조절 반영)">12M 예측</th>
       <th style="text-align:right">18M 예측</th>
       <th style="text-align:right">24M 예측</th>
-      <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th></tr></thead><tbody>${html}
+      <th style="text-align:right" title="기본비중 ± 12개월 상대예측 (코어 ±5%p · 위성 +3%p 한도)">제안 비중</th>
+      <th style="text-align:right" title="총 금액 × 제안 비중">금액</th></tr></thead><tbody>${html}
       <tr><td><b>현금·단기채</b></td><td>파킹/머니마켓</td><td class="num">${cashBase}%</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
-      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td></tr></tbody></table>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><b>${Math.max(0,100-tot)}%</b></td>
+      <td class="num"><b>${fmtAmt(manTotal()*Math.max(0,100-tot)/100)}</b></td></tr></tbody></table>
       <div class="note" style="margin-top:5px">${E(D.note||'')}</div>`;
     $('pf_alloc').querySelectorAll('[data-tk]').forEach(tr=>tr.onclick=()=>{cur=tr.dataset.tk;sel=[];view=null;render();});
+    /* 프리셋·기본비중 조절 */
+    $('pf_alloc').querySelectorAll('[data-ps]').forEach(b=>b.onclick=()=>{
+      curPreset=b.dataset.ps; customW={}; saveBase(); render();});
+    $('pf_alloc').querySelectorAll('[data-bw]').forEach(b=>b.onclick=e=>{e.stopPropagation();
+      const k=b.dataset.bw, d=+b.dataset.d;
+      customW[k]=Math.max(0,Math.min(60,baseOf(k)+d));
+      saveBase(); render();});
+    {const rb=$('pf_bwrst'); if(rb) rb.onclick=()=>{customW={};saveBase();render();};}
+    {const ai=$('pf_amt'); if(ai) ai.onchange=()=>{totAmt=Math.max(0,+ai.value||0);saveBase();render();};}
+    $('pf_alloc').querySelectorAll('[data-cur]').forEach(b=>b.onclick=()=>{
+      const to=b.dataset.cur;
+      if(to!==amtCur){                            // 통화 전환 시 금액도 환산해 이어준다
+        totAmt=to==='usd'?Math.round(totAmt*10000/fxNow()):Math.round(totAmt*fxNow()/10000);
+        amtCur=to; saveBase(); render();}});
     /* ── ② 지수 칩 + 컨트롤 ── */
     const btn=(on,txt,attr)=>`<button ${attr||''} style="padding:3px 9px;font-size:11.5px;border:1px solid ${on?'#1f2937':'#d7dce3'};border-radius:6px;cursor:pointer;background:${on?'#1f2937':'#fff'};color:${on?'#fff':'#444'}">${txt}</button>`;
     $('pf_tg').innerHTML=Object.entries(D.targets).map(([k,v])=>btn(k===cur,E(v.label),`data-k="${k}"`)).join(' ');
