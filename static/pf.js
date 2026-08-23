@@ -307,16 +307,17 @@
     $('pf_bt').innerHTML=`<div class="note" style="margin-bottom:3px">MAPE·단순예측 오차·방향적중·스킬·보정계수 = <b>${E(tg.label)}</b> 기준 · '전지수' 두 열만 12개 자산 평균(신뢰불가 제외)</div>
       <table><thead><tr><th>지평</th><th style="text-align:right" title="선택한 지수의 예측가격이 실제와 평균 몇 % 어긋났나">평균 오차(MAPE)</th>
       <th style="text-align:right" title="'변동 없음'이라고 찍었을 때의 오차 — 이보다 작아야 의미">단순예측 오차</th>
+      <th style="text-align:right" title="예측 변화율 대비 실제 실현 비율 — 예측선에 곱해져 있음">보정계수</th>
       <th style="text-align:right" title="선택한 지수의 오를지/내릴지 방향 적중">${E(tg.label)} 방향적중</th>
       <th style="text-align:right" title="스킬 = 1 − MAPE/단순예측오차. 0=게으른 예측과 동일, 0.5=오차 절반 감소">${E(tg.label)} 스킬</th>
-      <th style="text-align:right" title="예측 변화율 대비 실제 실현 비율 — 예측선에 곱해져 있음">보정계수</th>
       <th style="text-align:right" title="신뢰 가능한 전 지수(MAPE 50% 이하)의 평균 방향 적중">전지수 방향</th>
       <th style="text-align:right" title="전 지수 평균 스킬 — 이 지평의 모델 전반 신뢰도">전지수 스킬</th></tr></thead><tbody>${
       [1,3,6,12,18,24].filter(h=>bh[h]).map(h=>{const b=bh[h],a=avgH(h);
         return `<tr><td>${h}개월 뒤</td><td class="num">${fmt(b.mape,2)}%</td>
-        <td class="num">${fmt(b.naive,2)}%</td><td class="num"><b>${fmt(b.hit,1)}%</b></td>
-        <td class="num"><b>${b.skill!=null?(+b.skill).toFixed(2):'—'}</b></td>
+        <td class="num">${fmt(b.naive,2)}%</td>
         <td class="num">${fmt(b.calib,2)}</td>
+        <td class="num"><b>${fmt(b.hit,1)}%</b></td>
+        <td class="num"><b>${b.skill!=null?(+b.skill).toFixed(2):'—'}</b></td>
         <td class="num">${a.hi!=null?a.hi.toFixed(1)+'%':'—'}</td>
         <td class="num">${a.sk!=null?a.sk.toFixed(2):'—'}</td></tr>`;}).join('')}</tbody></table>
       <div class="note" style="margin-top:4px">워크포워드 백테스트 ${((tg.bt||{}).origins)||''}시점 — 그 시점까지 자료만으로 시차 탐색부터 다시 수행. 성적이 나쁘면 나쁜 대로 표시(포장 없음). 예측·비중 제안은 리서치 참고용이며 투자권유가 아님.</div>`;
