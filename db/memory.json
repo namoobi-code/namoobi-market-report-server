@@ -1,9 +1,9 @@
 {
- "marker": "2026-08-23",
- "as_of": "2026-08-23",
+ "marker": "2026-08-24",
+ "as_of": "2026-08-24",
  "data": {
-  "asof": "2026-08-23",
-  "fetched_at": "2026-08-23T09:49:36+09:00",
+  "asof": "2026-08-24",
+  "fetched_at": "2026-08-24T09:41:24+09:00",
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
@@ -4335,18 +4335,10 @@
     "ticker": "^KS11",
     "label": "코스피",
     "why": "삼성+SK 시총 55~60% — 메모리 사이클이 곧 지수",
-    "price": 6912.95,
-    "chg_1y_pct": 120.0,
-    "chg_1m_pct": 1.7,
+    "price": 6802.13,
+    "chg_1y_pct": 111.9,
+    "chg_1m_pct": -4.2,
     "series_1y": [
-     [
-      "2025-08-21",
-      3141.74
-     ],
-     [
-      "2025-08-22",
-      3168.73
-     ],
      [
       "2025-08-25",
       3209.86
@@ -5314,6 +5306,10 @@
      [
       "2026-08-21",
       6912.95
+     ],
+     [
+      "2026-08-24",
+      6802.13
      ]
     ]
    },
@@ -6343,13 +6339,13 @@
     "name": "SK하이닉스",
     "ticker": "000660.KS",
     "currency": "KRW",
-    "price": 1730000.0,
+    "price": 1740000.0,
     "eps_ttm": 224313.0,
     "eps_2026E": 349566,
     "eps_2027E": 436187,
-    "per_ttm": 7.71,
-    "per_2026E": 4.95,
-    "per_2027E": 3.97,
+    "per_ttm": 7.76,
+    "per_2026E": 4.98,
+    "per_2027E": 3.99,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다",
     "annual_naver": {
      "2021": {
@@ -6447,28 +6443,28 @@
     },
     "consensus_live": {
      "fwd_eps": 349566.0,
-     "fwd_per": 4.95,
+     "fwd_per": 5.0,
      "eps_ttm": 224313.0,
-     "per_ttm": 7.71,
-     "asof": "2026-08-23",
+     "per_ttm": 7.8,
+     "asof": "2026-08-24",
      "target": 3317917.0,
      "recomm": "4.00",
-     "target_asof": "2026-08-20"
+     "target_asof": "2026-08-21"
     },
     "eps_fwd": 349566.0,
-    "per_fwd": 4.95
+    "per_fwd": 4.98
    },
    {
     "name": "삼성전자",
     "ticker": "005930.KS",
     "currency": "KRW",
-    "price": 281500.0,
+    "price": 263250.0,
     "eps_ttm": 22292.0,
     "eps_2026E": 47816,
     "eps_2027E": 66500,
-    "per_ttm": 12.63,
-    "per_2026E": 5.89,
-    "per_2027E": 4.23,
+    "per_ttm": 11.81,
+    "per_2026E": 5.51,
+    "per_2027E": 3.96,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다",
     "annual_naver": {
      "2021": {
@@ -6566,17 +6562,17 @@
      }
     },
     "consensus_live": {
-     "fwd_eps": 47816.0,
-     "fwd_per": 5.89,
+     "fwd_eps": 48135.0,
+     "fwd_per": 5.47,
      "eps_ttm": 22292.0,
-     "per_ttm": 12.63,
-     "asof": "2026-08-23",
+     "per_ttm": 11.82,
+     "asof": "2026-08-24",
      "target": 491875.0,
      "recomm": "4.04",
-     "target_asof": "2026-08-20"
+     "target_asof": "2026-08-21"
     },
-    "eps_fwd": 47816.0,
-    "per_fwd": 5.89
+    "eps_fwd": 48135.0,
+    "per_fwd": 5.47
    },
    {
     "name": "Micron",
