@@ -250,7 +250,7 @@
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용)">시차</th>
       <th style="text-align:right" title="그 시차에서 전년비와의 상관(진단용)">r</th>${
       HZS.map(h=>`<th style="text-align:right">${h}M</th><th style="text-align:right" title="${h}개월 누적 변화율을 시차≥${h}개월 지표로 잰 상관 — 예측에 실제 쓰는 값">${h}M r</th>`).join('')}
-      <th style="text-align:right" title="|12M r| ÷ Σ|12M r| — 12개월 예측 발언 지분. 조절 배수 반영">가중치</th>
+      <th style="text-align:right" title="|12M r| ÷ Σ|12M r| — 12개월 예측에서의 발언 지분(조절 배수 반영). 다른 지평은 그 지평의 |r| 비례로 각각 따로 배분된다(동일가중 아님)">가중치<span class="note">(12M)</span></th>
       <th style="text-align:right;white-space:nowrap" title="−/＋=가중치 배수 ±0.1 · ▲/▼=그 지표가 1σ 오름/내림 가정. 바꾸면 예측선 즉시 재계산(저장 안 됨)">가중치조절 | 지표값조절</th></tr></thead>
       <tbody>${body}</tbody></table>
       <div class="note" style="margin:5px 0">실효 Σ가중치 <b style="color:${Math.abs(wSum-1)>.001?'#b45309':'#333'}">${(wSum*100).toFixed(0)}%</b> (기본 100%) — 예측선에 즉시 반영(저장 안 됨·새로고침 시 초기화)</div>
