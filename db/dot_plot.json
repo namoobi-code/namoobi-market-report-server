@@ -1,35 +1,36 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-24",
+ "as_of": "2026-08-25",
  "data": {
-  "sep_meeting_date": "2026-06-17",
-  "note_kr": "DB marker 'due'로 확인되어 WebSearch로 검증. 서버 정본(server_fomc_meetings.json)의 2026-03-18·2026-06-17 SEP 메모와 federalreserve.gov SEP PDF(2026-06-17)·CNBC/TradingKey 보도가 일치.",
+  "as_of_sep": "2026-06-17 SEP(최신, 2026-03-18 SEP 대비치 병기)",
+  "unit": "%",
+  "note": "연방기금금리 중간값(Median). 2026-06-17 SEP는 18명 참여(1명은 2028년 미제출), 2026-03-18 SEP는 19명 참여.",
+  "source": "https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf (Table 1, Federal funds rate Median 행)",
   "rows": [
    {
-    "period": "2026년말",
-    "mar": "3.4%",
-    "jun": "3.8%",
-    "change": ""
+    "year": "2026년말",
+    "jun": 3.8,
+    "mar": 3.4,
+    "change": "+0.4"
    },
    {
-    "period": "2027년말",
-    "mar": "3.1%",
-    "jun": "3.6%",
-    "change": ""
+    "year": "2027년말",
+    "jun": 3.6,
+    "mar": 3.1,
+    "change": "+0.5"
    },
    {
-    "period": "2028년말",
-    "mar": "3.1%",
-    "jun": "3.4%",
-    "change": ""
+    "year": "2028년말",
+    "jun": 3.4,
+    "mar": 3.1,
+    "change": "+0.3"
    },
    {
-    "period": "장기중립",
-    "mar": "3.1%",
-    "jun": "3.1%",
-    "change": ""
+    "year": "장기중립",
+    "jun": 3.1,
+    "mar": 3.1,
+    "change": "+0.0"
    }
-  ],
-  "comment": "2026-06-17 SEP은 매파적 상향이 핵심: 2026년말 중간값이 3월 3.4%→6월 3.8%로 급등(18명 중 9명이 연내 1회 이상 '인상' 전망), 2027년말 3.1%→3.6%, 2028년말 3.1%→3.4%로 동반 상향. 장기중립(longer-run) 3.1%는 3월·6월 모두 유지. 신임 의장 Kevin Warsh는 6월 SEP에 projection을 제출하지 않아 18명(19명 중 1명 제외) 기준. 다음 정례 SEP은 2026-09-16 회의(9월 회의 예정, 아직 미발표). 출처: federalreserve.gov FOMC statement·SEP PDF(2026-06-17, fomcprojtabl20260617.pdf), FRED Blog(2026-06), CNBC(2026-06-17), TradingKey(2026-06)."
+  ]
  }
 }

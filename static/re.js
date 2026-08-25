@@ -8,6 +8,23 @@
   const $=id=>document.getElementById(id);
   const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   let D=null,_init=false,cur='서울',logY=false,showPred=true,view=null,drag=null;
+  /* (2026-08-24) 지표 오버레이 — 행 클릭으로 차트에 겹쳐보기(pf 와 동일).
+     상속 36종 원계열은 relead.json 을 처음 클릭할 때 지연 로드, 신규 3종(subs·cons·j2m)은 D.d 동봉 */
+  let sel=[],RL=null,_rlLoading=false;
+  const COLS=['#b45309','#0e7490','#7c3aed','#be185d','#166534','#4338ca','#dc2626'];
+  const AXW=56;
+  function serOf(k){
+    if(D.d&&D.d[k]) return D.d[k][cur]||D.d[k]['전국']||null;
+    if(RL&&RL.d&&RL.d[k]) return RL.d[k][cur]||RL.d[k]['전국']||null;
+    return null;
+  }
+  function needRL(){return sel.some(k=>!(D.d&&D.d[k])&&!(RL&&RL.d&&RL.d[k]));}
+  function loadRL(){
+    if(_rlLoading) return; _rlLoading=true;
+    fetch('/api/db/relead',{cache:'reload'}).then(r=>r.ok?r.json():null).then(d=>{
+      RL=d; _rlLoading=false; if(D) render();
+    }).catch(()=>{_rlLoading=false;});
+  }
   let mulAll={},scAll={};                       // 조절은 지표 키 기준 전역(모든 지역 동시)
   const mulOf=k=>mulAll[k]??1, scOf=k=>scAll[k]??0;
   const HZS=[1,3,6,12,18,24,30];   // (2026-08-23) 부동산 장주기: 1M 유지 + 30M 추가 (사용자 확정)
@@ -72,17 +89,23 @@
     const N=ax.N;
     if(!view) view=[0,N-1];
     const [v0,v1]=view, M=v1-v0+1;
-    const Pd={l:8,t:18,b:20}, AXW=56, PW=Math.max(80,W-Pd.l-AXW);
+    const overlays=sel.map((k,i)=>({k,color:COLS[i%COLS.length],v:serOf(k)})).filter(o=>o.v);
+    const Pd={l:8,t:18,b:20}, RW=AXW*(overlays.length+1), PW=Math.max(80,W-Pd.l-RW);
     const X=i=>Pd.l+PW*(i-v0)/Math.max(1,M-1);
     x.font='10px sans-serif';
     const tf=v=>logY?Math.log10(Math.max(v,1e-9)):v;
     const seg=a=>a.slice(v0,v1+1);
+    const rng=vs=>{const f=vs.filter(z=>z!=null); if(!f.length)return{lo:0,hi:1};
+      let lo2=Math.min(...f),hi2=Math.max(...f);
+      if(hi2===lo2){hi2=lo2+Math.abs(lo2||1)*.1;lo2-=Math.abs(lo2||1)*.1;}
+      const p=(hi2-lo2)*.07; return{lo:lo2-p,hi:hi2+p};};
     const F=P.futX||P._f0;
     const vals=[...seg(ax.hist),...(showPred?[...seg(F.price),...seg(F.lo),...seg(F.hi)]:[])].map(v=>v==null?null:tf(v));
-    const f2=vals.filter(z=>z!=null);
-    let lo=f2.length?Math.min(...f2):0, hi=f2.length?Math.max(...f2):1;
-    if(hi===lo){hi=lo+1;} const pad=(hi-lo)*.07; lo-=pad; hi+=pad;
+    const scP=rng(vals);
+    const scO=overlays.map(o=>rng(seg(o.v)));
+    const lo=scP.lo, hi=scP.hi;
     const Y=v=>Pd.t+(H-Pd.t-Pd.b)*(1-(v-lo)/(hi-lo));
+    const Yo=(sc,v)=>Pd.t+(H-Pd.t-Pd.b)*(1-(v-sc.lo)/(sc.hi-sc.lo));
     x.strokeStyle='#eef1f4';
     for(let g=0;g<=4;g++){const yy=Pd.t+(H-Pd.t-Pd.b)*g/4;x.beginPath();x.moveTo(Pd.l,yy);x.lineTo(Pd.l+PW,yy);x.stroke();}
     x.fillStyle='#98a2ad';
@@ -100,6 +123,12 @@
       for(let j=v1;j>=Math.max(past,v0);j--){const v=F.lo[j];if(v==null)continue;x.lineTo(X(j),Y(tf(v)));}
       x.closePath();x.fillStyle='rgba(31,41,55,.10)';x.fill();
     }
+    /* 오버레이 지표 (자기 스케일) */
+    overlays.forEach((o,i)=>{
+      x.strokeStyle=o.color;x.lineWidth=1.4;x.beginPath();let on2=false;
+      for(let j=v0;j<=v1;j++){const v=o.v[j];if(v==null){on2=false;continue;}
+        const px=X(j),py=Yo(scO[i],v); on2?x.lineTo(px,py):(x.moveTo(px,py),on2=true);}
+      x.stroke();x.lineWidth=1;});
     x.strokeStyle='#1f2937';x.lineWidth=2;x.beginPath();let on=false;
     for(let j=v0;j<=v1;j++){const v=ax.hist[j];if(v==null){on=false;continue;}
       const px=X(j),py=Y(tf(v)); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
@@ -108,15 +137,22 @@
       for(let j=v0;j<=v1;j++){const v=F.price[j];if(v==null){on=false;continue;}
         const px=X(j),py=Y(tf(v)); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
       x.stroke();x.restore();x.lineWidth=1;}
-    /* 우측 축 */
-    const x0=Pd.l+PW;
-    x.strokeStyle='#e5e8ec';x.beginPath();x.moveTo(x0,Pd.t-8);x.lineTo(x0,H-Pd.b);x.stroke();
-    x.fillStyle='#1f2937';
-    for(let g=0;g<=4;g++){let vv=lo+(hi-lo)*(1-g/4);
-      if(logY)vv=Math.pow(10,vv);
-      const yy=Pd.t+(H-Pd.t-Pd.b)*g/4;
-      x.fillText(vv>=1e4?Math.round(vv).toLocaleString():vv.toFixed(0),x0+3,yy+3);}
-    x.save();x.font='bold 10px sans-serif';x.fillText(cur,x0+3,Pd.t-10);x.restore();
+    /* 우측 축 — 기준(가격) + 오버레이별 (pf 와 동일) */
+    const axes=[{sc:scP,color:'#1f2937',name:cur,log:logY},
+                ...overlays.map((o,i)=>({sc:scO[i],color:o.color,
+                  name:(D.meta[o.k]||{}).label||o.k,log:false}))];
+    axes.forEach((a,i)=>{
+      const x0=Pd.l+PW+AXW*i;
+      x.strokeStyle='#e5e8ec';x.beginPath();x.moveTo(x0,Pd.t-8);x.lineTo(x0,H-Pd.b);x.stroke();
+      x.fillStyle=a.color;x.globalAlpha=.08;x.fillRect(x0,Pd.t-8,AXW,H-Pd.t-Pd.b+8);x.globalAlpha=1;
+      x.fillStyle=a.color;
+      for(let g=0;g<=4;g++){let vv=a.sc.lo+(a.sc.hi-a.sc.lo)*(1-g/4);
+        if(a.log)vv=Math.pow(10,vv);
+        const yy=Pd.t+(H-Pd.t-Pd.b)*g/4;
+        x.fillText(Math.abs(vv)>=1e4?Math.round(vv).toLocaleString():(Math.abs(vv)>=100?vv.toFixed(0):vv.toFixed(2)),x0+3,yy+3);}
+      x.save();x.font='bold 10px sans-serif';
+      x.fillText(a.name.length>6?a.name.slice(0,6):a.name,x0+3,Pd.t-10);x.restore();
+    });
   }
 
   function setView(a,b){const N=axis(cur).N;
@@ -177,9 +213,10 @@
     const NC=4+HZS.length*2+2;
     const indRow=k=>{const l=lead[k]; if(!l) return '';
       const m=D.meta[k]||{}, mv=mulOf(k), sv=scOf(k);
+      const on=sel.includes(k), ci=sel.indexOf(k);
       const hz=HZS.map(h=>`<td class="num">${l['lag'+h]!=null?l['lag'+h]+'M':'—'}</td><td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`).join('');
-      return `<tr title="${E((m.hint||'')+(m.src?' · '+m.src:''))}">
-      <td style="padding-left:16px;white-space:nowrap">└ ${E(m.label||k)}</td>
+      return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}" title="클릭=차트 겹쳐보기 · ${E((m.hint||'')+(m.src?' · '+m.src:''))}">
+      <td style="padding-left:16px;white-space:nowrap">└ ${on?`<b style="color:${COLS[ci%COLS.length]}">✔ </b>`:''}${E(m.label||k)}</td>
       <td class="num" style="color:#98a2ad">${E(m.folk||'—')}</td>
       <td class="num">${l.lag}M</td><td class="num">${rc(l.corr)}</td>${hz}
       <td class="num"><b style="color:${mv!==1?'#b45309':''}">${l.w12!=null?(l.w12*mv*100).toFixed(1)+'%':'—'}</b></td>
@@ -222,6 +259,12 @@
       선택/평가 분리 실측에서 보정이 오히려 성적을 해쳤다(서울 6.87%→9.00%). 계산이 투명한 대신 비슷한 지표가 많은 그룹의 발언이
       그대로 합산된다(중복 자동 차감 없음) — 그룹 소계로 쏠림을 확인할 것. <b>통설 vs 실측 시차</b>가 크게 다르면 통설이 이 지역
       데이터에선 안 맞았다는 뜻. 기사 프레임: 전세→매매(1~2M) · 인허가→입주(6~18M) · 낙찰가율 80%↑ 안정/70%↓ 침체.</div>`;
+    /* 행 클릭 = 차트 오버레이 토글 (최대 6개, pf 와 동일) */
+    $('re_ind').querySelectorAll('[data-i]').forEach(tr=>tr.onclick=()=>{
+      const k=tr.dataset.i;
+      sel=sel.includes(k)?sel.filter(x=>x!==k):(sel.length>=6?sel:[...sel,k]);
+      if(needRL()) loadRL();          // 상속 지표 원계열은 relead.json 지연 로드 후 재렌더
+      render();});
     $('re_ind').querySelectorAll('[data-mm]').forEach(b=>b.onclick=e=>{e.stopPropagation();
       const k=b.dataset.mm, d=+b.dataset.d;
       mulAll[k]=Math.max(0,Math.min(3,+((mulOf(k)+d*0.1).toFixed(1))));

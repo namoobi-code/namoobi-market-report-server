@@ -438,6 +438,10 @@ def main():
         "t": T, "horizon": HZ, "regions": [r for r in R.SIDO if r in out_pred],
         "meta": meta, "group_order": GROUP_ORDER,
         "price": out_price, "pred": out_pred, "lead": out_lead,
+        # (2026-08-24) 차트 오버레이용 — 신규 3종만 원계열 동봉(상속 36종은 relead.json 지연 로드)
+        "d": {k: {reg: [mp.get(t) for t in T] for reg, mp in extra[k].items()
+                  if reg in R.SIDO or reg == "전국"}
+              for k in new_keys},
     }, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(f"  → {OUT} ({OUT.stat().st_size // 1024}KB) · 지역 {len(out_pred)}")
     return 0

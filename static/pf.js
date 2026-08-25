@@ -5,7 +5,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  let D=null,SC=null,_init=false,cur='spx',logY=true,showPred=true,sel=[],view=null,drag=null;
+  let D=null,SC=null,RV=null,_init=false,cur='spx',logY=true,showPred=true,sel=[],view=null,drag=null;
   /* (2026-08-23) 가중치 조절·시나리오 — 서버가 저장한 지표별 기여도(cont)·β 로
      g' = calib × (base + Σ m_k·(cont_k + s_k·β_k)) 를 클라이언트에서 정확히 재계산.
      m_k = 가중치 배수(기본 1, ±0.1), s_k = 시나리오(+1 지표 1σ 오름 / -1 내림 / 0 기본) */
@@ -533,7 +533,10 @@
           <th style="text-align:right" title="실전/백테스트 — 2배 초과 시 이탈 판정">배율</th>
           <th style="text-align:right">방향적중</th><th style="text-align:right" title="±1.5σ 밴드 이탈 횟수">밴드 이탈</th></tr></thead>
           <tbody>${rows}</tbody></table>
-          ${s.flag?`<div style="color:#dc2626;margin-top:4px"><b>⚠ 이탈 판정</b> — ${s.reasons.map(E).join(' · ')} <span class="note">(월간 원인검토 대상)</span></div>`:''}</div>`;})();
+          ${s.flag?`<div style="color:#dc2626;margin-top:4px"><b>⚠ 이탈 판정</b> — ${s.reasons.map(E).join(' · ')} <span class="note">(월간 원인검토 대상)</span></div>`:''}
+          ${(()=>{const it=RV&&(RV.items||[]).find(x=>x.tk===cur);
+            if(it)return `<div style="margin-top:4px;padding:5px 8px;background:#fef9ec;border-radius:5px"><b>원인검토 ${E(RV.asof||'')}</b> [${E(it.cause||'')}] ${E(it.detail||'')} <span class="note">제안: ${E(it.suggest||'')}</span></div>`;
+            return RV?`<div class="note" style="margin-top:4px">원인검토 ${E(RV.asof||'')}: ${E(RV.summary||'')}</div>`:'';})()}</div>`;})();
     bindChart(); draw();
   }
 
@@ -542,9 +545,10 @@
     if(_init) return; _init=true;
     Promise.all([
       fetch('/api/db/stlead',{cache:'reload'}).then(r=>r.ok?r.json():null),
-      fetch('/api/db/stlead_score',{cache:'reload'}).then(r=>r.ok?r.json():null).catch(()=>null)
-    ]).then(([d,sc])=>{
-      SC=sc;
+      fetch('/api/db/stlead_score',{cache:'reload'}).then(r=>r.ok?r.json():null).catch(()=>null),
+      fetch('/api/db/stlead_review',{cache:'reload'}).then(r=>r.ok?r.json():null).catch(()=>null)
+    ]).then(([d,sc,rv])=>{
+      SC=sc; RV=rv;
       if(!d||!d.targets||!Object.keys(d.targets).length){
         $('pf_alloc').innerHTML='<div class="note">수집 대기 중 — stlead.py 첫 실행이 끝나면 표시됩니다(매일 05:20 자동 갱신).</div>'; return;}
       D=d; if(!D.targets[cur]) cur=Object.keys(D.targets)[0];
