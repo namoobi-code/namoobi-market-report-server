@@ -468,7 +468,7 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
             fut["price"][j] = round(p, 2)
             fut["lo"][j] = round(p * math.exp(-1.28 * sd), 2)
             fut["hi"][j] = round(p * math.exp(1.28 * sd), 2)
-            pred[h] = {"g": round(g, 4), "price": round(p, 2)}
+            pred[h] = {"g": round(g, 4), "price": round(p, 2), "sd": round(sd, 4)}
             if "_cont" in r:                       # 가중치 조절·시나리오용
                 # g' = clamp(calib × (base + Σ m_k·(cont_k + s_k·β_k)))
                 #   m_k=가중치 배수, s_k=시나리오(지표 ±1σ 가정: +1 오름/-1 내림/0 기본)
@@ -518,6 +518,33 @@ def _crash_hist(targets_out):
     return out
 
 
+PRED_HIST = DB / "stlead_pred_hist.json"
+
+
+def _pred_hist(targets_out):
+    """(2026-08-25) 실전 검증용 예측 스냅샷 — 그날 내놓은 예측을 날짜별로 적재
+    (같은 날 재실행은 덮어씀). 이게 있어야 'N개월 전 예측 vs 실제'를 사후 채점할 수 있다.
+    m0=예측 기준월, p0=기준월 종가, g={지평: 예측수익률%}, sd={지평: 백테스트 표준편차(로그)},
+    cr=급락확률%. 채점은 scripts/stlead_score.py(매월 1일 cron)가 한다."""
+    try:
+        h = json.loads(PRED_HIST.read_text(encoding="utf-8"))
+    except Exception:
+        h = {}
+    snap = {}
+    for tk, t in targets_out.items():
+        tl = t["past"]
+        row = {"m0": str(t["t"][tl]), "p0": t["hist"][tl],
+               "g": {str(hh): round(math.exp(p["g"]) * 100 - 100, 2)
+                     for hh, p in t["pred"].items()},
+               "sd": {str(hh): p.get("sd") for hh, p in t["pred"].items()}}
+        c = t.get("crash")
+        if c and "p" in c:
+            row["cr"] = c["p"]
+        snap[tk] = row
+    h[NOW.strftime("%Y-%m-%d")] = snap
+    PRED_HIST.write_text(json.dumps(h), encoding="utf-8")
+
+
 def _finish(targets_out, alloc_in, ind):
     # ── 비중 제안 — 12개월 보정예측의 상대 우열로 코어 ±5%p · 위성 0~+3%p (현금에서)
     alloc = []
@@ -545,6 +572,10 @@ def _finish(targets_out, alloc_in, ind):
         alloc.append({"key": "cash", "asset": "현금·단기채 (SHY·KODEX단기채 등)",
                       "etf": "파킹/머니마켓", "base": CASH_BASE, "g12": None,
                       "g24": None, "sug": max(0, 100 - tot)})
+    try:
+        _pred_hist(targets_out)                   # (2026-08-25) 실전 검증용 스냅샷
+    except Exception as e:
+        print(f"    ⚠ pred_hist 적재 실패: {str(e)[:80]}")
     OUT.write_text(json.dumps({
         "asof": NOW.strftime("%Y-%m-%d %H:%M"),
         "src": "야후 월봉 · FRED · 한국은행 ECOS · OECD — 매일 05:20 자동 갱신",

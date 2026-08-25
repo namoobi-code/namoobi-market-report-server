@@ -5,7 +5,7 @@
 (function(){
   const $=id=>document.getElementById(id);
   const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  let D=null,_init=false,cur='spx',logY=true,showPred=true,sel=[],view=null,drag=null;
+  let D=null,SC=null,_init=false,cur='spx',logY=true,showPred=true,sel=[],view=null,drag=null;
   /* (2026-08-23) 가중치 조절·시나리오 — 서버가 저장한 지표별 기여도(cont)·β 로
      g' = calib × (base + Σ m_k·(cont_k + s_k·β_k)) 를 클라이언트에서 정확히 재계산.
      m_k = 가중치 배수(기본 1, ±0.1), s_k = 시나리오(+1 지표 1σ 오름 / -1 내림 / 0 기본) */
@@ -286,8 +286,10 @@
         const col=ratio<1?'#16a34a':(ratio<2?'#b45309':'#dc2626');
         return `<td class="num"><b style="color:${col}" title="12개월 내 -20% 드로다운 확률 (로지스틱 · 역사평균 대비 ${ratio.toFixed(1)}배)">${cr2.p}%</b></td><td class="num">${dsp}</td><td class="num"><span class="note">${cr2.base}%</span></td>`;})()
         :'<td class="num">—</td><td class="num">—</td><td class="num">—</td>';
+      const scFlag=(SC&&SC.targets&&SC.targets[a.key]&&SC.targets[a.key].flag)
+        ?` <span style="color:#dc2626;cursor:help" title="실전 채점 이탈: ${E((SC.targets[a.key].reasons||[]).join(' · '))} — 행을 클릭하면 아래 실전 성적 참조">⚠</span>`:'';
       return `<tr${D.targets[a.key]?` style="cursor:pointer" data-tk="${a.key}"`:''}>
-      <td><b>${E(a.asset)}</b></td><td>${E(a.etf)}</td>${crCell}
+      <td><b>${E(a.asset)}</b>${scFlag}</td><td>${E(a.etf)}</td>${crCell}
       <td class="num" style="white-space:nowrap"><button data-bw="${a.key}" data-d="-1" style="${bwsty}" onclick="event.stopPropagation()">−</button> <b${customW[a.key]!=null?' style="color:#b45309"':''}>${bw}%</b> <button data-bw="${a.key}" data-d="1" style="${bwsty}" onclick="event.stopPropagation()">＋</button></td>
       <td class="num">${pv(g1)}</td><td class="num">${pv(g3)}</td><td class="num">${pv(g6)}</td>
       <td class="num" style="color:${g12>0?'#0f766e':(g12<0?'#b91c1c':'#666')}">${pv(g12)}</td>
@@ -511,14 +513,38 @@
         <td class="num"><b>${b.skill!=null?(+b.skill).toFixed(2):'—'}</b></td>
         <td class="num">${a.hi!=null?a.hi.toFixed(1)+'%':'—'}</td>
         <td class="num">${a.sk!=null?a.sk.toFixed(2):'—'}</td></tr>`;}).join('')}</tbody></table>
-      <div class="note" style="margin-top:4px">워크포워드 백테스트 ${((tg.bt||{}).origins)||''}시점 — 그 시점까지 자료만으로 시차 탐색부터 다시 수행. 성적이 나쁘면 나쁜 대로 표시(포장 없음). 예측·비중 제안은 리서치 참고용이며 투자권유가 아님.</div>`;
+      <div class="note" style="margin-top:4px">워크포워드 백테스트 ${((tg.bt||{}).origins)||''}시점 — 그 시점까지 자료만으로 시차 탐색부터 다시 수행. 성적이 나쁘면 나쁜 대로 표시(포장 없음). 예측·비중 제안은 리서치 참고용이며 투자권유가 아님.</div>`
+      /* (2026-08-25) 실전 성적 — 매일 적재한 예측 스냅샷의 만기 도래분을 실제와 비교(매월 1일 채점).
+         백테스트(표본 내 재현)와 달리 진짜 운영 성적표. 이탈 기준 위반 시 ⚠ + 사유 표시 */
+      +(()=>{
+        const s=SC&&SC.targets?SC.targets[cur]:null;
+        const head=`<div style="border:1px solid #e5e8ec;border-radius:8px;padding:7px 12px;margin-top:8px;background:#fff">
+          <b>실전 성적</b> <span class="note">(${E(tg.label)} — 스냅샷 만기분 실측 채점 · 매월 1일 갱신 · 기준: 오차>백테스트×2 / 최근3회 방향오답≥2 / ±1.5σ 이탈)</span>`;
+        if(!SC) return head+`<br><span class="note">채점 데이터 없음 — 첫 채점은 매월 1일 06:40 자동 실행.</span></div>`;
+        if(!s||!s.n) return head+`<br><span class="note">채점 표본 아직 없음 — 스냅샷 적재 시작 ${E(SC.since||'')}, 1M 예측이 첫 만기(약 한 달 뒤)부터 쌓인다. 현재 스냅샷 ${SC.snapshots||0}일치.</span></div>`;
+        const rows=Object.keys(s.by_h||{}).sort((a,b)=>+a-+b).map(h=>{const v=s.by_h[h];
+          return `<tr><td>${h}개월 뒤</td><td class="num">${v.n}</td><td class="num">${v.mae}%</td>
+          <td class="num">${v.mape_bt!=null?v.mape_bt+'%':'—'}</td>
+          <td class="num"${v.ratio>2?' style="color:#dc2626;font-weight:700"':''}>${v.ratio!=null?v.ratio+'배':'—'}</td>
+          <td class="num"><b>${v.hit}%</b></td><td class="num">${v.breach||0}</td></tr>`;}).join('');
+        return head+`<table style="margin-top:5px"><thead><tr><th>지평</th><th style="text-align:right">채점 수</th>
+          <th style="text-align:right" title="실전 평균 절대오차(%p)">실전 오차</th>
+          <th style="text-align:right" title="같은 지평의 백테스트 MAPE — 실전이 이보다 크게 나쁘면 경고">백테스트</th>
+          <th style="text-align:right" title="실전/백테스트 — 2배 초과 시 이탈 판정">배율</th>
+          <th style="text-align:right">방향적중</th><th style="text-align:right" title="±1.5σ 밴드 이탈 횟수">밴드 이탈</th></tr></thead>
+          <tbody>${rows}</tbody></table>
+          ${s.flag?`<div style="color:#dc2626;margin-top:4px"><b>⚠ 이탈 판정</b> — ${s.reasons.map(E).join(' · ')} <span class="note">(월간 원인검토 대상)</span></div>`:''}</div>`;})();
     bindChart(); draw();
   }
 
   const PFV='i';                                  // 진단 배지용 버전
   function init(){
     if(_init) return; _init=true;
-    fetch('/api/db/stlead',{cache:'reload'}).then(r=>r.ok?r.json():null).then(d=>{
+    Promise.all([
+      fetch('/api/db/stlead',{cache:'reload'}).then(r=>r.ok?r.json():null),
+      fetch('/api/db/stlead_score',{cache:'reload'}).then(r=>r.ok?r.json():null).catch(()=>null)
+    ]).then(([d,sc])=>{
+      SC=sc;
       if(!d||!d.targets||!Object.keys(d.targets).length){
         $('pf_alloc').innerHTML='<div class="note">수집 대기 중 — stlead.py 첫 실행이 끝나면 표시됩니다(매일 05:20 자동 갱신).</div>'; return;}
       D=d; if(!D.targets[cur]) cur=Object.keys(D.targets)[0];
