@@ -131,7 +131,7 @@ def main():
     flagged = [tk for tk, v in out_t.items() if v.get("flag")]
     OUT.write_text(json.dumps({
         "asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "since": min(min(hist), default=""), "snapshots": len(hist),
+        "since": min(hist) if hist else "", "snapshots": len(hist),
         "scored": n_scored, "targets": out_t, "crash": crash, "flagged": flagged,
         "note": ("실전 채점 — 스냅샷(매일 05:20 적재)의 만기 도래 예측 vs 실제. "
                  "기준: F1 오차>백테스트×2, F2 최근3회 방향오답≥2, F3 ±1.5σ 이탈. "
