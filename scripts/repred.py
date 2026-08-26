@@ -121,21 +121,30 @@ def mask_y(Y, h, upto):
     return [Y[i] if (Y[i] is not None and i + h <= upto) else None for i in range(len(Y))]
 
 
-def scan(feat, Ymasks, keys, t_last, upto, h):
-    """지평 h 의 출전표: [(k, lag, r, z, mu, sd)] — 시차·r·현재 z 값.
-    r 은 h개월 누적 로그변화율(목표 그 자체)과의 상관 — 시차는 [h, MAXLAG]."""
+def scan(feat, Ymasks, keys, t_last, upto, h, usable=True):
+    """지평 h 의 출전표: [(k, lag, r, z)] — 시차·r·현재 z 값.
+    r 은 h개월 누적 로그변화율(목표 그 자체)과의 상관 — 시차는 [h, MAXLAG].
+
+    (2026-08-26) usable=True: **입력값이 존재하는 시차만** 후보로 — 연간·분기 지표
+    (GDP·GRDP·소득·K-HAI 등)는 공표 지연 때문에 전역 최적 시차의 입력이 미래라
+    그 지평에서 통째로 탈락했다(서울·전국 '—' 감사, C유형 다수). 지표를 버리는 대신
+    차선 시차로 출전시킨다 — relead 의 '시차를 옮긴다' 원칙과 동일."""
     cut = (upto if upto is not None else t_last) + 1
     Y = Ymasks[h]
     rows = []
     for k in keys:
         x = feat[k]
-        bl, bc = h, 0.0
+        bl, bc = None, 0.0
         for L in range(h, MAXLAG + 1):
+            if usable:
+                j = t_last - (L - h)
+                if not (0 <= j < len(x)) or x[j] is None:
+                    continue
             xs = [None] * L + x[:cut - L] if L else x[:cut]
             c, _ = R.corr(xs, Y[:cut])
             if abs(c) > abs(bc):
                 bl, bc = L, c
-        if bc == 0.0:
+        if bl is None or bc == 0.0:
             continue
         j = t_last - (bl - h)
         v = x[j] if 0 <= j < len(x) else None
@@ -218,11 +227,21 @@ def ridge_h(feat, prices, ytr, keys, h, t_last, lam, upto=None):
     cut = (upto if upto is not None else t_last) + 1
     lags = {}
     for k in keys:
-        L, c = R.best_lag_ge(feat[k][:cut], ytr[:cut], h)
-        lags[k] = {"lag": L, "corr": c}
-    sel = [k for k in keys
-           if 0 <= t_last - (lags[k]["lag"] - h) < len(feat[k])
-           and feat[k][t_last - (lags[k]["lag"] - h)] is not None]
+        # (2026-08-26) 입력값이 존재하는 시차만 후보 — 공표 지연 지표(GDP·GRDP 등)를
+        #   전역 최적 시차의 입력 부재로 버리는 대신 차선 시차로 출전시킨다.
+        x = feat[k]
+        bl, bc = None, 0.0
+        for L in range(h, MAXLAG + 1):
+            j = t_last - (L - h)
+            if not (0 <= j < len(x)) or x[j] is None:
+                continue
+            xs = [None] * L + x[:cut - L] if L else x[:cut]
+            c, _ = R.corr(xs, ytr[:cut])
+            if abs(c) > abs(bc):
+                bl, bc = L, c
+        if bl is not None and bc != 0.0:
+            lags[k] = {"lag": bl, "corr": bc}
+    sel = list(lags)
     if not sel:
         return None
     X, Y, use = R.build_xy(feat, R.step_log(prices, h), h, lags, sel,
