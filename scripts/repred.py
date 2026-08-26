@@ -146,14 +146,56 @@ def scan(feat, Ymasks, keys, t_last, upto, h):
     return rows
 
 
-def comp_pred(rows, ym, ysd, keyset=None):
-    """합성 예측: ŷ = ȳ + sd_y·Σ w·r·z (w=|r|비례). keyset 을 주면 부분집합만."""
+def shift_arr(a, L, cut):
+    return ([None] * L + a[:cut - L]) if L else a[:cut]
+
+
+def group_budgets(gz, Y, cut, h):
+    """(2026-08-26 · V2 그룹예산) 그룹 합성계열의 지평별 최적시차 상관 = 그룹 발언 예산.
+
+    지표별 |r| 비례만 쓰면 같은 얘기를 하는 지표가 많은 그룹이 머릿수만큼 발언권을
+    가져간다(사용자 지적). 4파전 백테스트(서울·전국·경기)에서 성적은 사실상 동률
+    (V2 서울 11.62→11.51% 소폭 우세)이라, 구조적 정당성으로 V2 를 채택:
+    그룹 총 발언권 = |그룹 합성 r_h| 비례 (머릿수 아닌 정보량 기준),
+    그룹 안에서는 |r_h| 비례로 나눈다. 시차는 그룹 합성계열로 [h, MAXLAG] 재탐색."""
+    out = {}
+    for g, a in gz.items():
+        best = 0.0
+        for L in range(h, MAXLAG + 1):
+            c, _ = R.corr(shift_arr(a, L, cut), Y[:cut])
+            if abs(c) > abs(best):
+                best = c
+        if best:
+            out[g] = abs(best)
+    return out
+
+
+def comp_pred(rows, ym, ysd, keyset=None, grp=None, bud=None):
+    """합성 예측: ŷ = ȳ + sd_y·Σ w·r·z.
+    grp·bud 가 있으면 V2 그룹예산(그룹 합성 r 비례 × 그룹 내 |r| 비례),
+    없으면 순수 |r| 비례. 반환: (ŷ, cont{k}, unit{k}=w·r·sd_y — 시나리오 ±1σ 용)."""
     rr = [r for r in rows if keyset is None or r[0] in keyset]
     if not rr:
-        return None, {}
-    wsum = sum(abs(c) for _, _, c, _ in rr) or 1.0
-    cont = {k: (abs(c) / wsum) * c * z * ysd for k, L, c, z in rr}
-    return ym + sum(cont.values()), cont
+        return None, {}, {}
+    w = {}
+    if grp and bud is not None:
+        from collections import defaultdict
+        G = defaultdict(list)
+        for r0 in rr:
+            G[grp.get(r0[0], "기타")].append(r0)
+        bud2 = {g: (bud.get(g) or max(abs(c) for _, _, c, _ in mem)) for g, mem in G.items()}
+        tb = sum(bud2.values()) or 1.0
+        for g, mem in G.items():
+            wg = sum(abs(c) for _, _, c, _ in mem) or 1.0
+            for k, L, c, z in mem:
+                w[k] = (abs(c) / wg) * (bud2[g] / tb)
+    else:
+        wsum = sum(abs(c) for _, _, c, _ in rr) or 1.0
+        for k, L, c, z in rr:
+            w[k] = abs(c) / wsum
+    cont = {k: w[k] * c * z * ysd for k, L, c, z in rr}
+    unit = {k: w[k] * c * ysd for k, L, c, z in rr}
+    return ym + sum(cont.values()), cont, unit
 
 
 def ystats(prices, h, upto):
@@ -166,8 +208,9 @@ def ystats(prices, h, upto):
     return Y, ym, ysd
 
 
-def backtest_multi(feat, prices, keys, keysets, origins=BT_ORIGINS):
-    """여러 지표집합을 한 번의 워크포워드로 채점 — 시차 탐색(scan)은 합집합에 1회."""
+def backtest_multi(feat, prices, keys, keysets, origins=BT_ORIGINS, grp=None, gz=None):
+    """여러 지표집합을 한 번의 워크포워드로 채점 — 시차 탐색(scan)은 합집합에 1회.
+    grp·gz 를 주면 V2 그룹예산 가중(본 모델과 동일 규칙으로 채점)."""
     n = len(prices)
     res = {name: {h: {"e": [], "ne": [], "pr": [], "hit": [0, 0]} for h in range(1, HZ + 1)}
            for name in keysets}
@@ -189,8 +232,9 @@ def backtest_multi(feat, prices, keys, keysets, origins=BT_ORIGINS):
             if act is None or act <= 0:
                 continue
             rows = scan(feat, Ymasks, keys, o, o, h)
+            bud = group_budgets(gz, Ymasks[h], o + 1, h) if (grp and gz) else None
             for name, ks in keysets.items():
-                g, _ = comp_pred(rows, yms[h], ysds[h], ks)
+                g, _, _ = comp_pred(rows, yms[h], ysds[h], ks, grp=grp, bud=bud)
                 if g is None:
                     continue
                 p = prices[o] * math.exp(g)
@@ -240,6 +284,24 @@ def zscore(seq):
     mu, sd = mstd(v)
     sd = sd or 1.0
     return [None if x is None else (x - mu) / sd for x in seq]
+
+
+def group_z(feat, keys, meta):
+    """그룹별 합성계열 — 멤버(변환 후)의 z-점수 평균. 그룹예산의 재료."""
+    from collections import defaultdict
+    G = defaultdict(list)
+    for k in keys:
+        G[meta[k]["group"]].append(k)
+    gz = {}
+    for g, mem in G.items():
+        zs_ = [z for z in (zscore(feat[k]) for k in mem) if z and any(v is not None for v in z)]
+        if not zs_:
+            continue
+        n = len(zs_[0])
+        gz[g] = [(sum(z[i] for z in zs_ if z[i] is not None) /
+                  max(1, sum(1 for z in zs_ if z[i] is not None)))
+                 if any(z[i] is not None for z in zs_) else None for i in range(n)]
+    return gz
 
 
 def main():
@@ -359,9 +421,17 @@ def main():
         for h in DISP_H:
             for (k, L, c, z) in rows_h.get(h, []):
                 lead[k][f"lag{h}"], lead[k][f"r{h}"] = L, round(c, 3)
-        r12s = sum(abs(lead[k].get("r12") or 0) for k in keys) or 1.0
+        # (2026-08-26 · V2) 그룹예산 가중 — 그룹 합성계열과 지평별 예산
+        grp = {k: meta[k]["group"] for k in keys}
+        gz = group_z(feat, keys, meta)
+        bud_h = {h: group_budgets(gz, Ymasks[h], t_last + 1, h) for h in Ymasks}
+        # 표시용 w12 = 실제 12M 가중치(그룹예산 반영)
+        _, _, u12 = comp_pred(rows_h.get(12, []), yms.get(12, 0), 1.0,
+                              grp=grp, bud=bud_h.get(12, {}))
+        r12map = {k: c for k, L, c, z in rows_h.get(12, [])}
         for k in keys:
-            lead[k]["w12"] = round(abs(lead[k].get("r12") or 0) / r12s, 4)
+            w = abs(u12.get(k, 0.0) / r12map[k]) if r12map.get(k) else 0.0
+            lead[k]["w12"] = round(w, 4)
 
         # 그룹 합성 r (표시용)
         groups = []
@@ -379,15 +449,15 @@ def main():
             if n:
                 groups.append({"name": g, "members": mem, "lag": L, "corr": round(c, 3), "n": n})
 
-        # 백테스트(전 지표) → 예측 + 보정·평활·가드·밴드
-        bt = backtest_multi(feat, prices, keys, {"all": set(keys)})["all"]
+        # 백테스트(전 지표·그룹예산 동일 규칙) → 예측 + 평활·가드·밴드
+        bt = backtest_multi(feat, prices, keys, {"all": set(keys)}, grp=grp, gz=gz)["all"]
         pred, g_raw = {}, {}
         for h in sorted(Ymasks):
-            g, cont = comp_pred(rows_h[h], yms[h], ysds[h])
+            g, cont, unit = comp_pred(rows_h[h], yms[h], ysds[h], grp=grp, bud=bud_h[h])
             if g is None:
                 continue
             calib = (bt["by_h"].get(h) or {}).get("calib", 0.0) or 0.0
-            g_raw[h] = (g, cont, calib)
+            g_raw[h] = (g, cont, calib, unit)
         gs, guard = {}, {}
         for h in sorted(g_raw):
             # (2026-08-23) calib 곱하지 않음 — 선택/평가 분리 실측에서 raw 가 전 지역 최선
@@ -414,14 +484,13 @@ def main():
             fut["price"][h - 1] = round(p, 1)
             fut["lo"][h - 1] = round(p * math.exp(-z128 * sd), 1)
             fut["hi"][h - 1] = round(p * math.exp(z128 * sd), 1)
-            g, cont, calib = g_raw[h]
+            g, cont, calib, unit = g_raw[h]
             pred[h] = {"g": round(v, 5), "price": round(p, 1),
                        "base": round(yms[h], 5), "calib": round(calib, 3),
                        "bsd": round(sd, 4),
                        "gb": [round(glo, 4), round(ghi, 4)] if glo is not None else None,
                        "cont": {k: round(c2, 5) for k, c2 in cont.items() if abs(c2) > 5e-6},
-                       "unit": {k: round((abs(c) / (sum(abs(c3) for _, _, c3, _ in rows_h[h]) or 1)) * c * ysds[h], 5)
-                                for k, L, c, zv in rows_h[h]}}
+                       "unit": {k: round(u2, 5) for k, u2 in unit.items()}}
         out_pred[reg] = {"past": t_last, "ext": ext, "fut": fut, "pred": pred,
                          "groups": groups, "bt": bt,
                          "last": {"t": T[t_last], "price": round(base_p, 1)}}
@@ -432,9 +501,10 @@ def main():
     OUT.write_text(json.dumps({
         "asof": R.NOW.strftime("%Y-%m-%d %H:%M"),
         "src": "한국부동산원 실거래 중위가 + 선행지표 38종 — r-가중 합성(릿지 미사용)",
-        "note": ("지평별로 시차≥h 에서 r 최대 시차를 찾고, 가중치=|r| 비례로 합성. "
-                 "워크포워드 백테스트 보정. 참고용이며 투자권유가 아님."),
-        "method": "ŷ_h = ȳ_h + sd_y·Σ w_k·r_k·z_k (w=|r|/Σ|r|, 시차≥h) × calib",
+        "note": ("지평별로 시차≥h 에서 r 최대 시차를 찾고, V2 그룹예산 가중으로 합성 "
+                 "(그룹 총 발언권=|그룹 합성 r_h| 비례 → 그룹 내 |r_h| 비례 — 머릿수 과대반영 방지). "
+                 "보정계수 미적용(실측). 참고용이며 투자권유가 아님."),
+        "method": "ŷ_h = ȳ_h + sd_y·Σ w_k·r_k·z_k (w=그룹예산×그룹내 |r| 비례, 시차≥h)",
         "t": T, "horizon": HZ, "regions": [r for r in R.SIDO if r in out_pred],
         "meta": meta, "group_order": GROUP_ORDER,
         "price": out_price, "pred": out_pred, "lead": out_lead,
