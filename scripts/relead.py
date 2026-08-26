@@ -811,6 +811,26 @@ def main():
         D[key] = D.pop(kback, {})
         for reg, mp in recent.items():
             D[key].setdefault(reg, {}).update(mp)
+        # (2026-08-26) 전국 백필 — 2007~ 백필이 시도 '계' 행만 채워 전국은 2022~ 53개월뿐이었다
+        #   (실측: RE 예측 탭 전국에서 미분양 r=0.000·전 지평 탈락 — 최소표본 48 미달).
+        #   미분양은 호수라 시도 합 = 전국. 17개 시도(세종 제외 달 감안, 14곳 이상 있는 달만) 합산으로
+        #   전국의 빈 달을 채운다 — 이미 값 있는 달(공표치)은 건드리지 않는다.
+        nat = D[key].setdefault("전국", {})
+        sidos = [r for r in D[key] if r not in ("전국",)]
+        acc = {}
+        for r in sidos:
+            for t, v in D[key][r].items():
+                if v is not None:
+                    a = acc.setdefault(t, [0, 0])
+                    a[0] += v
+                    a[1] += 1
+        added = 0
+        for t, (s, cnt) in acc.items():
+            if t not in nat and cnt >= 14:
+                nat[t] = s
+                added += 1
+        if added:
+            print(f"    {key} 전국 백필: 시도 합산으로 {added}개월 보충 (총 {len(nat)}개월)")
     tgt = from_hub(hub, TARGET)
     # 파생 ①: 서울 중위가를 타 지역의 후보 지표로 (서울→수도권→지방 순차 확산 가설).
     #   서울 자신에게는 목표와 동일한 계열이라 제외한다. 시차 탐색이 '몇 달 뒤 번지는지'를 찾는다.
