@@ -202,13 +202,24 @@ def comp_pred(rows, ym, ysd, keyset=None, grp=None, bud=None):
 # 3파전 실측(V2 그룹예산 vs 데이터 클러스터 vs 릿지 · 39지표·48시점·지평 7개):
 #   릿지가 전 지역·전 지평 압승 — 서울 2.34%/91.7% vs V2 10.12%/69.6% vs C50 9.51%/70.2%.
 #   V2·클러스터는 오차 기준으로 단순예측을 거의 못 이겼다(방향만 우위).
-#   → 예측 엔진을 릿지로 전환. 시차는 표와 동일하게 scan(목표 h개월 누적변화율 기준)을 쓰고,
+#   → 예측 엔진을 릿지로 전환. 시차 탐색은 relead 와 같이 전년비(ytr) 기준 —
+#     표의 시차·r 열(scan, 목표 기준)은 진단용으로 유지하되 엔진과 기준이 다름을 문서화.
 #     기여도 분해(cont=β·z, unit=β)로 화면의 가중치 배수·±1σ 시나리오 조절을 그대로 지원한다.
-def ridge_h(feat, prices, keys, rows, h, t_last, lam, upto=None):
-    """지평 h 릿지 예측. rows=scan 결과(시차·r — 표와 동일 기준).
+def ridge_h(feat, prices, ytr, keys, h, t_last, lam, upto=None):
+    """지평 h 릿지 예측 — 3파전에서 검증된 구성 그대로(시차 탐색은 relead 와 같이
+    전년비(ytr) 기준. 처음에 표와 맞추려 목표(step) 기준 시차를 썼더니 장지평에서
+    시차 재선택이 널뛰며 26M -40% ↔ 27M +49% 점프가 났다 — 실측 2026-08-26).
     반환: {g, ym, cont{k}=β·z(현재 기여), beta{k}(±1σ 시나리오용)} 또는 None."""
-    lags = {k: {"lag": L, "corr": c} for k, L, c, z in rows}
-    sel = list(lags)
+    cut = (upto if upto is not None else t_last) + 1
+    lags = {}
+    for k in keys:
+        L, c = R.best_lag_ge(feat[k][:cut], ytr[:cut], h)
+        lags[k] = {"lag": L, "corr": c}
+    sel = [k for k in keys
+           if 0 <= t_last - (lags[k]["lag"] - h) < len(feat[k])
+           and feat[k][t_last - (lags[k]["lag"] - h)] is not None]
+    if not sel:
+        return None
     X, Y, use = R.build_xy(feat, R.step_log(prices, h), h, lags, sel,
                            upto=(upto if upto is not None else t_last), force=sel)
     while len(X) < 60 and len(sel) > 3:
@@ -227,7 +238,7 @@ def ridge_h(feat, prices, keys, rows, h, t_last, lam, upto=None):
     return {"g": g, "ym": m["ym"], "cont": cont, "beta": beta}
 
 
-def bt_ridge(feat, prices, keys, lam, origins=BT_ORIGINS):
+def bt_ridge(feat, prices, ytr, keys, lam, origins=BT_ORIGINS):
     """릿지 워크포워드 백테스트 — backtest_multi 와 같은 통계(mape·sd·naive·calib·hit)."""
     n = len(prices)
     res = {h: {"e": [], "ne": [], "pr": [], "hit": [0, 0]} for h in range(1, HZ + 1)}
@@ -238,13 +249,7 @@ def bt_ridge(feat, prices, keys, lam, origins=BT_ORIGINS):
             act = prices[o + h] if o + h < n else None
             if act is None or act <= 0:
                 continue
-            Y, ym, ysd = ystats(prices, h, o)
-            if Y is None:
-                continue
-            rows = scan(feat, {h: mask_y(Y, h, o)}, keys, o, o, h)
-            if not rows:
-                continue
-            r2 = ridge_h(feat, prices, keys, rows, h, o, lam, upto=o)
+            r2 = ridge_h(feat, prices, ytr, keys, h, o, lam, upto=o)
             if not r2:
                 continue
             p = prices[o] * math.exp(max(-1.2, min(1.2, r2["g"])))
@@ -532,10 +537,10 @@ def main():
                 groups.append({"name": g, "members": mem, "lag": L, "corr": round(c, 3), "n": n})
 
         # (2026-08-26) 백테스트·예측 모두 릿지 — 3파전 압승으로 사용자 확정
-        bt = bt_ridge(feat, prices, keys, lam)
+        bt = bt_ridge(feat, prices, ytr, keys, lam)
         pred, g_raw = {}, {}
         for h in sorted(Ymasks):
-            r2 = ridge_h(feat, prices, keys, rows_h[h], h, t_last, lam)
+            r2 = ridge_h(feat, prices, ytr, keys, h, t_last, lam)
             if not r2:
                 continue
             calib = (bt["by_h"].get(h) or {}).get("calib", 0.0) or 0.0
