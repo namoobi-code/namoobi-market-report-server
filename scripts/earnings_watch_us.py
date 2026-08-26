@@ -87,6 +87,20 @@ def main():
             gap = (datetime.fromisoformat(r["ed"]).date() - datetime.fromisoformat(q).date()).days
             if not (0 <= gap <= 100):
                 continue
+            # (2026-08-23) gap 70일 초과는 **그날 실적 8-K(2.02) 접수가 있을 때만** 믿는다.
+            # 분기말→발표 통상 20~60일인데, 야후 예정일(ed)이 틀리면 70~100일 구간에서
+            # **직전 분기 실제치가 이번 발표로 오인**돼 붙는다.
+            #   실측 CRM(Salesforce) — 실제 발표는 8/26 예정인데 야후 ed 가 8/5 로 잘못
+            #   들어와, 5월 말 발표된 직전 분기 EPS 3.88(gap 97일)이 8/5 레코드에
+            #   '어닝비트 +24%' 로 붙었다. 그 오염이 달력의 발표 완료 판정까지 왜곡했다.
+            # 진짜 발표라면 8-K 감시기가 같은 날 실적(2.02) 레코드를 만들어 두므로,
+            # 그 교차 확인이 없는 장거리 gap 은 채택하지 않는다(다음 폴링에서 재시도).
+            if gap > 70:
+                _d8 = r["ed"].replace("-", "")
+                _prev = next((z for z in days.get(_d8, []) if z["c"] == sym), None)
+                if not (_prev and (_prev.get("ern") == 1
+                                   or any("(실적)" in t for t in _prev.get("tags") or []))):
+                    continue
         except Exception:
             pass
         ea = (x.get("epsActual") or {}).get("raw")
@@ -103,6 +117,7 @@ def main():
         d8 = r["ed"].replace("-", "")
         it = {"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
               "eps": ea, "est": ee, "spr": sp, "tags": tg,
+              "ern": 1,                                # (2026-08-23) 실적 매칭 레코드임을 명시
               "t": datetime.now().strftime("%H:%M")}
         if sym in core:
             it["core"] = 1                             # 핵심 리스트 — 스트립 항상 표시

@@ -102,6 +102,43 @@ def main():
         if age > hrs: out["alerts"].append(f"[신선도] {name} {age}시간 전 — 기대 {hrs}시간 이내(크론 확인)")
     out["checks"]["freshness"] = fr
 
+    # D-2. 달력 무결성 — 발표 예정 대형주가 달력에서 사라지지 않는가 (2026-08-23)
+    # 실측 사고: NVDA 8/17 일반 8-K 가 '발표 완료'로 오인돼 8/26 발표 예정 칸에서
+    # 시총 1위가 사라졌다(화면 필터가 레코드 존재만 보고 판정). 화면과 같은 로직을
+    # 서버에서 재현해, 향후 14일 내 발표 예정(ed)인 시총 \$100B+ 종목이 필터에 걸려
+    # 예정일 칸에서 지워지면 경보한다 — 이 부류(데이터 충돌로 인한 표시 누락)의 파수꾼.
+    try:
+        pool = json.load(open(os.path.join(DB, "screener_pool.json")))
+        live = json.load(open(os.path.join(DB, "earnings_live_us.json")))
+        byc = {}
+        for d8 in sorted((live.get("days") or {})):
+            for it in live["days"][d8]:
+                if isinstance(it, dict) and it.get("c"):
+                    byc[it["c"]] = dict(it, d8=d8)
+        t0 = dt.date.today()
+        hid = []
+        for r in (pool.get("us") or []):
+            ed = r.get("ed")
+            if not ed or (r.get("cap") or 0) < 100e9:
+                continue
+            try:
+                dd = (dt.date.fromisoformat(ed) - t0).days
+            except Exception:
+                continue
+            if not (0 <= dd <= 14):
+                continue
+            lv = byc.get(r["c"])
+            ern = bool(lv) and (lv.get("ern") == 1 if lv.get("ern") is not None
+                                else any(lv.get(k) is not None for k in ("eps", "spr")))
+            if ern and lv.get("d8") != ed.replace("-", ""):
+                hid.append(f"{r['c']}(예정 {ed} · 완료판정 {lv.get('d8')})")
+        out["checks"]["calendar"] = {"hidden": hid}
+        for h in hid[:3]:
+            out["alerts"].append(f"[달력] 발표 예정 대형주가 완료 판정에 가려짐 — {h}"
+                                 " (ern 플래그·야후 ed 확인 필요)")
+    except Exception as e:
+        out["checks"]["calendar"] = {"err": repr(e)[:80]}
+
     # E. 자원
     du = shutil.disk_usage("/")
     mem = {}

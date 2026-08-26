@@ -1107,7 +1107,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
          일반 8-K 가 발표 완료로 오인돼 **예정일 칸에서 종목이 사라진다**.
          실측 NVDA: 8/17 일반 8-K(eps=null) 때문에 8/26 발표 예정 칸에서 제거돼
          시총 1위가 달력에 안 보였다(CRM 도 동일 경로). */
-      const isErn=lv=>!!lv&&(lv.eps!=null||lv.spr!=null||lv.op_yoy!=null||lv.sales_yoy!=null);
+      /* (2026-08-23 2차) 수집기가 실적 여부를 ern 플래그로 명시 저장한다(8-K Item 2.02 판정).
+         플래그가 있으면 그것이 정답이고, 플래그 이전의 옛 레코드만 휴리스틱으로 추정한다. */
+      const isErn=lv=>!!lv&&(lv.ern!=null?lv.ern===1:(lv.eps!=null||lv.spr!=null||lv.op_yoy!=null||lv.sales_yoy!=null));
       if(LV){ for(const key in evs){ const k8=key.replace(/-/g,'');
         evs[key]=evs[key].filter(r=>{ const lv=LIVEBY[r.c]; return !isErn(lv) || lv.d8===k8; });
         if(!evs[key].length) delete evs[key]; } }

@@ -198,6 +198,92 @@ def comp_pred(rows, ym, ysd, keyset=None, grp=None, bud=None):
     return ym + sum(cont.values()), cont, unit
 
 
+# ══════════ (2026-08-26) 릿지 엔진 — 사용자 확정 ══════════
+# 3파전 실측(V2 그룹예산 vs 데이터 클러스터 vs 릿지 · 39지표·48시점·지평 7개):
+#   릿지가 전 지역·전 지평 압승 — 서울 2.34%/91.7% vs V2 10.12%/69.6% vs C50 9.51%/70.2%.
+#   V2·클러스터는 오차 기준으로 단순예측을 거의 못 이겼다(방향만 우위).
+#   → 예측 엔진을 릿지로 전환. 시차는 표와 동일하게 scan(목표 h개월 누적변화율 기준)을 쓰고,
+#     기여도 분해(cont=β·z, unit=β)로 화면의 가중치 배수·±1σ 시나리오 조절을 그대로 지원한다.
+def ridge_h(feat, prices, keys, rows, h, t_last, lam, upto=None):
+    """지평 h 릿지 예측. rows=scan 결과(시차·r — 표와 동일 기준).
+    반환: {g, ym, cont{k}=β·z(현재 기여), beta{k}(±1σ 시나리오용)} 또는 None."""
+    lags = {k: {"lag": L, "corr": c} for k, L, c, z in rows}
+    sel = list(lags)
+    X, Y, use = R.build_xy(feat, R.step_log(prices, h), h, lags, sel,
+                           upto=(upto if upto is not None else t_last), force=sel)
+    while len(X) < 60 and len(sel) > 3:
+        sel.remove(min(sel, key=lambda k: sum(1 for v in feat[k] if v is not None)))
+        X, Y, use = R.build_xy(feat, R.step_log(prices, h), h, lags, sel,
+                               upto=(upto if upto is not None else t_last), force=sel)
+    if len(X) < 36:
+        return None
+    m = R.ridge_fit(X, Y, lam=lam)
+    if not m:
+        return None
+    row = [feat[k][t_last - (lags[k]["lag"] - h)] for k in use]
+    g = R.ridge_pred(m, row)
+    cont = {k: m["beta"][j] * (row[j] - m["mu"][j]) / m["sd"][j] for j, k in enumerate(use)}
+    beta = {k: m["beta"][j] for j, k in enumerate(use)}
+    return {"g": g, "ym": m["ym"], "cont": cont, "beta": beta}
+
+
+def bt_ridge(feat, prices, keys, lam, origins=BT_ORIGINS):
+    """릿지 워크포워드 백테스트 — backtest_multi 와 같은 통계(mape·sd·naive·calib·hit)."""
+    n = len(prices)
+    res = {h: {"e": [], "ne": [], "pr": [], "hit": [0, 0]} for h in range(1, HZ + 1)}
+    for o in range(n - HZ - origins, n - HZ):
+        if o < 60 or prices[o] is None:
+            continue
+        for h in range(1, HZ + 1):
+            act = prices[o + h] if o + h < n else None
+            if act is None or act <= 0:
+                continue
+            Y, ym, ysd = ystats(prices, h, o)
+            if Y is None:
+                continue
+            rows = scan(feat, {h: mask_y(Y, h, o)}, keys, o, o, h)
+            if not rows:
+                continue
+            r2 = ridge_h(feat, prices, keys, rows, h, o, lam, upto=o)
+            if not r2:
+                continue
+            p = prices[o] * math.exp(max(-1.2, min(1.2, r2["g"])))
+            b = res[h]
+            b["e"].append(abs(p - act) / act)
+            b["ne"].append(abs(prices[o] - act) / act)
+            b["pr"].append((math.log(p / prices[o]), math.log(act / prices[o])))
+            b["hit"][0] += 1
+            b["hit"][1] += 1 if (p > prices[o]) == (act > prices[o]) else 0
+    by_h = {}
+    for h in range(1, HZ + 1):
+        b = res[h]
+        if not b["e"]:
+            continue
+        mape = sum(b["e"]) / len(b["e"])
+        sd = math.sqrt(sum((x - mape) ** 2 for x in b["e"]) / len(b["e"])) if len(b["e"]) > 1 else 0.0
+        nv = sum(b["ne"]) / len(b["ne"]) if b["ne"] else None
+        calib = 0.0
+        pr = b["pr"]
+        if len(pr) >= 12:
+            mx = sum(a for a, _ in pr) / len(pr)
+            my = sum(y for _, y in pr) / len(pr)
+            vxx = sum((a - mx) ** 2 for a, _ in pr)
+            cxy = sum((a - mx) * (y - my) for a, y in pr)
+            if vxx > 1e-12:
+                calib = max(0.0, min(1.5, cxy / vxx))
+        by_h[h] = {"mape": round(mape * 100, 2), "sd": round(sd * 100, 2),
+                   "naive": round(nv * 100, 2) if nv else None,
+                   "skill": round(max(0.0, min(1.0, 1 - mape / nv)), 3) if nv else 0.0,
+                   "calib": round(calib, 3), "n": len(b["e"]),
+                   "hit": round(100 * b["hit"][1] / b["hit"][0], 1) if b["hit"][0] else None}
+    alle = [x for h in res for x in res[h]["e"]]
+    allh = [res[h]["hit"] for h in res if res[h]["hit"][0]]
+    return {"by_h": by_h,
+            "mape": round(100 * sum(alle) / len(alle), 2) if alle else None,
+            "hit": round(100 * sum(a[1] for a in allh) / sum(a[0] for a in allh), 1) if allh else None,
+            "n": len(alle), "origins": origins}
+
+
 def ystats(prices, h, upto):
     Y = R.step_log(prices, h)
     lim = (upto + 1 - h) if upto is not None else len(Y)
@@ -421,17 +507,13 @@ def main():
         for h in DISP_H:
             for (k, L, c, z) in rows_h.get(h, []):
                 lead[k][f"lag{h}"], lead[k][f"r{h}"] = L, round(c, 3)
-        # (2026-08-26 · V2) 그룹예산 가중 — 그룹 합성계열과 지평별 예산
-        grp = {k: meta[k]["group"] for k in keys}
-        gz = group_z(feat, keys, meta)
-        bud_h = {h: group_budgets(gz, Ymasks[h], t_last + 1, h) for h in Ymasks}
-        # 표시용 w12 = 실제 12M 가중치(그룹예산 반영)
-        _, _, u12 = comp_pred(rows_h.get(12, []), yms.get(12, 0), 1.0,
-                              grp=grp, bud=bud_h.get(12, {}))
+        # (2026-08-26 · 릿지 전환) 표시용 w12 = |12M r|/Σ|12M r| (pf 와 동일 — 진단용 표시).
+        #   실제 예측 영향은 릿지 β·기여도(cont)가 담당한다.
         r12map = {k: c for k, L, c, z in rows_h.get(12, [])}
+        r12s = sum(abs(c) for c in r12map.values()) or 1.0
         for k in keys:
-            w = abs(u12.get(k, 0.0) / r12map[k]) if r12map.get(k) else 0.0
-            lead[k]["w12"] = round(w, 4)
+            lead[k]["w12"] = round(abs(r12map.get(k, 0.0)) / r12s, 4)
+        lam = (rl["pred"].get(reg) or {}).get("lam") or 1.0   # relead 지역별 λ 재사용
 
         # 그룹 합성 r (표시용)
         groups = []

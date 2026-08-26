@@ -465,11 +465,23 @@ def main():
                 cur["acc"] = ac.group(1); cur["cik"] = cik
                 cur.update(gd)                      # 가이던스 갭 필드(g_rev·g_rev_gap·g_eps·g_eps_gap)
                 if is_core: cur["core"] = 1
+                # (2026-08-23) 실적 여부를 **명시 저장** — 실적(2.02)이면 1로 승격,
+                # 일반 8-K 면 기존 판정을 건드리지 않는다.
+                if is_ern:
+                    cur["ern"] = 1
+                elif "ern" not in cur:
+                    cur["ern"] = 0
                 new += 1
         else:
             r = pool_us.get(sym) or {}
+            # (2026-08-23) **ern 플래그** — 이 레코드가 실적 발표(Item 2.02)인지 명시한다.
+            # 종전엔 is_ern 을 판정하고도 저장하지 않아, 화면이 'eps 매칭 존재' 같은
+            # 휴리스틱으로 실적 여부를 추정해야 했다. 그 휴리스틱이 실측 사고를 냈다:
+            #   NVDA — 8/17 일반 8-K(임원 공시)가 발표 완료로 오인돼 달력 8/26 발표 예정
+            #   칸에서 시총 1위가 사라졌다. 수집 시점에 아는 사실은 수집 시점에 기록한다.
             it2 = {"c": sym, "n": r.get("kn") or r.get("n") or sym, "cap": r.get("cap"),
                    "eps": None, "est": None, "spr": None, "tags": [tag],
+                   "ern": 1 if is_ern else 0,
                    "acc": ac.group(1), "cik": cik, "t": datetime.now().strftime("%H:%M"), **gd}
             if is_core: it2["core"] = 1
             lst.append(it2)
