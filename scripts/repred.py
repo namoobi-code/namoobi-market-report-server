@@ -531,15 +531,15 @@ def main():
             if n:
                 groups.append({"name": g, "members": mem, "lag": L, "corr": round(c, 3), "n": n})
 
-        # 백테스트(전 지표·그룹예산 동일 규칙) → 예측 + 평활·가드·밴드
-        bt = backtest_multi(feat, prices, keys, {"all": set(keys)}, grp=grp, gz=gz)["all"]
+        # (2026-08-26) 백테스트·예측 모두 릿지 — 3파전 압승으로 사용자 확정
+        bt = bt_ridge(feat, prices, keys, lam)
         pred, g_raw = {}, {}
         for h in sorted(Ymasks):
-            g, cont, unit = comp_pred(rows_h[h], yms[h], ysds[h], grp=grp, bud=bud_h[h])
-            if g is None:
+            r2 = ridge_h(feat, prices, keys, rows_h[h], h, t_last, lam)
+            if not r2:
                 continue
             calib = (bt["by_h"].get(h) or {}).get("calib", 0.0) or 0.0
-            g_raw[h] = (g, cont, calib, unit)
+            g_raw[h] = (max(-1.2, min(1.2, r2["g"])), r2["cont"], calib, r2["beta"], r2["ym"])
         gs, guard = {}, {}
         for h in sorted(g_raw):
             # (2026-08-23) calib 곱하지 않음 — 선택/평가 분리 실측에서 raw 가 전 지역 최선
@@ -566,13 +566,13 @@ def main():
             fut["price"][h - 1] = round(p, 1)
             fut["lo"][h - 1] = round(p * math.exp(-z128 * sd), 1)
             fut["hi"][h - 1] = round(p * math.exp(z128 * sd), 1)
-            g, cont, calib, unit = g_raw[h]
+            g, cont, calib, beta, ymh = g_raw[h]
             pred[h] = {"g": round(v, 5), "price": round(p, 1),
-                       "base": round(yms[h], 5), "calib": round(calib, 3),
+                       "base": round(ymh, 5), "calib": round(calib, 3),
                        "bsd": round(sd, 4),
                        "gb": [round(glo, 4), round(ghi, 4)] if glo is not None else None,
                        "cont": {k: round(c2, 5) for k, c2 in cont.items() if abs(c2) > 5e-6},
-                       "unit": {k: round(u2, 5) for k, u2 in unit.items()}}
+                       "unit": {k: round(u2, 5) for k, u2 in beta.items()}}
         out_pred[reg] = {"past": t_last, "ext": ext, "fut": fut, "pred": pred,
                          "groups": groups, "bt": bt,
                          "last": {"t": T[t_last], "price": round(base_p, 1)}}
@@ -583,10 +583,11 @@ def main():
     OUT.write_text(json.dumps({
         "asof": R.NOW.strftime("%Y-%m-%d %H:%M"),
         "src": "한국부동산원 실거래 중위가 + 선행지표 38종 — r-가중 합성(릿지 미사용)",
-        "note": ("지평별로 시차≥h 에서 r 최대 시차를 찾고, V2 그룹예산 가중으로 합성 "
-                 "(그룹 총 발언권=|그룹 합성 r_h| 비례 → 그룹 내 |r_h| 비례 — 머릿수 과대반영 방지). "
-                 "보정계수 미적용(실측). 참고용이며 투자권유가 아님."),
-        "method": "ŷ_h = ȳ_h + sd_y·Σ w_k·r_k·z_k (w=그룹예산×그룹내 |r| 비례, 시차≥h)",
+        "note": ("지평별로 시차≥h 에서 r 최대 시차를 찾고(표와 동일 기준), 표준화 릿지 회귀로 예측 "
+                 "(2026-08-26 사용자 확정 — 3파전 실측: 릿지 서울 2.34%/91.7% vs V2 10.12% vs 클러스터 9.51%). "
+                 "가중치(12M) 열은 |r| 비례 진단용 표시이고, 실제 영향·조절은 릿지 기여도(β·z) 기준. "
+                 "참고용이며 투자권유가 아님."),
+        "method": "표준화 릿지: ŷ_h = ȳ + Σ β_k·z_k (시차≥h, λ=relead 지역별) · cont=β·z · unit=β",
         "t": T, "horizon": HZ, "regions": [r for r in R.SIDO if r in out_pred],
         "meta": meta, "group_order": GROUP_ORDER,
         "price": out_price, "pred": out_pred, "lead": out_lead,

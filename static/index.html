@@ -1080,10 +1080,10 @@
   <div class="pane" id="p_re" style="overflow:auto">
     <h2>🔮 RE 예측 — 실거래 중위가 장기차트·지평별 r·수동 조절 <em id="re_asof" style="font-weight:400"></em></h2>
     <p class="note" style="margin:2px 0 8px;line-height:1.7">
-      한국부동산원 실거래 중위가(2006~·3개월 평균)에 <b>r-가중 합성 예측</b>(지평별로 시차≥h에서 r 최대 시차를 찾고
-      가중치=|r| 비례로 합성한 원신호 — <b>릿지 회귀·보정계수를 쓰지 않는 투명 모델</b>)을 겹친다.
-      지표는 공급/수요·금융/심리/가격/거시/소득 그룹으로 묶고, 기사 통설 선행기간과 실측 시차를 나란히 표시.
-      지표별 가중치 배수(−/＋)·±1σ 시나리오(▲/▼)를 조절하면 예측선이 즉시 재계산된다. 참고용이며 투자권유가 아님.</p>
+      한국부동산원 실거래 중위가(2006~·3개월 평균)에 <b>표준화 릿지 회귀 예측</b>(지평별로 시차≥h에서 r 최대 시차를 찾고
+      중복 지표 발언을 자동 차감 — 2026-08-26 3파전 실측 압승으로 채택: 서울 2.34%/방향 91.7%)을 겹친다.
+      지표는 공급/수요·금융/심리/가격/거시/소득 그룹으로 묶고, 기사 통설 선행기간과 실측 시차·지평별 r을 나란히 표시(진단용).
+      지표별 가중치 배수(−/＋)·±1σ 시나리오(▲/▼)를 조절하면 릿지 기여도 기준으로 예측선이 즉시 재계산된다. 참고용이며 투자권유가 아님.</p>
     <div id="re_sum" style="margin-bottom:8px"><div class="note">불러오는 중…</div></div>
     <div id="re_tg" style="margin-bottom:6px"></div>
     <div id="re_ctl" style="margin-bottom:6px"></div>
@@ -1833,11 +1833,11 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=08261838"></script>
+<script src="/app.js?v=08261853"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260825b"></script><!-- (2026-08-22) Portfolio 탭 -->
-<script src="/re.js?v=20260826a"></script><!-- (2026-08-23) RE 예측 탭 -->
+<script src="/re.js?v=20260826b"></script><!-- (2026-08-23) RE 예측 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

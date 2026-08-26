@@ -1149,7 +1149,12 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
            나빠 빠지는 경우가 흔하다. 그래서 ①서프라이즈 ②가이던스/컨센 ③주가반응을 같이 둔다. */
         const pct=(v,d)=>v==null?null:`<b class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${(+v).toFixed(d==null?1:d)}%</b>`;
         const row=(r,i)=>{
-          const lv=LIVEBY[r.c];        // 발표 완료 → ✅ + 결과 요약
+          const lv0=LIVEBY[r.c];
+          /* (2026-08-23) 팝업도 isErn 기준 — 일반 8-K(임원·계약·RegFD) 레코드는 발표로
+             취급하지 않는다. 실측: NVDA 8/17 일반 8-K 의 '접수 08:41ET · 수치 대기'가
+             8/26 발표 예정 팝업에 ✅와 함께 새어 들어와, 발표가 이미 끝난 것처럼 보였다
+             (달력 칩과 같은 버그의 팝업 경로 — SEC 확인 결과 8/17 은 Item 1.01/2.03/7.01). */
+          const lv=isErn(lv0)?lv0:null;  // 발표 완료 → ✅ + 결과 요약
           const rv=lv?(mk==='us'?lv.spr:(lv.spr!=null?lv.spr:lv.op_yoy)):null;
           const t8p=lv&&(lv.tags||[]).find(t=>t.includes('접수'));
           const secU=(lv&&lv.cik&&lv.acc)?`https://www.sec.gov/Archives/edgar/data/${lv.cik}/${String(lv.acc).replace(/-/g,'')}/`:null;
