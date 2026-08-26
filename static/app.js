@@ -1102,8 +1102,14 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
           if(!lst.some(r=>r.c===it.c)) lst.push({c:it.c,n:it.n,cap:0}); } } }
       /* (2026-08-05) 발표 완료 종목은 '실제 발표일' 칸에만 — 예정일(ed)이 달라 다른 날에도
          적혀 있으면(예: 8/4 발표인데 예정일 8/5 칸에 그대로) 혼동되므로 그 칸에서 제거 */
+      /* (2026-08-23) '발표 완료' 판정은 **실적 매칭이 있는 레코드**만 — 핵심 리스트 종목은
+         실적이 아닌 일반 8-K(임원 변동·기타 공시)도 기록되는데, 레코드 존재만 보면 그
+         일반 8-K 가 발표 완료로 오인돼 **예정일 칸에서 종목이 사라진다**.
+         실측 NVDA: 8/17 일반 8-K(eps=null) 때문에 8/26 발표 예정 칸에서 제거돼
+         시총 1위가 달력에 안 보였다(CRM 도 동일 경로). */
+      const isErn=lv=>!!lv&&(lv.eps!=null||lv.spr!=null||lv.op_yoy!=null||lv.sales_yoy!=null);
       if(LV){ for(const key in evs){ const k8=key.replace(/-/g,'');
-        evs[key]=evs[key].filter(r=>{ const lv=LIVEBY[r.c]; return !lv || lv.d8===k8; });
+        evs[key]=evs[key].filter(r=>{ const lv=LIVEBY[r.c]; return !isErn(lv) || lv.d8===k8; });
         if(!evs[key].length) delete evs[key]; } }
       for(const d in evs) evs[d].sort((a,b)=>(b.cap||0)-(a.cap||0));
       const first=new Date(mcY,mcM,1), off=first.getDay(), dim=new Date(mcY,mcM+1,0).getDate();
@@ -1122,8 +1128,9 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const wd=i%7;
         const chips=list.slice(0,4).map(r=>{
           const lv=LIVEBY[r.c];                        // (2026-08-05) 발표 완료 종목 ✅ + 결과 툴팁
-          const tip=lv?` — 발표됨: 영업익YoY ${lv.op_yoy??'—'}% · 매출YoY ${lv.sales_yoy??'—'}%${(lv.tags||[]).length?' · '+lv.tags.join('·'):''}`:'';
-          return `<span class="mc-chip" title="${esc(mk==='kr'?r.n:((r.kn?r.kn+' · ':'')+r.n))} (${esc(r.c)}) 실적발표${esc(tip)}">${lv?'✅':''}${esc(mk==='kr'?r.n:(r.kn||r.c))}</span>`;}).join('')
+          const ern=isErn(lv);                         // (2026-08-23) 일반 8-K 는 ✅로 표시하지 않는다
+          const tip=ern?` — 발표됨: 영업익YoY ${lv.op_yoy??'—'}% · 매출YoY ${lv.sales_yoy??'—'}%${(lv.tags||[]).length?' · '+lv.tags.join('·'):''}`:'';
+          return `<span class="mc-chip" title="${esc(mk==='kr'?r.n:((r.kn?r.kn+' · ':'')+r.n))} (${esc(r.c)}) 실적발표${esc(tip)}">${ern?'✅':''}${esc(mk==='kr'?r.n:(r.kn||r.c))}</span>`;}).join('')
           +(list.length>4?`<span class="mc-more">+${list.length-4}종 더 보기</span>`:'');
         h+=`<div class="mc-cell ${inM?'':'out'} ${isT?'tdy':''} ${list.length?'has':''}" ${list.length?`data-k="${key}"`:''}
              title="${list.length?'클릭하면 이날 전체 '+list.length+'종 표시':''}"><div class="mc-d ${wd===0?'sun':wd===6?'sat':''}">${inM?dnum:''}</div>${inM?chips:''}</div>`;
