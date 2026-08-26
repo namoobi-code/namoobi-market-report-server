@@ -210,16 +210,22 @@
     const rc=v=>{const a=Math.abs(v);
       return `<span style="color:${v>0?'#d9534f':(v<0?'#2f6fed':'#666')};opacity:${a<.2?.45:1};font-weight:${a>=.5?700:400}">${(+v).toFixed(3)}</span>`;};
     const bsty='padding:0 3px;font-size:10.5px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
-    const NC=4+HZS.length*2+2;
+    const NC=4+HZS.length*3+1;
+    /* (2026-08-26) 지평별 가중치 = 그 지평 릿지 |β| 지분(조절 배수 반영) — 실제 엔진 발언권 */
+    const wShare=(h,k)=>{const p=(P.pred||{})[h]; if(!p||!p.unit) return null;
+      let s=0,v=null;
+      for(const j in p.unit){const a=Math.abs(p.unit[j])*mulOf(j); s+=a; if(j===k) v=a;}
+      return (v!=null&&s>0)?100*v/s:null;};
+    const wCell=(h,k)=>{const w=wShare(h,k);
+      return `<td class="num" style="color:${mulOf(k)!==1?'#b45309':'#555'}">${w!=null?w.toFixed(1)+'%':'—'}</td>`;};
     const indRow=k=>{const l=lead[k]; if(!l) return '';
       const m=D.meta[k]||{}, mv=mulOf(k), sv=scOf(k);
       const on=sel.includes(k), ci=sel.indexOf(k);
-      const hz=HZS.map(h=>`<td class="num">${l['lag'+h]!=null?l['lag'+h]+'M':'—'}</td><td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`).join('');
+      const hz=HZS.map(h=>`<td class="num">${l['lag'+h]!=null?l['lag'+h]+'M':'—'}</td><td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`+wCell(h,k)).join('');
       return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}" title="클릭=차트 겹쳐보기 · ${E((m.hint||'')+(m.src?' · '+m.src:''))}">
       <td style="padding-left:16px;white-space:nowrap">└ ${on?`<b style="color:${COLS[ci%COLS.length]}">✔ </b>`:''}${E(m.label||k)}</td>
       <td class="num" style="color:#98a2ad">${E(m.folk||'—')}</td>
       <td class="num">${l.lag}M</td><td class="num">${rc(l.corr)}</td>${hz}
-      <td class="num"><b style="color:${mv!==1?'#b45309':''}">${l.w12!=null?(l.w12*mv*100).toFixed(1)+'%':'—'}</b></td>
       <td class="num" style="white-space:nowrap">
         <button data-mm="${k}" data-d="-1" style="${bsty}" title="가중치 -0.1배">−</button><b style="color:${mv!==1?'#b45309':'#333'}">${mv.toFixed(1)}</b><button data-mm="${k}" data-d="1" style="${bsty}" title="가중치 +0.1배">＋</button>
         <button data-ms="${k}" data-s="1" style="${bsty};${sv===1?'background:#d9534f;color:#fff;border-color:#d9534f':''}" title="이 지표가 1σ 오른다고 가정">▲</button><button data-ms="${k}" data-s="-1" style="${bsty};${sv===-1?'background:#2f6fed;color:#fff;border-color:#2f6fed':''}" title="이 지표가 1σ 내린다고 가정">▼</button></td></tr>`;};
@@ -235,30 +241,30 @@
       if(!mem.length) return;
       mem.forEach(k=>used.add(k));
       body+=`<tr style="background:#f4f6f8"><td style="white-space:nowrap"><b>▣ ${E(gn)}</b> <span class="note">×${mem.length}</span></td>
-        <td class="num">—</td><td class="num">${g?g.lag+'M':'—'}</td><td class="num">${g?rc(g.corr):'—'}</td>${('<td class="num">—</td>').repeat(HZS.length*2)}
-        <td class="num"><b>${(mem.reduce((s,k)=>s+(lead[k].w12||0)*mulOf(k),0)*100).toFixed(1)}%</b></td><td></td></tr>`
+        <td class="num">—</td><td class="num">${g?g.lag+'M':'—'}</td><td class="num">${g?rc(g.corr):'—'}</td>${
+        HZS.map(h=>{const gw=mem.reduce((s,k)=>s+(wShare(h,k)||0),0);
+          return `<td class="num">—</td><td class="num">—</td><td class="num"><b>${gw?gw.toFixed(1)+'%':'—'}</b></td>`;}).join('')}
+        <td></td></tr>`
         +mem.map(indRow).join('');
     });
     const rest=Object.keys(lead).filter(k=>!used.has(k))
       .sort((a,b)=>Math.abs(lead[b].r12||0)-Math.abs(lead[a].r12||0));
     if(rest.length)
       body+=`<tr style="background:#f4f6f8"><td colspan="${NC}"><b>▣ 기타</b></td></tr>`+rest.map(indRow).join('');
-    const wSum=Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(k),0);
     $('re_ind').innerHTML=`<div style="text-align:right;margin:1px 0"><button id="re_rst" style="${bsty}" title="가중치 배수·시나리오 전부 초기화(전 지역 반영)">⟲ 조절 전체 초기화</button></div>
       <table style="font-size:11px"><thead><tr><th title="마우스 올리면 해석·출처">지표</th>
       <th style="text-align:right" title="기사·통계기관이 말하는 통설 선행기간 — 실측 시차와 비교해 볼 것">통설</th>
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용)">시차</th>
       <th style="text-align:right" title="그 시차에서 전년비와의 상관(진단용)">r</th>${
-      HZS.map(h=>`<th style="text-align:right">${h}M</th><th style="text-align:right" title="${h}개월 누적 변화율을 시차≥${h}개월 지표로 잰 상관 — 예측에 실제 쓰는 값">${h}M r</th>`).join('')}
-      <th style="text-align:right" title="|12M r| ÷ Σ|12M r| — 12개월 예측에서의 발언 지분(조절 배수 반영). 다른 지평은 그 지평의 |r| 비례로 각각 따로 배분된다(동일가중 아님)">가중치<span class="note">(12M)</span></th>
+      HZS.map(h=>`<th style="text-align:right">${h}M</th><th style="text-align:right" title="${h}개월 누적 변화율을 시차≥${h}개월 지표로 잰 상관(진단용)">${h}M r</th>
+      <th style="text-align:right" title="${h}개월 예측 릿지 |β| 지분 — 그 지평 회귀에서의 실제 발언권(조절 배수 반영, 지평 합계 100%)">가</th>`).join('')}
       <th style="text-align:right;white-space:nowrap" title="−/＋=가중치 배수 ±0.1 · ▲/▼=그 지표가 1σ 오름/내림 가정. 바꾸면 예측선 즉시 재계산(저장 안 됨)">가중치조절 | 지표값조절</th></tr></thead>
       <tbody>${body}</tbody></table>
-      <div class="note" style="margin:5px 0">실효 Σ가중치 <b style="color:${Math.abs(wSum-1)>.001?'#b45309':'#333'}">${(wSum*100).toFixed(0)}%</b> (기본 100%) — 예측선에 즉시 반영(저장 안 됨·새로고침 시 초기화)</div>
       <div class="note" style="line-height:1.6">💡 <b>예측 엔진 = 표준화 릿지 회귀</b>(2026-08-26 확정) — 지평 h 마다 시차≥h 지표들을 한 회귀에 넣고
       중복 지표의 발언을 자동 차감해 예측한다. 3파전 실측: 릿지 서울 2.34%/방향 91.7% vs 그룹예산 10.12% vs
       데이터 클러스터 9.51% — 전 지역·전 지평 압승으로 채택. 표의 <b>시차·r 열은 진단용</b>(그 지평에서 지표 혼자의
-      신호 세기), <b>가중치(12M)도 |r| 비례 표시용</b>이며 실제 영향과 −/＋·▲/▼ 조절은 릿지 기여도(β·z) 기준으로
-      정확히 재계산된다. r 부호와 조절 반응이 다를 수 있는 건 중복 차감(억제 역할) 때문. <b>통설 vs 실측 시차</b>가
+      신호 세기), 각 지평의 <b>'가' 열이 그 지평 릿지 |β| 발언권</b>(지평 합계 100% · 조절 배수 반영)이다.
+      r 는 큰데 '가'가 작으면 다른 지표와 중복돼 발언이 깎인 것, r 부호와 조절 반응이 다르면 억제 역할. <b>통설 vs 실측 시차</b>가
       크게 다르면 통설이 이 지역 데이터에선 안 맞았다는 뜻. 기사 프레임: 전세→매매(1~2M) · 인허가→입주(6~18M) · 낙찰가율 80%↑/70%↓.</div>`;
     /* 행 클릭 = 차트 오버레이 토글 (최대 6개, pf 와 동일) */
     $('re_ind').querySelectorAll('[data-i]').forEach(tr=>tr.onclick=()=>{
