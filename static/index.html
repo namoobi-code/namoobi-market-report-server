@@ -1117,8 +1117,23 @@
       <!-- (2026-08-28) 전지역(시군구) 신호등 한눈에 — 빈 공간 활용, 클릭 시 해당 지역 선택 -->
       <div style="flex:1 1 360px;min-width:340px"><h3 style="margin:4px 0">전지역 국면 한눈에 <span class="note" style="font-weight:400">(시군구 · 점수순 · 클릭=선택)</span></h3><div id="re3_all"></div></div>
     </div>
-    <h3 style="margin:12px 0 4px">국면 점수 × 실거래 중위가 (2000~)</h3>
-    <div style="position:relative;max-width:1100px"><canvas id="re3_cv"></canvas></div>
+    <!-- (2026-08-28) 국면차트 | 조정확률 모델 나란히 배치 (사용자 요청 — 차트 오른쪽 빈 공간 활용) -->
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;margin-top:12px">
+      <div style="flex:1 1 640px;max-width:1000px">
+        <h3 style="margin:0 0 4px">국면 점수 × 실거래 중위가 (2000~)</h3>
+        <div style="position:relative"><canvas id="re3_cv"></canvas></div>
+      </div>
+      <div style="flex:1 1 560px;min-width:520px">
+        <h2 style="margin:0 0 4px">⚠️ 조정 확률 모델</h2>
+        <p class="note" style="margin:2px 0 8px;line-height:1.7">
+          "12개월 내 실거래 중위가(3M평활) <b>−8% 이상 조정</b>" 확률을 로지스틱 회귀로 추정한다
+          (특징: 주담대금리·거래량·미분양·CSI·낙찰가율·전세가율 — 18개 지역 풀링 학습).
+          <b>한계</b>: 표본 내 적합·월별 자기상관이 있어 참고치다. 조정 표본이 적어(이벤트 55건) 예언이 아니라 "위험 신호 강도"로 읽을 것.</p>
+        <div id="re3_crash" style="margin-bottom:8px"></div>
+        <div style="position:relative"><canvas id="re3_crash_cv"></canvas></div>
+        <div id="re3_crash_lift" style="margin-top:8px"></div>
+      </div>
+    </div>
     <!-- (2026-08-27) ② 매매 vs 전세·월세 판단기 — 도림청구 분석 일반화. 입력은 브라우저 저장 -->
     <hr style="margin:16px 0;border:none;border-top:1px solid #e2e5ea">
     <h2 style="margin:4px 0">🧮 매매 vs 전세·월세 판단기</h2>
@@ -1140,18 +1155,6 @@
       목록은 브라우저에 저장된다. 실거래 신고(계약 후 30일) 특성상 최신월 수치는 이후 갱신될 수 있음.</p>
     <div id="re3_wl_add" style="margin-bottom:8px"></div>
     <div id="re3_wl" style="display:flex;gap:10px;flex-wrap:wrap"></div>
-    <!-- (2026-08-27) ④ 조정 확률 모델 — Portfolio 급락확률의 부동산판. 로지스틱(순수 파이썬 IRLS) · re3.py -->
-    <hr style="margin:16px 0;border:none;border-top:1px solid #e2e5ea">
-    <h2 style="margin:4px 0">⚠️ 조정 확률 모델</h2>
-    <p class="note" style="margin:2px 0 8px;line-height:1.7">
-      "12개월 내 실거래 중위가(3M평활) <b>−8% 이상 조정</b>" 확률을 로지스틱 회귀로 추정한다
-      (특징: 주담대금리·거래량·미분양·CSI·낙찰가율·전세가율 — 18개 지역 풀링 학습).
-      <b>한계</b>: 표본 내 적합·월별 자기상관이 있어 참고치다. 주식과 달리 부동산 조정 표본이 적어(이벤트 55건) 예언이 아니라 "위험 신호 강도"로 읽을 것.</p>
-    <div id="re3_crash" style="margin-bottom:8px"></div>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
-      <div style="flex:1 1 560px;max-width:760px"><div style="position:relative"><canvas id="re3_crash_cv"></canvas></div></div>
-      <div id="re3_crash_lift" style="flex:0 0 300px"></div>
-    </div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
   <div class="pane" id="p_sub" style="overflow:auto">
