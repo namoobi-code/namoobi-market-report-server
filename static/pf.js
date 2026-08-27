@@ -72,7 +72,10 @@
       if(!p0.cont){tg.pred[h]=p0;continue;}
       let raw=p0.base;
       for(const k in p0.cont) raw+=mulOf(k)*(p0.cont[k]+(scOf(k)*(p0.beta?.[k]??0)));
-      const g=Math.max(-1.2,Math.min(1.2,raw*(p0.calib??1)));
+      let g=Math.max(-1.2,Math.min(1.2,raw*(p0.calib??1)));
+      /* (2026-08-26) 역사범위 가드 — 서버(stlead)와 동일 규칙. 조절해도 그 자산이 과거
+         h개월 동안 실제로 움직인 폭(5~95%) 밖으로는 나가지 않게 한다. */
+      if(p0.gb) g=Math.max(p0.gb[0],Math.min(p0.gb[1],g));
       const pr=basePx*Math.exp(g), sd=p0.bsd??0.05, j=tg.past+ +h;
       tg.pred[h]={...p0,g:+g.toFixed(4),price:+pr.toFixed(2)};
       tg.fut.price[j]=+pr.toFixed(2);

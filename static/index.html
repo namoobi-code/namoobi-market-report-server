@@ -1112,8 +1112,10 @@
     <div id="re3_reg" style="margin-bottom:8px"></div>
     <div id="re3_verdict" style="margin-bottom:10px"></div>
     <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
-      <div><h3 style="margin:4px 0">신호 6종 (기준월 시점)</h3><div id="re3_sig"></div></div>
-      <div><h3 style="margin:4px 0">국면 판정 백테스트</h3><div id="re3_bt"></div></div>
+      <div style="flex:0 0 auto"><h3 style="margin:4px 0">신호 6종 (기준월 시점)</h3><div id="re3_sig"></div></div>
+      <div style="flex:0 0 auto;max-width:480px"><h3 style="margin:4px 0">국면 판정 백테스트</h3><div id="re3_bt"></div></div>
+      <!-- (2026-08-28) 전지역(시군구) 신호등 한눈에 — 빈 공간 활용, 클릭 시 해당 지역 선택 -->
+      <div style="flex:1 1 360px;min-width:340px"><h3 style="margin:4px 0">전지역 국면 한눈에 <span class="note" style="font-weight:400">(시군구 · 점수순 · 클릭=선택)</span></h3><div id="re3_all"></div></div>
     </div>
     <h3 style="margin:12px 0 4px">국면 점수 × 실거래 중위가 (2000~)</h3>
     <div style="position:relative;max-width:1100px"><canvas id="re3_cv"></canvas></div>
@@ -1892,7 +1894,7 @@
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826re"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/re3.js?v=08280010"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
+<script src="/re3.js?v=08280040"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

@@ -462,6 +462,18 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
             # (2026-08-23) BTC 같은 고변동 자산은 보정 전 성장률·백테스트 sd 가 폭주해
             # exp 오버플로가 났다(실측) → 로그성장 ±1.2(≈-70%~+230%)·sd 100% 로 클램프
             g = max(-1.2, min(1.2, raw * calib))
+            # (2026-08-26) 역사범위 가드 — RE 예측 탭과 동일 규칙을 이식.
+            #   그 자산이 과거 h개월 동안 실제로 움직인 폭의 5~95% 밖으로는 예측하지 않는다.
+            #   ±1.2 클램프만으로는 "코스피200 24M +104%·금 +105%" 같은 값이 그대로 나갔다(실측).
+            hist = sorted(math.log(prices[j0 + h] / prices[j0])
+                          for j0 in range(len(prices) - h)
+                          if prices[j0] and prices[j0 + h] and prices[j0] > 0 and prices[j0 + h] > 0)
+            guarded = False
+            if len(hist) >= 40:
+                glo, ghi = hist[int(len(hist) * 0.05)], hist[int(len(hist) * 0.95)]
+                if g < glo or g > ghi:
+                    guarded = True
+                g = max(glo, min(ghi, g))
             p = prices[t_last] * math.exp(g)
             sd = min(1.0, (b.get("sd") or 5.0) / 100)
             j = t_last + h
@@ -469,6 +481,10 @@ def _one(tk, sym, label, etf, base_w, ind, targets_out, alloc_in):
             fut["lo"][j] = round(p * math.exp(-1.28 * sd), 2)
             fut["hi"][j] = round(p * math.exp(1.28 * sd), 2)
             pred[h] = {"g": round(g, 4), "price": round(p, 2), "sd": round(sd, 4)}
+            if len(hist) >= 40:                    # 클라이언트 조절 재계산도 같은 가드 적용
+                pred[h]["gb"] = [round(glo, 4), round(ghi, 4)]
+                if guarded:
+                    pred[h]["guarded"] = 1
             if "_cont" in r:                       # 가중치 조절·시나리오용
                 # g' = clamp(calib × (base + Σ m_k·(cont_k + s_k·β_k)))
                 #   m_k=가중치 배수, s_k=시나리오(지표 ±1σ 가정: +1 오름/-1 내림/0 기본)

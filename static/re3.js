@@ -71,18 +71,40 @@ function render(){
   $('re3_bt').innerHTML=bt&&bt.h6?`<table style="border-collapse:collapse;font-size:12.5px;background:#fff">
     <tr style="background:#f6f7f9"><th style="border:1px solid #e2e5ea;padding:4px 10px">이후 지평</th>
       ${['🔴 상승판정','🟡 중립','🔵 하락판정'].map(x=>`<th style="border:1px solid #e2e5ea;padding:4px 10px">${x}</th>`).join('')}</tr>
-    ${rows.map(([k,lb])=>{const b=bt[k];if(!b)return '';const c=x=>x&&x.n?`평균 <b>${x.avg>0?'+':''}${x.avg}%</b> · 승률 ${x.win}% <span style="opacity:.6">(n=${x.n})</span>`:'—';
-      return `<tr><td style="border:1px solid #e2e5ea;padding:4px 10px">${lb} 뒤 중위가</td>
-        <td style="border:1px solid #e2e5ea;padding:4px 10px">${c(b.up)}</td>
-        <td style="border:1px solid #e2e5ea;padding:4px 10px">${c(b.mid)}</td>
-        <td style="border:1px solid #e2e5ea;padding:4px 10px">${c(b.down)}</td></tr>`;}).join('')}
+    ${rows.map(([k,lb])=>{const b=bt[k];if(!b)return '';const c=x=>x&&x.n?`<b>${x.avg>0?'+':''}${x.avg}%</b>·${x.win}% <span style="opacity:.6">(${x.n})</span>`:'—';
+      return `<tr><td style="border:1px solid #e2e5ea;padding:3px 8px;white-space:nowrap">${lb} 뒤</td>
+        <td style="border:1px solid #e2e5ea;padding:3px 8px;white-space:nowrap">${c(b.up)}</td>
+        <td style="border:1px solid #e2e5ea;padding:3px 8px;white-space:nowrap">${c(b.mid)}</td>
+        <td style="border:1px solid #e2e5ea;padding:3px 8px;white-space:nowrap">${c(b.down)}</td></tr>`;}).join('')}
   </table>
   <p class="note" style="margin:4px 0 0;line-height:1.7">읽는 법(2026-08-27 실측·서울): <b>6개월</b> 지평에선 상승판정 +5.9% > 중립 +2.9% > 하락판정 +0.3%로 국면 순서대로 갈린다 —
   단기 방향 참고용. 반면 <b>24개월</b> 지평에선 하락판정 뒤가 오히려 가장 높았다(+21.9%) — 하락 국면 신호는 장기 투자자에겐 역발상 <b>바닥 신호</b>였다는 뜻.
   같은 규칙을 과거 전체에 소급 적용한 결과이며, 미래를 보장하지 않는다.</p>`:'<div class="note">백테스트 표본 없음</div>';
 
   $('re3_asof').textContent='('+D.asof+' 갱신 · 매일 08:05)';
+  renderAllMap();
   renderCrash();
+}
+
+/* ── 전지역(시군구) 신호등 한눈에 (2026-08-28) — 점수순 정렬, 클릭 시 해당 지역 선택 ── */
+function renderAllMap(){
+  const host=$('re3_all'); if(!host||!(D.gu_list||[]).length) return;
+  const spreadOf=n=>{const b=D.bt[n]&&D.bt[n].h6;
+    return (b&&b.up&&b.down&&b.up.avg!=null&&b.down.avg!=null)?b.up.avg-b.down.avg:null;};
+  const mk=n=>{const c=D.cur[n]||{}; const v=c.verdict;
+    const ic=v==='up'?'🔴':v==='down'?'🔵':(v?'🟡':'⚪');
+    const sp=spreadOf(n);
+    return {n,short:n.replace(/^서울 |^경기 /,''),ic,score:c.score,warn:sp!=null&&sp<1.5};};
+  const grp=(title,names)=>{
+    const its=names.map(mk).sort((a,b)=>((b.score==null?-9:b.score)-(a.score==null?-9:a.score)));
+    return `<div style="margin-bottom:6px"><b style="font-size:12px">${title}</b>
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">${its.map(x=>
+        `<button data-g="${x.n}" title="${x.n}${x.warn?' · ⚠ 백테스트 분리력 낮음 — 판정 신뢰 불가':''}" style="font-size:11px;padding:2px 6px;border-radius:10px;cursor:pointer;border:1px solid ${x.n===REG?'#9a3412':'#e2e5ea'};background:${x.n===REG?'#fff7ed':'#fff'};${x.warn?'opacity:.5':''}">${x.ic} ${x.short} <b>${x.score==null?'—':x.score.toFixed(2)}</b>${x.warn?'<span style="color:#b91c1c">⚠</span>':''}</button>`).join('')}</div></div>`;};
+  host.innerHTML=grp('서울 (구)',D.gu_list.filter(g=>g.startsWith('서울')))
+    +grp('경기 (시군구)',D.gu_list.filter(g=>g.startsWith('경기')))
+    +`<p class="note" style="margin:4px 0 0;line-height:1.6">🔴 상승 · 🟡 중립 · 🔵 하락 · 숫자=국면 점수(−1~+1, 점수순 정렬).
+      흐림+⚠ = 백테스트 분리력 낮음(서울 구 대부분 해당 — 서울은 시도 단위 판정 권장).</p>`;
+  host.querySelectorAll('button').forEach(b=>b.onclick=()=>{REG=b.dataset.g;render();renderCalc();});
 }
 
 /* ── ④ 조정 확률 (2026-08-27) ── */
