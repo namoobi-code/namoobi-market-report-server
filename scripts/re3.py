@@ -200,6 +200,102 @@ def main():
                     "win": round(sum(1 for x in v if x>0)/len(v)*100) if v else None}
                     for k,v in bt.items()}
 
+    # ── ④ 조정 확률 모델 (2026-08-27) — "12개월 내 실거래 중위가(3M평활) −8% 이상 하락" 로지스틱 ──
+    # 순수 파이썬 IRLS(릿지 λ=1) — 서버 시스템 python3 에 numpy 없음(기존 스크립트 관례 유지).
+    # 특징 6개(시점 i 정보만): 금리6M·거래량YoY·미분양6M·CSI(전국)·낙찰가율3-12M·전세가율6M(전국)
+    # 한계(정직 명시): 표본 내 적합·월별 자기상관·지역 풀링 — 참고치이며 급락 예언이 아님.
+    def smooth3(v):
+        return [None if i<2 or any(x is None for x in v[i-2:i+1]) else sum(v[i-2:i+1])/3
+                for i in range(len(v))]
+    def feats_at(reg, i, trade, unsold):
+        f = []
+        f.append(chg(rate, i, 6))
+        f.append(None if not trade or sum3(trade,i) is None or sum3(trade,i-12) in (None,0)
+                 else (sum3(trade,i)/sum3(trade,i-12)-1)*100)
+        f.append(pct(unsold, i, 6) if unsold else None)
+        csi_n = d["csi"]["전국"]; f.append(csi_n[i] if csi_n and i < len(csi_n) else None)
+        f.append(None if avgn(bidr,i,3) is None or avgn(bidr,i,12) is None
+                 else avgn(bidr,i,3)-avgn(bidr,i,12))
+        f.append(chg(jsr.get("전국"), i, 6))
+        return f
+    FN = ["주담대6M", "거래량YoY", "미분양6M", "CSI", "낙찰가율3-12M", "전세가율6M"]
+    rows, tags = [], []          # tags: (reg, i) — hist 재구성용
+    med_s_map = {}
+    for reg in regions:
+        med = d["rt_med"].get(reg)
+        if not med: continue
+        ms = smooth3(med); med_s_map[reg] = ms
+        trade = d["trade"].get(reg) or d["trade"].get("전국")
+        unsold = d["unsold"].get(reg) or d["unsold"].get("전국")
+        for i in range(N):
+            f = feats_at(reg, i, trade, unsold)
+            if any(x is None for x in f) or ms[i] in (None, 0): continue
+            fut = [ms[i+k] for k in range(1, 13) if i+k < N and ms[i+k] is not None]
+            y = None
+            if len(fut) >= 10:
+                y = 1 if min(x/ms[i]-1 for x in fut) <= -0.08 else 0
+            rows.append((f, y)); tags.append((reg, i))
+    train = [(f, y) for f, y in rows if y is not None]
+    crash = {"note": "타깃: 12M 내 3M평활 중위가 −8% 이상 하락 · 풀링 로지스틱(표본 내) · 참고치",
+             "feat": FN, "n": len(train), "events": sum(y for _, y in train)}
+    if crash["events"] >= 30:
+        K = len(FN)
+        mu = [sum(f[k] for f, _ in train)/len(train) for k in range(K)]
+        sd = [max((sum((f[k]-mu[k])**2 for f, _ in train)/len(train))**.5, 1e-9) for k in range(K)]
+        Z = [[1.0]+[(f[k]-mu[k])/sd[k] for k in range(K)] for f, _ in train]
+        Y = [y for _, y in train]
+        import math as _m
+        b = [0.0]*(K+1)
+        def sigm(z): return 1/(1+_m.exp(-max(-30, min(30, z))))
+        for _ in range(30):                       # IRLS + 릿지 λ=1(절편 제외)
+            P = [sigm(sum(b[j]*z[j] for j in range(K+1))) for z in Z]
+            W = [max(p*(1-p), 1e-6) for p in P]
+            A = [[sum(W[n_]*Z[n_][a]*Z[n_][c] for n_ in range(len(Z))) + (1.0 if a == c and a > 0 else 0)
+                  for c in range(K+1)] for a in range(K+1)]
+            g = [sum((Y[n_]-P[n_])*Z[n_][a] for n_ in range(len(Z))) - (b[a] if a > 0 else 0)
+                 for a in range(K+1)]
+            # 가우스 소거로 A·db = g
+            M = [Ar[:]+[g[a]] for a, Ar in enumerate(A)]
+            for c in range(K+1):
+                piv = max(range(c, K+1), key=lambda r_: abs(M[r_][c])); M[c], M[piv] = M[piv], M[c]
+                if abs(M[c][c]) < 1e-12: break
+                for r_ in range(K+1):
+                    if r_ != c and M[r_][c]:
+                        f2 = M[r_][c]/M[c][c]
+                        M[r_] = [M[r_][x]-f2*M[c][x] for x in range(K+2)]
+            db = [M[a][K+1]/M[a][a] if abs(M[a][a]) > 1e-12 else 0 for a in range(K+1)]
+            b = [b[a]+db[a] for a in range(K+1)]
+            if max(abs(x) for x in db) < 1e-6: break
+        def prob_of(f):
+            z = [1.0]+[(f[k]-mu[k])/sd[k] for k in range(K)]
+            return sigm(sum(b[j]*z[j] for j in range(K+1)))
+        # 지역별 확률 시계열 + 현재값
+        crash["hist"], crash["cur"] = {}, {}
+        for reg in regions:
+            if reg not in med_s_map: continue
+            trade = d["trade"].get(reg) or d["trade"].get("전국")
+            unsold = d["unsold"].get(reg) or d["unsold"].get("전국")
+            hs = [None]*N
+            for i in range(N):
+                f = feats_at(reg, i, trade, unsold)
+                if any(x is None for x in f): continue
+                hs[i] = round(prob_of(f)*100, 1)
+            crash["hist"][reg] = hs
+            li = next((j for j in range(N-1, -1, -1) if hs[j] is not None), None)
+            nn = [x for x in hs if x is not None]
+            crash["cur"][reg] = {"p": hs[li] if li is not None else None,
+                                 "m": T[li] if li is not None else None,
+                                 "avg": round(sum(nn)/len(nn), 1) if nn else None}
+        # 5분위 리프트(표본 내 정직성 점검): 확률 상위 구간에서 실제 조정이 잦았는가
+        pv = sorted(((prob_of(f), y) for f, y in train), key=lambda x: x[0])
+        q = len(pv)//5
+        crash["lift"] = [{"q": qi+1,
+                          "rate": round(sum(y for _, y in pv[qi*q:(qi+1)*q if qi < 4 else len(pv)])
+                                        /max(len(pv[qi*q:(qi+1)*q if qi < 4 else len(pv)]), 1)*100)}
+                         for qi in range(5)]
+        crash["base"] = round(crash["events"]/crash["n"]*100)
+    out["crash"] = crash
+
     dst = os.path.join(BASE, "re3.json")
     with open(dst, "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, separators=(",",":"))

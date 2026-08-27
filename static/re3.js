@@ -72,6 +72,40 @@ function render(){
   같은 규칙을 과거 전체에 소급 적용한 결과이며, 미래를 보장하지 않는다.</p>`:'<div class="note">백테스트 표본 없음</div>';
 
   $('re3_asof').textContent='('+D.asof+' 갱신 · 매일 08:05)';
+  renderCrash();
+}
+
+/* ── ④ 조정 확률 (2026-08-27) ── */
+let crashChart=null;
+function renderCrash(){
+  const C=D.crash, host=$('re3_crash'); if(!C||!host) return;
+  const cu=C.cur&&C.cur[REG];
+  if(!cu){ host.innerHTML='<div class="note">'+REG+' 표본 부족</div>'; return; }
+  const warn=cu.p!=null&&cu.avg!=null&&cu.p>=cu.avg*1.5, col=warn?'#dc2626':'#166534';
+  host.innerHTML=`<div style="display:flex;align-items:center;gap:14px;padding:8px 16px;border:2px solid ${col};border-radius:10px;background:#fff;max-width:640px">
+    <div style="font-size:30px">${warn?'⚠️':'✅'}</div>
+    <div><b style="font-size:17px;color:${col}">${REG} 12M 내 −8% 조정 확률 ${cu.p==null?'—':cu.p+'%'}</b>
+      <div class="note">역사 평균 ${cu.avg}% · 전체 기저율 ${C.base}% · 기준월 ${fmt(cu.m)} —
+      ${warn?'평균의 1.5배 이상, 주의 구간':'평상 수준'}</div></div></div>`;
+  // 확률 추이 차트
+  if(window.Chart&&$('re3_crash_cv')&&C.hist&&C.hist[REG]){
+    const hs=C.hist[REG]; let i0=hs.findIndex(x=>x!=null); if(i0<0)i0=0;
+    if(crashChart) crashChart.destroy();
+    crashChart=new Chart($('re3_crash_cv'),{type:'line',data:{labels:D.t.slice(i0).map(fmt),datasets:[
+      {label:REG+' 조정확률(%)',data:hs.slice(i0),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.10)',pointRadius:0,borderWidth:1.4,fill:true,spanGaps:true},
+      {label:'역사 평균',data:hs.slice(i0).map(()=>cu.avg),borderColor:'#94a3b8',borderDash:[5,4],pointRadius:0,borderWidth:1}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:16,font:{size:10}}}},
+      scales:{x:{ticks:{maxTicksLimit:12,font:{size:9}}},y:{min:0,ticks:{font:{size:9},callback:v=>v+'%'}}}}});
+  }
+  // 리프트 표
+  const lf=$('re3_crash_lift');
+  if(lf&&C.lift) lf.innerHTML=`<h3 style="margin:4px 0;font-size:13px">모델 점검 — 확률 5분위별 실제 조정 빈도</h3>
+    <table style="border-collapse:collapse;font-size:12px;background:#fff">
+      <tr style="background:#f6f7f9"><th style="border:1px solid #e2e5ea;padding:3px 10px">모델 확률 구간</th><th style="border:1px solid #e2e5ea;padding:3px 10px">실제 조정률</th></tr>
+      ${C.lift.map(q=>`<tr><td style="border:1px solid #e2e5ea;padding:3px 10px">${q.q}분위 ${q.q===1?'(최저)':q.q===5?'(최고)':''}</td>
+        <td style="border:1px solid #e2e5ea;padding:3px 10px;text-align:right"><b>${q.rate}%</b></td></tr>`).join('')}
+    </table>
+    <p class="note" style="margin:4px 0 0;line-height:1.6">확률이 높다고 한 달(5분위)에 실제 조정이 ${C.lift[4].rate}%로 기저율(${C.base}%)의 ${(C.lift[4].rate/C.base).toFixed(1)}배 — 모델이 위험을 구분하고 있다는 표본 내 증거. 표본 ${C.n}건 중 조정 ${C.events}건.</p>`;
 }
 
 /* ── ② 매매 vs 전세·월세 판단기 (2026-08-27) ─────────────────────────

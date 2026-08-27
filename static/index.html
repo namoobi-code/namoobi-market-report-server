@@ -70,6 +70,7 @@
   #re_cv{height:calc(100vh - 200px)!important;min-height:520px!important;max-height:none!important}
   #re3_cv{height:380px!important;max-height:none!important}   /* (2026-08-27) RE3 국면 히스토리 — 전역 200px 캡 해제 */
   .re3sp{height:56px!important;max-height:56px!important;width:240px!important} /* RE3 워치리스트 스파크라인 — 전역 캡 회피 */
+  #re3_crash_cv{height:240px!important;max-height:none!important}               /* RE3 조정확률 추이 차트 */
   #re_ind td,#re_ind th{padding:3px 4px!important;font-size:10.5px!important;white-space:nowrap}
   #ms_unsold,#ms_pipe{height:300px!important;max-height:none!important} /* 주택 공급 차트 — 동일 캡 해제 */
   #et_main{height:340px!important;max-height:none!important}            /* 비아파트 실거래 — 동일 캡 해제 */
@@ -1137,6 +1138,18 @@
       목록은 브라우저에 저장된다. 실거래 신고(계약 후 30일) 특성상 최신월 수치는 이후 갱신될 수 있음.</p>
     <div id="re3_wl_add" style="margin-bottom:8px"></div>
     <div id="re3_wl" style="display:flex;gap:10px;flex-wrap:wrap"></div>
+    <!-- (2026-08-27) ④ 조정 확률 모델 — Portfolio 급락확률의 부동산판. 로지스틱(순수 파이썬 IRLS) · re3.py -->
+    <hr style="margin:16px 0;border:none;border-top:1px solid #e2e5ea">
+    <h2 style="margin:4px 0">⚠️ 조정 확률 모델</h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      "12개월 내 실거래 중위가(3M평활) <b>−8% 이상 조정</b>" 확률을 로지스틱 회귀로 추정한다
+      (특징: 주담대금리·거래량·미분양·CSI·낙찰가율·전세가율 — 18개 지역 풀링 학습).
+      <b>한계</b>: 표본 내 적합·월별 자기상관이 있어 참고치다. 주식과 달리 부동산 조정 표본이 적어(이벤트 55건) 예언이 아니라 "위험 신호 강도"로 읽을 것.</p>
+    <div id="re3_crash" style="margin-bottom:8px"></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1 1 560px;max-width:760px"><div style="position:relative"><canvas id="re3_crash_cv"></canvas></div></div>
+      <div id="re3_crash_lift" style="flex:0 0 300px"></div>
+    </div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
   <div class="pane" id="p_sub" style="overflow:auto">
@@ -1879,7 +1892,7 @@
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826re"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826d"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/re3.js?v=08272300"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
+<script src="/re3.js?v=08272320"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
