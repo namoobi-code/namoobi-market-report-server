@@ -465,7 +465,14 @@ def main():
             mp = src.get("전국" if k == "cons" else reg) or src.get("전국") or {}
             return [mp.get(t) for t in T]
         src = rl["d"].get(k) or {}
-        return src.get("전국" if k in GL else reg) or src.get("전국")
+        if k in GL:                       # 전국 공통 지표(금리·M2·경매 등)
+            return src.get("전국")
+        # (2026-08-26) 지역별 지표는 **전국 대체 금지**.
+        #   seoul_p(서울→지방 파급)는 relead 에서 '서울' 키를 일부러 빼는데, 여기서 전국으로
+        #   폴백하면 그 전국 항목의 내용물이 곧 '서울 중위가' 라 서울 예측에 자기 계열이
+        #   지표로 들어갔다(실측: 서울 seoul_p r=0.974·시차 1M — 사실상 자기회귀 누수).
+        #   지역 데이터가 없으면 그 지역에서는 해당 지표를 쓰지 않는다.
+        return src.get(reg)
 
     base_keys = [k for k in rl["meta"]]
     new_keys = [k for k in ("subs", "cons", "j2m") if k in extra]
