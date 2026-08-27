@@ -7269,8 +7269,19 @@ await _canvasFlow(c);
       const today=new Date();
       const series=z=>{                                   // → [{t(일 오프셋), v}] 시간 오름차순
         const sk=SNKEY[z.per];
-        const daily=snAll.filter(s=>s[sk]!=null)
-          .map(s=>({t:Math.round((new Date(s.d)-today)/864e5), v:s[sk]}));
+        let sn=snAll.filter(s=>s[sk]!=null);
+        /* (2026-08-27) **발표 롤오버 절단** — 분기 지표(진행분기·다음분기)는 실적 발표
+           순간 다음 분기로 넘어간다. 자체 스냅샷은 '그날의 진행분기'를 적립하므로 발표
+           이전 스냅은 **이전 분기의 컨센**이고, 이를 이어 그리면 표(현재 분기 기준 90일)와
+           모순되는 가짜 급등이 생긴다. 실측 NVDA D+1: 표는 90일 내내 2.34(Q3 기준)인데
+           그래프는 발표 전 Q2 컨센 2.08에서 발표 후 Q3 2.34 로 점프해 급등처럼 보였다.
+           발표일 이후 스냅만 그리고, 남은 점이 적으면 야후 5시점(현재 분기 기준)으로
+           자동 폴백해 표와 기준이 일치한다. 연간(FY)은 발표로 대상이 바뀌지 않아 그대로. */
+        if((z.per==='0q'||z.per==='+1q')&&_polRV.edl){
+          const ed=String(_polRV.edl).replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3');
+          sn=sn.filter(s=>String(s.d)>ed);
+        }
+        const daily=sn.map(s=>({t:Math.round((new Date(s.d)-today)/864e5), v:s[sk]}));
         if(daily.length>=8) return {pts:daily, daily:true};
         return {pts:[['d90',-90],['d60',-60],['d30',-30],['d7',-7],['cur',0]]
           .map(([k,t])=>z[k]!=null?{t,v:z[k]}:null).filter(Boolean), daily:false};
