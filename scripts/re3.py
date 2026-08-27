@@ -200,6 +200,101 @@ def main():
                     "win": round(sum(1 for x in v if x>0)/len(v)*100) if v else None}
                     for k,v in bt.items()}
 
+    # ── 시군구(서울 25구·경기 45시군구) 확장 (2026-08-27) ──
+    # 가격: releadg.json(시군구 예측용 3M평활 중위가, 억원) · 거래량: apt.sqlite 집계 · 미분양: rehub 시군구
+    # 전세가율은 서울 구=서울 프록시, 경기=전국 프록시 상속. 금리·경매·연체율은 전국 공통.
+    def build_unit(name, med, trade, unsold, jsr_s):
+        """시도 루프와 동일한 규칙으로 cur/hist/bt[name] 을 채운다"""
+        score_hist = [None]*N
+        for i in range(N):
+            items = {
+                "trade": sig_of(None if not trade or sum3(trade,i) is None or sum3(trade,i-12) in (None,0)
+                                 else (sum3(trade,i)/sum3(trade,i-12)-1)*100, 10, -10),
+                "jsr":   sig_of(chg(jsr_s,i,6), 0.5, -0.5) if jsr_s else None,
+                "unsold":sig_of(pct(unsold,i,6), 10, -10, invert=True) if unsold else None,
+                "rate":  sig_of(chg(rate,i,6), 0.3, -0.3, invert=True),
+                "bid":   sig_of(None if avgn(bidr,i,3) is None or avgn(bidr,i,12) is None
+                                 else avgn(bidr,i,3)-avgn(bidr,i,12), 2, -2),
+                "delq":  sig_of(chg(delq_all,i,6), 0.10, -0.10, invert=True),
+            }
+            avail = {k:v for k,v in items.items() if v is not None}
+            if len(avail) >= 4: score_hist[i] = round(sum(avail.values())/len(avail), 3)
+        score_s = [None]*N
+        for i in range(2, N):
+            vs = [x for x in score_hist[i-2:i+1] if x is not None]
+            if len(vs) == 3: score_s[i] = round(sum(vs)/3, 3)
+        out["hist"][name] = {"score": score_hist, "score_s": score_s, "med": med}
+        i = next((j for j in range(N-1, -1, -1) if score_s[j] is not None), N-1)
+        raw = {
+            "trade": None if not trade or sum3(trade,i) is None or sum3(trade,i-12) in (None,0)
+                     else round((sum3(trade,i)/sum3(trade,i-12)-1)*100,1),
+            "jsr":   round(chg(jsr_s,i,6),2) if jsr_s and chg(jsr_s,i,6) is not None else None,
+            "unsold":round(pct(unsold,i,6),1) if unsold and pct(unsold,i,6) is not None else None,
+            "rate":  round(chg(rate,i,6),2) if chg(rate,i,6) is not None else None,
+            "bid":   None if avgn(bidr,i,3) is None or avgn(bidr,i,12) is None
+                     else round(avgn(bidr,i,3)-avgn(bidr,i,12),1),
+            "delq":  round(chg(delq_all,i,6),3) if chg(delq_all,i,6) is not None else None,
+        }
+        UNITS = {"trade":"%","jsr":"%p","unsold":"%","rate":"%p","bid":"%p","delq":"%p"}
+        sig_now = {
+            "trade": sig_of(raw["trade"], 10, -10), "jsr": sig_of(raw["jsr"], 0.5, -0.5),
+            "unsold": sig_of(raw["unsold"], 10, -10, invert=True),
+            "rate": sig_of(raw["rate"], 0.3, -0.3, invert=True),
+            "bid": sig_of(raw["bid"], 2, -2), "delq": sig_of(raw["delq"], 0.10, -0.10, invert=True)}
+        cur_items = [{"k":k, "sig":sig_now[k], "val":raw[k], "unit":UNITS[k]} for k in LABELS]
+        sbar = score_s[i]
+        verdict = None if sbar is None else ("up" if sbar >= 0.25 else ("down" if sbar <= -0.25 else "mid"))
+        out["cur"][name] = {"score": sbar, "verdict": verdict, "month": T[i], "items": cur_items}
+        out["bt"][name] = {}
+        if med:
+            for hor in (6, 12, 24):
+                bt = {"up":[], "mid":[], "down":[]}
+                for j in range(N-hor):
+                    sc = score_s[j]
+                    if sc is None or med[j] in (None,0) or med[j+hor] is None: continue
+                    r = (med[j+hor]/med[j]-1)*100
+                    bt["up" if sc >= 0.25 else ("down" if sc <= -0.25 else "mid")].append(r)
+                out["bt"][name]["h%d"%hor] = {k: {"n": len(v),
+                    "avg": round(sum(v)/len(v),1) if v else None,
+                    "win": round(sum(1 for x in v if x>0)/len(v)*100) if v else None}
+                    for k,v in bt.items()}
+
+    gu_units = {}
+    try:
+        import sqlite3
+        rg = load("releadg.json"); gt = rg["t"]
+        cx = sqlite3.connect("file:%s?mode=ro" % os.path.join(BASE, "apt.sqlite"), uri=True)
+        q = cx.execute("SELECT a.sgg, s.ym, SUM(s.n) FROM sale s JOIN apt a ON a.id=s.apt_id "
+                       "WHERE substr(a.sgg,1,2) IN ('11','41') GROUP BY a.sgg, s.ym").fetchall()
+        cx.close()
+        tr_map = {}
+        for sgg, ym, n_ in q: tr_map.setdefault(sgg, {})[ym] = n_
+        tidx = {m: i for i, m in enumerate(T)}
+        def unsold_key(nm):
+            if nm.startswith("서울"): return nm                    # '서울 강남구' 그대로
+            city = nm.replace("(경기)", "").split()[0]             # '수원 장안구' → '수원'
+            if not city.endswith(("시", "군")): city += "시"
+            return "경기 " + city
+        gu_list = []
+        for sgg, nm in sorted(rg["names"].items(), key=lambda x: x[1]):
+            pv = rg["price"].get(sgg) or {}
+            ma = pv.get("ma") or pv.get("raw")
+            if not ma: continue
+            med = align(T, gt, ma)
+            tr = [None]*N
+            for ym, n_ in tr_map.get(sgg, {}).items():
+                if ym in tidx: tr[tidx[ym]] = n_
+            un = d["unsold"].get(unsold_key(nm))
+            jsr_s = jsr["서울"] if nm.startswith("서울") else jsr["전국"]
+            name = nm if nm.startswith("서울") else "경기 " + nm.replace("(경기)", "")
+            build_unit(name, med, tr, un, jsr_s)
+            gu_units[name] = (tr, un)
+            gu_list.append(name)
+        out["gu_list"] = gu_list
+        print("gu:", len(gu_list), "시군구")
+    except Exception as e:
+        print("gu skip:", e)
+
     # ── ④ 조정 확률 모델 (2026-08-27) — "12개월 내 실거래 중위가(3M평활) −8% 이상 하락" 로지스틱 ──
     # 순수 파이썬 IRLS(릿지 λ=1) — 서버 시스템 python3 에 numpy 없음(기존 스크립트 관례 유지).
     # 특징 6개(시점 i 정보만): 금리6M·거래량YoY·미분양6M·CSI(전국)·낙찰가율3-12M·전세가율6M(전국)
@@ -267,7 +362,11 @@ def main():
             b = [b[a]+db[a] for a in range(K+1)]
             if max(abs(x) for x in db) < 1e-6: break
         def prob_of(f):
-            z = [1.0]+[(f[k]-mu[k])/sd[k] for k in range(K)]
+            # (2026-08-27) 결측 1개까지 평균 대체(z=0) 허용 — 낙찰가율 등 늦게 시작하는
+            # 지표가 확률 시계열 앞부분을 통째로 잘라먹던 것을 완화 (x축 연장, 사용자 요청)
+            miss = sum(1 for x in f if x is None)
+            if miss > 1: return None
+            z = [1.0]+[0.0 if f[k] is None else (f[k]-mu[k])/sd[k] for k in range(K)]
             return sigm(sum(b[j]*z[j] for j in range(K+1)))
         # 지역별 확률 시계열 + 현재값
         crash["hist"], crash["cur"] = {}, {}
@@ -277,15 +376,26 @@ def main():
             unsold = d["unsold"].get(reg) or d["unsold"].get("전국")
             hs = [None]*N
             for i in range(N):
-                f = feats_at(reg, i, trade, unsold)
-                if any(x is None for x in f): continue
-                hs[i] = round(prob_of(f)*100, 1)
+                p = prob_of(feats_at(reg, i, trade, unsold))
+                if p is not None: hs[i] = round(p*100, 1)
             crash["hist"][reg] = hs
             li = next((j for j in range(N-1, -1, -1) if hs[j] is not None), None)
             nn = [x for x in hs if x is not None]
             crash["cur"][reg] = {"p": hs[li] if li is not None else None,
                                  "m": T[li] if li is not None else None,
                                  "avg": round(sum(nn)/len(nn), 1) if nn else None}
+        # 시군구(서울·경기)도 같은 풀링 모델로 확률 산출 (2026-08-27)
+        for name, (tr, un) in gu_units.items():
+            hs = [None]*N
+            for i in range(N):
+                p = prob_of(feats_at(name, i, tr, un))
+                if p is not None: hs[i] = round(p*100, 1)
+            crash["hist"][name] = hs
+            li = next((j for j in range(N-1, -1, -1) if hs[j] is not None), None)
+            nn = [x for x in hs if x is not None]
+            crash["cur"][name] = {"p": hs[li] if li is not None else None,
+                                  "m": T[li] if li is not None else None,
+                                  "avg": round(sum(nn)/len(nn), 1) if nn else None}
         # 5분위 리프트(표본 내 정직성 점검): 확률 상위 구간에서 실제 조정이 잦았는가
         pv = sorted(((prob_of(f), y) for f, y in train), key=lambda x: x[0])
         q = len(pv)//5

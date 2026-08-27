@@ -13,10 +13,13 @@ const fmt=m=>m?m.slice(0,4)+'.'+m.slice(4):'';
 function render(){
   if(!D) return;
   const cur=D.cur[REG], bt=D.bt[REG], h=D.hist[REG];
-  // 지역 칩
+  // 지역 칩 + 시군구 드롭다운 (2026-08-27 — 서울 25구·경기 45시군구)
   $('re3_reg').innerHTML=D.regions.map(r=>
-    `<button class="chip${r===REG?' on':''}" data-r="${r}" style="margin:0 4px 4px 0;padding:3px 10px;border-radius:14px;border:1px solid ${r===REG?'#9a3412':'#d6d9de'};background:${r===REG?'#9a3412':'#fff'};color:${r===REG?'#fff':'#333'};cursor:pointer;font-size:12px">${r}</button>`).join('');
+    `<button class="chip${r===REG?' on':''}" data-r="${r}" style="margin:0 4px 4px 0;padding:3px 10px;border-radius:14px;border:1px solid ${r===REG?'#9a3412':'#d6d9de'};background:${r===REG?'#9a3412':'#fff'};color:${r===REG?'#fff':'#333'};cursor:pointer;font-size:12px">${r}</button>`).join('')+
+    ((D.gu_list||[]).length?` <select id="re3_gusel" style="font-size:12px;padding:3px 6px;border:1px solid ${D.gu_list.includes(REG)?'#9a3412':'#d6d9de'};border-radius:14px;background:${D.gu_list.includes(REG)?'#9a3412':'#fff'};color:${D.gu_list.includes(REG)?'#fff':'#333'};max-width:170px">
+      <option value="">시군구 선택…</option>${D.gu_list.map(g=>`<option value="${g}"${g===REG?' selected':''}>${g}</option>`).join('')}</select>`:'');
   $('re3_reg').querySelectorAll('button').forEach(b=>b.onclick=()=>{REG=b.dataset.r;render();renderCalc();});
+  const gs=$('re3_gusel'); if(gs) gs.onchange=()=>{if(gs.value){REG=gs.value;render();renderCalc();}};
 
   // 종합 신호등
   const v=cur&&cur.verdict, vc=v?VC[v]:['#94a3b8','⚪','판정 보류'];
@@ -59,7 +62,7 @@ function render(){
     ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{boxWidth:18,font:{size:11}}}},
       scales:{x:{ticks:{maxTicksLimit:14,font:{size:10}}},
-        y:{position:'left',title:{display:true,text:'중위가(만원)',font:{size:10}},ticks:{font:{size:10}}},
+        y:{position:'left',title:{display:true,text:(D.gu_list||[]).includes(REG)?'중위가(억원·3M평활)':'중위가(만원)',font:{size:10}},ticks:{font:{size:10}}},
         y2:{position:'right',min:-1,max:1,grid:{drawOnChartArea:false},title:{display:true,text:'국면 점수',font:{size:10}},ticks:{font:{size:10}}}}}});
   }
 
@@ -107,7 +110,7 @@ function renderCrash(){
       plugins:{legend:{labels:{boxWidth:16,font:{size:10}}}},
       scales:{x:{ticks:{maxTicksLimit:12,font:{size:9}}},
         y:{position:'left',min:0,title:{display:true,text:'조정확률',font:{size:10}},ticks:{font:{size:9},callback:v=>v+'%'}},
-        y2:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'중위가(만원)',font:{size:10}},ticks:{font:{size:9}}}}}});
+        y2:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:(D.gu_list||[]).includes(REG)?'중위가(억원·3M평활)':'중위가(만원)',font:{size:10}},ticks:{font:{size:9}}}}}});
   }
   // 리프트 표
   const lf=$('re3_crash_lift');
