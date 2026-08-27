@@ -541,6 +541,7 @@
       <button class="tab"    data-pane="p_pf" style="background:#166534;border-color:#166534;color:#fff">💼 Portfolio<small style="color:#bbf7d0">지수 예측·비중 제안</small></button>
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
       <button class="tab"    data-pane="p_re" style="background:#7c2d12;border-color:#7c2d12;color:#fff">🔮 RE 예측<small style="color:#fed7aa">r가중 합성·조절</small></button>
+      <button class="tab"    data-pane="p_re3" style="background:#9a3412;border-color:#9a3412;color:#fff">🏘️ RE3<small style="color:#ffedd5">준비중</small></button>
       <!-- (2026-08-16) 청약 탭 — namoobi 로그인 시에만 노출 (sub.js 가 /api/auth/me 로 표시) -->
       <button class="tab" id="tab_sub" data-pane="p_sub" style="display:none;background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
@@ -1096,6 +1097,11 @@
     <div style="margin-top:10px;flex:0 0 auto;max-width:960px">
       <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="re_bt"></div>
     </div>
+  </div>
+  <!-- (2026-08-27) 🏘️ RE3 페인 — 빈 탭 선생성(사용자 지시). 내용은 추후 채움 -->
+  <div class="pane" id="p_re3" style="overflow:auto">
+    <h2>🏘️ RE3 <em style="font-weight:400">준비중</em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">이 탭은 아직 비어 있습니다. 내용은 추후 추가 예정입니다.</p>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
   <div class="pane" id="p_sub" style="overflow:auto">
@@ -1833,7 +1839,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=08272019"></script>
+<script src="/app.js?v=08272100"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826re"></script><!-- (2026-08-22) Portfolio 탭 -->
