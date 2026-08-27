@@ -1,11 +1,11 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-26",
+ "as_of": "2026-08-27",
  "data": {
   "as_of_sep": "2026-06-17 SEP(최신, 2026-03-18 SEP 대비치 병기)",
   "unit": "%",
-  "note": "연방기금금리 중간값(Median). 2026-06-17 SEP는 18명 참여(1명은 2028년 미제출), 2026-03-18 SEP는 19명 참여. 다음 SEP는 2026-09-16 회의에서 발표 예정.",
-  "source": "https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf (Table 1, Federal funds rate Median 행) — DB(dot_plot.json) 재사용, 신규 조사 없음",
+  "note": "연방기금금리 중간값(Median). 2026-06-17 SEP는 18명 참여(1명은 2028년 미제출), 2026-03-18 SEP는 19명 참여. 다음 SEP는 2026-09-16 회의에서 발표 예정(2026-08-27 현재 미발표 — 기존 DB 값 재사용).",
+  "source": "https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf (Table 1, Federal funds rate Median 행) — DB(dot_plot.json) 재사용, 신규 조사 없음(다음 SEP 전이라 최신값 불변)",
   "rows": [
    {
     "year": "2026년말",

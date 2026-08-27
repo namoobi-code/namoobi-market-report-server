@@ -259,7 +259,13 @@ def ridge_h(feat, prices, ytr, keys, h, t_last, lam, upto=None):
     g = R.ridge_pred(m, row)
     cont = {k: m["beta"][j] * (row[j] - m["mu"][j]) / m["sd"][j] for j, k in enumerate(use)}
     beta = {k: m["beta"][j] for j, k in enumerate(use)}
-    return {"g": g, "ym": m["ym"], "cont": cont, "beta": beta}
+    # (2026-08-26) 화면 표의 시차·r 도 여기서 나간다 — 표와 엔진 기준 100% 일치.
+    #   기존 표는 '목표=h개월 누적변화율' 기준이었는데, 월별 누적은 창이 h-1 개월씩 겹쳐
+    #   상관이 부풀려진다(실측: 난수 39개를 30M 기준으로 재면 |r| 0.396 — 진짜 지표 평균
+    #   0.273 보다 높다). 전년비 기준은 난수 기준선이 0.21~0.28 로 평탄해 비교가 공정하다.
+    return {"g": g, "ym": m["ym"], "cont": cont, "beta": beta,
+            "lags": {k: lags[k]["lag"] for k in use},
+            "corrs": {k: round(lags[k]["corr"], 3) for k in use}}
 
 
 def bt_ridge(feat, prices, ytr, keys, lam, origins=BT_ORIGINS):
@@ -532,17 +538,9 @@ def main():
             if Y is None:
                 continue
             Ymasks[h], yms[h], ysds[h] = Y, ym, ysd
-        rows_h = {h: scan(feat, Ymasks, keys, t_last, None, h) for h in Ymasks}
-        for h in DISP_H:
-            for (k, L, c, z) in rows_h.get(h, []):
-                lead[k][f"lag{h}"], lead[k][f"r{h}"] = L, round(c, 3)
-        # (2026-08-26 · 릿지 전환) 표시용 w12 = |12M r|/Σ|12M r| (pf 와 동일 — 진단용 표시).
-        #   실제 예측 영향은 릿지 β·기여도(cont)가 담당한다.
-        r12map = {k: c for k, L, c, z in rows_h.get(12, [])}
-        r12s = sum(abs(c) for c in r12map.values()) or 1.0
-        for k in keys:
-            lead[k]["w12"] = round(abs(r12map.get(k, 0.0)) / r12s, 4)
         lam = (rl["pred"].get(reg) or {}).get("lam") or 1.0   # relead 지역별 λ 재사용
+        # (2026-08-26) 표의 지평별 시차·r 은 아래 릿지 계산(g_raw)에서 그대로 받아 채운다 —
+        #   scan(누적변화율 기준) 대신 엔진과 동일한 전년비 기준. 표=엔진 일치.
 
         # 그룹 합성 r (표시용)
         groups = []
@@ -569,6 +567,15 @@ def main():
                 continue
             calib = (bt["by_h"].get(h) or {}).get("calib", 0.0) or 0.0
             g_raw[h] = (max(-1.2, min(1.2, r2["g"])), r2["cont"], calib, r2["beta"], r2["ym"])
+            if h in DISP_H:                       # 표의 지평별 시차·r = 엔진이 실제로 쓴 값
+                for k, L in r2["lags"].items():
+                    lead[k][f"lag{h}"] = L
+                    lead[k][f"r{h}"] = r2["corrs"][k]
+        # 표시용 w12 = |12M r|/Σ|12M r| (진단용) — 실제 영향은 릿지 β 기반 '가' 열이 담당
+        r12map = {k: (lead[k].get("r12") or 0.0) for k in keys}
+        r12s = sum(abs(c) for c in r12map.values()) or 1.0
+        for k in keys:
+            lead[k]["w12"] = round(abs(r12map[k]) / r12s, 4)
         gs, guard = {}, {}
         for h in sorted(g_raw):
             # (2026-08-23) calib 곱하지 않음 — 선택/평가 분리 실측에서 raw 가 전 지역 최선
