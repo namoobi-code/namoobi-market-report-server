@@ -160,11 +160,96 @@ function renderJsr(){
       scales:{x:{ticks:{maxTicksLimit:8,font:{size:9}}},y:{ticks:{font:{size:9}}}}}});
 }
 
+/* ── ③ 관심단지 워치리스트 (2026-08-27) — /api/apt/search·series 재사용 ── */
+const WK='re3_watch_v1';
+function wlLoad(){ try{const v=JSON.parse(localStorage.getItem(WK)); if(Array.isArray(v))return v;}catch(e){}
+  return [{id:6889,name:'도림청구',ar:0}]; }          // 기본: 도림청구(영등포 도림동)
+function wlSave(v){ try{localStorage.setItem(WK,JSON.stringify(v));}catch(e){} }
+const fmtP=x=>x==null?'—':(x>=1?(+x).toFixed(2).replace(/\.?0+$/,'')+'억':Math.round(x*10000).toLocaleString()+'만'); // apt.sqlite 금액 단위=억원(실측)
+
+function renderWlAdd(){
+  const h=$('re3_wl_add'); if(!h) return;
+  h.innerHTML=`<div style="display:flex;gap:6px;align-items:center;position:relative">
+    <input id="re3w_q" placeholder="단지명 검색 (2자 이상)" style="width:220px;padding:4px 8px;border:1px solid #cfd4da;border-radius:6px;font-size:12.5px">
+    <button id="re3w_go" style="font-size:12px;padding:4px 12px;border:1px solid #9a3412;border-radius:6px;background:#9a3412;color:#fff;cursor:pointer">검색</button>
+    <div id="re3w_res" style="position:absolute;top:30px;left:0;z-index:30;background:#fff;border:1px solid #cfd4da;border-radius:8px;max-height:260px;overflow:auto;box-shadow:0 4px 14px rgba(0,0,0,.12);display:none;min-width:340px"></div></div>`;
+  const q=$('re3w_q'), res=$('re3w_res');
+  const go=async()=>{
+    const v=q.value.trim(); if(v.length<2) return;
+    const r=await fetch('/api/apt/search?q='+encodeURIComponent(v)); const j=await r.json();
+    res.style.display='block';
+    res.innerHTML=(j.rows||[]).length?j.rows.map(x=>
+      `<div class="re3w_it" data-id="${x.id}" data-name="${x.name}" style="padding:5px 10px;font-size:12px;cursor:pointer;border-bottom:1px solid #f0f2f5">
+        <b>${x.name}</b> <span style="color:#667">${x.umd} · 거래 ${x.ns}건 · 최근 ${x.last||'—'}</span></div>`).join('')
+      :'<div style="padding:8px 10px;font-size:12px;color:#889">검색 결과 없음</div>';
+    res.querySelectorAll('.re3w_it').forEach(el=>el.onclick=()=>{
+      const wl=wlLoad();
+      if(!wl.some(w=>w.id==el.dataset.id)){ wl.push({id:+el.dataset.id,name:el.dataset.name,ar:0}); wlSave(wl); renderWl(); }
+      res.style.display='none'; q.value='';
+    });
+  };
+  $('re3w_go').onclick=go; q.addEventListener('keydown',e=>{if(e.key==='Enter')go();});
+  document.addEventListener('click',e=>{if(!h.contains(e.target))res.style.display='none';});
+}
+
+function spark(cv,vals){
+  const xs=vals.filter(x=>x!=null); if(!cv||xs.length<2) return;
+  const W=240,H=56; cv.width=W; cv.height=H;
+  const ctx=cv.getContext('2d'); ctx.clearRect(0,0,W,H);
+  const mn=Math.min(...xs),mx=Math.max(...xs),sp=(mx-mn)||1;
+  ctx.beginPath(); ctx.strokeStyle='#0f766e'; ctx.lineWidth=1.4;
+  let started=false;
+  vals.forEach((v,i)=>{ if(v==null){return;}
+    const x=i/(vals.length-1)*(W-4)+2, y=H-4-(v-mn)/sp*(H-10);
+    started?ctx.lineTo(x,y):ctx.moveTo(x,y); started=true;});
+  ctx.stroke();
+}
+
+async function renderWl(){
+  const host=$('re3_wl'); if(!host) return;
+  const wl=wlLoad();
+  host.innerHTML=wl.length?'':'<div class="note">등록된 단지가 없습니다 — 위에서 검색해 추가하세요.</div>';
+  for(const w of wl){
+    const card=document.createElement('div');
+    card.style.cssText='flex:0 0 300px;background:#fff;border:1px solid #e2e5ea;border-radius:10px;padding:10px 12px';
+    card.innerHTML='<div class="note">'+w.name+' 불러오는 중…</div>';
+    host.appendChild(card);
+    try{
+      const r=await fetch('/api/apt/series?id='+w.id+(w.ar?'&ar='+w.ar:'')); const j=await r.json();
+      const sale=j.sale||[], jeon=j.jeon||[];
+      const last=sale[sale.length-1];
+      const cutoff=last?(+last.ym.slice(0,4)-1)+last.ym.slice(4):null;
+      const y12=sale.filter(s=>cutoff&&s.ym>=cutoff);
+      const hi=y12.length?Math.max(...y12.map(s=>s.mx||s.med)):null;
+      const lo=y12.length?Math.min(...y12.map(s=>s.mn||s.med)):null;
+      const jl=jeon.length?jeon[jeon.length-1]:null;
+      const jsrPct=(last&&jl&&last.med)?(jl.med/last.med*100):null;
+      const yy=last?(+last.ym.slice(0,4)-5)+last.ym.slice(4):null;
+      const sp5=sale.filter(s=>yy&&s.ym>=yy).map(s=>s.med);
+      card.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center">
+          <b style="font-size:13.5px">${j.apt.name} <span style="font-weight:400;color:#667;font-size:11.5px">${j.apt.umd} · ${j.ar}㎡</span></b>
+          <button data-x="${w.id}" style="border:none;background:none;color:#b91c1c;cursor:pointer;font-size:13px" title="삭제">✕</button></div>
+        <select data-ar="${w.id}" style="font-size:11px;margin:3px 0;padding:1px 4px;border:1px solid #d6d9de;border-radius:5px">
+          ${(j.ars||[]).slice(0,8).map(a=>`<option value="${a.ar}"${a.ar==j.ar?' selected':''}>${a.ar}㎡ (거래 ${a.n}건)</option>`).join('')}</select>
+        <div style="font-size:12.5px;line-height:1.9">
+          최신 매매 <b>${last?fmtP(last.med):'—'}</b> <span style="color:#667">(${last?fmt(last.ym):'—'} · ${last?last.n:0}건)</span><br>
+          12M 신고가 <b style="color:#dc2626">${fmtP(hi)}</b> · 신저가 <b style="color:#2563eb">${fmtP(lo)}</b>
+          ${last&&hi?`<span style="color:#667">— 현재 고점 대비 ${((last.med/hi-1)*100).toFixed(1)}%</span>`:''}<br>
+          전세 중위 <b>${jl?fmtP(jl.med):'—'}</b>${jsrPct?` · 전세가율 <b>${jsrPct.toFixed(0)}%</b>`:''}${(()=>{const wv=(j.wol||[]);const wlr=wv[wv.length-1];return wlr?`<br>월세 최근 <b>${fmtP(wlr.dep)}/${Math.round(wlr.rent)}만</b> <span style="color:#667">(${fmt(wlr.ym)})</span>`:'';})()}</div>
+        <canvas class="re3sp"></canvas><div class="note" style="margin-top:0">최근 5년 매매 중위가</div>`;
+      spark(card.querySelector('canvas'),sp5);
+      card.querySelector('[data-x]').onclick=()=>{wlSave(wlLoad().filter(x=>x.id!=w.id));renderWl();};
+      card.querySelector('[data-ar]').onchange=e=>{
+        const wl2=wlLoad(); const it=wl2.find(x=>x.id==w.id); if(it){it.ar=+e.target.value; wlSave(wl2); renderWl();}};
+    }catch(e){ card.innerHTML='<div class="note">'+w.name+' 로드 실패: '+e.message+'</div>'; }
+  }
+}
+
 async function boot(){
   try{
     const r=await fetch('/api/db/re3'); D=await r.json();
     if(!D.regions.includes(REG)) REG=D.regions[0];
-    render(); renderCalc(); renderJsr();
+    render(); renderCalc(); renderJsr(); renderWlAdd(); renderWl();
   }catch(e){ const el=$('re3_verdict'); if(el) el.innerHTML='<div class="note">re3 데이터 로드 실패: '+e.message+'</div>'; }
 }
 document.addEventListener('DOMContentLoaded',boot);
