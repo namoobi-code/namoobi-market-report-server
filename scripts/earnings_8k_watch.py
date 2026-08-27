@@ -224,13 +224,31 @@ def exhibit_text(cik, accno):
              and not re.search(r"index|\.txt$|-\d{8}\.htm$", i.get("name", ""), re.I)]
         return max(c, key=lambda i: int(i.get("size") or 0))["name"] if c else None
     name = pick()
-    if not name:
+    t = None
+    if name:
+        try:
+            t = get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/{name}",
+                    timeout=30).decode("utf-8", "ignore")
+        except Exception:
+            return ""
+    else:
+        # (2026-08-27) **전체 제출(.txt) 폴백** — 접수 직후에는 SEC 디렉터리에 개별 첨부
+        # .htm 이 아직 전개되지 않아 index.json 에 index.html·전체 .txt·xbrl.zip 만 있는
+        # 시간대가 있다. 종전엔 후보가 없어 빈 문자열을 돌려줬고, 가이던스가 통째로 비었다.
+        #   실측 NVDA 2026-08-26 실적 8-K — 발표 다음 날까지 개별 첨부가 없어 화면
+        #   가이던스 표가 전부 '미제시'였다. 전체 .txt 의 <DOCUMENT> 블록에서 EX-99 를
+        #   잘라내면 같은 본문을 얻는다(실측: Q3 매출 $108.0B ±2% 정상 파싱).
+        try:
+            full = get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/{accno}.txt",
+                       timeout=45).decode("utf-8", "ignore")
+            docs = re.findall(r"<DOCUMENT>([\s\S]*?)</DOCUMENT>", full)
+            ex = next((d for d in docs if re.search(r"<TYPE>EX-99", d)), None)
+            if ex:
+                t = ex
+        except Exception:
+            return ""
+    if not t:
         return ""
-    try:
-        raw = get(f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/{an}/{name}", timeout=30)
-    except Exception:
-        return ""
-    t = raw.decode("utf-8", "ignore")
     # (2026-08-10) 원문 HTML 을 남겨 둔다 — 표 파서(guidance_table)가 같은 첨부를 다시
     # 내려받지 않게 하기 위함이다(SEC 호출을 두 배로 늘리면 곧바로 차단당한다).
     if len(RAW_CACHE) > 8:        # 워커 4개가 동시에 쓰므로 통째로 비우면 남의 것을 지운다
