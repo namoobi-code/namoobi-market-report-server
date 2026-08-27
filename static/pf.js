@@ -397,25 +397,40 @@
     const hasAdj=!!(((tg.pred||{})[12]||{}).cont);          // 기여도 있는 JSON 만 조절 가능
     const bsty='padding:0 3px;font-size:10.5px;border:1px solid #d7dce3;border-radius:4px;cursor:pointer;background:#fff';
     /* (2026-08-23) 사이드 배치용 압축 — 출처는 툴팁으로, 그룹 열 제거(들여쓰기로 구분), 폰트 11px */
+    /* (2026-08-26 · RE 예측과 동일) 지평별 '가' = 그 지평 릿지 |β| 발언권(조절 배수 반영, 합계 100%).
+       기존 '가중치(12M)' 한 칸은 |12M r| 비례 표시였는데, 실제 예측 영향은 지평마다 다른 β 다. */
+    const wShare=(h,k)=>{const p=((tg._p0||tg.pred||{})[h]||{}).beta; if(!p) return null;
+      let s=0,v=null;
+      for(const j in p){const a=Math.abs(p[j])*mulOf(j); s+=a; if(j===k) v=a;}
+      return (v!=null&&s>0)?100*v/s:null;};
+    const hasW=HZS.some(h=>((tg._p0||tg.pred||{})[h]||{}).beta);
+    const wCell=(h,k)=>{if(!hasW) return '';
+      const w=wShare(h,k);
+      return `<td class="num" style="color:${mulOf(k)!==1?'#b45309':'#555'}">${w!=null?w.toFixed(1)+'%':'—'}</td>`;};
     const indRow=(k,ind)=>{const l=lead[k],m=D.meta[k]||{};const on=sel.includes(k);
       const mv=mulOf(k), sv=scOf(k);
       const hzCells=HZS.map(h=>`<td class="num">${l['lag'+h]!=null?l['lag'+h]+'M':'—'}</td>
-        <td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`).join('');
+        <td class="num">${l['r'+h]!=null?rc(l['r'+h]):'—'}</td>`+wCell(h,k)).join('');
       const adjCell=hasAdj?`<td class="num" style="white-space:nowrap">
         <button data-mm="${k}" data-d="-1" style="${bsty}" title="가중치 -0.1">−</button><b style="color:${mv!==1?'#b45309':'#333'}">${mv.toFixed(1)}</b><button data-mm="${k}" data-d="1" style="${bsty}" title="가중치 +0.1">＋</button>
         <button data-ms="${k}" data-s="1" style="${bsty};${sv===1?'background:#16a34a;color:#fff;border-color:#16a34a':''}" title="이 지표가 1σ 오른다고 가정">▲</button><button data-ms="${k}" data-s="-1" style="${bsty};${sv===-1?'background:#dc2626;color:#fff;border-color:#dc2626':''}" title="이 지표가 1σ 내린다고 가정">▼</button></td>`:'';
       return `<tr data-i="${k}" style="cursor:pointer${on?';background:#fffbe6':''}" title="${E(m.src||'')}">
       <td style="padding-left:${ind?16:4}px;white-space:nowrap">${ind?'└ ':''}${on?'✔ ':''}${E(m.label||k)}</td>
       <td class="num">${l.lag}M</td>
-      <td class="num">${rc(l.corr)}</td>${hzCells}${HZS.length?`
-      <td class="num"><b style="color:${mv!==1?'#b45309':''}">${l.w12!=null?(l.w12*mv*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`}${adjCell}</tr>`;};
+      <td class="num">${rc(l.corr)}</td>${hzCells}${hasW?'':(HZS.length?`
+      <td class="num"><b style="color:${mv!==1?'#b45309':''}">${l.w12!=null?(l.w12*mv*100).toFixed(1)+'%':'—'}</b></td>`:`<td class="num">${(l.w*100).toFixed(1)}%</td>`)}${adjCell}</tr>`;};
     const gArr=(tg.groups||[]).slice().sort((a,b)=>Math.abs(b.corr)-Math.abs(a.corr));
     const used=new Set();
     let body=gArr.map(g=>{
       const mem=g.members.filter(k=>lead[k]).sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
       mem.forEach(k=>used.add(k));
-      const NC=3+HZS.length*2+1+(hasAdj?1:0);
-      const pad=('<td class="num">—</td>').repeat(NC-3);
+      const NC=3+HZS.length*(hasW?3:2)+(hasW?0:1)+(hasAdj?1:0);
+      /* 지평별 '가' 소계 — 그 그룹이 그 지평에서 차지한 발언권 합 */
+      const pad=hasW
+        ? HZS.map(h=>{const gw=mem.reduce((s,k)=>s+(wShare(h,k)||0),0);
+            return `<td class="num">—</td><td class="num">—</td><td class="num"><b>${gw?gw.toFixed(1)+'%':'—'}</b></td>`;}).join('')
+          +(hasAdj?'<td></td>':'')
+        : ('<td class="num">—</td>').repeat(NC-3);
       return `<tr style="background:#f4f6f8"><td style="white-space:nowrap"><b>▣ ${E(g.name)} 통합</b> <span class="note">${mem.length}개</span></td>
         <td class="num">${g.lag}M</td><td class="num">${rc(g.corr)}</td>${pad}</tr>`
         +mem.map(k=>indRow(k,true)).join('');
@@ -423,7 +438,7 @@
     const rest=Object.keys(lead).filter(k=>!used.has(k))
       .sort((a,b)=>Math.abs(lead[b].corr)-Math.abs(lead[a].corr));
     if(rest.length)
-      body+=`<tr style="background:#f4f6f8"><td colspan="${3+HZS.length*2+1+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
+      body+=`<tr style="background:#f4f6f8"><td colspan="${3+HZS.length*(hasW?3:2)+(hasW?0:1)+(hasAdj?1:0)}"><b>▣ 단독 지표</b> <span class="note">그룹 미구성</span></td></tr>`
         +rest.map(k=>indRow(k,true)).join('');
     const wSum=has12?Object.keys(lead).reduce((s,k)=>s+(lead[k].w12||0)*mulOf(k),0):1;
     $('pf_ind').innerHTML=`${hasAdj?`<div style="text-align:right;margin:1px 0">
@@ -433,9 +448,10 @@
       <th style="text-align:right" title="전 구간 상관 최대 시차 — 0M이면 동행지표(현재 확인용, 선행 아님)">시차</th>
       <th style="text-align:right" title="그 시차에서의 상관 — '얼마나 닮았나'이지 예측 기여가 아님">r</th>${
       HZS.map(h=>`<th style="text-align:right" title="${h}개월 예측에 출전 가능한 시차(≥${h}개월) 중 상관 최대 지점">${h}M</th>
-      <th style="text-align:right" title="${h}개월 이상 선행 구간에서의 상관 — 동행지표는 먼 지평에서 뚝 떨어진다">${h}M r</th>`).join('')}${has12?`
+      <th style="text-align:right" title="${h}개월 이상 선행 구간에서의 상관 — 동행지표는 먼 지평에서 뚝 떨어진다">${h}M r</th>`
+      +(hasW?`<th style="text-align:right" title="${h}개월 예측 릿지 |β| 지분 — 그 지평 회귀에서의 실제 발언권(조절 배수 반영, 지평 합계 100%)">가</th>`:'')).join('')}${hasW?'':(has12?`
       <th style="text-align:right" title="|12M r| 정규화 — 12개월 예측에서의 실제 상대 영향력. 조절 배수 반영">가중치</th>`:`
-      <th style="text-align:right">가중치</th>`}${hasAdj?`
+      <th style="text-align:right">가중치</th>`)}${hasAdj?`
       <th style="text-align:right;white-space:nowrap" title="가중치조절(−/＋) = 배수 ±0.1, 예측 기여를 그 배수만큼 · 지표값조절(▲/▼) = 이 지표가 1σ 오름/내림 가정 시나리오. 바꾸면 차트 예측선·비중 제안이 즉시 재계산">가중치조절 | 지표값조절</th>`:''}</tr></thead><tbody>${body}</tbody></table>${
       hasAdj?`<div class="note" style="margin:5px 0">실효 Σ가중치 <b style="color:${Math.abs(wSum-1)>.001?'#b45309':'#333'}">${(wSum*100).toFixed(0)}%</b> (기본 100%)
       · <button id="pf_rst" style="${bsty}">조절 초기화</button> — 예측선·비중 제안에 즉시 반영됨(저장 안 됨·새로고침 시 초기화)</div>`:''}
