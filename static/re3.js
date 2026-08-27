@@ -100,7 +100,8 @@ function renderAllMap(){
     return `<div style="margin-bottom:6px"><b style="font-size:12px">${title}</b>
       <div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:3px">${its.map(x=>
         `<button data-g="${x.n}" title="${x.n}${x.warn?' · ⚠ 백테스트 분리력 낮음 — 판정 신뢰 불가':''}" style="font-size:11px;padding:2px 6px;border-radius:10px;cursor:pointer;border:1px solid ${x.n===REG?'#9a3412':'#e2e5ea'};background:${x.n===REG?'#fff7ed':'#fff'};${x.warn?'opacity:.5':''}">${x.ic} ${x.short} <b>${x.score==null?'—':x.score.toFixed(2)}</b>${x.warn?'<span style="color:#b91c1c">⚠</span>':''}</button>`).join('')}</div></div>`;};
-  host.innerHTML=grp('서울 (구)',D.gu_list.filter(g=>g.startsWith('서울')))
+  host.innerHTML=grp('전국·시도',D.regions)          // (2026-08-28) 시도도 함께 표시 (사용자 요청)
+    +grp('서울 (구)',D.gu_list.filter(g=>g.startsWith('서울')))
     +grp('경기 (시군구)',D.gu_list.filter(g=>g.startsWith('경기')))
     +`<p class="note" style="margin:4px 0 0;line-height:1.6">🔴 상승 · 🟡 중립 · 🔵 하락 · 숫자=국면 점수(−1~+1, 점수순 정렬).
       흐림+⚠ = 백테스트 분리력 낮음(서울 구 대부분 해당 — 서울은 시도 단위 판정 권장).</p>`;
