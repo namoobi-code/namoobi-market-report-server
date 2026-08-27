@@ -8,6 +8,11 @@
   const $=id=>document.getElementById(id);
   const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   let D=null,_init=false,cur='서울',logY=false,showPred=true,view=null,drag=null;
+  /* (2026-08-26) 예측선 표시 단위 — 'hz' = 표시 지평(1·3·6·12·18·24·30M)만 이어 그림(기본),
+     'm' = 월별 30점 전부. 지평마다 독립 회귀라 안 보는 중간 지평이 요동치면 톱니로 보이는데,
+     평활을 더 걸면 정확도가 나빠진다(실측: 3점 2.91% → 9점 3.66%). 그래서 평활이 아니라
+     '실제로 읽는 지평만 잇는' 표시로 해결한다 — 데이터·백테스트는 그대로. */
+  let predMode='hz';
   /* (2026-08-24) 지표 오버레이 — 행 클릭으로 차트에 겹쳐보기(pf 와 동일).
      상속 36종 원계열은 relead.json 을 처음 클릭할 때 지연 로드, 신규 3종(subs·cons·j2m)은 D.d 동봉 */
   let sel=[],RL=null,_rlLoading=false;
@@ -117,11 +122,15 @@
       x.save();x.setLineDash([4,4]);x.strokeStyle='#c8ced6';
       x.beginPath();x.moveTo(X(past),Pd.t-8);x.lineTo(X(past),H-Pd.b);x.stroke();x.restore();
       x.fillStyle='#98a2ad';x.fillText('예측 →',X(past)+3,Pd.t-1);
+      /* 예측 구간 인덱스 — 지평 모드면 표시 지평만(+시작점) */
+      const idxs=(predMode==='hz'?[past,...HZS.map(h=>past+h)]:(()=>{const a=[];for(let j=past;j<N;j++)a.push(j);return a;})())
+        .filter(j=>j>=Math.max(past,v0)&&j<=v1);
       x.beginPath();let st=false;
-      for(let j=Math.max(past,v0);j<=v1;j++){const v=F.hi[j];if(v==null)continue;
+      for(const j of idxs){const v=F.hi[j];if(v==null)continue;
         const px=X(j),py=Y(tf(v)); st?x.lineTo(px,py):(x.moveTo(px,py),st=true);}
-      for(let j=v1;j>=Math.max(past,v0);j--){const v=F.lo[j];if(v==null)continue;x.lineTo(X(j),Y(tf(v)));}
+      for(let q=idxs.length-1;q>=0;q--){const j=idxs[q],v=F.lo[j];if(v==null)continue;x.lineTo(X(j),Y(tf(v)));}
       x.closePath();x.fillStyle='rgba(31,41,55,.10)';x.fill();
+      F._idxs=idxs;
     }
     /* 오버레이 지표 (자기 스케일) */
     overlays.forEach((o,i)=>{
@@ -134,9 +143,14 @@
       const px=X(j),py=Y(tf(v)); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
     x.stroke();
     if(showPred){x.save();x.setLineDash([6,4]);x.strokeStyle='#d9534f';x.lineWidth=2;x.beginPath();on=false;
-      for(let j=v0;j<=v1;j++){const v=F.price[j];if(v==null){on=false;continue;}
+      const pj=F._idxs||(()=>{const a=[];for(let j=v0;j<=v1;j++)a.push(j);return a;})();
+      for(const j of pj){const v=F.price[j];if(v==null){on=false;continue;}
         const px=X(j),py=Y(tf(v)); on?x.lineTo(px,py):(x.moveTo(px,py),on=true);}
-      x.stroke();x.restore();x.lineWidth=1;}
+      x.stroke();x.restore();
+      if(predMode==='hz'){x.fillStyle='#d9534f';           // 지평 점 표시
+        for(const j of pj){const v=F.price[j];if(v==null)continue;
+          x.beginPath();x.arc(X(j),Y(tf(v)),2.6,0,6.283);x.fill();}}
+      x.lineWidth=1;}
     /* 우측 축 — 기준(가격) + 오버레이별 (pf 와 동일) */
     const axes=[{sc:scP,color:'#1f2937',name:cur,log:logY},
                 ...overlays.map((o,i)=>({sc:scO[i],color:o.color,
@@ -200,11 +214,13 @@
     const spans={'전체':N,'10년':144,'5년':84};
     $('re_ctl').innerHTML=Object.keys(spans).map(s=>btn(false,s,`data-s="${s}"`)).join(' ')
       +' '+btn(logY,'로그축','id="re_log"')+' '+btn(showPred,'예측','id="re_pred"')
+      +' '+btn(predMode==='hz','지평선','id="re_pm" title="예측선을 표시 지평(1·3·6·12·18·24·30M)만 이어 그린다 — 끄면 월별 30점 전부(중간 지평 요동까지 보여 톱니로 보임)"')
       +` <span class="note">휠=확대축소 · 드래그=이동 · 더블클릭=전체 · ${fm(D.t[0])}~${fm(D.t[P.past])} 실측 ${P.past+1}개월 · 3개월 평균 계열</span>`;
     $('re_ctl').querySelectorAll('[data-s]').forEach(b=>b.onclick=()=>{
       const n=Math.min(spans[b.dataset.s],N); setView(N-n,N-1);});
     $('re_log').onclick=()=>{logY=!logY;render();};
     $('re_pred').onclick=()=>{showPred=!showPred;render();};
+    {const pm=$('re_pm'); if(pm) pm.onclick=()=>{predMode=(predMode==='hz'?'m':'hz');render();};}
     /* ③ 지표 표 — 그룹(통합 r) + 개별(통설 vs 실측·지평별 r·가중치·조절) */
     const lead=D.lead[cur]||{};
     const rc=v=>{const a=Math.abs(v);

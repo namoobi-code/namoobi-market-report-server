@@ -20,12 +20,19 @@ function render(){
 
   // 종합 신호등
   const v=cur&&cur.verdict, vc=v?VC[v]:['#94a3b8','⚪','판정 보류'];
+  /* (2026-08-27) 지역별 신뢰도 — h6 백테스트 스프레드(상승-하락). 실측: 서울 5.6·경기 5.1은 잘 갈리지만
+     전국 −0.6·부산 −2.2 등 지방은 분리 실패 → 낮은 지역엔 경고를 붙여 과신 방지 (신호 추가 실험 5종 전부 개선 없음) */
+  const h6=bt&&bt.h6, spread=(h6&&h6.up&&h6.down&&h6.up.avg!=null&&h6.down.avg!=null)?+(h6.up.avg-h6.down.avg).toFixed(1):null;
+  const rel=spread==null?null:(spread>=3?['#166534','신뢰도 높음 — 백테스트에서 국면 순서대로 잘 갈렸다']
+            :spread>=1.5?['#a16207','신뢰도 보통']
+            :['#b91c1c','⚠ 신뢰도 낮음 — 이 지역은 백테스트에서 판정이 수익률을 거의/전혀 못 갈랐다. 판정을 믿지 말 것']);
   $('re3_verdict').innerHTML=cur?`
     <div style="display:flex;align-items:center;gap:14px;padding:10px 16px;border:2px solid ${vc[0]};border-radius:10px;background:#fff">
       <div style="font-size:34px">${vc[1]}</div>
       <div><div style="font-size:19px;font-weight:800;color:${vc[0]}">${REG} — ${vc[2]}</div>
         <div class="note">종합 점수 <b>${cur.score===null?'—':cur.score.toFixed(2)}</b> (−1 하락 ~ +1 상승 · 3M 평활) · 기준월 <b>${fmt(cur.month)}</b>
-        <span style="opacity:.75">— 지표 발표 시차로 최신월과 1~2개월 차이가 날 수 있음</span></div></div>
+        <span style="opacity:.75">— 지표 발표 시차로 최신월과 1~2개월 차이가 날 수 있음</span>
+        ${rel?`<br>백테스트 분리력(6M 상승−하락) <b style="color:${rel[0]}">${spread>0?'+':''}${spread}%p — ${rel[1]}</b>`:''}</div></div>
     </div>`:'<div class="note">데이터 없음</div>';
 
   // 신호 표
@@ -90,12 +97,17 @@ function renderCrash(){
   // 확률 추이 차트
   if(window.Chart&&$('re3_crash_cv')&&C.hist&&C.hist[REG]){
     const hs=C.hist[REG]; let i0=hs.findIndex(x=>x!=null); if(i0<0)i0=0;
+    const med=(D.hist[REG]||{}).med||[];   // (2026-08-27) 실거래 중위가 겹쳐 표시 — 확률 급등 구간과 실제 가격 흐름 대조용
     if(crashChart) crashChart.destroy();
     crashChart=new Chart($('re3_crash_cv'),{type:'line',data:{labels:D.t.slice(i0).map(fmt),datasets:[
-      {label:REG+' 조정확률(%)',data:hs.slice(i0),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.10)',pointRadius:0,borderWidth:1.4,fill:true,spanGaps:true},
-      {label:'역사 평균',data:hs.slice(i0).map(()=>cu.avg),borderColor:'#94a3b8',borderDash:[5,4],pointRadius:0,borderWidth:1}
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{boxWidth:16,font:{size:10}}}},
-      scales:{x:{ticks:{maxTicksLimit:12,font:{size:9}}},y:{min:0,ticks:{font:{size:9},callback:v=>v+'%'}}}}});
+      {label:REG+' 조정확률(%)',data:hs.slice(i0),yAxisID:'y',borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.10)',pointRadius:0,borderWidth:1.4,fill:true,spanGaps:true},
+      {label:'역사 평균',data:hs.slice(i0).map(()=>cu.avg),yAxisID:'y',borderColor:'#94a3b8',borderDash:[5,4],pointRadius:0,borderWidth:1},
+      {label:'실거래 중위가',data:med.slice(i0),yAxisID:'y2',borderColor:'#0f766e',backgroundColor:'transparent',pointRadius:0,borderWidth:1.6,spanGaps:true}
+    ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:16,font:{size:10}}}},
+      scales:{x:{ticks:{maxTicksLimit:12,font:{size:9}}},
+        y:{position:'left',min:0,title:{display:true,text:'조정확률',font:{size:10}},ticks:{font:{size:9},callback:v=>v+'%'}},
+        y2:{position:'right',grid:{drawOnChartArea:false},title:{display:true,text:'중위가(만원)',font:{size:10}},ticks:{font:{size:9}}}}}});
   }
   // 리프트 표
   const lf=$('re3_crash_lift');
