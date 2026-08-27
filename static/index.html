@@ -1115,6 +1115,19 @@
     </div>
     <h3 style="margin:12px 0 4px">국면 점수 × 실거래 중위가 (2000~)</h3>
     <div style="position:relative;max-width:1100px"><canvas id="re3_cv"></canvas></div>
+    <!-- (2026-08-27) ② 매매 vs 전세·월세 판단기 — 도림청구 분석 일반화. 입력은 브라우저 저장 -->
+    <hr style="margin:16px 0;border:none;border-top:1px solid #e2e5ea">
+    <h2 style="margin:4px 0">🧮 매매 vs 전세·월세 판단기</h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      조건을 넣으면 <b>연간 총비용</b>(기회비용+이자+세금−기대 상승분)을 세 가지 거주 방식으로 비교한다.
+      기대 상승률 기본값은 <b>RE 예측 12M</b>(수정 가능), 금리 기본값은 ECOS 최신 주담대 금리. 입력은 브라우저에 저장된다. 참고용이며 투자·세무 자문이 아님.</p>
+    <div id="re3_calc"></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start;margin-top:10px">
+      <div style="flex:0 0 460px"><h3 style="margin:4px 0">전세가율 프록시 추이 (전세지수/매매지수)</h3>
+        <div style="position:relative"><canvas id="re3_jsr"></canvas></div>
+        <p class="note" style="margin:2px 0 0">비율 상승 = 전세가 매매보다 강함 → 통설상 매매 상승 압력. 절대 전세가율이 아니라 2010=100 지수의 비율(방향만 유효).</p></div>
+      <div id="re3_calc_out" style="flex:1 1 420px"></div>
+    </div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
   <div class="pane" id="p_sub" style="overflow:auto">
@@ -1857,7 +1870,7 @@
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826re"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826d"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/re3.js?v=08272130"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
+<script src="/re3.js?v=08272220"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

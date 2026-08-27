@@ -103,6 +103,24 @@ def main():
            "t": T, "labels": LABELS, "scope": SCOPE, "regions": regions,
            "cur": {}, "hist": {}, "bt": {}}
 
+    # ── ② 매매 vs 전세·월세 판단기용 부가 데이터 ──
+    out["jsr"] = {k: [round(x,2) if x is not None else None for x in v] for k, v in jsr.items()}
+    mtg_v = [x for x in s["mtg"]["v"] if x is not None]
+    out["mtg"] = mtg_v[-1] if mtg_v else None                     # 최신 주담대 금리(%)
+    out["pred12"] = {}
+    try:
+        rp = load("repred.json")
+        for reg, pv in rp.get("pred", {}).items():
+            p12 = pv.get("pred", {}).get("12")
+            if p12 and p12.get("g") is not None:
+                cal = p12.get("calib", 1) or 1
+                out["pred12"][reg] = {"g": round(p12["g"]*cal*100, 1),
+                                      "lo": round(p12["gb"][0]*100,1) if p12.get("gb") else None,
+                                      "hi": round(p12["gb"][1]*100,1) if p12.get("gb") else None,
+                                      "m": (pv.get("last") or {}).get("t")}
+    except Exception as e:
+        print("pred12 skip:", e)
+
     for reg in regions:
         trade = d["trade"].get(reg) or d["trade"].get("전국")
         unsold = d["unsold"].get(reg) or d["unsold"].get("전국")
