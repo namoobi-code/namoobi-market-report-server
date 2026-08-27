@@ -68,6 +68,7 @@
   #pf_ind td,#pf_ind th{padding:3px 4px!important;font-size:10.5px!important;white-space:nowrap}
   /* (2026-08-23) RE 예측 차트 — 전역 canvas 200px 캡 해제(pf_cv와 동일. 빠뜨려서 차트가 눌려 나왔다 — 실측) */
   #re_cv{height:calc(100vh - 200px)!important;min-height:520px!important;max-height:none!important}
+  #re3_cv{height:380px!important;max-height:none!important}   /* (2026-08-27) RE3 국면 히스토리 — 전역 200px 캡 해제 */
   #re_ind td,#re_ind th{padding:3px 4px!important;font-size:10.5px!important;white-space:nowrap}
   #ms_unsold,#ms_pipe{height:300px!important;max-height:none!important} /* 주택 공급 차트 — 동일 캡 해제 */
   #et_main{height:340px!important;max-height:none!important}            /* 비아파트 실거래 — 동일 캡 해제 */
@@ -541,7 +542,7 @@
       <button class="tab"    data-pane="p_pf" style="background:#166534;border-color:#166534;color:#fff">💼 Portfolio<small style="color:#bbf7d0">지수 예측·비중 제안</small></button>
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
       <button class="tab"    data-pane="p_re" style="background:#7c2d12;border-color:#7c2d12;color:#fff">🔮 RE 예측<small style="color:#fed7aa">r가중 합성·조절</small></button>
-      <button class="tab"    data-pane="p_re3" style="background:#9a3412;border-color:#9a3412;color:#fff">🏘️ RE3<small style="color:#ffedd5">준비중</small></button>
+      <button class="tab"    data-pane="p_re3" style="background:#9a3412;border-color:#9a3412;color:#fff">🏘️ RE3<small style="color:#ffedd5">국면 신호등</small></button>
       <!-- (2026-08-16) 청약 탭 — namoobi 로그인 시에만 노출 (sub.js 가 /api/auth/me 로 표시) -->
       <button class="tab" id="tab_sub" data-pane="p_sub" style="display:none;background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
@@ -1098,10 +1099,22 @@
       <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="re_bt"></div>
     </div>
   </div>
-  <!-- (2026-08-27) 🏘️ RE3 페인 — 빈 탭 선생성(사용자 지시). 내용은 추후 채움 -->
+  <!-- (2026-08-27) 🏘️ RE3 페인 — 시장 국면 신호등 · scripts/re3.py (매일 08:05) · re3.js
+       스터디 자료 "시장 사이클 읽기" 구현: 6신호(거래량·전세가율·미분양·금리·경매·연체율) 규칙 판정 + 소급 백테스트 -->
   <div class="pane" id="p_re3" style="overflow:auto">
-    <h2>🏘️ RE3 <em style="font-weight:400">준비중</em></h2>
-    <p class="note" style="margin:2px 0 8px;line-height:1.7">이 탭은 아직 비어 있습니다. 내용은 추후 추가 예정입니다.</p>
+    <h2>🏘️ RE3 — 시장 국면 신호등 <em id="re3_asof" style="font-weight:400"></em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      거래량(KOSIS)·전세가율(ECOS)·미분양·주담대 금리·경매 낙찰가율(등기광장)·가계대출 연체율 6개 신호를
+      고정 임계값으로 판정해 <b>지금이 상승/하락 국면인지</b>를 종합한다(3M 평활 · 신규 수집 없음, 기존 서버 데이터 조합).
+      같은 규칙을 2000년부터 소급 적용한 <b>국면별 이후 수익률 백테스트</b>를 함께 표시 — 규칙이 실제로 맞았는지 그대로 보여준다. 참고용이며 투자권유가 아님.</p>
+    <div id="re3_reg" style="margin-bottom:8px"></div>
+    <div id="re3_verdict" style="margin-bottom:10px"></div>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:flex-start">
+      <div><h3 style="margin:4px 0">신호 6종 (기준월 시점)</h3><div id="re3_sig"></div></div>
+      <div><h3 style="margin:4px 0">국면 판정 백테스트</h3><div id="re3_bt"></div></div>
+    </div>
+    <h3 style="margin:12px 0 4px">국면 점수 × 실거래 중위가 (2000~)</h3>
+    <div style="position:relative;max-width:1100px"><canvas id="re3_cv"></canvas></div>
   </div>
   <!-- (2026-08-16) 🏗️ 청약 페인 — scripts/applyhome_list.py (매일 07:58) · sub.js · namoobi 로그인 시에만 탭 노출 -->
   <div class="pane" id="p_sub" style="overflow:auto">
@@ -1844,6 +1857,7 @@
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826re"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826d"></script><!-- (2026-08-23) RE 예측 탭 -->
+<script src="/re3.js?v=08272130"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
