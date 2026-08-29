@@ -80,9 +80,8 @@ function render(){
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},
         tooltip:{itemSort:(a,b)=>(b.raw??-1e18)-(a.raw??-1e18),   // (2026-08-29 피드백) 팝업 값 높은 순
-          callbacks:{label:c=>MODE==='idx'
-          ?c.dataset.label+' '+c.raw+' ('+nf(c.dataset._abs[c.dataIndex])+'천$)'
-          :c.dataset.label+' '+nf(c.raw)+'천$'}}},
+          callbacks:{label:c=>{const nm=c.dataset.label.replace(/ → -?\d+$/,'');   // 범례의 '→ 최종값' 중복 제거
+            return MODE==='idx'?nm+' '+c.raw+' ('+nf(c.dataset._abs[c.dataIndex])+'천$)':nm+' '+nf(c.raw)+'천$';}}}},
       scales:{x:{ticks:{maxTicksLimit:12,font:{size:10}}},
         y:MODE==='idx'
           ?{ticks:{font:{size:10}},title:{display:true,text:'12개월 누적 지수 (시작월=100) — 규모 무관 증감률 비교',font:{size:10}}}
@@ -91,7 +90,9 @@ function render(){
   const n=M.length-1;
   $('kc_tbl').innerHTML=`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
     <thead><tr style="background:#f8fafc">${['품목군','최근월(천$)','전년동월比','12M누적(천$)','누적 YoY','관련 종목 (연동 경로)'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
-    <tbody>${[...its].sort((a,b)=>((b.exp[n]||0)-(a.exp[n]||0))).map(x=>{   // (2026-08-29 피드백) 최근월 수출액 높은 순
+    <tbody>${[...its].sort((a,b)=>{   // (2026-08-29 피드백 2차) 차트(지수)와 같은 기준 — 3년 지수 높은 순(향수 맨 위)
+      const g=x=>{const r=roll12(x.exp||[]);const b=r.find(v=>v!=null&&v>0);return (b&&r[n]!=null)?r[n]/b:-1e18;};
+      return g(b)-g(a);}).map(x=>{
       const r=roll12(x.exp||[]);
       const ry=(r[n]!=null&&n>=12&&r[n-12])?((r[n]/r[n-12]-1)*100):null;
       const yo=yoy(x.exp||[],n);
