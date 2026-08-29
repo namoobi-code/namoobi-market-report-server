@@ -1,36 +1,33 @@
 {
  "marker": "2026-08",
- "as_of": "2026-08-27",
+ "as_of": "2026-08-29",
  "data": {
-  "as_of_sep": "2026-06-17 SEP(최신, 2026-03-18 SEP 대비치 병기)",
-  "unit": "%",
-  "note": "연방기금금리 중간값(Median). 2026-06-17 SEP는 18명 참여(1명은 2028년 미제출), 2026-03-18 SEP는 19명 참여. 다음 SEP는 2026-09-16 회의에서 발표 예정(2026-08-27 현재 미발표 — 기존 DB 값 재사용).",
-  "source": "https://www.federalreserve.gov/monetarypolicy/files/fomcprojtabl20260617.pdf (Table 1, Federal funds rate Median 행) — DB(dot_plot.json) 재사용, 신규 조사 없음(다음 SEP 전이라 최신값 불변)",
   "rows": [
    {
-    "year": "2026년말",
-    "jun": 3.8,
+    "period": "2026년말",
     "mar": 3.4,
+    "jun": 3.8,
     "change": "+0.4"
    },
    {
-    "year": "2027년말",
-    "jun": 3.6,
+    "period": "2027년말",
     "mar": 3.1,
+    "jun": 3.6,
     "change": "+0.5"
    },
    {
-    "year": "2028년말",
-    "jun": 3.4,
+    "period": "2028년말",
     "mar": 3.1,
+    "jun": 3.4,
     "change": "+0.3"
    },
    {
-    "year": "장기중립",
-    "jun": 3.1,
+    "period": "장기중립",
     "mar": 3.1,
+    "jun": 3.1,
     "change": "+0.0"
    }
-  ]
+  ],
+  "comment": "3월(2026-03-18)·6월(2026-06-17) SEP 중간값(median dot) 비교. 6월 SEP에서 2026년말 중간값이 3.4%→3.8%로 매파적 상향(18명 중 9명이 연내 1회 이상 인상 전망), 2027년말 3.1%→3.6%·2028년말 3.1%→3.4%로 동반 상향. 장기중립금리는 3.1%로 양 SEP 모두 동일. (출처: federalreserve.gov Summary of Economic Projections 2026-03·2026-06, server_fomc_meetings.json)"
  }
 }
