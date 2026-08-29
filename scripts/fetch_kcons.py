@@ -13,9 +13,13 @@
              K패션(가방4202·선글라스9004·의류61+62)
      ※ 8543은 전기기기 광범위 코드라 미용기기 외 노이즈 포함(추이용). 61/62는 류(2자리) 전체.
   ② 연동 종목 시세 (야후 일봉 1년) — 품목 수출과 실적 경로가 있는 종목만.
+  ③ 해외 유통 침투 (2026-08-29 추가 — 이코노미스트 '온라인서 뜬 K뷰티, 해외 오프라인 매장 뚫는다'):
+     - 아마존 US 뷰티 베스트셀러 K뷰티 스캔 (무인증 실측 ✓ — 서버렌더 한계로 페이지당 상위 ~30개, 2페이지 = 톱60 커버)
+     - 세포라 US 브랜드 리스트 K뷰티 입점 체크 (무인증 실측 ✓) — 신규 입점 = 오프라인 확장의 이벤트 신호
+     이력은 kcons_hist.json 누적 — 랭크 변화·신규 입점은 관측치로만 계산(추정 금지).
 일간 트렌드(구글·유튜브·네이버쇼핑)는 기존 Trends 탭(trends_collect.py)이 담당 — 국내 관심도 보조지표.
 
-산출: data/db/kcons.json
+산출: data/db/kcons.json · kcons_hist.json
 cron: 25 6 * * *   (수출은 월간·월중 갱신이라 매일 돌려도 값은 가끔 바뀐다 — 무해)
 """
 import json, re, time, urllib.request, urllib.parse
@@ -24,6 +28,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 OUT  = BASE / "data" / "db" / "kcons.json"
+HIST = BASE / "data" / "db" / "kcons_hist.json"
 UA   = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"}
 KST  = timezone(timedelta(hours=9))
 
@@ -67,6 +72,41 @@ STOCKS = [
     ("081660.KS", "휠라홀딩스",   "K패션", "휠라+타이틀리스트 — 글로벌 브랜드 포트폴리오"),
     ("111770.KS", "영원무역",     "K패션", "노스페이스 등 OEM — 의류(61·62) 수출 물량의 생산자"),
     ("298540.KQ", "더네이쳐홀딩스","K패션", "내셔널지오그래픽 어패럴 — 아시아 확장 국면"),
+]
+
+# ── K뷰티 브랜드 사전 (표시명, 매칭 패턴[정규식·소문자], 관련 종목) ───────────
+#   매칭은 단어 경계 정규식 — 'anua'가 'manual'에 걸리는 류의 오탐 방지.
+KBRANDS = [
+    ("메디큐브",    r"medicube",            "에이피알 278470"),
+    ("조선미녀",    r"beauty of joseon",     "구다이글로벌(비상장)"),
+    ("코스알엑스",  r"cosrx",               "아모레퍼시픽(자회사)"),
+    ("아누아",      r"\banua\b",            "더파운더즈(비상장)"),
+    ("티르티르",    r"tirtir",              "구다이글로벌(비상장)"),
+    ("스킨1004",   r"skin\s?1004",          "크레이버(비상장)"),
+    ("바이오던스",  r"biodance",            "비상장"),
+    ("라운드랩",    r"round\s?lab",          "비상장"),
+    ("토리든",      r"torriden",            "비상장"),
+    ("넘버즈인",    r"numbuzin",            "비상장"),
+    ("믹순",        r"mixsoon",             "비상장"),
+    ("메디힐",      r"mediheal",            "엘앤피(비상장)"),
+    ("아비브",      r"\babib\b",            "비상장"),
+    ("달바",        r"d[' ]?alba",          "달바글로벌(상장)"),
+    ("라네즈",      r"laneige",             "아모레퍼시픽 090430"),
+    ("설화수",      r"sulwhasoo",           "아모레퍼시픽 090430"),
+    ("이니스프리",  r"innisfree",           "아모레퍼시픽 090430"),
+    ("에뛰드",      r"\betude\b",           "아모레퍼시픽 090430"),
+    ("헤라",        r"\bhera\b",            "아모레퍼시픽 090430"),
+    ("마녀공장",    r"ma[:.]?nyo",          "마녀공장 439090"),
+    ("구달",        r"goodal",              "클리오 237880"),
+    ("페리페라",    r"peripera",            "클리오 237880"),
+    ("클리오",      r"\bclio\b",            "클리오 237880"),
+    ("미샤",        r"missha",              "에이블씨엔씨 078520"),
+    ("썸바이미",    r"some by mi",          "비상장"),
+    ("아이듀케어",  r"i dew care",          "비상장"),
+    ("닥터그루트",  r"dr\.?\s?groot",       "LG생활건강 051900"),
+    ("빌리프",      r"\bbelif\b",           "LG생활건강 051900"),
+    ("더페이스샵",  r"face\s?shop",         "LG생활건강 051900"),
+    ("키스(KEYTH)", r"keyth",               "비상장"),
 ]
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -169,16 +209,92 @@ def collect_stocks():
     print(f"  시세: {sum(1 for r in rows if r.get('cur'))}/{len(STOCKS)}종목", flush=True)
     return rows
 
+# ── ③ 해외 유통 침투 — 아마존 베스트셀러·세포라 입점 ────────────────────────
+EN_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120", "Accept-Language": "en-US"}
+
+def collect_amazon():
+    """아마존 US 뷰티 베스트셀러 — 랭크·타이틀을 순서 결합해 K뷰티 매칭.
+       서버렌더는 페이지당 상위 ~30개만 담긴다(실측) → 2페이지 합쳐 톱60 커버로 표기."""
+    rows, scanned = [], 0
+    for pg, u in [(1, "https://www.amazon.com/Best-Sellers-Beauty/zgbs/beauty"),
+                  (2, "https://www.amazon.com/Best-Sellers-Beauty/zgbs/beauty?pg=2")]:
+        try:
+            h = get(u, hdr=EN_UA).decode("utf-8", "replace")
+        except Exception as e:
+            print(f"  ⚠ 아마존 p{pg} 실패: {repr(e)[:60]}", flush=True)
+            continue
+        ranks  = [int(x) for x in re.findall(r'zg-bdg-text">\s*#?(\d+)', h)]
+        titles = re.findall(r'_p13n-sc-css-line-clamp[^"]*">\s*([^<]{10,300})<', h)
+        if not titles:  # 마크업 변경 대비 폴백 — 상품 이미지 alt
+            titles = re.findall(r'<img alt="([^"]{10,300})"[^>]*class="[^"]*p13n', h)
+        pairs = list(zip(ranks, titles))
+        scanned += len(pairs)
+        for rk, ti in pairs:
+            for disp, pat, stock in KBRANDS:
+                if re.search(pat, ti.lower()):
+                    rows.append({"rank": rk, "brand": disp, "stock": stock,
+                                 "title": re.sub(r"\s+", " ", ti).strip()[:80]})
+                    break
+        time.sleep(1.0)
+    rows.sort(key=lambda r: r["rank"])
+    print(f"  아마존: 스캔 {scanned}개 · K뷰티 {len(rows)}개", flush=True)
+    return {"scanned": scanned, "rows": rows}
+
+def collect_sephora():
+    """세포라 US 브랜드 리스트 — K뷰티 입점 여부 체크"""
+    try:
+        h = get("https://www.sephora.com/brands-list", hdr=EN_UA).decode("utf-8", "replace").lower()
+    except Exception as e:
+        print(f"  ⚠ 세포라 실패: {repr(e)[:60]}", flush=True)
+        return None
+    inb, outb = [], []
+    for disp, pat, stock in KBRANDS:
+        (inb if re.search(pat, h) else outb).append({"brand": disp, "stock": stock})
+    print(f"  세포라: 입점 {len(inb)} / 미입점 {len(outb)}", flush=True)
+    return {"in": inb, "out": outb}
+
+def push_retail_hist(az, sep):
+    """이력 누적 → 아마존 랭크 Δ(7일 전 대비)·세포라 신규 입점 계산 (관측치만, 추정 금지)"""
+    try:
+        h = json.loads(HIST.read_text(encoding="utf-8"))
+    except Exception:
+        h = {"days": []}
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    best = {}
+    for r in (az or {}).get("rows", []):
+        best[r["brand"]] = min(best.get(r["brand"], 999), r["rank"])
+    h["days"] = [d for d in h.get("days", []) if d.get("d") != today]
+    h["days"].append({"d": today, "az": best,
+                      "sep": [x["brand"] for x in (sep or {}).get("in", [])]})
+    h["days"] = sorted(h["days"], key=lambda x: x["d"])[-400:]
+    HIST.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
+    days = h["days"]
+    prev = days[-8] if len(days) >= 8 else (days[-2] if len(days) >= 2 else None)
+    if az:
+        for r in az["rows"]:
+            p = (prev or {}).get("az", {}).get(r["brand"])
+            r["d7"] = (p - r["rank"]) if p else None      # +면 순위 상승
+    if sep and prev is not None:
+        pset = set(prev.get("sep", []))
+        sep["new"] = [x["brand"] for x in sep["in"] if x["brand"] not in pset] if pset else []
+    elif sep:
+        sep["new"] = []
+    return az, sep
+
 # ══════════════════════════════════════════════════════════════════════════
 def main():
     print("[kcons] 수집 시작", flush=True)
     export = collect_export()
     stocks = collect_stocks()
+    az  = collect_amazon()
+    sep = collect_sephora()
+    az, sep = push_retail_hist(az, sep)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "themes": [{"name": t, "color": c} for t, c in THEME_COLOR.items()],
         "export": export, "stocks": stocks,
+        "retail": {"az": az, "sep": sep},
     }, ensure_ascii=False), encoding="utf-8")
     print(f"[kcons] ✅ {len(export['items'])}품목 · {len(export['months'])}개월 · {len(stocks)}종목 → {OUT}", flush=True)
 
