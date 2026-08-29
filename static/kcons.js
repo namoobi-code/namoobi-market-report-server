@@ -65,8 +65,10 @@ function render(){
     `<button data-m="${m[0]}" style="margin-left:6px;padding:2px 10px;border-radius:12px;border:1px solid ${MODE===m[0]?'#334155':'#d6d9de'};background:${MODE===m[0]?'#334155':'#fff'};color:${MODE===m[0]?'#fff':'#333'};cursor:pointer;font-size:11.5px">${m[1]}</button>`).join('');
   $('kc_mode').querySelectorAll('button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;render();});
   if(ch1) ch1.destroy();
-  ch1=new Chart($('kc_cv1'),{type:'line',data:{labels:M,datasets:its.map((x,i)=>{
-      const r=roll12(x.exp||[]);
+  // (2026-08-29 피드백) 12M 누적은 앞 11개월을 소모 — 빈 구간을 그리지 말고 실제 시작점(12번째 달)부터 축을 시작
+  const i0=Math.min(11,Math.max(0,M.length-1));
+  ch1=new Chart($('kc_cv1'),{type:'line',data:{labels:M.slice(i0),datasets:its.map((x,i)=>{
+      const r=roll12(x.exp||[]).slice(i0);
       let data=r, abs=r;
       if(MODE==='idx'){ const base=r.find(v=>v!=null&&v>0); data=r.map(v=>(v!=null&&base)?+(v/base*100).toFixed(1):null); }
       return {label:x.nm,data:data,_abs:abs,borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.7,spanGaps:true};})},
@@ -77,7 +79,7 @@ function render(){
           :c.dataset.label+' '+nf(c.raw)+'천$'}}},
       scales:{x:{ticks:{maxTicksLimit:12,font:{size:10}}},
         y:MODE==='idx'
-          ?{ticks:{font:{size:10}},title:{display:true,text:'12개월 누적 지수 (첫 관측=100) — 규모 무관 증감률 비교',font:{size:10}}}
+          ?{ticks:{font:{size:10}},title:{display:true,text:'12개월 누적 지수 (시작월=100) — 규모 무관 증감률 비교',font:{size:10}}}
           :{ticks:{font:{size:10},callback:v=>(v/1000000).toFixed(1)+'십억$'},title:{display:true,text:'12개월 누적 수출(천$) — 계절성 제거 추세',font:{size:10}}}}}});
 
   const n=M.length-1;
@@ -97,11 +99,11 @@ function render(){
   // ── ③ 연동 종목 표 (선택 테마) ────────────────────────────────────────
   const ST=(D.stocks||[]).filter(s=>s.th===TH);
   $('kc_stk').innerHTML=ST.length?`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
-    <thead><tr style="background:#f8fafc">${['종목','현재가','1일','1개월','3개월','1년','수출 지표와의 연결'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
+    <thead><tr style="background:#f8fafc">${['종목','현재가','1일','1개월','3개월','1년','3년','수출 지표와의 연결'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
     <tbody>${ST.map(r=>`<tr>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:700">${r.name}<span style="font-size:10.5px;color:#94a3b8"> ${r.sym.replace(/\.(KS|KQ)$/,'')}</span></td>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${nf(r.cur)}</td>
-      ${['d1','m1','m3','y1'].map(k=>`<td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(r[k])};font-weight:${k==='y1'?'700':'400'}">${pf(r[k])}</td>`).join('')}
+      ${['d1','m1','m3','y1','y3'].map(k=>`<td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(r[k])};font-weight:${k==='y3'?'700':'400'}">${pf(r[k])}</td>`).join('')}
       <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#475569;font-size:11.5px">${r.why||''}</td></tr>`).join('')}</tbody></table>`
     :'<div class="note">종목 없음</div>';
 
@@ -119,7 +121,7 @@ function render(){
           borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.4,spanGaps:true};})},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+c.raw}}},
-        scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:TH+' 연동 종목 상대주가 (1년 전=100)',font:{size:10}}}}}});
+        scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:TH+' 연동 종목 상대주가 (3년 전=100 — 수출 지수와 동일 시점)',font:{size:10}}}}}});
   }
 }
 

@@ -98,8 +98,10 @@ def fetch_hs(hs, fr, to):
     return out
 
 def collect_export():
+    # (2026-08-29 피드백) 12M 누적선이 앞 11개월을 소모해 시작점이 밀리는 문제 — 48개월을 받아
+    # 지수 시작점을 '3년 전'으로 맞춘다(연동 종목 주가 3y와 동일 시점).
     now = datetime.now(KST)
-    fr = f"{now.year-3}{now.month:02d}"
+    fr = f"{now.year-4}{now.month:02d}"
     to = f"{now.year}{now.month:02d}"
     items, months = [], set()
     for th, nm, codes, note in ITEMS:
@@ -129,8 +131,9 @@ def pct(a, b):
         return None
 
 def yahoo(sym):
+    # (2026-08-29 피드백) 주가도 수출 지수 시작 시점(3년 전)과 동일 구간으로 — range 1y → 3y
     u = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}"
-         f"?range=1y&interval=1d")
+         f"?range=3y&interval=1d")
     j = json.loads(get(u, to=20))
     r = (j.get("chart") or {}).get("result") or []
     if not r:
@@ -142,15 +145,15 @@ def yahoo(sym):
     if not pts:
         return None
     closes = [c for _, c in pts]
-    step = max(1, len(pts) // 60)
-    samp = pts[::step][-60:]
+    step = max(1, len(pts) // 90)
+    samp = pts[::step][-90:]
     return {"cur": round(closes[-1], 1),
             "d1": pct(closes[-2], closes[-1]) if len(closes) > 1 else None,
             "m1": pct(closes[-22], closes[-1]) if len(closes) > 22 else None,
             "m3": pct(closes[-64], closes[-1]) if len(closes) > 64 else None,
-            "y1": pct(closes[0], closes[-1]),
+            "y1": pct(closes[-253], closes[-1]) if len(closes) > 253 else pct(closes[0], closes[-1]),
+            "y3": pct(closes[0], closes[-1]),
             "spark": [round(c, 1) for _, c in samp],
-            # (2026-08-29) X축 날짜 미표시 피드백 — 샘플과 같은 보폭의 날짜(YY.MM.DD)를 함께 내린다
             "spark_d": [datetime.fromtimestamp(t, KST).strftime("%y.%m.%d") for t, _ in samp]}
 
 def collect_stocks():
