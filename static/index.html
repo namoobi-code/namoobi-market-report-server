@@ -556,6 +556,7 @@
       <button class="tab off" data-pane="p_fire" disabled title="준비 중">경제적 자유<small>퇴사 시뮬레이터</small></button>
       <button class="tab"    data-pane="p_hobby" style="background:#047857;border-color:#047857;color:#fff">🏃 취미(운동)<small style="color:#a7f3d0">대회 일정·신청</small></button>
       <button class="tab"    data-pane="p_kpop" style="background:#be123c;border-color:#be123c;color:#fff">🎤 K-POP<small style="color:#fecdd3">앨범·수출·팬덤 선행지표</small></button>
+      <button class="tab"    data-pane="p_kcons" style="background:#9d174d;border-color:#9d174d;color:#fff">🛍️ K-소비재<small style="color:#fbcfe8">뷰티·푸드·패션 수출×주가</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -643,6 +644,34 @@
       </div>
     </div>
     <div class="note" style="margin:8px 0 14px;line-height:1.7">📖 기간수익률은 각 소스의 1년 일봉 기준(현재가 대비 과거 최근접 종가) · KRX 세부지수는 이력 누적 개시(2026-08-02)부터 기간수익률·추세가 차오른다 · 미래에셋 리스트 중 러시아 RTS(거래정지)·항셍종합·항셍 레드칩(R)·K-뉴딜 TOP10 시리즈는 무료 소스 미제공. 선물 시세는 최근월 연속(롤오버 자동)이며, 만기 교체 시 월물 간 가격차가 시계열에 섞여 매월물 상품(원유·천연가스 등)의 장기 수익률은 실제 현물 등락과 다소 다를 수 있음. 리서치용·투자권유 아님.</div>
+  </div>
+
+  <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
+  <div class="pane" id="p_kcons" style="overflow:auto">
+    <h2>🛍️ K-소비재 선행지표 <em id="kc_asof"></em> <button id="kc_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px">이상적 선행 흐름은 <b>검색량 → 콘텐츠 반응 → 장바구니 → 주문 → 리뷰·재구매 → 수출액</b> 순이지만,
+      검색·쇼피·SNS 데이터는 공개 API가 없다(쇼피 비공개·틱톡 폐쇄). 무토큰으로 잡히는 <b>품목군별 수출(월간·관세청) × 연동 종목 주가</b> 축을 여기 두고,
+      국내 관심도(구글·유튜브·네이버쇼핑)는 📈 Trends 탭을 보조지표로 본다. 수출은 소비자 수요의 후행이지만 <b>기업 분기 실적 발표보다 1~2개월 앞선다</b>. 리서치용이며 투자권유가 아님.</div>
+
+    <h3>테마 요약 <span class="note">최근월 수출 합계 · 전년동월比 · 12개월 누적 YoY</span></h3>
+    <div class="box" style="padding:12px 14px"><div id="kc_sum" style="display:flex;gap:8px;flex-wrap:wrap"></div></div>
+
+    <h3>품목군별 수출 추이 <span class="note">관세청 수출입무역통계 · 월간 3년 · 12개월 누적선 = 계절성 제거 추세</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="kc_chips" style="margin-bottom:8px"></div>
+      <div style="height:270px"><canvas id="kc_cv1"></canvas></div>
+      <div id="kc_tbl" style="margin-top:10px"></div>
+      <div class="note" style="margin-top:6px">※ 미용기기(8543)는 광범위 전기기기 코드라 노이즈 포함(추이용) · 의류는 61+62류 전체 합산.
+        <b>12개월 누적선의 기울기가 꺾이는 시점</b>이 테마 실적 전환의 신호 — 검색량 급증 후 수출이 따라오지 않으면 일시적 바이럴 가능성.</div>
+    </div>
+
+    <h3>연동 종목 <span class="note">수출 지표 → 실적 경로가 있는 종목만 · 테마 칩 선택 연동</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="kc_stk"></div>
+      <div style="height:230px;margin-top:12px"><canvas id="kc_cv2"></canvas></div>
+      <div class="note" style="margin-top:6px">브랜드(아모레·삼양·F&F)는 수출 통계와 직접, ODM·유통(코스맥스·실리콘투·영원무역)은 물량으로 연동.
+        현지 생산 비중이 큰 기업(CJ제일제당 미국공장·오리온 현지법인)은 수출 통계에 안 잡히는 매출이 있어 괴리가 정상.</div>
+    </div>
   </div>
 
   <!-- (2026-08-29) K-POP 선행지표 탭 — kpop.js · 데이터 scripts/fetch_kpop.py (매일 06:20) -->
@@ -1934,13 +1963,14 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=08290100"></script>
+<script src="/app.js?v=08290200"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/kpop.js?v=08290100"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
+<script src="/kcons.js?v=08290200"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
