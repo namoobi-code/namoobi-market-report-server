@@ -10,7 +10,7 @@
   {
    "date": "2025-09-17",
    "stance": "인하",
-   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran 50bp 인하 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
+   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran 50bp 인하 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17, 서버 실측 server_fomc_meetings.json)"
   },
   {
    "date": "2025-10-28~29",
@@ -90,7 +90,7 @@
   {
    "date": "2026-09-16",
    "stance": "예정",
-   "note": "SEP(점도표) 발표 예정 정례회의(3·6·9·12월 분기 공개 주기). (출처: federalreserve.gov FOMC calendar 2026)"
+   "note": "SEP(점도표) 발표 예정 정례회의(3·6·9·12월 분기 공개 주기). (출처: federalreserve.gov FOMC calendar 2026, server_fomc_meetings.json)"
   },
   {
    "date": "2026-10-27~28",

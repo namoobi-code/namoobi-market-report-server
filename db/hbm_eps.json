@@ -1,24 +1,7 @@
 {
  "as_of": "2026-08-29",
- "source": "single-source: EPS=컨센서스, PER=종가÷EPS 매일 재계산",
+ "source": "field-level carry-forward",
  "price_note": "기준가(2026-08-29 종가): SK하이닉스 1,653,000 · 삼성전자 257,000 · Micron $932.86",
- "prices": {
-  "SK하이닉스": {
-   "price": 1653000.0,
-   "currency": "KRW",
-   "asof": "2026-08-29"
-  },
-  "삼성전자": {
-   "price": 257000.0,
-   "currency": "KRW",
-   "asof": "2026-08-29"
-  },
-  "마이크론": {
-   "price": 932.86,
-   "currency": "USD",
-   "asof": "2026-08-29"
-  }
- },
  "data": {
   "SK하이닉스": {
    "y2025_eps": 58955,
