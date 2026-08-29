@@ -104,6 +104,9 @@ function render(){
       <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#334155;font-size:11.5px">${ITEM_MAP[x.nm]||x.note||''}</td></tr>`;}).join('')}</tbody></table>`;
 
   // ── ②-b 해외 유통 침투 (2026-08-29 — 이코노미스트 '온라인서 뜬 K뷰티' 반영) ──
+  //     아마존·세포라는 K뷰티 전용 데이터 — K푸드·K패션 선택 시 섹션 숨김(사용자 피드백)
+  const showRet=(TH==='K뷰티');
+  ['kc_ret_h3','kc_ret_box'].forEach(id=>{const el=$(id); if(el) el.style.display=showRet?'':'none';});
   const RT=D.retail||{}, AZ=RT.az, SP=RT.sep;
   if($('kc_az')) $('kc_az').innerHTML=(AZ&&AZ.rows&&AZ.rows.length)?`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
     <thead><tr style="background:#f8fafc">${['랭크','브랜드','7일Δ','관련 종목','상품(대표)'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
