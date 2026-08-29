@@ -112,6 +112,12 @@ META = {   # key: (label, group, unit, src)
     "fx":      ("원/달러 환율", "심리", "전년비", "ECOS"),
     "spx_ind": ("S&P500(전이)", "시장", "전년비", "야후"),
     "wti":     ("WTI 유가", "실물", "전년비", "FRED DCOILWTICO 월평균"),
+    # (2026-08-26) 미국 신용잔고(FINRA Margin Debt) — 레버리지 과열 지표.
+    #   기사 로직: YoY 증가율 고점(2000 +72%·2007 +58%·2021 +63%) 도달 후 꺾이면
+    #   0~9개월 내 대세 하락에 선행. 이미 margin_debt.py 가 매일 07:20 수집(1997~).
+    #   편입 판정 백테스트(8개 자산): 7개 개선 — 나스닥100 8.84→7.09%, 메가캡 8.00→6.81%,
+    #   S&P500 6.47→6.10%, 신흥국 11.01→10.30%(방향 80.0→83.3). 미국 리츠만 악화(기각).
+    "margin":  ("미 신용잔고(FINRA)", "유동성", "전년비", "FINRA Margin Statistics"),
 }
 # 수준(lvl) 그대로 쓰는 지표 — 나머지는 전년비 로그성장률로 변환
 LVL = {"ffr", "us10y", "us2y", "t10y2y", "unrate", "vix", "umcsent", "dxy",
@@ -120,10 +126,10 @@ GROUPS = ["물가", "금리", "고용", "실물", "유동성", "심리", "시장
 
 US_KEYS = ["cpi", "ppi", "pce", "ffr", "us10y", "us2y", "t10y2y", "payems",
            "unrate", "claims", "gdp", "indpro", "retail", "houst", "m2",
-           "vix", "umcsent", "dxy", "baa10y"]
+           "vix", "umcsent", "dxy", "baa10y", "margin"]
 KR_KEYS = ["ffr", "us10y", "t10y2y", "vix", "dxy", "m2", "indpro",
            "rate_kr", "m2_kr", "fx", "cli_kr", "spx_ind",
-           "baa10y", "claims", "umcsent", "cpi", "unrate"]   # 급락모델·위기전이 지표
+           "baa10y", "claims", "umcsent", "cpi", "unrate", "margin"]  # 급락모델·위기전이 지표
 KEYS_FOR = {
     "spx":   US_KEYS,
     "ndx":   US_KEYS + ["semi_ip"],
@@ -141,7 +147,7 @@ KEYS_FOR = {
     "efa":   US_KEYS,
     "tip":   US_KEYS,
     "eem":   US_KEYS + ["wti"],
-    "vnq":   US_KEYS,
+    "vnq":   [k for k in US_KEYS if k != "margin"],   # 리츠는 편입 판정 기각(8.38→8.97%)
     "dbc":   US_KEYS + ["wti"],
 }
 
@@ -223,6 +229,14 @@ def collect_indicators():
         f["cli_kr"] = relead.oecd_cli()
     except Exception as e:
         print("    ⚠ KR 지표:", str(e)[:80])
+    # (2026-08-26) 미 신용잔고 — margin_debt.py 가 이미 수집(매일 07:20). 재수집 없이 합류.
+    try:
+        md = json.loads((DB / "margin_debt.json").read_text(encoding="utf-8"))
+        f["margin"] = {t.replace("-", ""): v
+                       for t, v in zip(md["t"], md["debit"]) if v is not None}
+        print(f"    margin   {len(f['margin'])}개월 (FINRA {md['t'][0]}~{md['t'][-1]})")
+    except Exception as e:
+        print("    ⚠ 신용잔고 합류 실패:", str(e)[:80])
     return f
 
 
