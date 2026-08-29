@@ -6,7 +6,24 @@
              국내 관심도는 기존 Trends 탭(구글·유튜브·네이버쇼핑)을 보조지표로 쓴다. */
 (function(){
 'use strict';
-let D=null, TH='K뷰티', ch1=null, ch2=null;
+let D=null, TH='K뷰티', MODE='idx', ch1=null, ch2=null;   // MODE: idx(지수)|abs(절대값) — 화장품이 축을 지배해 소품목 급등이 안 보이는 문제(2026-08-29 피드백)
+
+// 품목 → 관련 종목 매핑 (연동 논리 — 직결 상장사가 없으면 정직하게 표기)
+const ITEM_MAP={
+ '화장품(기초·색조)':'아모레퍼시픽·LG생활건강·코스맥스·한국콜마·실리콘투·브이티',
+ '헤어 제품':'LG생활건강(닥터그루트)·아모레퍼시픽(려·라보에이치)',
+ '향수':'직결 상장사 희소 — 코스맥스·한국콜마(ODM 일부), 니치 브랜드 다수 비상장',
+ '방향제·퍼스널케어':'LG생활건강·애경산업(비편입) — 생활용품 부문',
+ '미용기기(광범위)':'에이피알(뷰티 디바이스)·클래시스(미용 의료기기)',
+ '라면(면류)':'삼양식품(불닭)·농심(신라면)',
+ '소스류':'CJ제일제당(비비고)·대상(청정원)·삼양식품(불닭소스)',
+ '김':'동원F&B·CJ씨푸드(비편입) — 조미김 수출',
+ '당류과자':'오리온·롯데웰푸드(비편입)',
+ '음료':'롯데칠성·LG생활건강(음료 부문)',
+ '주류':'하이트진로(소주)·롯데칠성(처음처럼)',
+ '가방·잡화':'F&F·더네이쳐홀딩스 — 브랜드 잡화',
+ '선글라스·안경':'직결 상장사 희소 — 젠틀몬스터 등 주요 브랜드 비상장',
+ '의류(편물+직물)':'영원무역(OEM 생산)·F&F·휠라홀딩스(브랜드)'};
 const $=id=>document.getElementById(id);
 const nf=n=>(n==null?'—':Number(n).toLocaleString());
 const pf=v=>v==null?'—':(v>0?'+':'')+v.toFixed(1)+'%';
@@ -43,29 +60,39 @@ function render(){
   $('kc_chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{TH=b.dataset.t;render();});
 
   const its=IT.filter(x=>x.th===TH);
+  // 표시 모드: 지수(품목별 12M누적 첫 유효값=100 — 규모 무관 증감률 비교) / 절대값(천$)
+  $('kc_mode').innerHTML=[['idx','지수 (시작=100)'],['abs','절대값 (천$)']].map(m=>
+    `<button data-m="${m[0]}" style="margin-left:6px;padding:2px 10px;border-radius:12px;border:1px solid ${MODE===m[0]?'#334155':'#d6d9de'};background:${MODE===m[0]?'#334155':'#fff'};color:${MODE===m[0]?'#fff':'#333'};cursor:pointer;font-size:11.5px">${m[1]}</button>`).join('');
+  $('kc_mode').querySelectorAll('button').forEach(b=>b.onclick=()=>{MODE=b.dataset.m;render();});
   if(ch1) ch1.destroy();
   ch1=new Chart($('kc_cv1'),{type:'line',data:{labels:M,datasets:its.map((x,i)=>{
       const r=roll12(x.exp||[]);
-      return {label:x.nm,data:r,borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.7,spanGaps:true};})},
+      let data=r, abs=r;
+      if(MODE==='idx'){ const base=r.find(v=>v!=null&&v>0); data=r.map(v=>(v!=null&&base)?+(v/base*100).toFixed(1):null); }
+      return {label:x.nm,data:data,_abs:abs,borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.7,spanGaps:true};})},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+nf(c.raw)+'천$'}}},
+      plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},
+        tooltip:{callbacks:{label:c=>MODE==='idx'
+          ?c.dataset.label+' '+c.raw+' ('+nf(c.dataset._abs[c.dataIndex])+'천$)'
+          :c.dataset.label+' '+nf(c.raw)+'천$'}}},
       scales:{x:{ticks:{maxTicksLimit:12,font:{size:10}}},
-        y:{ticks:{font:{size:10},callback:v=>(v/1000000).toFixed(1)+'십억$'},title:{display:true,text:'12개월 누적 수출(천$) — 계절성 제거 추세',font:{size:10}}}}}});
+        y:MODE==='idx'
+          ?{ticks:{font:{size:10}},title:{display:true,text:'12개월 누적 지수 (첫 관측=100) — 규모 무관 증감률 비교',font:{size:10}}}
+          :{ticks:{font:{size:10},callback:v=>(v/1000000).toFixed(1)+'십억$'},title:{display:true,text:'12개월 누적 수출(천$) — 계절성 제거 추세',font:{size:10}}}}}});
 
   const n=M.length-1;
   $('kc_tbl').innerHTML=`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
-    <thead><tr style="background:#f8fafc">${['품목군','HS','최근월(천$)','전년동월比','12M누적(천$)','누적 YoY','비고'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
+    <thead><tr style="background:#f8fafc">${['품목군','최근월(천$)','전년동월比','12M누적(천$)','누적 YoY','관련 종목 (연동 경로)'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
     <tbody>${its.map(x=>{
       const r=roll12(x.exp||[]);
       const ry=(r[n]!=null&&n>=12&&r[n-12])?((r[n]/r[n-12]-1)*100):null;
       const yo=yoy(x.exp||[],n);
-      return `<tr><td style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:600">${x.nm}</td>
-      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:center;color:#94a3b8;font-size:11px">${x.hs}</td>
+      return `<tr><td style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:600">${x.nm}<span style="font-size:10px;color:#94a3b8"> HS ${x.hs}</span></td>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;font-weight:700">${nf(x.exp[n])}</td>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(yo)}">${pf(yo)}</td>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${nf(r[n])}</td>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;font-weight:700;color:${pc(ry)}">${pf(ry)}</td>
-      <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#64748b;font-size:11.5px">${x.note||''}</td></tr>`;}).join('')}</tbody></table>`;
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#334155;font-size:11.5px">${ITEM_MAP[x.nm]||x.note||''}</td></tr>`;}).join('')}</tbody></table>`;
 
   // ── ③ 연동 종목 표 (선택 테마) ────────────────────────────────────────
   const ST=(D.stocks||[]).filter(s=>s.th===TH);
