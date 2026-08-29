@@ -28,7 +28,7 @@ function render(){
     ch1=new Chart($('kp_cv1'),{type:'bar',data:{labels:L,datasets:ds},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},
-          tooltip:{callbacks:{label:c=>c.dataset.label+' '+nf(c.raw)+'장'}}},
+          tooltip:{itemSort:(a,b)=>(b.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+nf(c.raw)+'장'}}},
         scales:{x:{stacked:true,ticks:{font:{size:10}}},
           y:{stacked:true,ticks:{font:{size:10},callback:v=>(v/10000)+'만'},title:{display:true,text:'주간 판매량(장)',font:{size:10}}}}}});
     // 최근 4주 소속사 요약
@@ -66,7 +66,7 @@ function render(){
       {type:'line',label:'12개월 누적(천$)',data:roll,yAxisID:'y2',borderColor:'#0f766e',backgroundColor:'transparent',pointRadius:0,borderWidth:1.8,spanGaps:true}]},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},
-          tooltip:{callbacks:{label:c=>c.dataset.label+' '+nf(c.raw)}}},
+          tooltip:{itemSort:(a,b)=>(b.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+nf(c.raw)}}},
         scales:{x:{ticks:{maxTicksLimit:12,font:{size:10}}},
           y:{position:'left',ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'백만$'}},
           y2:{position:'right',grid:{drawOnChartArea:false},ticks:{font:{size:10},callback:v=>(v/1000).toFixed(0)+'백만$'}}}}});
@@ -125,7 +125,7 @@ function render(){
             borderColor:COL(b.name==='JYP Ent.'?'JYP':(b.name==='하이브'?'하이브':(b.name==='에스엠'?'에스엠':'와이지'))),
             backgroundColor:'transparent',pointRadius:0,borderWidth:1.6,spanGaps:true};})},
         options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-          plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},tooltip:{callbacks:{title:()=>'',label:c=>c.dataset.label+' '+c.raw}}},
+          plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},tooltip:{itemSort:(a,b)=>(b.raw??-1e18)-(a.raw??-1e18),callbacks:{title:()=>'',label:c=>c.dataset.label+' '+c.raw}}},
           scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:'1년 전=100 기준 상대주가',font:{size:10}}}}}});
     }
   }

@@ -71,10 +71,16 @@ function render(){
       const r=roll12(x.exp||[]).slice(i0);
       let data=r, abs=r;
       if(MODE==='idx'){ const base=r.find(v=>v!=null&&v>0); data=r.map(v=>(v!=null&&base)?+(v/base*100).toFixed(1):null); }
-      return {label:x.nm,data:data,_abs:abs,borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.7,spanGaps:true};})},
+      // (2026-08-29 피드백) 선만으론 향수 371 같은 최종 지수 인지가 어렵다 — 범례에 최종값 병기 + 선 끝 점 강조
+      const last=[...data].reverse().find(v=>v!=null);
+      const lastIdx=data.length-1-[...data].reverse().findIndex(v=>v!=null);
+      return {label:x.nm+(MODE==='idx'&&last!=null?' → '+Math.round(last):''),data:data,_abs:abs,
+        borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:ITEM_COLORS[i%ITEM_COLORS.length],
+        pointRadius:data.map((_,j)=>j===lastIdx?3:0),borderWidth:1.7,spanGaps:true};})},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},
-        tooltip:{callbacks:{label:c=>MODE==='idx'
+        tooltip:{itemSort:(a,b)=>(b.raw??-1e18)-(a.raw??-1e18),   // (2026-08-29 피드백) 팝업 값 높은 순
+          callbacks:{label:c=>MODE==='idx'
           ?c.dataset.label+' '+c.raw+' ('+nf(c.dataset._abs[c.dataIndex])+'천$)'
           :c.dataset.label+' '+nf(c.raw)+'천$'}}},
       scales:{x:{ticks:{maxTicksLimit:12,font:{size:10}}},
@@ -85,7 +91,7 @@ function render(){
   const n=M.length-1;
   $('kc_tbl').innerHTML=`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
     <thead><tr style="background:#f8fafc">${['품목군','최근월(천$)','전년동월比','12M누적(천$)','누적 YoY','관련 종목 (연동 경로)'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
-    <tbody>${its.map(x=>{
+    <tbody>${[...its].sort((a,b)=>((b.exp[n]||0)-(a.exp[n]||0))).map(x=>{   // (2026-08-29 피드백) 최근월 수출액 높은 순
       const r=roll12(x.exp||[]);
       const ry=(r[n]!=null&&n>=12&&r[n-12])?((r[n]/r[n-12]-1)*100):null;
       const yo=yoy(x.exp||[],n);
@@ -100,7 +106,7 @@ function render(){
   const ST=(D.stocks||[]).filter(s=>s.th===TH);
   $('kc_stk').innerHTML=ST.length?`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
     <thead><tr style="background:#f8fafc">${['종목','현재가','1일','1개월','3개월','1년','3년','수출 지표와의 연결'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
-    <tbody>${ST.map(r=>`<tr>
+    <tbody>${[...ST].sort((a,b)=>((b.y3??-1e18)-(a.y3??-1e18))).map(r=>`<tr>   <!-- (2026-08-29 피드백) 3년 수익률(차트 기준) 높은 순 -->
       <td style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:700">${r.name}<span style="font-size:10.5px;color:#94a3b8"> ${r.sym.replace(/\.(KS|KQ)$/,'')}</span></td>
       <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${nf(r.cur)}</td>
       ${['d1','m1','m3','y1','y3'].map(k=>`<td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(r[k])};font-weight:${k==='y3'?'700':'400'}">${pf(r[k])}</td>`).join('')}
@@ -120,7 +126,7 @@ function render(){
         return {label:s.name,data:s.spark.map(v=>+(v/b*100).toFixed(1)),
           borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.4,spanGaps:true};})},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-        plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+c.raw}}},
+        plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},tooltip:{itemSort:(a,b)=>(b.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+c.raw}}},
         scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:TH+' 연동 종목 상대주가 (3년 전=100 — 수출 지수와 동일 시점)',font:{size:10}}}}}});
   }
 }
