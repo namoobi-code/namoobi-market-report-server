@@ -115,7 +115,9 @@ function render(){
     const big=ST.filter(r=>r.tag==='직결'&&r.spark&&r.spark.length);
     if(big.length){
       const n=Math.max(...big.map(b=>b.spark.length));
-      const labels=Array.from({length:n},(_,i)=>'');
+      // (2026-08-29 피드백) X축 날짜 표시 — spark_d(수집기 동봉 날짜)가 있으면 사용
+      const ref=big.reduce((a,b)=>((b.spark_d||[]).length>(a.spark_d||[]).length?b:a),big[0]);
+      const labels=(ref.spark_d&&ref.spark_d.length===n)?ref.spark_d:Array.from({length:n},(_,i)=>'');
       if(ch3) ch3.destroy();
       ch3=new Chart($('kp_cv3'),{type:'line',data:{labels:labels,datasets:big.map(b=>{
           const base=b.spark[0]||1;
@@ -124,7 +126,7 @@ function render(){
             backgroundColor:'transparent',pointRadius:0,borderWidth:1.6,spanGaps:true};})},
         options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
           plugins:{legend:{labels:{boxWidth:14,font:{size:11}}},tooltip:{callbacks:{title:()=>'',label:c=>c.dataset.label+' '+c.raw}}},
-          scales:{x:{ticks:{display:false}},y:{ticks:{font:{size:10}},title:{display:true,text:'1년 전=100 기준 상대주가',font:{size:10}}}}}});
+          scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:'1년 전=100 기준 상대주가',font:{size:10}}}}}});
     }
   }
 }

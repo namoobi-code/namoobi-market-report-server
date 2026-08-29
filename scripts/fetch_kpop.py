@@ -233,12 +233,16 @@ def yahoo(sym, rng="1y"):
         return None
     closes = [c for _, c in pts]
     meta = r.get("meta") or {}
+    step = max(1, len(pts) // 60)
+    samp = pts[::step][-60:]
     return {"cur": closes[-1], "ccy": meta.get("currency") or "",
             "d1": pct(closes[-2], closes[-1]) if len(closes) > 1 else None,
             "m1": pct(closes[-22], closes[-1]) if len(closes) > 22 else None,
             "m3": pct(closes[-64], closes[-1]) if len(closes) > 64 else None,
             "y1": pct(closes[0], closes[-1]),
-            "spark": [round(c, 2) for c in closes[::max(1, len(closes)//60)]][-60:]}
+            "spark": [round(c, 2) for _, c in samp],
+            # (2026-08-29) X축 날짜 미표시 피드백 — 샘플과 같은 보폭의 날짜(YY.MM.DD)를 함께 내린다
+            "spark_d": [datetime.fromtimestamp(t, KST).strftime("%y.%m.%d") for t, _ in samp]}
 
 def pct(a, b):
     try:

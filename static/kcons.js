@@ -109,14 +109,17 @@ function render(){
   if(ch2) ch2.destroy();
   const spark=ST.filter(s=>s.spark&&s.spark.length);
   if(spark.length){
+    // (2026-08-29 피드백) X축 날짜 표시 — spark_d(수집기 동봉 날짜)가 가장 긴 종목을 라벨 축으로 사용
+    const ref=spark.reduce((a,b)=>((b.spark_d||[]).length>(a.spark_d||[]).length?b:a),spark[0]);
     const L=Math.max(...spark.map(s=>s.spark.length));
-    ch2=new Chart($('kc_cv2'),{type:'line',data:{labels:Array.from({length:L},()=>''),
+    const labels=(ref.spark_d&&ref.spark_d.length===L)?ref.spark_d:Array.from({length:L},(_,i)=>'');
+    ch2=new Chart($('kc_cv2'),{type:'line',data:{labels:labels,
       datasets:spark.map((s,i)=>{const b=s.spark[0]||1;
         return {label:s.name,data:s.spark.map(v=>+(v/b*100).toFixed(1)),
           borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.4,spanGaps:true};})},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-        plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},tooltip:{callbacks:{title:()=>'',label:c=>c.dataset.label+' '+c.raw}}},
-        scales:{x:{ticks:{display:false}},y:{ticks:{font:{size:10}},title:{display:true,text:TH+' 연동 종목 상대주가 (1년 전=100)',font:{size:10}}}}}});
+        plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+c.raw}}},
+        scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:TH+' 연동 종목 상대주가 (1년 전=100)',font:{size:10}}}}}});
   }
 }
 
