@@ -115,10 +115,11 @@ function render(){
       <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#475569;font-size:11px">${r.title}</td></tr>`).join('')}</tbody></table>
     <div class="note" style="margin-top:5px">아마존 US 뷰티 베스트셀러 스캔 ${AZ.scanned}개(서버렌더 한계로 톱60 커버) 중 K뷰티 ${AZ.rows.length}개 · 7일Δ=순위 변화(▲상승)</div>`
     :'<div class="note">아마존 데이터 없음(수집 실패 시 다음 날 재시도)</div>';
+  const stkNm=s=>String(s||'').replace(/ \d{6}/,'');   // "아모레퍼시픽 090430" → 이름만
   if($('kc_sep')) $('kc_sep').innerHTML=SP?`
-    <div style="line-height:2.1">${SP.in.map(x=>{const isNew=(SP.new||[]).includes(x.brand);
-      return `<span title="${x.stock}" style="display:inline-block;margin:0 5px 4px 0;padding:2px 10px;border-radius:12px;font-size:12px;background:${isNew?'#dc2626':/비상장/.test(x.stock)?'#e2e8f0':'#fce7f3'};color:${isNew?'#fff':/비상장/.test(x.stock)?'#475569':'#9d174d'}">${isNew?'🆕 ':''}${x.brand}</span>`;}).join('')}</div>
-    <div class="note" style="margin-top:4px">미입점(추적 중): ${SP.out.map(x=>x.brand).join(' · ')}</div>
+    <div style="line-height:2.3">${SP.in.map(x=>{const isNew=(SP.new||[]).includes(x.brand);
+      return `<span title="${x.stock}" style="display:inline-block;margin:0 5px 4px 0;padding:2px 10px;border-radius:12px;font-size:12px;background:${isNew?'#dc2626':/비상장/.test(x.stock)?'#e2e8f0':'#fce7f3'};color:${isNew?'#fff':/비상장/.test(x.stock)?'#475569':'#9d174d'}">${isNew?'🆕 ':''}${x.brand} <span style="opacity:.72;font-size:10.5px">${stkNm(x.stock)}</span></span>`;}).join('')}</div>
+    <div class="note" style="margin-top:4px">미입점(추적 중): ${SP.out.map(x=>`${x.brand}(${stkNm(x.stock)})`).join(' · ')}</div>
     <div class="note">분홍=상장 연결 · 회색=비상장 · 🆕=신규 입점 감지(이력 누적 후) — 입점 이벤트가 오프라인 확장의 선행 신호</div>`
     :'<div class="note">세포라 데이터 없음</div>';
 
