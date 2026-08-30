@@ -3,7 +3,7 @@
  "as_of": "2026-08-30",
  "data": {
   "asof": "2026-08-30",
-  "fetched_at": "2026-08-30T11:57:11+09:00",
+  "fetched_at": "2026-08-30T19:25:46+09:00",
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
@@ -183,7 +183,32 @@
      "note": "Capacity Constrained"
     }
    ],
-   "asp": [],
+   "asp": [
+    {
+     "product": "HBM3 (Active)",
+     "price": "$1,200 - $1,400",
+     "price_mid": 1200.0,
+     "trend": "up",
+     "change": "+5%",
+     "driver": "Capacity cut for HBM3E"
+    },
+    {
+     "product": "HBM3E 8-Hi",
+     "price": "$1,800 - $2,000",
+     "price_mid": 1800.0,
+     "trend": "up",
+     "change": "+10%",
+     "driver": "Standard B200 Supply Tightness"
+    },
+    {
+     "product": "HBM4 12-Hi (contract est.)",
+     "price": "$500 - $600+/stack (36GB)",
+     "price_mid": 500.0,
+     "trend": "up",
+     "change": "+55-70% vs HBM3E",
+     "driver": "2026 ramp for NVIDIA Vera Rubin; TSMC/foundry base-die cost floor; suppliers seeking multi-fold 2027 increases"
+    }
+   ],
    "specs": [
     {
      "gen": "HBM2",
@@ -272,7 +297,16 @@
      "revenue_bn": 3.2
     }
    ],
-   "source": "https://siliconanalysts.com/api/v1/hbm"
+   "source": "https://siliconanalysts.com/api/v1/hbm",
+   "ddr5_gap": {
+    "hbm_per_gb": 50.0,
+    "ddr5_per_gb": 14.38,
+    "ratio": 3.5,
+    "ddr5_spot_per_gb": 26.97,
+    "ratio_spot": 1.9,
+    "basis": "HBM3E 36GB 스택 ASP $1,800 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $115.00 ÷ 8GB (환산 추정)",
+    "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"
+   }
   },
   "leading": {
    "SOX": {
