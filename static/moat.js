@@ -66,7 +66,7 @@ function render(){
         <b style="font-size:14px">${r.name} <span style="font-size:10.5px;color:#94a3b8">${r.sym}</span>
           <span style="font-size:10.5px;background:#f1f5f9;color:#475569;border-radius:8px;padding:1px 7px;margin-left:3px">${mkt(r.sym)[0]} ${mkt(r.sym)[1]}</span></b>
         <span title="${v[4]}" style="background:${v[3]};color:${v[2]};border-radius:10px;padding:2px 9px;font-size:11.5px;font-weight:700">${v[0]} ${v[1]}${r.vd_days>1?` <span style="font-weight:400;opacity:.8">D+${r.vd_days}</span>`:r.vd_prev?' <span style="font-weight:400">⚡오늘 전환</span>':''}</span></div>
-      <div style="font-size:11px;color:#64748b;margin:3px 0 6px"><span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:1px 7px;margin-right:5px">${r.sec}</span>${r.moat}</div>
+      <div style="font-size:11px;color:#64748b;margin:3px 0 6px"><span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:1px 7px;margin-right:5px">${r.sec}</span>${r.tier==='B2+'?'<span title="관계도 배지는 황색(복점·양강)이나 해자 실질이 독점급이라 선별 편입" style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 7px;margin-right:5px">선별 B2</span>':''}${r.moat}</div>
       <div style="display:flex;gap:10px;align-items:center">
         ${spark(r.spark,v[2])}
         <table style="font-size:11.5px;border-collapse:collapse;flex:1;white-space:nowrap">
