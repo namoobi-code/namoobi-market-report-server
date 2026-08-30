@@ -38,7 +38,7 @@ UNIV = [
     ("VRT",       "버티브",         "AI반도체", "데이터센터 전력·액체냉각 토탈 — '칩보다 전기' 병목의 수혜",     "^SOX", "필라델피아 반도체지수"),
     ("000660.KS", "SK하이닉스",     "AI반도체", "HBM 점유 1위 — 엔비디아 최우선 공급사",                     "MU",   "마이크론(메모리 업황 대리)"),
     ("042700.KS", "한미반도체",     "AI반도체", "HBM TC본더 선두 — SK하이닉스와 동반 성장",                  "MU",   "마이크론(메모리 업황 대리)"),
-    ("6324.T",    "하모닉드라이브",  "피지컬AI", "로봇 관절 감속기 세계 표준 — 수십 년 내구성 데이터가 해자",     None,   None),
+    ("6324.T",    "하모닉드라이브",  "피지컬AI", "로봇 관절 감속기 세계 표준 — 수십 년 내구성 데이터가 해자",     "6954.T", "화낙(산업로봇 업황 대리)"),
     ("6758.T",    "소니그룹",       "피지컬AI", "이미지센서 1위 — 로봇·스마트폰 '눈'의 기본 공급자",           None,   None),
     ("3402.T",    "도레이",         "피지컬AI", "탄소섬유(CFRP) 세계 1위 — 경량화의 소재 관문",               None,   None),
     ("034020.KS", "두산에너빌리티", "SMR·원전", "SMR 파운드리 — 테라파워·뉴스케일·엑스에너지 주기기 계약",       "U-UN.TO", "스프로트 실물 우라늄"),
@@ -51,10 +51,10 @@ UNIV = [
     ("VRTX",      "버텍스",         "첨단바이오", "낭포성섬유증 치료제 사실상 독점 + CRISPR 상업화 선두",        "XBI",  "미 바이오테크 ETF"),
     ("ILMN",      "일루미나",       "첨단바이오", "유전자 시퀀싱 준독점 — 장비 설치기반 락인",                  "XBI",  "미 바이오테크 ETF"),
     ("CRSP",      "크리스퍼 Tx",    "첨단바이오", "유전자편집 치료제 최초 상업화(카스게비)",                    "XBI",  "미 바이오테크 ETF"),
-    ("047810.KS", "한국항공우주",   "우주·방산", "국내 완제기 체계종합 유일 — FA-50 수출 축",                  None,   None),
-    ("012450.KS", "한화에어로",     "우주·방산", "누리호 체계종합 독점 + K-방산 수주잔고",                     None,   None),
-    ("IRDM",      "이리듐",         "우주·방산", "극지 포함 L밴드 전지구망 보유 유일 사업자",                   None,   None),
-    ("QBTS",      "디웨이브",       "양자",     "양자 어닐링 상용화 유일",                                   None,   None),
+    ("047810.KS", "한국항공우주",   "우주·방산", "국내 완제기 체계종합 유일 — FA-50 수출 축",                  "hs:88",      "항공기 수출(관세청 88류·12M누적)"),
+    ("012450.KS", "한화에어로",     "우주·방산", "누리호 체계종합 독점 + K-방산 수주잔고",                     "hs:93+8710", "무기·전차 수출(관세청·12M누적)"),
+    ("IRDM",      "이리듐",         "우주·방산", "극지 포함 L밴드 전지구망 보유 유일 사업자",                   "ARKX",       "우주·방산 혁신 ETF(테마 대리)"),
+    ("QBTS",      "디웨이브",       "양자",     "양자 어닐링 상용화 유일",                                   "QTUM",       "양자 테마 ETF(테마 조정 vs 고유 문제 구분)"),
     ("294630.KQ", "서남",          "핵융합",   "2세대 고온초전도 선재 양산 국내 유일 — 英 STEP 공급사",        None,   None),
 ]
 
@@ -156,6 +156,37 @@ def rsi14(closes):
 def pct(a, b):
     return round((b/a - 1) * 100, 1) if a else None
 
+# ── (Phase3) 관세청 HS 수출을 선행지표로 — "hs:88" / "hs:93+8710" 형식 ──────
+#    K-소비재 탭에서 검증된 tradedata 패턴 재사용. 12M 누적의 3개월/12개월 변화율로 방향 판정.
+TRADE_URL = "https://tradedata.go.kr/cts/hmpg/retrieveTrade.do"
+TRADE_H = dict(UA); TRADE_H.update({"Content-Type": "application/x-www-form-urlencoded",
+                                    "Referer": "https://tradedata.go.kr/cts/index.do"})
+
+def hs_lead(codes):
+    import re as _re
+    now = datetime.now(KST)
+    fr, to = f"{now.year-3}{now.month:02d}", f"{now.year}{now.month:02d}"
+    acc = {}
+    for hs in codes.split("+"):
+        col = {2: "HS2_SGN", 4: "HS4_SGN", 6: "HS6_SGN"}[len(hs)]
+        body = urllib.parse.urlencode({"tradeKind": "ETS_MNK_1020000A", "priodKind": "MON",
+            "priodFr": fr, "priodTo": to, "statsBase": "acptDd", "ttwgTpcd": "1000",
+            "showPagingLine": "100", "hsSgnGrpCol": col, "hsSgnWhrCol": col, "hsSgn": hs}).encode()
+        j = json.loads(urllib.request.urlopen(urllib.request.Request(TRADE_URL, data=body, headers=TRADE_H), timeout=30).read())
+        for x in j.get("items") or []:
+            p = (x.get("priodTitle") or "").strip()
+            if _re.match(r"^\d{4}\.\d{2}$", p):
+                v = (x.get("expUsdAmt") or "").replace(",", "").strip()
+                acc[p] = acc.get(p, 0) + (int(v) if v else 0)
+        time.sleep(0.4)
+    ms = sorted(acc)
+    vals = [acc[m] for m in ms]
+    roll = [sum(vals[i-11:i+1]) if i >= 11 else None for i in range(len(vals))]
+    rv = [r for r in roll if r is not None]
+    if len(rv) < 4:
+        return None
+    return {"m3": pct(rv[-4], rv[-1]), "y1": pct(rv[-13], rv[-1]) if len(rv) >= 13 else None, "cur": rv[-1]}
+
 def main():
     print("[moat] 수집 시작", flush=True)
     # (Phase2) PER 스냅샷 → 이력 누적 → 밴드 percentile
@@ -169,10 +200,13 @@ def main():
     leads = {}
     for sym in sorted({x[4] for x in UNIV if x[4]}):
         try:
-            pts = hist(sym, "1y")
-            cl = [c for _, c in pts]
-            leads[sym] = {"m3": pct(cl[-64], cl[-1]) if len(cl) > 64 else None,
-                          "y1": pct(cl[0], cl[-1]), "cur": round(cl[-1], 2)}
+            if sym.startswith("hs:"):
+                leads[sym] = hs_lead(sym[3:])
+            else:
+                pts = hist(sym, "1y")
+                cl = [c for _, c in pts]
+                leads[sym] = {"m3": pct(cl[-64], cl[-1]) if len(cl) > 64 else None,
+                              "y1": pct(cl[0], cl[-1]), "cur": round(cl[-1], 2)}
         except Exception as e:
             print(f"  ⚠ lead {sym}: {repr(e)[:50]}", flush=True)
             leads[sym] = None

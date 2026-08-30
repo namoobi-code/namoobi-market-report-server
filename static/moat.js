@@ -62,13 +62,20 @@ function render(){
       <div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0">
         ${r.lead?`🔗 선행지표 <b>${r.lead.name}</b> 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
                 :'🔗 선행지표 미연결 — 해자 훼손 뉴스 수동 확인 대상'}
-        ${r.risk?`<div style="color:#b45309;margin-top:3px">⚠ ${r.risk}</div>`:''}</div>
+        ${r.risk?`<div style="color:#b45309;margin-top:3px">⚠ ${r.risk}</div>`:''}
+        ${(function(){const a=(window.__moatLLM&&window.__moatLLM.map[r.sym]);if(!a)return '';
+          const c=a.verdict_llm==='유지'?'#166534':a.verdict_llm==='훼손 의심'?'#b91c1c':'#a16207';
+          return `<div style="margin-top:3px">🧠 AI 점검(${(window.__moatLLM.as_of||'').slice(5,10)}) <b style="color:${c}">${a.verdict_llm}</b> — ${a.note||''}${a.src?` <a href="${a.src}" target="_blank" rel="noopener" style="color:#94a3b8">[근거]</a>`:''}</div>`;})()}</div>
     </div>`;}).join('');
 }
 
 function load(force){
   if(D&&!force){ render(); return; }
   $('mw_asof').textContent='불러오는 중…';
+  // (v3.93) 보고서 실행이 남기는 AI 점검 결과 — 없으면 조용히 생략(404 무해)
+  fetch('/api/db/moat_llm',{cache:'no-cache'}).then(r=>r.ok?r.json():null).then(j=>{
+    if(j&&j.checks){ window.__moatLLM={as_of:j.as_of,map:Object.fromEntries(j.checks.map(c=>[c.sym,c]))}; if(D) render(); }
+  }).catch(()=>{});
   fetch('/api/db/moat',{cache:'no-cache'}).then(r=>{
     if(!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
