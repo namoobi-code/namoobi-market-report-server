@@ -82,6 +82,7 @@ function render(){
       <div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0">
         ${r.lead?`🔗 선행지표 <b>${r.lead.name}</b> — 1개월 <span style="color:${pc(r.lead.m1)}">${pf(r.lead.m1)}</span> · 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 6개월 <span style="color:${pc(r.lead.m6)}">${pf(r.lead.m6)}</span> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
                 :'🔗 선행지표 미연결 — 해자 훼손 뉴스 수동 확인 대상'}
+        ${r.share?`<div style="color:#4338ca;margin-top:3px">📊 점유 추이 — ${r.share}</div>`:''}
         ${r.risk?`<div style="color:#b45309;margin-top:3px">⚠ ${r.risk}</div>`:''}
         ${(function(){const a=(window.__moatLLM&&window.__moatLLM.map[r.sym]);if(!a)return '';
           const c=a.verdict_llm==='유지'?'#166534':a.verdict_llm==='훼손 의심'?'#b91c1c':'#a16207';
