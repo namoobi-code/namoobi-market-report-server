@@ -46,6 +46,12 @@ function render(){
     `<button data-f="${f[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${FILT===f[0]?'#334155':'#d6d9de'};background:${FILT===f[0]?'#334155':'#fff'};color:${FILT===f[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${f[1]}</button>`).join('');
   $('mw_filt').querySelectorAll('button').forEach(b=>b.onclick=()=>{FILT=b.dataset.f;render();});
 
+  // (Phase3) 오늘의 판정 전환 배너
+  const chg=rows.filter(r=>r.vd_prev);
+  const VE={buy:'🟢',buy_m:'🟢※',risk:'🔴',watch:'🟡',top:'⚪'};
+  const bn=$('mw_chg');
+  if(bn) bn.innerHTML=chg.length?`<b>⚡ 오늘의 전환</b> — ${chg.map(r=>`${r.name} ${VE[r.vd_prev]||r.vd_prev}→${VE[r.verdict]}`).join(' · ')}`
+                               :'오늘 판정 전환 없음 — 신호등은 매일 06:30 재산출';
   let list=[...rows];
   if(FILT==='buy') list=list.filter(r=>r.verdict==='buy'||r.verdict==='buy_m');
   else if(FILT!=='all') list=list.filter(r=>r.verdict===FILT);
@@ -59,7 +65,7 @@ function render(){
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:14px">${r.name} <span style="font-size:10.5px;color:#94a3b8">${r.sym}</span>
           <span style="font-size:10.5px;background:#f1f5f9;color:#475569;border-radius:8px;padding:1px 7px;margin-left:3px">${mkt(r.sym)[0]} ${mkt(r.sym)[1]}</span></b>
-        <span title="${v[4]}" style="background:${v[3]};color:${v[2]};border-radius:10px;padding:2px 9px;font-size:11.5px;font-weight:700">${v[0]} ${v[1]}</span></div>
+        <span title="${v[4]}" style="background:${v[3]};color:${v[2]};border-radius:10px;padding:2px 9px;font-size:11.5px;font-weight:700">${v[0]} ${v[1]}${r.vd_days>1?` <span style="font-weight:400;opacity:.8">D+${r.vd_days}</span>`:r.vd_prev?' <span style="font-weight:400">⚡오늘 전환</span>':''}</span></div>
       <div style="font-size:11px;color:#64748b;margin:3px 0 6px"><span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:1px 7px;margin-right:5px">${r.sec}</span>${r.moat}</div>
       <div style="display:flex;gap:10px;align-items:center">
         ${spark(r.spark,v[2])}

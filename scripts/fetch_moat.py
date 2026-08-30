@@ -269,6 +269,36 @@ def main():
                      "spark": [round(c, 1) for _, c in samp],
                      "spark_d": [datetime.fromtimestamp(t, KST).strftime("%y.%m.%d") for t, _ in samp]})
         time.sleep(0.3)
+    # (Phase3) 판정 이력 누적 → 전환 감지(어제와 다르면 vd_prev)·유지일수(vd_days)
+    try:
+        h = json.loads(HIST.read_text(encoding="utf-8"))
+    except Exception:
+        h = {"days": []}
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    vd_today = {r["sym"]: r["verdict"] for r in rows}
+    prev_days = [d for d in h.get("days", []) if d.get("d") != today and d.get("vd")]
+    prev = prev_days[-1]["vd"] if prev_days else {}
+    for d in h.get("days", []):
+        if d.get("d") == today:
+            d["vd"] = vd_today
+            break
+    else:
+        h.setdefault("days", []).append({"d": today, "vd": vd_today})
+    h["days"] = sorted(h["days"], key=lambda x: x["d"])[-1500:]
+    HIST.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
+    for r in rows:
+        p = prev.get(r["sym"])
+        r["vd_prev"] = p if (p and p != r["verdict"]) else None   # 오늘 전환됐으면 직전 판정
+        n = 0
+        for d in reversed(h["days"]):
+            if (d.get("vd") or {}).get(r["sym"]) == r["verdict"]:
+                n += 1
+            else:
+                break
+        r["vd_days"] = n
+    chg = [f"{r['name']} {r['vd_prev']}→{r['verdict']}" for r in rows if r["vd_prev"]]
+    if chg:
+        print("  전환:", chg, flush=True)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
