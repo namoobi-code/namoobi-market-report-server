@@ -8,7 +8,7 @@
 let D=null, M=null, GR='all', charts={};
 const $=id=>document.getElementById(id);
 const COLS=['#be185d','#0ea5e9','#b45309','#7c3aed','#0f766e','#e11d48','#4f46e5','#ca8a04','#334155','#16a34a'];
-const GB={'A':['#166534','#dcfce7','A급 — 월간·주간 공개 데이터'],'B':['#1d4ed8','#dbeafe','B급 — 분기·반기(보고서 실행 시 자동 갱신)']};
+const GB={'A':['#166534','#dcfce7','A급 — 월간·주간 공개 데이터'],'B':['#1d4ed8','#dbeafe','B급 — 분기·반기(보고서 실행 시 자동 갱신)'],'C':['#7c3aed','#ede9fe','C급 — 캐파(증설) 시계열: 수요 초과 시장에서 캐파가 곧 미래 매출']};
 
 function latestGap(b){
   // 리더-2위 격차와 직전 관측 대비 변화 — '역전 진행'을 한 줄로
@@ -30,7 +30,7 @@ function render(){
   if(!D) return;
   $('sh_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:35'+(D.llm_asof?` · 🧠 최근 보고서 갱신 ${D.llm_asof}`:'');
   const bs=(D.battles||[]).filter(b=>GR==='all'||b.grade===GR);
-  $('sh_chips').innerHTML=[['all','전체'],['A','A급(고빈도)'],['B','B급(분기)']].map(g=>
+  $('sh_chips').innerHTML=[['all','전체'],['A','A급(고빈도)'],['B','B급(분기)'],['C','C급(캐파)']].map(g=>
     `<button data-g="${g[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${GR===g[0]?'#334155':'#d6d9de'};background:${GR===g[0]?'#334155':'#fff'};color:${GR===g[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${g[1]}</button>`).join('');
   $('sh_chips').querySelectorAll('button').forEach(x=>x.onclick=()=>{GR=x.dataset.g;render();});
 
