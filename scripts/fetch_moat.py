@@ -289,10 +289,34 @@ def main():
         y1 = pct(cl[-253], cur) if len(cl) > 253 else pct(cl[0], cur)
         L = leads.get(lsym) if lsym else None
         lead_m3 = L.get("m3") if L else None
+        # (2026-08-31) 고점 질 점수 — '오를 이유가 살아있는 고점'인지 5요소 채점(사용자 요청)
+        qh = None
+        if dd is not None and dd > -10:
+            yrl = list(yr)
+            dsh = len(yrl) - 1 - yrl[::-1].index(hi52)      # 52주 신고가 후 경과 거래일
+            ma20 = sum(cl[-20:]) / min(20, len(cl))
+            ma60 = sum(cl[-60:]) / min(60, len(cl))
+            ma120 = sum(cl[-120:]) / min(120, len(cl))
+            sc = 0
+            bp = (band.get(sym) or {}).get("pct")
+            sc += 12 if bp is None else (25 if bp <= 40 else (12 if bp < 75 else 0))          # ① PER 밴드(하위=이익이 미는 고점)
+            _l = leads.get(lsym) if lsym else None
+            _lm3 = (_l or {}).get("m3")
+            if _lm3 is None:
+                sc += 10
+            else:
+                dgap = _lm3 - (m3 or 0)
+                sc += 20 if dgap >= 0 else (10 if dgap >= -10 else 0)                          # ② 선행지표가 주가보다 앞서는가
+            sc += 20 if dsh <= 5 else (12 if dsh <= 20 else (5 if dsh <= 60 else 0))           # ③ 신고가 최근성
+            sc += 20 if (ma20 > ma60 > ma120) else (10 if ma20 > ma60 else 0)                  # ④ 이평 정배열
+            if gap200 is not None and gap200 > 25:
+                sc -= 10                                                                        #    이격 과대 페널티
+            sc += 15 if (rsi is not None and rsi >= 55) else (8 if (rsi is not None and rsi >= 45) else 0)  # ⑤ 모멘텀 유지(신고가+낮은 RSI=다이버전스 근사)
+            qh = max(0, min(100, sc))
         if dd is None:
             v = "watch"
         elif dd > -10:
-            v = "top"
+            v = "top_hot" if qh >= 70 else ("top_warn" if qh < 40 else "top")
         elif dd <= -20 and (rsi is None or rsi < 50):
             if lsym is None or lead_m3 is None:
                 v = "buy_m"                        # 🟢※ 선행지표 미연결 — 수동 확인
@@ -308,7 +332,7 @@ def main():
                      "tier": ("B2+" if sym in SEL_B2 else "B1"), "share": SHARES.get(sym),
                      "val": band.get(sym),
                      "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
-                     "m1": m1, "m3": m3, "y1": y1, "verdict": v,
+                     "m1": m1, "m3": m3, "y1": y1, "verdict": v, "qh": qh,
                      "lead": ({"sym": lsym, "name": lnm, "m1": (L or {}).get("m1"), "m3": lead_m3,
                                "m6": (L or {}).get("m6"), "y1": (L or {}).get("y1")} if lsym else None),
                      "spark": [round(c, 1) for _, c in samp],
@@ -348,7 +372,7 @@ def main():
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "rows": rows,
-        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_m", "risk", "watch", "top")},
+        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_m", "risk", "watch", "top", "top_hot", "top_warn")},
     }, ensure_ascii=False), encoding="utf-8")
     vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'buy_m', 'risk')}
     print(f"[moat] ✅ {len(rows)}/{len(UNIV)}종 → {OUT} · 신호: {vc}", flush=True)

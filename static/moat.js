@@ -26,8 +26,10 @@ const V={buy:  ['🟢','일시적 빠짐 후보','#166534','#dcfce7','해자 유
         buy_m:['🟢','빠짐 후보 ※수동확인','#166534','#dcfce7','큰 낙폭이나 선행지표 미연결 — 해자 훼손 뉴스 직접 확인 필요'],
         risk: ['🔴','선행지표 동반 악화','#b91c1c','#fee2e2','낙폭 + 연결 지표도 하락 — 구조적 이유 의심'],
         watch:['🟡','관찰','#a16207','#fef9c3','중간 지대 — 신호 대기'],
-        top:  ['⚪','고점권','#475569','#f1f5f9','52주 고점 부근 — 빠짐 신호 없음']};
-const ORDER={buy:0,buy_m:1,risk:2,watch:3,top:4};
+        top:  ['⚪','고점권','#475569','#f1f5f9','52주 고점 부근 — 빠짐 신호 없음'],
+        top_hot: ['⚪🔥','추세 건강','#0f766e','#ccfbf1','고점 질 점수 70+ — 신고가 최근·선행지표 동행·밴드 중하위 = 오를 이유가 살아있는 고점'],
+        top_warn:['⚪⚠','과열·소진 주의','#b45309','#ffedd5','고점 질 점수 40미만 — 경신 끊김·다이버전스·이격 과대 = 멀티플 의존 고점']};
+const ORDER={buy:0,buy_m:1,risk:2,top_warn:3,watch:4,top_hot:5,top:6};
 
 function spark(sv,color){
   if(!sv||sv.length<2) return '';
@@ -41,19 +43,20 @@ function render(){
   $('mw_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:30 자동 갱신';
   const rows=D.rows||[], c=D.counts||{};
   // 필터 칩 + 신호등 요약
-  const FL=[['all','전체 '+rows.length],['buy','🟢 빠짐 후보 '+((c.buy||0)+(c.buy_m||0))],['risk','🔴 악화 '+(c.risk||0)],['watch','🟡 관찰 '+(c.watch||0)],['top','⚪ 고점권 '+(c.top||0)]];
+  const FL=[['all','전체 '+rows.length],['buy','🟢 빠짐 후보 '+((c.buy||0)+(c.buy_m||0))],['risk','🔴 악화 '+(c.risk||0)],['watch','🟡 관찰 '+(c.watch||0)],['top','⚪ 고점권 '+((c.top||0)+(c.top_hot||0)+(c.top_warn||0))]];
   $('mw_filt').innerHTML=FL.map(f=>
     `<button data-f="${f[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${FILT===f[0]?'#334155':'#d6d9de'};background:${FILT===f[0]?'#334155':'#fff'};color:${FILT===f[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${f[1]}</button>`).join('');
   $('mw_filt').querySelectorAll('button').forEach(b=>b.onclick=()=>{FILT=b.dataset.f;render();});
 
   // (Phase3) 오늘의 판정 전환 배너
   const chg=rows.filter(r=>r.vd_prev);
-  const VE={buy:'🟢',buy_m:'🟢※',risk:'🔴',watch:'🟡',top:'⚪'};
+  const VE={buy:'🟢',buy_m:'🟢※',risk:'🔴',watch:'🟡',top:'⚪',top_hot:'⚪🔥',top_warn:'⚪⚠'};
   const bn=$('mw_chg');
   if(bn) bn.innerHTML=chg.length?`<b>⚡ 오늘의 전환</b> — ${chg.map(r=>`${r.name} ${VE[r.vd_prev]||r.vd_prev}→${VE[r.verdict]}`).join(' · ')}`
                                :'오늘 판정 전환 없음 — 신호등은 매일 06:30 재산출';
   let list=[...rows];
   if(FILT==='buy') list=list.filter(r=>r.verdict==='buy'||r.verdict==='buy_m');
+  else if(FILT==='top') list=list.filter(r=>r.verdict.startsWith('top'));
   else if(FILT!=='all') list=list.filter(r=>r.verdict===FILT);
   // 정렬: 🟢 우선 → 낙폭 큰 순 (기회 후보가 맨 위)
   list.sort((a,b)=>(ORDER[a.verdict]-ORDER[b.verdict])||((a.dd??0)-(b.dd??0)));
@@ -65,7 +68,7 @@ function render(){
       <div style="display:flex;justify-content:space-between;align-items:center">
         <b style="font-size:14px">${r.name} <span style="font-size:10.5px;color:#94a3b8">${r.sym}</span>
           <span style="font-size:10.5px;background:#f1f5f9;color:#475569;border-radius:8px;padding:1px 7px;margin-left:3px">${mkt(r.sym)[0]} ${mkt(r.sym)[1]}</span></b>
-        <span title="${v[4]}" style="background:${v[3]};color:${v[2]};border-radius:10px;padding:2px 9px;font-size:11.5px;font-weight:700">${v[0]} ${v[1]}${r.vd_days>1?` <span style="font-weight:400;opacity:.8">D+${r.vd_days}</span>`:r.vd_prev?' <span style="font-weight:400">⚡오늘 전환</span>':''}</span></div>
+        <span title="${v[4]}" style="background:${v[3]};color:${v[2]};border-radius:10px;padding:2px 9px;font-size:11.5px;font-weight:700">${v[0]} ${v[1]}${r.qh!=null?` <span style=\"font-weight:400;opacity:.85\">${r.qh}점</span>`:''}${r.vd_days>1?` <span style="font-weight:400;opacity:.8">D+${r.vd_days}</span>`:r.vd_prev?' <span style="font-weight:400">⚡오늘 전환</span>':''}</span></div>
       <div style="font-size:11px;color:#64748b;margin:3px 0 6px"><span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:1px 7px;margin-right:5px">${r.sec}</span>${r.tier==='B2+'?'<span title="관계도 배지는 황색(복점·양강)이나 해자 실질이 독점급이라 선별 편입" style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 7px;margin-right:5px">선별 B2</span>':''}${r.moat}</div>
       <div style="display:flex;gap:10px;align-items:center">
         ${spark(r.spark,v[2])}
