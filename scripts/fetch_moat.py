@@ -1,0 +1,167 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""fetch_moat.py — 해자 워치(Moat Watch) 수집 (2026-08-30 신설)
+
+부록 해자지도(D·F·H)의 파란 배지(독점·준독점) 상장 종목에 대해
+"일시적 빠짐 vs 이유 있는 하락"을 구분하는 3층 신호를 매일 산출한다.
+  ① 가격 신호: 52주 고점 대비 낙폭 · 200일선 이격도 · RSI(14) · 기간 수익률
+  ② 해자 선행지표: 종목별 연결 지표(우라늄 실물신탁·은 선물·SOX·XBI·MU 등, 야후)의 3개월 방향
+  ③ 판정 신호등:
+     ⚪ top   낙폭 > -10%              — 고점권(빠짐 신호 없음)
+     🟢 buy   낙폭 ≤ -20% & RSI<50 & 선행지표 3개월 ≥0 — '일시적 빠짐 후보'
+     🔴 risk  낙폭 ≤ -20% & 선행지표 3개월 <0          — 선행지표 동반 악화(구조 의심)
+     🟡 watch 그 외                                    — 관찰
+     선행지표 미연결 종목이 낙폭 조건 충족 시 buy_m(🟢※ 수동 확인 필요).
+※ 가격·판정은 '검토 후보 알림'이지 매수 신호가 아니다 — 가치함정은 걸러지지 않는다.
+유니버스는 gen_appd/appf/apph 관계도의 B1 카드 기준 수동 동기화(관계도 갱신 시 여기도 갱신).
+
+산출: data/db/moat.json
+cron: 30 6 * * *
+"""
+import json, time, urllib.request, urllib.parse
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+BASE = Path(__file__).resolve().parent.parent
+OUT  = BASE / "data" / "db" / "moat.json"
+UA   = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"}
+KST  = timezone(timedelta(hours=9))
+
+# (심볼, 이름, 분야, 해자 한 줄, 선행지표 심볼|None, 선행지표 이름)
+UNIV = [
+    ("ASML",      "ASML",          "AI반도체", "EUV 노광 유일 — 선단공정의 문지기, 대체재 없음",              "^SOX", "필라델피아 반도체지수"),
+    ("TSM",       "TSMC",          "AI반도체", "선단공정 파운드리 압도 — AI 칩 전량이 거쳐가는 관문",          "^SOX", "필라델피아 반도체지수"),
+    ("NVDA",      "엔비디아",       "AI반도체", "CUDA 생태계 락인 — GPU를 넘어선 소프트웨어 해자",             "^SOX", "필라델피아 반도체지수"),
+    ("ARM",       "Arm",           "AI반도체", "저전력 설계 IP 사실상 표준 — 로열티 수취 구조",               "^SOX", "필라델피아 반도체지수"),
+    ("4062.T",    "이비덴",         "AI반도체", "AI 서버용 FC-BGA 70~80% 과점 — 칩 설계 단계부터 공동개발",    "^SOX", "필라델피아 반도체지수"),
+    ("VRT",       "버티브",         "AI반도체", "데이터센터 전력·액체냉각 토탈 — '칩보다 전기' 병목의 수혜",     "^SOX", "필라델피아 반도체지수"),
+    ("000660.KS", "SK하이닉스",     "AI반도체", "HBM 점유 1위 — 엔비디아 최우선 공급사",                     "MU",   "마이크론(메모리 업황 대리)"),
+    ("042700.KS", "한미반도체",     "AI반도체", "HBM TC본더 선두 — SK하이닉스와 동반 성장",                  "MU",   "마이크론(메모리 업황 대리)"),
+    ("6324.T",    "하모닉드라이브",  "피지컬AI", "로봇 관절 감속기 세계 표준 — 수십 년 내구성 데이터가 해자",     None,   None),
+    ("6758.T",    "소니그룹",       "피지컬AI", "이미지센서 1위 — 로봇·스마트폰 '눈'의 기본 공급자",           None,   None),
+    ("3402.T",    "도레이",         "피지컬AI", "탄소섬유(CFRP) 세계 1위 — 경량화의 소재 관문",               None,   None),
+    ("034020.KS", "두산에너빌리티", "SMR·원전", "SMR 파운드리 — 테라파워·뉴스케일·엑스에너지 주기기 계약",       "U-UN.TO", "스프로트 실물 우라늄"),
+    ("LEU",       "센트러스",       "SMR·원전", "美 HALEU 농축 유일 — DOE가 직접 돈을 대는 병목",             "U-UN.TO", "스프로트 실물 우라늄"),
+    ("KAP.L",     "카자톰프롬",     "SMR·원전", "우라늄 채굴 세계 1위(점유 23%)",                            "U-UN.TO", "스프로트 실물 우라늄"),
+    ("MP",        "MP머티리얼즈",   "핵심광물", "미국 유일 희토류 일관 — 국방부 지분 15%·가격 하한 보장",       "REMX", "희토류·전략금속 ETF"),
+    ("LYC.AX",    "라이너스",       "핵심광물", "중국 밖 유일 중희토류 분리 — 디스프로슘 상업생산",             "REMX", "희토류·전략금속 ETF"),
+    ("010130.KS", "고려아연",       "핵심광물", "아연 제련 세계 1위 + 美 테네시 74억$ 제련소 — 비철 13종 회수", "SI=F", "은 선물(부산물 가격)"),
+    ("196170.KQ", "알테오젠",       "첨단바이오", "SC 제형 변환 독점 — 키트루다SC 머크 독점계약 로열티",         "MRK",  "머크(키트루다 주인)"),
+    ("VRTX",      "버텍스",         "첨단바이오", "낭포성섬유증 치료제 사실상 독점 + CRISPR 상업화 선두",        "XBI",  "미 바이오테크 ETF"),
+    ("ILMN",      "일루미나",       "첨단바이오", "유전자 시퀀싱 준독점 — 장비 설치기반 락인",                  "XBI",  "미 바이오테크 ETF"),
+    ("CRSP",      "크리스퍼 Tx",    "첨단바이오", "유전자편집 치료제 최초 상업화(카스게비)",                    "XBI",  "미 바이오테크 ETF"),
+    ("047810.KS", "한국항공우주",   "우주·방산", "국내 완제기 체계종합 유일 — FA-50 수출 축",                  None,   None),
+    ("012450.KS", "한화에어로",     "우주·방산", "누리호 체계종합 독점 + K-방산 수주잔고",                     None,   None),
+    ("IRDM",      "이리듐",         "우주·방산", "극지 포함 L밴드 전지구망 보유 유일 사업자",                   None,   None),
+    ("QBTS",      "디웨이브",       "양자",     "양자 어닐링 상용화 유일",                                   None,   None),
+    ("294630.KQ", "서남",          "핵융합",   "2세대 고온초전도 선재 양산 국내 유일 — 英 STEP 공급사",        None,   None),
+]
+
+# 해자 위협 워치포인트 (구조 훼손 후보 — 뉴스 기반 수동 갱신)
+RISKS = {
+    "ASML": "中 역설계 EUV 프로토타입(2025.12)·화웨이 LDP 광원 실험 — 단 국산 DUV는 4세대 격차, 양산칩은 2030년 전망(현재 위협 아님)",
+    "ILMN": "중국 수입금지 — 2026 성장률 1%p 역풍(구조 훼손 진행형 리스크)",
+    "010130.KS": "경영권 분쟁 2라운드 진행 중 — 지배구조 리스크 잔존",
+}
+
+def get(u, to=25):
+    return urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=to).read()
+
+def hist(sym, rng="2y"):
+    u = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range={rng}&interval=1d"
+    j = json.loads(get(u))
+    r = (j.get("chart") or {}).get("result") or []
+    if not r:
+        return None
+    r = r[0]
+    ts = r.get("timestamp") or []
+    cl = ((r.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
+    pts = [(t, c) for t, c in zip(ts, cl) if c is not None]
+    return pts or None
+
+def rsi14(closes):
+    if len(closes) < 15:
+        return None
+    g = l = 0.0
+    for i in range(1, 15):
+        d = closes[i] - closes[i-1]
+        g += max(d, 0); l += max(-d, 0)
+    ag, al = g/14, l/14
+    for i in range(15, len(closes)):
+        d = closes[i] - closes[i-1]
+        ag = (ag*13 + max(d, 0)) / 14
+        al = (al*13 + max(-d, 0)) / 14
+    return 100.0 if al == 0 else round(100 - 100/(1 + ag/al), 1)
+
+def pct(a, b):
+    return round((b/a - 1) * 100, 1) if a else None
+
+def main():
+    print("[moat] 수집 시작", flush=True)
+    leads = {}
+    for sym in sorted({x[4] for x in UNIV if x[4]}):
+        try:
+            pts = hist(sym, "1y")
+            cl = [c for _, c in pts]
+            leads[sym] = {"m3": pct(cl[-64], cl[-1]) if len(cl) > 64 else None,
+                          "y1": pct(cl[0], cl[-1]), "cur": round(cl[-1], 2)}
+        except Exception as e:
+            print(f"  ⚠ lead {sym}: {repr(e)[:50]}", flush=True)
+            leads[sym] = None
+        time.sleep(0.3)
+    rows = []
+    for sym, nm, sec, moat, lsym, lnm in UNIV:
+        try:
+            pts = hist(sym)
+        except Exception as e:
+            print(f"  ⚠ {nm}({sym}) 실패: {repr(e)[:50]}", flush=True)
+            continue
+        if not pts:
+            continue
+        cl = [c for _, c in pts]
+        cur = cl[-1]
+        yr = cl[-252:] if len(cl) >= 252 else cl
+        hi52 = max(yr)
+        dd = pct(hi52, cur)                       # 52주 고점 대비(음수)
+        ma200 = sum(cl[-200:])/min(200, len(cl))
+        gap200 = pct(ma200, cur)
+        rsi = rsi14(cl[-120:])
+        m1 = pct(cl[-22], cur) if len(cl) > 22 else None
+        m3 = pct(cl[-64], cur) if len(cl) > 64 else None
+        y1 = pct(cl[-253], cur) if len(cl) > 253 else pct(cl[0], cur)
+        L = leads.get(lsym) if lsym else None
+        lead_m3 = L.get("m3") if L else None
+        if dd is None:
+            v = "watch"
+        elif dd > -10:
+            v = "top"
+        elif dd <= -20 and (rsi is None or rsi < 50):
+            if lsym is None or lead_m3 is None:
+                v = "buy_m"                        # 🟢※ 선행지표 미연결 — 수동 확인
+            elif lead_m3 >= 0:
+                v = "buy"
+            else:
+                v = "risk"
+        else:
+            v = "watch"
+        step = max(1, len(pts)//60)
+        samp = pts[::step][-60:]
+        rows.append({"sym": sym, "name": nm, "sec": sec, "moat": moat, "risk": RISKS.get(sym),
+                     "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
+                     "m1": m1, "m3": m3, "y1": y1, "verdict": v,
+                     "lead": ({"sym": lsym, "name": lnm, "m3": lead_m3,
+                               "y1": (L or {}).get("y1")} if lsym else None),
+                     "spark": [round(c, 1) for _, c in samp],
+                     "spark_d": [datetime.fromtimestamp(t, KST).strftime("%y.%m.%d") for t, _ in samp]})
+        time.sleep(0.3)
+    OUT.parent.mkdir(parents=True, exist_ok=True)
+    OUT.write_text(json.dumps({
+        "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
+        "rows": rows,
+        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_m", "risk", "watch", "top")},
+    }, ensure_ascii=False), encoding="utf-8")
+    vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'buy_m', 'risk')}
+    print(f"[moat] ✅ {len(rows)}/{len(UNIV)}종 → {OUT} · 신호: {vc}", flush=True)
+
+if __name__ == "__main__":
+    main()

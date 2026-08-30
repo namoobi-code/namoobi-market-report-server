@@ -557,6 +557,7 @@
       <button class="tab"    data-pane="p_hobby" style="background:#047857;border-color:#047857;color:#fff">🏃 취미(운동)<small style="color:#a7f3d0">대회 일정·신청</small></button>
       <button class="tab"    data-pane="p_kpop" style="background:#be123c;border-color:#be123c;color:#fff">🎤 K-POP<small style="color:#fecdd3">앨범·수출·팬덤 선행지표</small></button>
       <button class="tab"    data-pane="p_kcons" style="background:#9d174d;border-color:#9d174d;color:#fff">🛍️ K-소비재<small style="color:#fbcfe8">뷰티·푸드·패션 수출×주가</small></button>
+      <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -644,6 +645,33 @@
       </div>
     </div>
     <div class="note" style="margin:8px 0 14px;line-height:1.7">📖 기간수익률은 각 소스의 1년 일봉 기준(현재가 대비 과거 최근접 종가) · KRX 세부지수는 이력 누적 개시(2026-08-02)부터 기간수익률·추세가 차오른다 · 미래에셋 리스트 중 러시아 RTS(거래정지)·항셍종합·항셍 레드칩(R)·K-뉴딜 TOP10 시리즈는 무료 소스 미제공. 선물 시세는 최근월 연속(롤오버 자동)이며, 만기 교체 시 월물 간 가격차가 시계열에 섞여 매월물 상품(원유·천연가스 등)의 장기 수익률은 실제 현물 등락과 다소 다를 수 있음. 리서치용·투자권유 아님.</div>
+  </div>
+
+  <!-- (2026-08-30) 해자 워치 탭 — moat.js · 데이터 scripts/fetch_moat.py (매일 06:30) -->
+  <div class="pane" id="p_moat" style="overflow:auto">
+    <h2>🏰 해자 워치 <em id="mw_asof"></em> <button id="mw_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px"><b>무엇을 보는 화면인가</b> — 부록 해자지도(AI반도체·피지컬AI·7대 전략분야)에서 <b>독점·준독점(파란 배지)</b>으로 분류된
+      상장 종목만 모아, 주가가 크게 빠졌을 때 그것이 <b>"일시적 빠짐(기회 후보)"인지 "이유 있는 하락(해자 훼손)"인지</b>를 구분하는 3층 신호를 매일 갱신한다.
+      ① 가격 신호(낙폭·이격도·RSI) ② 해자 선행지표(종목별 연결 지표의 3개월 방향) ③ 신호등 판정.
+      <b>판정은 '검토 후보 알림'이지 매수 신호가 아니다</b> — 가격 신호는 가치함정을 못 거르므로 반드시 해자 훼손 여부(⚠ 워치포인트·뉴스)와 함께 볼 것. 리서치용·투자권유 아님.</div>
+    <div class="box" style="padding:12px 14px">
+      <div id="mw_filt" style="margin-bottom:10px"></div>
+      <div id="mw_grid" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+    </div>
+    <h3>읽는 법 — 지표의 의미와 해석</h3>
+    <div class="box" style="padding:12px 14px;font-size:12.5px">
+      <table style="border-collapse:collapse;width:100%;background:#fff">
+        <thead><tr style="background:#f8fafc"><th style="border:1px solid #e2e8f0;padding:4px 8px">지표</th><th style="border:1px solid #e2e8f0;padding:4px 8px">의미</th><th style="border:1px solid #e2e8f0;padding:4px 8px">해석 방법</th></tr></thead>
+        <tbody>
+        <tr><td style="border:1px solid #e2e8f0;padding:4px 8px;font-weight:700">52주 고점比 낙폭</td><td style="border:1px solid #e2e8f0;padding:4px 8px">최근 1년 최고가에서 얼마나 내려왔나</td><td style="border:1px solid #e2e8f0;padding:4px 8px">-20% 이하 = '크게 빠진 상태'. 독점 기업의 큰 낙폭은 드물어 그 자체가 점검 트리거 — 단 이유를 반드시 확인</td></tr>
+        <tr><td style="border:1px solid #e2e8f0;padding:4px 8px;font-weight:700">200일선 이격도</td><td style="border:1px solid #e2e8f0;padding:4px 8px">장기 추세선 대비 현재 위치</td><td style="border:1px solid #e2e8f0;padding:4px 8px">큰 음수 = 장기 추세 아래로 과매도 이탈. 양수 전환은 추세 복귀 신호</td></tr>
+        <tr><td style="border:1px solid #e2e8f0;padding:4px 8px;font-weight:700">RSI(14)</td><td style="border:1px solid #e2e8f0;padding:4px 8px">단기 과열/과매도 (0~100)</td><td style="border:1px solid #e2e8f0;padding:4px 8px">30 이하 과매도(파랑)·70 이상 과열(빨강). 낙폭 + RSI 30대 조합이 전형적 '일시 빠짐' 후보 구간</td></tr>
+        <tr><td style="border:1px solid #e2e8f0;padding:4px 8px;font-weight:700">🔗 해자 선행지표</td><td style="border:1px solid #e2e8f0;padding:4px 8px">그 기업 해자의 '재료'가 되는 지표 (우라늄 실물·은 선물·반도체지수·메모리 대리·바이오 ETF 등)</td><td style="border:1px solid #e2e8f0;padding:4px 8px"><b>주가는 빠졌는데 선행지표가 견조하면 해자는 무사하다는 방증</b> → 일시적 빠짐 가능성. 선행지표도 같이 꺾이면 업황·구조 문제</td></tr>
+        <tr><td style="border:1px solid #e2e8f0;padding:4px 8px;font-weight:700">신호등 판정</td><td style="border:1px solid #e2e8f0;padding:4px 8px">위 신호의 기계적 결합</td><td style="border:1px solid #e2e8f0;padding:4px 8px">🟢 낙폭≤-20%·RSI&lt;50·선행지표 3개월 ≥0 = 빠짐 후보 / 🔴 낙폭 + 선행지표도 하락 = 구조 의심 / 🟡 중간 / ⚪ 낙폭 -10% 이내 고점권. ※표시는 선행지표 미연결 — 뉴스로 직접 확인</td></tr>
+        <tr><td style="border:1px solid #e2e8f0;padding:4px 8px;font-weight:700">⚠ 워치포인트</td><td style="border:1px solid #e2e8f0;padding:4px 8px">해자 훼손 가능성이 제기된 이슈(수동 갱신)</td><td style="border:1px solid #e2e8f0;padding:4px 8px">예: ASML — 中 역설계 EUV 프로토타입은 존재하나 양산칩 2030년 전망·DUV 4세대 격차로 현재 위협 아님. 이런 맥락 없이 낙폭만 보면 오판</td></tr>
+        </tbody></table>
+      <div class="note" style="margin-top:6px">한계 — ① 선행지표는 대리변수(마이크론=메모리 업황 등)라 종목 고유 악재(소송·경영권·규제)는 못 잡는다 ② 밸류에이션 밴드(자기 역사 대비 PER 위치)는 데이터 누적 후 추가 예정 ③ 유니버스는 해자지도 갱신 시 수동 동기화.</div>
+    </div>
   </div>
 
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
@@ -1971,7 +1999,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=08290200"></script>
+<script src="/app.js?v=08300100"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -1979,6 +2007,7 @@
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=08291100"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
+<script src="/moat.js?v=08300200"></script><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
