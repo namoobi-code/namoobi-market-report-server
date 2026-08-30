@@ -24,6 +24,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 OUT  = BASE / "data" / "db" / "moat.json"
+HIST = BASE / "data" / "db" / "moat_hist.json"   # (Phase2) PER 일일 스냅샷 누적 — 자기 역사 대비 percentile
 UA   = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"}
 KST  = timezone(timedelta(hours=9))
 
@@ -67,6 +68,65 @@ RISKS = {
 def get(u, to=25):
     return urllib.request.urlopen(urllib.request.Request(u, headers=UA), timeout=to).read()
 
+# ── (Phase2) 야후 PER — crumb 인증 플로우 (2026-08-30 실측 확인) ─────────────
+_OPENER = urllib.request.build_opener(urllib.request.HTTPCookieProcessor())
+_CRUMB = None
+
+def _crumb():
+    global _CRUMB
+    if _CRUMB is None:
+        try:
+            try:
+                _OPENER.open(urllib.request.Request("https://fc.yahoo.com", headers=UA), timeout=15).read()
+            except Exception:
+                pass  # fc.yahoo.com 은 404 여도 쿠키는 심어진다
+            _CRUMB = _OPENER.open(urllib.request.Request(
+                "https://query1.finance.yahoo.com/v1/test/getcrumb", headers=UA), timeout=15).read().decode()
+        except Exception as e:
+            print(f"  ⚠ crumb 실패: {repr(e)[:50]}", flush=True)
+            _CRUMB = ""
+    return _CRUMB
+
+def fetch_per(sym):
+    """forward PER 우선, 없으면 trailing. 통화 불일치 쓰레기값(KAP.L 0.0096 실측) 필터: 1<PE<500 만 유효."""
+    c = _crumb()
+    if not c:
+        return None, None
+    try:
+        u = (f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{urllib.parse.quote(sym)}"
+             f"?modules=summaryDetail,defaultKeyStatistics&crumb={urllib.parse.quote(c)}")
+        d = json.loads(_OPENER.open(urllib.request.Request(u, headers=UA), timeout=20).read())
+        r = d["quoteSummary"]["result"][0]
+        sd, ks = r.get("summaryDetail", {}), r.get("defaultKeyStatistics", {})
+        for v, src in (((ks.get("forwardPE") or sd.get("forwardPE") or {}).get("raw"), "fwd"),
+                       ((sd.get("trailingPE") or {}).get("raw"), "ttm")):
+            if v is not None and 1 < v < 500:
+                return round(v, 1), src
+    except Exception:
+        pass
+    return None, None
+
+def per_band(per_map):
+    """이력 누적 후 종목별 percentile(하위 x% = 자기 역사상 저평가) — 관측 20일 미만이면 percentile 없이 일수만."""
+    try:
+        h = json.loads(HIST.read_text(encoding="utf-8"))
+    except Exception:
+        h = {"days": []}
+    today = datetime.now(KST).strftime("%Y-%m-%d")
+    h["days"] = [d for d in h.get("days", []) if d.get("d") != today]
+    h["days"].append({"d": today, "per": {k: v for k, (v, s) in per_map.items() if v is not None}})
+    h["days"] = sorted(h["days"], key=lambda x: x["d"])[-1500:]
+    HIST.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
+    out = {}
+    for sym, (v, src) in per_map.items():
+        if v is None:
+            continue
+        hist_vals = [d["per"][sym] for d in h["days"] if sym in d.get("per", {})]
+        n = len(hist_vals)
+        pct = round(sum(1 for x in hist_vals if x <= v) / n * 100) if n >= 20 else None
+        out[sym] = {"per": v, "src": src, "pct": pct, "n": n}
+    return out
+
 def hist(sym, rng="2y"):
     u = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range={rng}&interval=1d"
     j = json.loads(get(u))
@@ -98,6 +158,14 @@ def pct(a, b):
 
 def main():
     print("[moat] 수집 시작", flush=True)
+    # (Phase2) PER 스냅샷 → 이력 누적 → 밴드 percentile
+    per_map = {}
+    for sym, *_ in UNIV:
+        per_map[sym] = fetch_per(sym)
+        time.sleep(0.3)
+    band = per_band(per_map)
+    ok = sum(1 for v in band.values())
+    print(f"  PER: {ok}/{len(UNIV)}종 수집 · 밴드 누적 {max((b['n'] for b in band.values()), default=0)}일", flush=True)
     leads = {}
     for sym in sorted({x[4] for x in UNIV if x[4]}):
         try:
@@ -147,6 +215,7 @@ def main():
         step = max(1, len(pts)//60)
         samp = pts[::step][-60:]
         rows.append({"sym": sym, "name": nm, "sec": sec, "moat": moat, "risk": RISKS.get(sym),
+                     "val": band.get(sym),
                      "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
                      "m1": m1, "m3": m3, "y1": y1, "verdict": v,
                      "lead": ({"sym": lsym, "name": lnm, "m3": lead_m3,

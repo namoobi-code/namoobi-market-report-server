@@ -56,6 +56,8 @@ function render(){
               <td style="color:#94a3b8;padding:1px 6px 1px 12px">3개월</td><td style="text-align:right;color:${pc(r.m3)}">${pf(r.m3)}</td></tr>
           <tr><td style="color:#94a3b8;padding:1px 6px 1px 0">1년</td><td style="text-align:right;color:${pc(r.y1)}">${pf(r.y1)}</td>
               <td style="color:#94a3b8;padding:1px 6px 1px 12px">현재가</td><td style="text-align:right">${(r.cur??0).toLocaleString()}</td></tr>
+          <tr><td style="color:#94a3b8;padding:1px 6px 1px 0">PER(${r.val?r.val.src:'-'})</td><td style="text-align:right;font-weight:700">${r.val?r.val.per:'—'}</td>
+              <td style="color:#94a3b8;padding:1px 6px 1px 12px">밴드</td><td style="text-align:right;font-size:10.5px">${r.val?(r.val.pct!=null?`<b style="color:${r.val.pct<=25?'#166534':r.val.pct>=75?'#b91c1c':'#334155'}">하위 ${r.val.pct}%</b>(${r.val.n}일)`:`누적 ${r.val.n}일`):'—'}</td></tr>
         </table></div>
       <div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0">
         ${r.lead?`🔗 선행지표 <b>${r.lead.name}</b> 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
