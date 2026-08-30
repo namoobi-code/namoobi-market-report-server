@@ -220,7 +220,10 @@ def hs_lead(codes):
     rv = [r for r in roll if r is not None]
     if len(rv) < 4:
         return None
-    return {"m3": pct(rv[-4], rv[-1]), "y1": pct(rv[-13], rv[-1]) if len(rv) >= 13 else None, "cur": rv[-1]}
+    return {"m1": pct(rv[-2], rv[-1]) if len(rv) >= 2 else None,
+            "m3": pct(rv[-4], rv[-1]),
+            "m6": pct(rv[-7], rv[-1]) if len(rv) >= 7 else None,
+            "y1": pct(rv[-13], rv[-1]) if len(rv) >= 13 else None, "cur": rv[-1]}
 
 def main():
     print("[moat] 수집 시작", flush=True)
@@ -240,7 +243,9 @@ def main():
             else:
                 pts = hist(sym, "1y")
                 cl = [c for _, c in pts]
-                leads[sym] = {"m3": pct(cl[-64], cl[-1]) if len(cl) > 64 else None,
+                leads[sym] = {"m1": pct(cl[-22], cl[-1]) if len(cl) > 22 else None,
+                              "m3": pct(cl[-64], cl[-1]) if len(cl) > 64 else None,
+                              "m6": pct(cl[-128], cl[-1]) if len(cl) > 128 else None,
                               "y1": pct(cl[0], cl[-1]), "cur": round(cl[-1], 2)}
         except Exception as e:
             print(f"  ⚠ lead {sym}: {repr(e)[:50]}", flush=True)
@@ -288,8 +293,8 @@ def main():
                      "val": band.get(sym),
                      "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
                      "m1": m1, "m3": m3, "y1": y1, "verdict": v,
-                     "lead": ({"sym": lsym, "name": lnm, "m3": lead_m3,
-                               "y1": (L or {}).get("y1")} if lsym else None),
+                     "lead": ({"sym": lsym, "name": lnm, "m1": (L or {}).get("m1"), "m3": lead_m3,
+                               "m6": (L or {}).get("m6"), "y1": (L or {}).get("y1")} if lsym else None),
                      "spark": [round(c, 1) for _, c in samp],
                      "spark_d": [datetime.fromtimestamp(t, KST).strftime("%y.%m.%d") for t, _ in samp]})
         time.sleep(0.3)

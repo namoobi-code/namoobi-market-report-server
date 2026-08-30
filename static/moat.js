@@ -80,7 +80,7 @@ function render(){
               <td style="color:#94a3b8;padding:1px 6px 1px 12px">밴드</td><td style="text-align:right;font-size:10.5px">${r.val?(r.val.pct!=null?`<b style="color:${r.val.pct<=25?'#166534':r.val.pct>=75?'#b91c1c':'#334155'}">하위 ${r.val.pct}%</b>(${r.val.n}일)`:`누적 ${r.val.n}일`):'—'}</td></tr>
         </table></div>
       <div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0">
-        ${r.lead?`🔗 선행지표 <b>${r.lead.name}</b> 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
+        ${r.lead?`🔗 선행지표 <b>${r.lead.name}</b> — 1개월 <span style="color:${pc(r.lead.m1)}">${pf(r.lead.m1)}</span> · 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 6개월 <span style="color:${pc(r.lead.m6)}">${pf(r.lead.m6)}</span> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
                 :'🔗 선행지표 미연결 — 해자 훼손 뉴스 수동 확인 대상'}
         ${r.risk?`<div style="color:#b45309;margin-top:3px">⚠ ${r.risk}</div>`:''}
         ${(function(){const a=(window.__moatLLM&&window.__moatLLM.map[r.sym]);if(!a)return '';
