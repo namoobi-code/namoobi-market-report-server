@@ -7,3 +7,4 @@ charts/
 /nmr_krx_brief.json
 data/db/apt.sqlite*
 data/db/rtms_etc.sqlite*
+testfile_del_check
