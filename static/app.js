@@ -1275,7 +1275,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_kpop','p_kcons','p_moat','p_share','p_sub','p_pf','p_re','p_re3'];  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) · p_re: (2026-08-23) RE 예측 탭 (re.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_kpop','p_kcons','p_moat','p_share','p_debt','p_sub','p_pf','p_re','p_re3'];  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) · p_re: (2026-08-23) RE 예측 탭 (re.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -1302,6 +1302,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(b.dataset.pane==='p_kcons'&&window.renderKcons) window.renderKcons(); // (2026-08-29) K-소비재 선행지표
     if(b.dataset.pane==='p_moat'&&window.renderMoat) window.renderMoat();    // (2026-08-30) 해자 워치
     if(b.dataset.pane==='p_share'&&window.renderShare) window.renderShare();  // (2026-08-31) 점유율 추이
+    if(b.dataset.pane==='p_debt'&&window.renderDebt) window.renderDebt();    // (2026-08-31) 빅테크 조달구조
     /* (2026-08-05) 숨김 상태에서 생성된 Chart.js 는 0×0 으로 남는다(실측: 3.1.10 3×3 그리드)
        → 탭을 열 때 크기 없는 차트만 골라 resize */
     if(window.Chart&&Chart.getChart) setTimeout(()=>{

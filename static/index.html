@@ -559,6 +559,7 @@
       <button class="tab"    data-pane="p_kcons" style="background:#9d174d;border-color:#9d174d;color:#fff">🛍️ K-소비재<small style="color:#fbcfe8">뷰티·푸드·패션 수출×주가</small></button>
       <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
+      <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -662,6 +663,43 @@
     </div>
     <h3>선별 B2 점유 구도 <span class="note">해자워치 SHARES 정본 — 시계열화 대상 외 종목의 스냅샷, 보고서 Phase 3.6 이 뉴스로 점검</span></h3>
     <div class="box" style="padding:12px 14px"><div id="sh_b2"></div></div>
+  </div>
+
+  <div class="pane" id="p_debt" style="overflow:auto">
+    <h2>💵 빅테크 조달구조 <em id="dbt_asof"></em> <button id="dbt_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px"><b>무엇을 보는 화면인가</b> — 보고서 3.1.8 CAPEX 가 <b>'얼마 쓰나'</b>라면, 여기는 <b>'그 돈을 어디서 구하나'</b>다.
+      하이퍼스케일러 5사(MS·아마존·알파벳·메타·오라클)는 최근 18개월 사이 <b>자기 현금으로 짓던 데이터센터를 빚으로 짓기 시작</b>했다.
+      한 줄 지표는 <b>증분부채 ÷ CAPEX</b> — 1년 새 늘어난 빚이 같은 기간 설비투자의 몇 %인가(100%면 전액 차입). 이 비율이 오르면 회사채 공급이 늘고,
+      3.1.15 HY 스프레드·3.1.9 메모리 사이클과 한 줄로 이어진다.
+      수치는 <b>SEC EDGAR XBRL 실측</b>(각사 10-K/10-Q 원문 태그)이며 금융리스는 제외한 차입금 기준이라, 리스를 포함하는 외부 집계(FactSet 등)보다 낮게 나온다.
+      단위 십억 달러. 리서치용·투자권유 아님.</div>
+
+    <h3>① 조달 요약 <span class="note">5사 합산 · 최근 9분기</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="dbt_head" style="font-size:12.5px;margin-bottom:8px"></div>
+      <div id="dbt_agg"></div>
+      <div class="note" style="margin-top:6px">오라클은 5월 결산이라 달력분기 축에서는 직전 관측이 이월된다. 참고 집계치 → <span id="dbt_bench"></span></div>
+      <h4 style="margin:12px 0 5px;font-size:13px">기업별 최신 분기</h4>
+      <div id="dbt_co"></div>
+      <div class="note" style="margin-top:6px">순부채 음수 = 현금이 빚보다 많음(순현금). 순부채/EBITDA 는 통상 1.0~1.5x 를 넘으면 등급 압박 구간으로 본다.</div>
+    </div>
+
+    <h3>② 발행 딜 타임라인 <span class="note">대형 발행 건 — 🧠 는 보고서 Phase 3.8 이 웹서치로 갱신한 건</span></h3>
+    <div class="box" style="padding:10px 14px"><div id="dbt_deals"></div>
+      <div class="note" style="margin-top:6px">청약배수(오버서브스크립션)가 낮아지면 <b>같은 금액을 더 비싸게 조달</b>한다는 뜻 — 수요 둔화의 조기 신호.</div></div>
+
+    <h3>③ 신용 경고등 <span class="note">등급이 내려가면 조달비용 상승 → CAPEX 계획 자체가 압박받는다</span></h3>
+    <div class="box" style="padding:12px 14px"><div id="dbt_rate"></div></div>
+
+    <h3>④ 차트</h3>
+    <div class="box" style="padding:12px 14px">
+      <div style="height:260px"><canvas id="dbt_cv1"></canvas></div>
+      <div class="note" style="margin:2px 0 14px">(a) 회색 막대=5사 합산 총부채, 빨간 선=증분부채÷CAPEX. <b>선이 위로 꺾이는 지점이 '현금 조달 → 차입 조달' 전환점</b>이다.</div>
+      <div style="height:240px"><canvas id="dbt_cv2"></canvas></div>
+      <div class="note" style="margin:2px 0 14px">(b) 기업별 최근 12개월 회사채 발행액 — 누가 먼저·얼마나 크게 빚을 내는지.</div>
+      <div style="height:240px"><canvas id="dbt_cv3"></canvas></div>
+      <div class="note" style="margin:2px 0 0">(c) 조달비용 환경 — FRED ICE BofA 투자등급(BAMLC0A0CM)·하이일드(BAMLH0A0HYM2) 가산금리. 빅테크 발행이 몰리는데 가산금리가 벌어지면 시장이 공급을 소화하지 못한다는 뜻.</div>
+    </div>
   </div>
 
   <!-- (2026-08-30) 해자 워치 탭 — moat.js · 데이터 scripts/fetch_moat.py (매일 06:30) -->
@@ -2028,7 +2066,7 @@
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=08291100"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=08310300"></script>
-<script src="/share.js?v=08312100"></script><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
+<script src="/share.js?v=08312100"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
