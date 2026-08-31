@@ -735,6 +735,13 @@
       <div class="note" style="margin:2px 0 8px">각 나라에서 <b>현지어로</b> '한국 여행'을 얼마나 검색하는지(구글 트렌즈, 100=해당 국가 12개월 최고점).
         나라별 100은 서로 비교할 수 없고, <b>같은 나라의 시간 변화</b>만 읽는다.</div>
       <div id="tv_in_rank"></div>
+
+      <h4 style="margin:14px 0 5px;font-size:13px">노선 공급 — 인천 도착 여객편 <span class="note">항공사가 미리 깐 좌석 = 수요 예측의 선행</span></h4>
+      <div id="tv_routes"></div>
+      <div style="height:200px;margin-top:8px;display:none"><canvas id="tv_cv_routes"></canvas></div>
+      <details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:#475569">출발 공항 상위 20</summary>
+        <div id="tv_routes_top" style="margin-top:6px"></div></details>
+
       <div id="tv_in_st" style="margin-top:12px"></div>
     </div>
 
@@ -2113,7 +2120,7 @@
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=08312048"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=08310300"></script>
-<script src="/share.js?v=08312100"></script><script src="/debt.js?v=08312130"></script><script src="/travel.js?v=08312200"></script><!-- (2026-08-31) 여행 시소 탭 --><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
+<script src="/share.js?v=08312100"></script><script src="/debt.js?v=08312130"></script><script src="/travel.js?v=08312230"></script><!-- (2026-08-31) 여행 시소 탭 --><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

@@ -113,6 +113,42 @@ function render(){
         ${[c4,c12].map(c=>`<td style="${td('text-align:right;color:'+(c>0?'#166534':c<0?'#b91c1c':'#64748b'))}">${c==null?'—':sg(c)+'%'}</td>`).join('')}</tr>`;}).join('')}
       </tbody></table>`;
   }
+  // ③-b 인천 노선 공급 — 국가·권역별 도착편 (중국의 유일한 고빈도 대리지표)
+  const rt=D.routes, rh=(D.routes_hist||[]);
+  if(rt&&rt.co){
+    const order=['중국','일본','홍콩·마카오·대만','동남아','미주','유럽·중동','기타'];
+    const ks=order.filter(k=>rt.co[k]!=null);
+    const tot=rt.total||1;
+    // 이력이 쌓이면 직전 스냅샷 대비 증감
+    const prev=rh.length>1?rh[rh.length-2]:null;
+    $('tv_routes').innerHTML=`<div style="font-size:12.5px;margin-bottom:6px">인천공항 도착 여객편 <b>${rt.total.toLocaleString()}편</b>
+        <span class="note">향후 ${rt.days}일치 스케줄 (${rt.span}) — 항공사가 수요를 보고 미리 깐 좌석이라 실제 입국객보다 앞선다</span></div>
+      <table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%">
+      <thead><tr style="background:#f8fafc">${['권역','도착 편수','비중','직전 대비'].map(h=>`<th style="${td()}">${h}</th>`).join('')}</tr></thead>
+      <tbody>${ks.map(k=>{const v=rt.co[k],p=prev?prev[k]:null,d=(p!=null&&p)?((v/p-1)*100):null;
+        return `<tr${k==='중국'?' style="background:#fef2f2"':''}>
+        <td style="${td('font-weight:'+(k==='중국'?700:400))}">${k}${k==='중국'?' <span class="note">★ 검색 프록시 불가 — 이 지표로 본다</span>':''}</td>
+        <td style="${td('text-align:right;font-weight:600')}">${v.toLocaleString()}</td>
+        <td style="${td('text-align:right;color:#64748b')}">${(v/tot*100).toFixed(1)}%</td>
+        <td style="${td('text-align:right;color:'+(d==null?'#94a3b8':d>0?'#166534':d<0?'#b91c1c':'#64748b'))}">${d==null?'—':sg(d.toFixed(1))+'%'}</td></tr>`;}).join('')}
+      </tbody></table>
+      <div class="note" style="margin-top:4px">직전 대비는 이력이 이틀 이상 쌓인 뒤부터 표시된다(매일 06:50 스냅샷 누적).</div>`;
+    // 노선 공급 추이 차트 (이력 2일 이상일 때만)
+    if(rh.length>1){
+      line('tv_cv_routes',rh.map(x=>x.d.slice(4,6)+'/'+x.d.slice(6,8)),
+        ks.map((k,i)=>({label:k,data:rh.map(x=>x[k]??null),borderColor:C[i%C.length],
+          backgroundColor:C[i%C.length],pointRadius:2,borderWidth:1.8,spanGaps:true})),'주간 도착 편수');
+      const cv=$('tv_cv_routes'); if(cv&&cv.parentElement) cv.parentElement.style.display='';
+    } else { const cv=$('tv_cv_routes'); if(cv&&cv.parentElement) cv.parentElement.style.display='none'; }
+    // 출발지 상위
+    $('tv_routes_top').innerHTML=`<table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%">
+      <thead><tr style="background:#f8fafc">${['#','출발 공항','권역','편수'].map(h=>`<th style="${td()}">${h}</th>`).join('')}</tr></thead>
+      <tbody>${(rt.top||[]).map((t,i)=>`<tr><td style="${td('text-align:center;color:#94a3b8')}">${i+1}</td>
+        <td style="${td('font-weight:600')}">${t.name} <span class="note">${t.code}</span></td>
+        <td style="${td('color:#475569')}">${t.co}</td>
+        <td style="${td('text-align:right;font-weight:600')}">${t.n}</td></tr>`).join('')}</tbody></table>`;
+  }
+
   // 공항별 인바운드 구성
   const ba=kac.byarp||{};
   const ks=Object.keys(ba).sort((a,b)=>ba[b].in-ba[a].in).slice(0,8);

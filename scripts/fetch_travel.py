@@ -60,6 +60,27 @@ AIRPORT_KO = {"ICN":"인천","GMP":"김포","PUS":"김해","CJU":"제주","TAE":
               "KWJ":"광주","USN":"울산","YNY":"양양","RSU":"여수","KUV":"군산","HIN":"사천",
               "KPO":"포항","WJU":"원주","MWX":"무안"}
 
+# 인천 도착편 출발지 IATA → 국가/권역 (실측 상위 120개로 전체 편수의 97% 커버, 나머지는 기타)
+# ★ 중국은 구글이 차단돼 검색 프록시가 성립하지 않는다 — 이 '노선 공급'이 중국발 인바운드의 유일한 고빈도 대리지표다.
+CO_MAP = {
+ "중국": ["PVG","TAO","PEK","SZX","CAN","SHE","HGH","TNA","YNJ","YNT","DLC","TSN","NKG","XIY","TFU","CKG",
+        "CGQ","HRB","XMN","WEH","CSX","CGO","WUH","PKX","KMG","FOC","WUX","DYG","SYX","HAK","INC","TYN",
+        "HFE","NGB","CZX","JJN","YIH","LYA","ZUH","SJW","KWL","URC","LHW","HET","CGD","JMU","MDG"],
+ "일본": ["NRT","KIX","FUK","NGO","CTS","OKA","HND","UKB","KMQ","KIJ","KMJ","OKJ","AOJ","SDJ","KMI","MYJ",
+        "FSZ","HIJ","SHI","TAK","KKJ","ISG","HSG","TOY","OIT","KOJ","AXT","NGS","FKS","GAJ","TTJ","YGJ","MMJ"],
+ "홍콩·마카오·대만": ["HKG","MFM","TPE","KHH","RMQ","TSA","TTT"],
+ "동남아": ["BKK","SIN","HAN","SGN","DAD","MNL","CXR","DPS","KUL","CGK","PQC","CRK","KTI","CNX","CEB","BKI",
+          "HKT","VTE","REP","SUB","PNH","DMK","USM","HDY","LGK","PEN","ILO","KLO","TAG","DAD"],
+ "미주": ["LAX","JFK","SFO","ATL","SEA","YVR","GUM","DFW","IAD","HNL","MTY","LAS","SLC","DTW","MSP","BOS",
+        "ORD","YYZ","YYC","EWR","IAH","PHX","SAN","MEX","GRU","YUL","SPN"],
+ "유럽·중동": ["CDG","AUH","DOH","IST","LHR","AMS","FRA","MAD","BCN","PRG","BUD","DXB","MUC","FCO","VIE","ZRH",
+            "HEL","ARN","CPH","WAW","LIS","MXP","TLV","KWI","RUH","JED","SVO","LED","OTP","ZAG"],
+ "기타": ["UBN","TAS","ALA","ADD","SYD","BNE","AKL","DEL","BOM","MEL","CAI","NBO","ULN","FRU","GYD","TBS",
+        "IKA","BJS","AUS","PER","CHC","CMB","DAC","KTM","MLE","ISB","LHE"],
+}
+IATA2CO = {c: k for k, v in CO_MAP.items() for c in v}
+KOR = {"PUS", "TAE", "CJU", "GMP", "KWJ", "RSU", "USN", "CJJ", "YNY", "MWX", "KPO", "WJU", "ICN"}
+
 
 def sec(name):
     for p in glob.glob("/sessions/*/mnt/claudeCowork/SECURITY/" + name) + \
@@ -144,6 +165,42 @@ def icn_notice(key):
             if "eg" in k: s["in"] += f          # entry gate = 입국장 = 인바운드
             elif "dg" in k: s["out"] += f       # departure gate = 출국장 = 아웃바운드
     return {d: {"in": round(v["in"]), "out": round(v["out"])} for d, v in days.items() if v["in"] or v["out"]}
+
+
+# ══════════════════ ②-b 인천 노선 공급 (도착편 D+0~D+6) ══════════════════
+def icn_routes(key):
+    """인천 도착 여객편 주간(D+0~D+6) → 국가·권역별 편수 + 출발지 상위.
+
+    '노선 공급'은 항공사가 수요를 보고 미리 깐 좌석이라, 실제 입국객보다 앞선다.
+    특히 중국은 구글 차단으로 검색 프록시가 없어 이 지표가 유일한 고빈도 대리지표다.
+    """
+    B = "https://apis.data.go.kr/B551177/StatusOfPassengerFlightsDSOdp/getPassengerArrivalsDSOdp"
+    rows, pn, tc = [], 1, 1
+    while len(rows) < tc and pn <= 30:
+        j = jload(curl(f"{B}?serviceKey={key}&type=json&numOfRows=100&pageNo={pn}", 30))
+        if not j or "response" not in j: break
+        b = j["response"].get("body") or {}
+        it = b.get("items")
+        it = it.get("item") if isinstance(it, dict) else it
+        if not it: break
+        try: tc = int(b.get("totalCount") or 0)
+        except Exception: tc = len(it)
+        rows += it; pn += 1; time.sleep(0.12)
+    if not rows: return None
+    co, org, dates = {}, {}, set()
+    for x in rows:
+        c = x.get("airportCode")
+        if not c or c in KOR: continue            # 국내선 연결편 제외
+        k = IATA2CO.get(c, "기타")
+        co[k] = co.get(k, 0) + 1
+        o = org.setdefault(c, {"n": 0, "name": x.get("airport") or c, "co": k})
+        o["n"] += 1
+        d = (x.get("scheduleDateTime") or "")[:8]
+        if len(d) == 8: dates.add(d)
+    top = sorted(org.items(), key=lambda kv: -kv[1]["n"])[:20]
+    return {"total": sum(co.values()), "days": len(dates),
+            "span": (min(dates) + "~" + max(dates)) if dates else None,
+            "co": co, "top": [{"code": k, **v} for k, v in top]}
 
 
 # ══════════════════ ③ 구글 트렌즈 (쿠키 워밍업 필수) ══════════════════
@@ -284,6 +341,13 @@ def main():
         if icn:
             for d, v in icn.items(): days.setdefault(d, {})["icn"] = v
             print(f"  인천 승객예고: {list(icn.items())[:1]}", flush=True)
+        # ②-b 인천 노선 공급 — 스냅샷을 오늘 자로 이력에 누적(주간 공급 추이가 된다)
+        rt = icn_routes(key)
+        if rt:
+            hist.setdefault("routes", {})[today.strftime("%Y%m%d")] = rt["co"]
+            hist["routes_last"] = rt
+            print(f"  인천 노선공급: {rt['total']}편/{rt['days']}일 {rt['span']} · "
+                  + ", ".join(f"{k} {v}" for k, v in sorted(rt["co"].items(), key=lambda x: -x[1])), flush=True)
     HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
 
     # ③ 구글 트렌즈 (인바운드 6개국 + 아웃바운드 4키워드) — 실패 시 1회 재시도(쿠키 재발급)
@@ -334,6 +398,8 @@ def main():
         "air": [{"d": d, **days[d]} for d in ds],
         "airport_ko": AIRPORT_KO,
         "gt": gts, "gt_out": gtout, "naver": nv, "ecos": ec,
+        "routes": hist.get("routes_last"),
+        "routes_hist": [{"d": d, **v} for d, v in sorted((hist.get("routes") or {}).items())],
         "outb": ob, "inb": ib, "fx": fx, "lead": lead,
     }, ensure_ascii=False), encoding="utf-8")
     last = ds[-1] if ds else None
