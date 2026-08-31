@@ -8621,6 +8621,38 @@ await _canvasFlow(c);
     const set=_surgeBase();
     set('ern',{min:-7,max:-1});                        // 어닝 D+1~D+7 — 실적 발표 직후
     apply(); };}
+  /* (2026-08-27) 📈 이익성장 상위 — '영업이익 성장률 상위 매수'가 매출·순이익 성장보다
+     고수익이었다는 백테스트(2016~26 · KR +645% · US +466%, 토스 콘텐츠)를 실전형으로 보정.
+     원문 방법(성장률 상위 10% 단순 매수)의 세 함정을 필터로 막는다:
+       ① 저기저 왜곡 — 전년 이익 1억→10억이 +900%로 최상위에 온다
+          → 영업이익률 5%↑(마진 있는 성장만) + [US] 정렬을 성장률이 아니라 **리비전순**으로
+            (실측: 성장률 정렬 시 TWLO +4,671% 같은 저기저가 상위 독식)
+       ② 일회성 반등 — 성장가속 0%p↑(직전 분기보다 성장률이 더 높아야)
+       ③ 지속 확인 없음 — [US] 컨센 리비전 30일↑ + 직전 서프라이즈↑(애널·실적이 추인 중)
+     KR 은 리비전(515종)·서프(299종) 커버리지가 좁아 하드컷으로 걸면 2종만 남는다(실측)
+     → KR 은 가속까지만 컷(48종), 영업적자 이력 제외로 저기저 보강. 분기 리밸런싱 전제.
+     실측 통과: KR 48종 · US 171종. */
+  {const b=$('scr_opg'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('ogrw',{min:30,max:null});                     // 이익성장 +30% ↑ (KR=영업익 · US=EPS)
+    set('opm',{min:5,max:null});                       // 영업이익률 5% ↑ — 저기저 왜곡 차단
+    set('gacc',{min:0,max:null});                      // 성장가속 0%p ↑ — 일회성 반등 배제
+    if(mkt==='kr'){
+      set('opLoss',{min:null,max:1});                  // 영업적자 1년이상 제외
+      set('cap',{min:3e11,max:null});                  // 시총 3,000억 ↑
+      set('tv',{min:1e9,max:null});                    // 거래대금 10억 ↑
+      sort={k:'opg',d:-1};                             // KR 은 저기저 심하지 않음 — 성장률순
+    }else{
+      set('cr30',{min:0,max:null});                    // 컨센 리비전 30일 ↑ — 지속 확인
+      set('spr',{min:0,max:null});                     // 직전 서프라이즈 ↑
+      set('cap',{min:2e9,max:null});                   // 시총 $2B ↑
+      set('tv',{min:2e7,max:null});                    // 거래대금 $20M ↑
+      sort={k:'cr30',d:-1};                            // 리비전순 — 저기저 상위 독식 방지
+    }
+    apply(); };}
   /* (2026-08-05) 🎁 배당선취 (KR 전용) — 8~9월 연말 배당 선취 전략.
      고배당(4~12% — 12% 초과는 주가 폭락 역산/특별배당 '배당 함정' 배제)
      + 지속성(배당성향 20~60% — 상한이 핵심: 이익 일부만 배당해야 매년 지킬 체력)
