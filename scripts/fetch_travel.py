@@ -27,7 +27,7 @@
 산출: data/db/travel.json  (+ 이력 data/db/travel_hist.json — 공항 일별 누적)
 cron: 50 6 * * *
 """
-import json, subprocess, time, glob, os, sys
+import json, subprocess, time, glob, os, sys, re, zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -203,6 +203,62 @@ def icn_routes(key):
             "co": co, "top": [{"code": k, **v} for k, v in top]}
 
 
+# ══════════════════ ②-c 외국인 전용 카지노 월매출 (DART 공정공시) ══════════════════
+# 파라다이스·GKL 은 매월 초 '연결재무제표기준영업(잠정)실적(공정공시)'로 전월 카지노 매출을 낸다.
+# 내국인 출입이 법으로 막힌 외국인 전용 카지노라 매출 전액이 방한 외국인 소비 —
+# 백화점·면세점 실적보다 6주 이상 빠른, 인바운드의 최고빈도 실측치다(T+2일).
+CASINO = [("파라다이스", "00171265", "034230"), ("GKL", "00557508", "114090")]
+
+
+def dart_casino(months=30):
+    key = sec("opendart.txt")
+    if not key: return None
+    key = key.split()[0]
+    end = datetime.now(KST).strftime("%Y%m%d")
+    bgn = (datetime.now(KST) - timedelta(days=months * 31)).strftime("%Y%m%d")
+    out = {}
+    for name, cc, stock in CASINO:
+        u = ("https://opendart.fss.or.kr/api/list.json?crtfc_key=%s&corp_code=%s"
+             "&bgn_de=%s&end_de=%s&page_count=100" % (key, cc, bgn, end))
+        j = jload(curl(u, 25))
+        lst = [x for x in (j or {}).get("list", []) if "잠정" in (x.get("report_nm") or "")]
+        ser = []
+        for x in lst:
+            rc = x.get("rcept_no")
+            z = "/tmp/nmr_dart_%s.zip" % rc
+            subprocess.run(["curl", "-s", "--max-time", "30", "-o", z,
+                            "https://opendart.fss.or.kr/api/document.xml?crtfc_key=%s&rcept_no=%s" % (key, rc)],
+                           capture_output=True)
+            try:
+                import zipfile, re
+                zf = zipfile.ZipFile(z)
+                s = zf.read(zf.namelist()[0]).decode("utf-8", "ignore")
+            except Exception:
+                continue
+            finally:
+                try: os.remove(z)
+                except Exception: pass
+            t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", s))
+            # 당기실적 기간이 '한 달'인 공시만 = 월별 공시(분기 공시는 3개월이라 제외)
+            m = re.search(r"당기실적\s*(\d{4})-(\d{2})-(\d{2})\s*~\s*(\d{4})-(\d{2})-(\d{2})", t)
+            if not m: continue
+            y1, m1, d1, y2, m2, d2 = m.groups()
+            if (y1, m1) != (y2, m2) or d1 != "01": continue
+            c = re.search(r"카지노매출액\s*([\d,]+)\s*([\d,]+)?\s*(-?[\d.]+)?", t)
+            if not c: continue
+            try: cur = float(c.group(1).replace(",", ""))
+            except Exception: continue
+            yy = re.search(r"카지노매출액\s*[\d,]+\s*[\d,]+\s*-?[\d.]+\s*-?\s*([\d,]+)\s*(-?[\d.]+)", t)
+            ser.append({"d": f"{y1}-{m1}", "rev": round(cur / 1000, 1),      # 백만원 → 십억원
+                        "yoy": (float(yy.group(2)) if yy else None), "rcp": rc})
+        seen, dedup = set(), []
+        for x in sorted(ser, key=lambda z: z["d"]):
+            if x["d"] in seen: continue
+            seen.add(x["d"]); dedup.append(x)
+        if dedup: out[name] = {"stock": stock, "series": dedup}
+    return out or None
+
+
 # ══════════════════ ③ 구글 트렌즈 (쿠키 워밍업 필수) ══════════════════
 def gt_warm():
     try: os.remove(JAR)
@@ -362,13 +418,44 @@ def main():
             if s: o.append({"name": name, "geo": geo, "kw": kw, "series": s})
             print(f"  트렌즈[{tag}] {name}({kw}): {'✅ '+str(len(s))+'점 최근'+str(s[-1][1]) if s else '❌'}", flush=True)
         return o
-    gts   = pull(GT_IN, "인")
-    gtout = pull(GT_OUT, "아웃")
+    # ⚠ 구글 트렌즈는 IP당 호출량 제한이 있다 — 한 시간에 여러 번 돌리면 워밍업을 해도 429 로 막힌다.
+    #   주간 데이터라 하루 1회면 충분하므로, 이력에 캐시해 두고 20시간 안이면 아예 호출하지 않는다.
+    #   호출 실패 시에도 캐시를 그대로 쓴다(빈 배열로 덮으면 화면에서 지표가 통째로 사라진다).
+    cache_at = hist.get("gt_at")
+    fresh = False
+    if cache_at:
+        try: fresh = (datetime.now(KST) - datetime.strptime(cache_at, "%Y-%m-%d %H:%M").replace(tzinfo=KST)) < timedelta(hours=20)
+        except Exception: fresh = False
+    if fresh:
+        gts, gtout = hist.get("gt") or [], hist.get("gt_out") or []
+        print(f"  트렌즈: 캐시 사용({cache_at}, 20시간 이내 — 쿼터 보호)", flush=True)
+    else:
+        gts   = pull(GT_IN, "인")
+        gtout = pull(GT_OUT, "아웃")
+        if gts and gtout:
+            hist["gt"], hist["gt_out"] = gts, gtout
+            hist["gt_at"] = datetime.now(KST).strftime("%Y-%m-%d %H:%M")
+        else:
+            have = {x["name"] for x in gts} | {x["name"] for x in gtout}
+            for key, cur in (("gt", gts), ("gt_out", gtout)):
+                for o in (hist.get(key) or []):
+                    if o.get("name") not in have:
+                        o = dict(o); o["stale"] = True; cur.append(o)
+            print(f"  ⚠ 트렌즈 실패 → 캐시 재사용(마지막 성공 {cache_at or '없음'})", flush=True)
+        HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
     nv = None   # 네이버 데이터랩 검색어 트렌드 API 는 앱 scope 미승인(errorCode 024) — 트렌즈로 대체
 
     # ⑤ ECOS
     ec = ecos_travel()
     print(f"  ECOS 여행수지: {'✅ '+str(len(ec))+'개월 최근 '+ec[-1]['d'] if ec else '❌'}", flush=True)
+
+    # ②-c 카지노 월매출 (DART)
+    cas = dart_casino()
+    if cas:
+        for k, v in cas.items():
+            print(f"  카지노 {k}: {len(v['series'])}개월 최근 {v['series'][-1]['d']} {v['series'][-1]['rev']}십억원", flush=True)
+    else:
+        print("  카지노: ❌", flush=True)
 
     # ⑥ 주가·환율 + 선행성 검증
     def px(lst):
@@ -398,6 +485,7 @@ def main():
         "air": [{"d": d, **days[d]} for d in ds],
         "airport_ko": AIRPORT_KO,
         "gt": gts, "gt_out": gtout, "naver": nv, "ecos": ec,
+        "casino": cas,
         "routes": hist.get("routes_last"),
         "routes_hist": [{"d": d, **v} for d, v in sorted((hist.get("routes") or {}).items())],
         "outb": ob, "inb": ib, "fx": fx, "lead": lead,

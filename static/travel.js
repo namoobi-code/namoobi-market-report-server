@@ -113,6 +113,29 @@ function render(){
         ${[c4,c12].map(c=>`<td style="${td('text-align:right;color:'+(c>0?'#166534':c<0?'#b91c1c':'#64748b'))}">${c==null?'—':sg(c)+'%'}</td>`).join('')}</tr>`;}).join('')}
       </tbody></table>`;
   }
+  // ③-a 카지노 월매출 — 내국인 출입 금지라 매출 전액이 방한 외국인 소비(T+2일)
+  const cas=D.casino;
+  if(cas&&Object.keys(cas).length){
+    const names=Object.keys(cas);
+    const all=[...new Set(names.flatMap(n=>cas[n].series.map(s=>s.d)))].sort();
+    line('tv_cv_casino',all,names.map((n,i)=>({label:n,data:all.map(d=>{
+        const f=cas[n].series.find(s=>s.d===d);return f?f.rev:null;}),
+      borderColor:C[i%C.length],backgroundColor:C[i%C.length],pointRadius:2.5,borderWidth:2,spanGaps:true})),
+      '카지노 매출(십억원/월)');
+    $('tv_casino').innerHTML=`<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%">
+      <thead><tr style="background:#f8fafc">${['','월'].concat(all.slice(-6)).map((h,i)=>`<th style="${td()}">${i===0?'회사':i===1?'':h}</th>`).join('')}</tr></thead>
+      <tbody>${names.map(n=>{const S=cas[n].series;
+        return `<tr><td style="${td('font-weight:700;white-space:nowrap')}" rowspan="2">${n} <span class="note">${cas[n].stock}</span></td>
+          <td style="${td('color:#64748b;font-size:11px')}">매출</td>
+          ${all.slice(-6).map(d=>{const f=S.find(s=>s.d===d);return `<td style="${td('text-align:right;font-weight:600')}">${f?f.rev:'—'}</td>`;}).join('')}</tr>
+        <tr><td style="${td('color:#64748b;font-size:11px')}">YoY</td>
+          ${all.slice(-6).map(d=>{const f=S.find(s=>s.d===d),y=f?f.yoy:null;
+            return `<td style="${td('text-align:right;font-size:11px;color:'+(y==null?'#94a3b8':y>0?'#166534':'#b91c1c'))}">${y==null?'—':sg(y.toFixed(1))+'%'}</td>`;}).join('')}</tr>`;}).join('')}
+      </tbody></table>
+      <div class="note" style="margin-top:4px">단위 십억원. 외국인 전용 카지노는 <b>내국인 출입이 법으로 금지</b>돼 매출 전액이 방한 외국인 소비다 —
+        백화점·면세점 실적보다 6주 이상 빠르고, 중화권 큰손 비중이 커서 <b>중국 인바운드의 실적 대리지표</b>가 된다. 매월 초 DART 공정공시(T+2일).</div>`;
+  }
+
   // ③-b 인천 노선 공급 — 국가·권역별 도착편 (중국의 유일한 고빈도 대리지표)
   const rt=D.routes, rh=(D.routes_hist||[]);
   if(rt&&rt.co){
