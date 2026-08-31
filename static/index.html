@@ -560,6 +560,7 @@
       <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
+      <button class="tab"    data-pane="p_travel" style="background:#0c4a6e;border-color:#0c4a6e;color:#fff">✈️ 여행 시소<small style="color:#bae6fd">아웃바운드↔인바운드 선행지표</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -700,6 +701,52 @@
       <div style="height:240px"><canvas id="dbt_cv3"></canvas></div>
       <div class="note" style="margin:2px 0 0">(c) 조달비용 환경 — FRED ICE BofA 투자등급(BAMLC0A0CM)·하이일드(BAMLH0A0HYM2) 가산금리. 빅테크 발행이 몰리는데 가산금리가 벌어지면 시장이 공급을 소화하지 못한다는 뜻.</div>
     </div>
+  </div>
+
+  <div class="pane" id="p_travel" style="overflow:auto">
+    <h2>✈️ 여행 시소 <em id="tv_asof"></em> <button id="tv_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px"><b>무엇을 보는 화면인가</b> — 한국인이 나가는 여행(아웃바운드)과 외국인이 들어오는 여행(인바운드)은
+      하나의 테마가 아니라 <b>시소</b>다. 원화가 약해지면 외국인에겐 한국이 싸지고(인바운드↑) 한국인에겐 해외가 비싸진다(아웃바운드↓).
+      그래서 하나투어와 호텔신라를 같은 화면에 놓고 <b>반대로</b> 읽는다.
+      선행 사슬은 <b>① 검색(의향) → ② 공항 예상승객(예약) → ③ 여행수지(지출) → ④ 분기 실적</b> 순이고, 이 화면은 ①~③을 매일 자동으로 잇는다.
+      ※ 중국 본토는 구글이 차단돼 검색 프록시가 성립하지 않는다 — 중화권은 대만·홍콩으로 보고, 본토는 공항 도착 실측으로 본다.
+      리서치용·투자권유 아님.</div>
+
+    <h3>① 시소 현황 <span class="note">국제선 예상승객 7일 평균 · 환율</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="tv_head"></div>
+      <div style="height:230px;margin-top:10px"><canvas id="tv_cv_air"></canvas></div>
+      <div class="note">한국공항공사 일별 예상승객(전국 14개 공항, 시간대별 합산) — 항공사 예약 기반이라 <b>당일·익일까지 미리 나온다</b>.
+        두 선이 벌어지는 방향이 곧 시소의 기울기.</div>
+      <h4 style="margin:12px 0 5px;font-size:13px">공항별 구성 (최신일)</h4>
+      <div id="tv_arp"></div>
+    </div>
+
+    <h3>② 🛫 아웃바운드 — 한국인이 나간다</h3>
+    <div class="box" style="padding:12px 14px">
+      <div style="height:220px"><canvas id="tv_cv_out_s"></canvas></div>
+      <div class="note" style="margin-bottom:10px">구글 트렌즈(한국) 주간 검색 관심도 — 여행사·LCC 실적보다 먼저 움직이는 '의향' 신호.</div>
+      <div id="tv_out_st"></div>
+    </div>
+
+    <h3>③ 🛬 인바운드 — 외국인이 들어온다</h3>
+    <div class="box" style="padding:12px 14px">
+      <div style="height:220px"><canvas id="tv_cv_in_s"></canvas></div>
+      <div class="note" style="margin:2px 0 8px">각 나라에서 <b>현지어로</b> '한국 여행'을 얼마나 검색하는지(구글 트렌즈, 100=해당 국가 12개월 최고점).
+        나라별 100은 서로 비교할 수 없고, <b>같은 나라의 시간 변화</b>만 읽는다.</div>
+      <div id="tv_in_rank"></div>
+      <div id="tv_in_st" style="margin-top:12px"></div>
+    </div>
+
+    <h3>④ 국가 집계 — 여행수지 <span class="note">한국은행 ECOS 월별</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="tv_ecos" style="font-size:12.5px;margin-bottom:6px"></div>
+      <div style="height:220px"><canvas id="tv_cv_pay"></canvas></div>
+      <div class="note">여행수입=외국인이 한국에서 쓴 돈(인바운드 매출), 여행지급=한국인이 해외에서 쓴 돈(아웃바운드 소비). T+45일로 느리지만 금액 확정치라 검증 기준이 된다.</div>
+    </div>
+
+    <h3>⑤ 선행성 검증판 <span class="note">이 지표가 정말 주가를 앞서는가 — 숫자로 확인</span></h3>
+    <div class="box" style="padding:12px 14px"><div id="tv_lead"></div></div>
   </div>
 
   <!-- (2026-08-30) 해자 워치 탭 — moat.js · 데이터 scripts/fetch_moat.py (매일 06:30) -->
@@ -2066,7 +2113,7 @@
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=08312048"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=08310300"></script>
-<script src="/share.js?v=08312100"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
+<script src="/share.js?v=08312100"></script><script src="/debt.js?v=08312130"></script><script src="/travel.js?v=08312200"></script><!-- (2026-08-31) 여행 시소 탭 --><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
