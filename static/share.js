@@ -72,7 +72,9 @@ function render(){
         plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},
           tooltip:{itemSort:(a,c)=>(c.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+c.raw+(b.unit==='위'?'위':b.unit)}}},
         scales:{x:{ticks:{maxTicksLimit:10,font:{size:9.5}}},
-          y:{reverse:(b.unit==='위'),ticks:{font:{size:10}},title:{display:true,text:b.unit==='위'?'랭크(낮을수록 상위)':b.unit,font:{size:10}}}}}});
+          y:{reverse:(b.unit==='위'),min:(b.unit==='단계'?0:undefined),max:(b.unit==='단계'?8:undefined),
+             ticks:{stepSize:(b.unit==='단계'?1:undefined),font:{size:10}},
+             title:{display:true,text:b.unit==='위'?'랭크(낮을수록 상위)':(b.unit==='단계'?'개발 단계 (1 Ph1 → 8 다국가 승인)':b.unit),font:{size:10}}}}}});
   });
 
   // B2 점유 구도 표 (moat.json SHARES — Phase 3.6 이 점검·갱신 제안)
