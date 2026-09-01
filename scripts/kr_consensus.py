@@ -249,6 +249,24 @@ def main():
                 pass
         return None
 
+    # ── (2026-09-02 사용자 요청) 전망 전구간 증가 플래그 — WISEreport 가 주는 **모든**
+    #    미래(E) 구간의 영업익 증가율이 양수인가. 분기(E)는 전년동기(YoY) 대비,
+    #    연간(E)은 전년 대비. 증가율 = (a−b)/|b| — 적자 기저의 흑자전환은 +로 본다
+    #    (kr_fin 상세표의 표시 산식과 동일). 판정 가능한 (E)가 하나도 없으면 None.
+    def _futup(rows, base_key):
+        opv = {p2: o2 for p2, _e2, o2 in rows}
+        ok = None
+        for p2, e2, o2 in rows:
+            if not e2 or o2 is None:
+                continue
+            b = opv.get(base_key(p2))
+            if b is None or abs(b) < 1:
+                continue                              # 기저 결측·0 근처 → 그 구간은 판정 제외
+            if (o2 - b) / abs(b) <= 0:
+                return 0
+            ok = 1
+        return ok
+
     out = {}
     for code, qs in got.items():
         est = [q for q in qs if q[1]]
@@ -259,6 +277,10 @@ def main():
         for lab, dd in (("op7", 7), ("op30", 30), ("op90", 90)):
             prev = rev(code, p, dd)
             rec[lab] = round(o / prev - 1.0, 4) if (o and prev and prev > 0) else None
+        qr = [(p2, e2, o2) for p2, e2, _s2, o2, _n2 in qs if not p2.startswith("FY")]
+        yr = [(p2, e2, o2) for p2, e2, _s2, o2, _n2 in qs if p2.startswith("FY")]
+        rec["qup"] = _futup(qr, lambda pp: str(int(pp[:4]) - 1) + pp[4:])   # 분기(E) 전부 YoY+
+        rec["yup"] = _futup(yr, lambda pp: "FY" + str(int(pp[2:]) - 1))     # 연간(E) 전부 전년+
         out[code] = rec
 
     # ── 리포트 발간 흐름·목표주가 (상위 종목만 — 호출 절약)

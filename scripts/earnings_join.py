@@ -29,7 +29,7 @@ import sys as _sys
 _sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pool_merge import save_pool_merged
 # (2026-08-10) 이 스크립트가 책임지는 필드만 병합 저장 — 다른 수집기 결과를 덮지 않는다
-JOIN_FIELDS = ("cr30","cr90","tprv","tprv90","tpn","tpu","tpd","edl","r1","r5","r20","gap","gapR","gapE","gapRp","gapEp","pgapR","pgapE","spr","sspr","syoy","oyoy","nyoy","sqoq","oqoq","nqoq","opmn","opmy","oqt","nqt")
+JOIN_FIELDS = ("cr30","cr90","tprv","tprv90","tpn","tpu","tpd","qup","yup","edl","r1","r5","r20","gap","gapR","gapE","gapRp","gapEp","pgapR","pgapE","spr","sspr","syoy","oyoy","nyoy","sqoq","oqoq","nqoq","opmn","opmy","oqt","nqt")
 
 BASE = Path(__file__).resolve().parent.parent
 POOL = BASE / "data" / "db" / "screener_pool.json"
@@ -141,6 +141,10 @@ def main():
                     patch["tpn"] = cc.get("tpn"); patch["tpu"] = cc.get("tpu"); patch["tpd"] = cc.get("tpd")
                 if cc.get("tp90") is not None:
                     patch["tprv90"] = cc["tp90"]
+                # (2026-09-02) 전망 전구간 증가 플래그 — 모든 미래(E) 분기 YoY / 연간 전년比 양수
+                for k in ("qup", "yup"):
+                    if cc.get(k) is not None:
+                        patch[k] = cc[k]
             d8, it = ev.get(c, (None, None))
             # (2026-08-10) 가이던스 필드는 매 실행마다 **초기화 후 재기록** — 소급 재파싱으로
             # 값이 빠진 경우(예: ±25% 초과 오파싱 제거)에도 풀에 옛 값이 남으면 안 된다.
