@@ -265,7 +265,13 @@ BUNDLE_SKIP = {"screener_pool", "tp_history", "us_krname", "etf_holdings", "rele
                # 초과. 화면은 guidance_tendency(개별 조회)와 /api/us_fin 의 gd.prof 만 쓰고
                # 이 두 파일을 번들로 직접 읽지 않는다(history 는 분석·백테스트용 원본 1.9MB ·
                # profile 은 백필이 서버에서 읽는 파서 힌트 0.4MB). 제외해도 기능 손실 없음.
-               "guidance_history", "guidance_profile"}
+               "guidance_history", "guidance_profile",
+               # (2026-09-01) 번들 12.4MB 경보 — 전수 실측: 아래 9개는 전부 개별 API 로 소비
+               # (pf.js→stlead, re3.js→re3, sub.js→applyhome_sub, ta.js J()→ta_stage2·ta_calls,
+               #  app.js 직접 fetch→rehub·kimp_series) 또는 JS 미참조(ta_state·growth_accel =
+               # 서버 내부용). b.<이름> 번들 소비 0건 확인 — 제외해도 기능 손실 없음. 약 -6.8MB.
+               "ta_calls", "rehub", "applyhome_sub", "ta_stage2", "stlead",
+               "kimp_series", "ta_state", "re3", "growth_accel"}
 _bundle_cache = {"sig": None, "body": None, "etag": None}
 
 def _db_sig(files):
