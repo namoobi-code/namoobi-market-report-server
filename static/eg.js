@@ -69,8 +69,11 @@
     s.push({ok:tr, na:r.vs200==null,
       txt:`장기선 ${r.vs200!=null?(r.vs200>0?'위':'아래'):'—'}${typeof r.align==='string'?'·'+r.align:''}`});
     s.push({ok:r.rsi!=null&&r.rsi<70, na:r.rsi==null, txt:`RSI ${r.rsi!=null?Math.round(r.rsi):'—'}`});
-    s.push({ok:r.gacc!=null&&r.gacc>0, na:r.gacc==null,
-      txt:`가속 ${r.gacc!=null?((r.gacc>0?'+':'-')+Math.min(Math.abs(r.gacc)*100,999).toFixed(0)+'%p'+(Math.abs(r.gacc)>9.99?'↑':'')):'—'}`});
+    // (2026-09-02) |가속|>300%p 는 기저효과(적자·일회성 분기 대비)로 YoY 분모가 망가진 값 —
+    //   실측: 알테오젠 -221%p 는 비교 분기가 -4억이었던 탓. 판정 제외(na)로 감점하지 않는다.
+    const gx=r.gacc, gBase=(gx!=null&&Math.abs(gx)>3);
+    s.push({ok:gx!=null&&!gBase&&gx>0, na:gx==null||gBase,
+      txt:`가속 ${gx==null?'—':(gBase?'기저효과(판정 제외)':((gx>0?'+':'-')+Math.min(Math.abs(gx)*100,300).toFixed(0)+'%p'))}`});
     return s;
   }
   const lamp=n=>n>=5?'🟢':(n>=3?'🟡':'🔴');
