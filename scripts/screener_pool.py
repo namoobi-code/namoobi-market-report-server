@@ -236,6 +236,12 @@ def _enrich_kr(kr, d0s):
         revg,opg=_yoy(fn.get("매출액")),_yoy(fn.get("영업이익"))
         la,le=_last(fn.get("매출액")),fn.get("매출액_E")
         rf=(le/la-1) if (la and le and la>0) else None
+        # (2026-09-01) 이익성장 모니터링 탭 — '미래 이익성장'을 별도 필드로 노출.
+        #   영업이익_E(네이버 컨센 연간 전망)는 이미 수집 중인데 g_new 에 섞여만 있었다.
+        #   opg_f = 컨센 영업이익 ÷ 최근 실적 영업이익 − 1 (둘 다 흑자일 때만), revg_f = 매출 전망 성장.
+        ol,oe=_last(fn.get("영업이익")),fn.get("영업이익_E")
+        opg_f=(oe/ol-1) if (ol and oe and ol>0 and oe>0) else None
+        r["opg_f"]=opg_f; r["revg_f"]=rf
         gg=[min(x,3.0) for x in (revg,opg,rf) if x is not None]
         roe=_last(fn.get("ROE")); de=_last(fn.get("부채비율")); cr=_last(fn.get("당좌비율"))
         op3=[v for v in (fn.get("영업이익") or []) if v is not None]

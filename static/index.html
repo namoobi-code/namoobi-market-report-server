@@ -556,6 +556,7 @@
       <button class="tab off" data-pane="p_fire" disabled title="준비 중">경제적 자유<small>퇴사 시뮬레이터</small></button>
       <button class="tab"    data-pane="p_hobby" style="background:#047857;border-color:#047857;color:#fff">🏃 취미(운동)<small style="color:#a7f3d0">대회 일정·신청</small></button>
       <button class="tab"    data-pane="p_kpop" style="background:#be123c;border-color:#be123c;color:#fff">🎤 K-POP<small style="color:#fecdd3">앨범·수출·팬덤 선행지표</small></button>
+      <button class="tab"    data-pane="p_eg" style="background:#155e75;border-color:#155e75;color:#fff">📈 이익성장<small style="color:#a5f3fc">과거+미래+선행 매수판별</small></button>
       <button class="tab"    data-pane="p_kcons" style="background:#9d174d;border-color:#9d174d;color:#fff">🛍️ K-소비재<small style="color:#fbcfe8">뷰티·푸드·패션 수출×주가</small></button>
       <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
@@ -732,6 +733,17 @@
   </div>
 
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
+  <!-- (2026-09-01) 📈 이익성장 모니터링 페인 — screener_pool + stlead 재사용 · eg.js -->
+  <div class="pane" id="p_eg" style="overflow:auto">
+    <h2>📈 이익성장 모니터링 — 과거 실적 + 미래 전망 + 선행지표</h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      <b>과거 이익성장(실적으로 증명) + 미래 이익성장 예측(컨센서스) + 선행지표(시장)</b>가 모두 우호적인 종목이
+      주가가 오른다는 컨셉. 두 성장 조건을 동시 충족한 한국·미국 종목을 리스트업하고,
+      '지금 사기 좋은 시점인가'를 6항목 신호등(시장 선행지표·리비전·밸류·추세·과열·가속)으로 판별한다.
+      스크리너 풀(매일 갱신) 기반 · 참고용이며 투자권유가 아님.</p>
+    <div id="eg_top"><div class="note">불러오는 중…</div></div>
+    <div id="eg_tbl"></div>
+  </div>
   <div class="pane" id="p_kcons" style="overflow:auto">
     <h2>🛍️ K-소비재 선행지표 <em id="kc_asof"></em> <button id="kc_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
     <div class="note" style="margin:-4px 0 10px">이상적 선행 흐름은 <b>검색량 → 콘텐츠 반응 → 장바구니 → 주문 → 리뷰·재구매 → 수출액</b> 순이지만,
@@ -2057,12 +2069,13 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=08312044"></script>
+<script src="/app.js?v=09012230"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
+<script src="/eg.js?v=20260901a"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=08312048"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09010700"></script>
