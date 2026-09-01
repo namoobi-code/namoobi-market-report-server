@@ -29,6 +29,17 @@
     return {past,fut,futSrc:'컨센 EPS(내년/올해)'};
   }
 
+  /* (2026-09-02) PEG 재정의 — 기존 peg(분모=직전 1년 실적 성장률)는 이 탭 상위군(성장 400~600%)에서
+     0.0x 로 붕괴해 의미 없음(실측: 상위30 PEG 중앙값 0.04). 표시·판정용 PEG 는
+     **fPER ÷ 미래 성장예측%** 로 재계산하고, 성장률 15~100% 구간에서만 값 인정
+     (100%↑ = 기저효과 왜곡 · 15%↓ = PEG 부적합). 그 외는 '—' + 상승여력으로만 밸류 판정. */
+  function fpeg(r,g,m){
+    const pe=m==='kr'?r.fper:r.fpe;
+    if(pe==null||pe<=0||g.fut==null) return null;
+    const gp=g.fut*100;
+    if(gp<15||gp>100) return null;
+    return pe/gp;
+  }
   /* (2026-09-01) 컨셉 확장: 과거이익성장 + 미래이익성장예측 + **선행지표** → 주가 오름.
      선행지표 축 = 소속 시장 지수(코스피200/S&P500)의 12개월 릿지 예측(Portfolio stlead 엔진 —
      금리·유동성·신용잔고 등 20여 선행지표 기반). 종목 레벨 선행은 ②리비전이 담당. */
@@ -38,7 +49,7 @@
     return p?p.g:null;
   }
   /* 신호등 6항목 — 각 항목 {ok, txt} */
-  function signals(r,m){
+  function signals(r,m,g){
     const s=[];
     const ml=mktLead(m);
     s.push({ok:ml!=null&&ml>0, na:ml==null,
@@ -47,9 +58,10 @@
     s.push({ok:rev!=null&&rev>0, na:rev==null,
       txt:m==='kr'?`목표가30일 ${rev!=null?(rev>0?'+':'')+(rev*100).toFixed(1)+'%':'—'}`
                   :`컨센30일 ${rev!=null?(rev>0?'+':'')+(rev*100).toFixed(1)+'%':'—'}`});
-    const val=(r.peg!=null&&r.peg>0&&r.peg<1.5)||(r.upside!=null&&r.upside>0);
-    s.push({ok:val, na:r.peg==null&&r.upside==null,
-      txt:`PEG ${r.peg!=null?r.peg.toFixed(2):'—'}·여력 ${r.upside!=null?(r.upside>0?'+':'')+(r.upside*100).toFixed(0)+'%':'—'}`});
+    const pg=fpeg(r,g,m);
+    const val=(pg!=null&&pg<1.5)||(r.upside!=null&&r.upside>0);
+    s.push({ok:val, na:pg==null&&r.upside==null,
+      txt:`PEG ${pg!=null?pg.toFixed(2):'—'}·여력 ${r.upside!=null?(r.upside>0?'+':'')+(r.upside*100).toFixed(0)+'%':'—'}`});
     const tr=(r.vs200!=null&&r.vs200>0)&&(r.align==null||r.align>0);
     s.push({ok:tr, na:r.vs200==null,
       txt:`장기선 ${r.vs200!=null?(r.vs200>0?'위':'아래'):'—'}${r.align!=null?(r.align>0?'·정배열':'·역배열'):''}`});
@@ -72,9 +84,9 @@
       const g=grow(r,m);
       if(g.past==null||g.fut==null) continue;
       if(g.past<=0||g.fut<=0) continue;                   // 컨셉: 과거·미래 모두 +
-      const sg=signals(r,m);
+      const sg=signals(r,m,g);
       const sc=sg.filter(x=>x.ok).length;
-      out.push({r,g,sg,sc,rank:Math.min(g.past,3)+Math.min(g.fut,3)});  // 극단 캡 후 합산
+      out.push({r,g,sg,sc,pg:fpeg(r,g,m),rank:Math.min(g.past,3)+Math.min(g.fut,3)});  // 극단 캡 후 합산
     }
     out.sort((a,b)=>b.rank-a.rank);
     return out.slice(0,30);
@@ -109,7 +121,7 @@
     $('eg_top').querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{mkt=b.dataset.m;render();});
     const th=t=>`<th style="text-align:right">${t}</th>`;
     $('eg_tbl').innerHTML=`<table style="font-size:12px"><thead><tr>
-      <th>#</th><th>종목</th>${th('시총')}${th('과거 이익성장')}${th('미래 성장예측')}${th('PEG')}${th(m==='kr'?'fPER':'fPE')}
+      <th>#</th><th>종목</th>${th('시총')}${th('과거 이익성장')}${th('미래 성장예측')}<th style="text-align:right" title="PEG = fPER ÷ 미래 성장예측(%). 1 근처 적정·1미만 저평가·2이상 고평가(피터 린치). 성장률 15~100% 구간만 표시 — 그 밖은 왜곡이라 '—'">PEG</th>${th(m==='kr'?'fPER':'fPE')}
       <th style="text-align:center" title="6항목 중 충족 수 — 5~6 🟢 매수우호 · 3~4 🟡 관망 · 0~2 🔴 대기">타이밍</th>
       <th title="①시장 선행지표 ②전망 리비전 ③밸류 ④추세 ⑤과열아님 ⑥성장가속 — ✓충족 ✗미충족 ·자료없음">판별 근거 6항목</th></tr></thead><tbody>${
       data.map((x,i)=>{const r=x.r;
@@ -120,7 +132,7 @@
         <td class="num">${capf(r,m)}</td>
         <td class="num"><b>${pct(x.g.past,0)}</b></td>
         <td class="num"><b>${pct(x.g.fut,0)}</b> <span class="note" title="${E(x.g.futSrc)}">ⓘ</span></td>
-        <td class="num">${r.peg!=null?r.peg.toFixed(2):'—'}</td>
+        <td class="num" title="fPER ÷ 미래 성장예측% — 성장 15~100% 구간만 표시(그 밖은 기저효과 왜곡/부적합)">${(x.pg!=null)?x.pg.toFixed(2):'—'}</td>
         <td class="num">${pe!=null?pe.toFixed(1):'—'}</td>
         <td style="text-align:center;font-size:14px" title="${lampTxt(x.sc)} (${x.sc}/6)">${lamp(x.sc)} <span class="note">${x.sc}/6</span></td>
         <td style="font-size:10.5px;color:#555">${x.sg.map(s=>`<span style="margin-right:7px;white-space:nowrap;${s.na?'opacity:.4':''}">${s.na?'·':(s.ok?'<b style="color:#16a34a">✓</b>':'<b style="color:#dc2626">✗</b>')} ${E(s.txt)}</span>`).join('')}</td></tr>`;
