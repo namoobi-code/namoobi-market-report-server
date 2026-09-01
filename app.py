@@ -2219,6 +2219,102 @@ def popular():
     except Exception:
         return _pop_cache["data"] or {"asof": None, "rows": []}
 
+_revd_cache = {"key": None, "data": None}
+@app.get("/api/kr_rev_daily")
+def kr_rev_daily():
+    """(2026-09-02) KR 리비전 데일리 — 목표주가·영업익 컨센 변동리스트 (최근 7 스냅샷일 횡단).
+
+    근거(사용자 관찰 · 코스메카코리아 실측): 8/10 실적발표(호실적) → 8/11 증권사 목표가 상향
+    → 8/12 영업익 컨센 상향 → 주가 지속 상승. 이 연쇄의 2·3단계 '변동'을 매일 전 종목
+    횡단으로 잡아 검토 후 매수 후보를 제공한다(개별 종목 상세는 kr_fin 이 담당 — 여기는 리스트).
+
+    소스: tp_history.json(평균 목표가 일별 스냅샷 · ~520종목/일 커버, 하루 변동 ~31종목 실측)
+          + kr_consensus.sqlite snap(2,513종목 컨센 일별 · 하루 영업익 변동 ~39종목 실측).
+    주의: 평균 목표가는 리포트 24건 롤링 평균이라 액면병합·리포트 이탈로 급변할 수 있다
+          (실측 091810 +400%) — 원자료 그대로 표시하고 화면에 사유 각주만 둔다(가공 금지).
+    캐시: 두 소스 mtime 키 — 파일이 바뀔 때만 재계산."""
+    tp_p = DB / "tp_history.json"
+    cs_p = DB / "kr_consensus.sqlite"
+    key = (tp_p.stat().st_mtime if tp_p.exists() else 0,
+           cs_p.stat().st_mtime if cs_p.exists() else 0)
+    if _revd_cache["key"] == key and _revd_cache["data"]:
+        return _revd_cache["data"]
+    # 종목 메타 (이름·시총·현재가·직전 실적발표일)
+    meta = {}
+    try:
+        pool = json.loads((DB / "screener_pool.json").read_text(encoding="utf-8"))
+        for r in pool.get("kr") or []:
+            c = r.get("c") or r.get("code")
+            if c:
+                meta[c] = {"n": r.get("n") or r.get("name") or c, "cap": r.get("mcap") or r.get("cap"),
+                           "px": r.get("px"), "chg": r.get("chg"), "edl": r.get("edl")}
+    except Exception:
+        pass
+    def _m(c):
+        return meta.get(c) or {"n": c, "cap": None, "px": None, "chg": None, "edl": None}
+    # ① 목표주가 변동 — 평균 목표가 일별 diff
+    tp_days = []
+    try:
+        h = json.loads(tp_p.read_text(encoding="utf-8")).get("hist") or {}
+        dates = sorted({d for s in h.values() for d in s})[-8:]
+        for i in range(len(dates) - 1, 0, -1):
+            d0, d1 = dates[i - 1], dates[i]
+            rows = []
+            for c, s in h.items():
+                a, b = s.get(d0), s.get(d1)
+                if not a or not b or a == b:
+                    continue
+                m = _m(c)
+                rows.append({"c": c, **m, "old": a, "new": b,
+                             "pct": round((b / a - 1) * 100, 1),
+                             "up": round((b / m["px"] - 1) * 100, 1) if m.get("px") else None})
+            rows.sort(key=lambda x: -x["pct"])
+            tp_days.append({"d": d1, "prev": d0, "rows": rows})
+    except Exception:
+        pass
+    # ② 영업익 컨센 리비전 — snap 일별 diff (종목당 가장 가까운 미래 기간 대표 + 변동기간 수)
+    op_days = []
+    try:
+        import datetime as _dt
+        nowym = _dt.date.today().strftime("%Y/%m")
+        def _pkey(p):   # 'YYYY/MM' → YYYYMM · 'FYYYYY' → YYYY99 (연간은 해당연도 말로 취급)
+            mq = re.fullmatch(r"(\d{4})/(\d{2})", p or "")
+            if mq: return int(mq.group(1)) * 100 + int(mq.group(2))
+            my = re.search(r"(\d{4})", p or "")
+            return int(my.group(1)) * 100 + 99 if my else 999999
+        cx = sqlite3.connect(f"file:{cs_p}?mode=ro", uri=True, timeout=10)
+        sdates = [r0[0] for r0 in cx.execute("SELECT DISTINCT d FROM snap ORDER BY d DESC LIMIT 8")][::-1]
+        for i in range(len(sdates) - 1, 0, -1):
+            d0, d1 = sdates[i - 1], sdates[i]
+            ch = {}
+            for c, per, a, b in cx.execute(
+                    "SELECT a.code, a.period, b.op, a.op FROM snap a "
+                    "JOIN snap b ON a.code=b.code AND a.period=b.period "
+                    "WHERE a.d=? AND b.d=? AND a.op IS NOT NULL AND b.op IS NOT NULL AND a.op<>b.op",
+                    (d1, d0)):
+                ch.setdefault(c, []).append((per, a, b))
+            rows = []
+            nk = _pkey(nowym)
+            for c, lst in ch.items():
+                fut = [x for x in lst if _pkey(x[0]) >= nk]
+                per, a, b = min(fut or lst, key=lambda x: _pkey(x[0]))
+                m = _m(c)
+                # (실측 수정) 기준이 적자(음수)면 b/a-1 의 부호가 뒤집힌다 — 리가켐바이오
+                # -985→-1022(적자 심화)가 +3.8% 로 상위 노출. (new-old)/|old| 는 양수 기준에서
+                # 기존 산식과 동일하고 음수 기준에서 방향이 올바르다(심화=−, 개선=+).
+                rows.append({"c": c, **m, "per": per, "old": a, "new": b,
+                             "pct": round((b - a) / abs(a) * 100, 1) if a else None,
+                             "nch": len(lst)})
+            rows.sort(key=lambda x: -(x["pct"] if x["pct"] is not None else -1e9))
+            op_days.append({"d": d1, "prev": d0, "rows": rows})
+        cx.close()
+    except Exception:
+        pass
+    out = {"asof": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"),
+           "tp_days": tp_days, "op_days": op_days}
+    _revd_cache["key"] = key; _revd_cache["data"] = out
+    return out
+
 _sdl_cache = {}
 @app.get("/api/stock_deriv_live/{code}")
 def stock_deriv_live(code: str):

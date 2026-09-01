@@ -561,6 +561,7 @@
       <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
+      <button class="tab"    data-pane="p_revd" style="background:#7c2d12;border-color:#7c2d12;color:#fff">📋 리비전 데일리<small style="color:#fed7aa">목표가·컨센 변동 일별</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -733,6 +734,20 @@
   </div>
 
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
+  <!-- (2026-09-02) 📋 리비전 데일리 페인 — /api/kr_rev_daily · revd.js -->
+  <div class="pane" id="p_revd" style="overflow:auto">
+    <h2>📋 리비전 데일리 — 목표주가·영업익 컨센 변동리스트 <em id="rv_asof"></em> <button id="rv_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px;line-height:1.7">
+      한국 주식의 실측 패턴(코스메카코리아 2026-08): <b>실적발표(8/10 호실적) → 증권사 목표가 일제 상향(8/11)
+      → 영업익 컨센서스 상향(8/12) → 주가 지속 상승</b>. 이 연쇄의 2·3단계 '변동'을 매일 전 종목 횡단으로 잡는다 —
+      리스트에서 확인 → 종목 클릭(네이버) 또는 TICKER 차트로 검토 → 매수 판단.
+      ※ 평균 목표가는 증권사 리포트 ~24건 롤링 평균이라 액면병합·오래된 리포트 이탈 시 급변할 수 있음(원자료 그대로 표시).
+      참고용이며 투자권유가 아님.</div>
+    <h3>① 증권사 평균 목표주가 변동 <span class="note">일별 스냅샷 대비 · ~520종목 커버 · 개별 증권사 리포트는 종목 차트 하단 표</span></h3>
+    <div class="box" style="padding:12px 14px"><div id="rv_tp"><div class="note">불러오는 중…</div></div></div>
+    <h3>② 영업이익 컨센서스 리비전 <span class="note">일별 스냅샷 대비 · 2,513종목 · 종목당 가장 가까운 미래 추정 기간 대표 표시</span></h3>
+    <div class="box" style="padding:12px 14px"><div id="rv_op"><div class="note">불러오는 중…</div></div></div>
+  </div>
   <!-- (2026-09-01) 📈 이익성장 모니터링 페인 — screener_pool + stlead 재사용 · eg.js -->
   <div class="pane" id="p_eg" style="overflow:auto">
     <h2>📈 이익성장 모니터링 — 과거 실적 + 미래 전망 + 선행지표</h2>
@@ -2071,13 +2086,14 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09021100"></script>
+<script src="/app.js?v=09012355"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
+<script src="/revd.js?v=09012356"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=09021130"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09010700"></script>
