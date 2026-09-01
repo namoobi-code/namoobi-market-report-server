@@ -54,20 +54,23 @@
     const ml=mktLead(m);
     s.push({ok:ml!=null&&ml>0, na:ml==null,
       txt:`시장 선행지표 12M ${ml!=null?(ml>0?'+':'')+((Math.exp(ml)-1)*100).toFixed(1)+'%':'—'}`});
+    // (2026-09-02) KR tprv 는 원본이 이미 % 단위(kr_consensus tp30), US cr30 은 fraction — 단위 분리
     const rev=m==='kr'?r.tprv:r.cr30;
+    const revPct=rev==null?null:(m==='kr'?rev:rev*100);
     s.push({ok:rev!=null&&rev>0, na:rev==null,
-      txt:m==='kr'?`목표가30일 ${rev!=null?(rev>0?'+':'')+(rev*100).toFixed(1)+'%':'—'}`
-                  :`컨센30일 ${rev!=null?(rev>0?'+':'')+(rev*100).toFixed(1)+'%':'—'}`});
+      txt:`${m==='kr'?'목표가30일':'컨센30일'} ${revPct!=null?(revPct>0?'+':'')+revPct.toFixed(1)+'%':'—'}`});
     const pg=fpeg(r,g,m);
     const val=(pg!=null&&pg<1.5)||(r.upside!=null&&r.upside>0);
     s.push({ok:val, na:pg==null&&r.upside==null,
       txt:`PEG ${pg!=null?pg.toFixed(2):'—'}·여력 ${r.upside!=null?(r.upside>0?'+':'')+(r.upside*100).toFixed(0)+'%':'—'}`});
-    const tr=(r.vs200!=null&&r.vs200>0)&&(r.align==null||r.align>0);
+    // (2026-09-02) align 은 문자열("정배열/혼조/역배열") — 숫자 비교 버그로 전종목 역배열 표시됐었다.
+    //   판정 = 장기선(120일/200일) 위 AND 역배열 아님(혼조 허용 — 정배열만 요구하면 KR 145종뿐).
+    const tr=(r.vs200!=null&&r.vs200>0)&&(r.align!=='역배열');
     s.push({ok:tr, na:r.vs200==null,
-      txt:`장기선 ${r.vs200!=null?(r.vs200>0?'위':'아래'):'—'}${r.align!=null?(r.align>0?'·정배열':'·역배열'):''}`});
+      txt:`장기선 ${r.vs200!=null?(r.vs200>0?'위':'아래'):'—'}${typeof r.align==='string'?'·'+r.align:''}`});
     s.push({ok:r.rsi!=null&&r.rsi<70, na:r.rsi==null, txt:`RSI ${r.rsi!=null?Math.round(r.rsi):'—'}`});
     s.push({ok:r.gacc!=null&&r.gacc>0, na:r.gacc==null,
-      txt:`가속 ${r.gacc!=null?(r.gacc>0?'+':'')+(r.gacc*100).toFixed(0)+'%p':'—'}`});
+      txt:`가속 ${r.gacc!=null?((r.gacc>0?'+':'-')+Math.min(Math.abs(r.gacc)*100,999).toFixed(0)+'%p'+(Math.abs(r.gacc)>9.99?'↑':'')):'—'}`});
     return s;
   }
   const lamp=n=>n>=5?'🟢':(n>=3?'🟡':'🔴');
