@@ -226,11 +226,28 @@ def main():
     print(f"[cons] 스냅샷 {n}행 적재 ({today})", flush=True)
 
     # ── 리비전 = 과거 스냅샷 대비 변화율
+    #    (2026-09-02 사용자 확정) **30일만 부분 창 허용** — 스냅샷 적재(2026-08-09~)가
+    #    30일이 안 쌓였으면 '가장 오래된 스냅샷' 대비로 대체해 쌓인 만큼이라도 제공한다
+    #    (최소 7일 — 그 미만이면 op7 과 중복). 30일이 다 쌓이는 09-08 부터는 자동으로 정식 창.
+    #    90일은 부분 창 없이 기존대로 — 다 쌓이는 2026-11-07 부터 제공.
     def rev(code, period, days):
         d0 = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
         r = cx.execute("SELECT op FROM snap WHERE code=? AND period=? AND d<=? ORDER BY d DESC LIMIT 1",
                        (code, period, d0)).fetchone()
-        return r[0] if r else None
+        if r:
+            return r[0]
+        if days != 30:
+            return None
+        r2 = cx.execute("SELECT op, d FROM snap WHERE code=? AND period=? AND op IS NOT NULL "
+                        "ORDER BY d ASC LIMIT 1", (code, period)).fetchone()
+        if r2:
+            try:
+                span = (datetime.now().date() - datetime.strptime(r2[1], "%Y-%m-%d").date()).days
+                if span >= 7:
+                    return r2[0]
+            except Exception:
+                pass
+        return None
 
     out = {}
     for code, qs in got.items():
