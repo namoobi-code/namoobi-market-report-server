@@ -254,8 +254,26 @@ def collect_sephora():
     print(f"  세포라: 입점 {len(inb)} / 미입점 {len(outb)}", flush=True)
     return {"in": inb, "out": outb}
 
-def push_retail_hist(az, sep):
-    """이력 누적 → 아마존 랭크 Δ(7일 전 대비)·세포라 신규 입점 계산 (관측치만, 추정 금지)"""
+def collect_ulta():
+    """울타(Ulta) US 브랜드 리스트 — K뷰티 입점 여부 체크 (2026-09-02 사용자 요청).
+
+    미국 오프라인 뷰티는 매장 수 기준 울타가 최대(1,400+ vs 세포라 독립 ~600)이고
+    프레스티지+매스 혼합이라 K뷰티 중저가의 실질 관문은 세포라보다 울타다.
+    /brand/all 은 서버렌더 무인증 실측 ✓ (2026-09-02 · 4.2MB · 15브랜드 매칭
+    — 메디큐브·아누아·코스알엑스 등 세포라 미입점 브랜드가 울타엔 있다)."""
+    try:
+        h = get("https://www.ulta.com/brand/all", hdr=EN_UA).decode("utf-8", "replace").lower()
+    except Exception as e:
+        print(f"  ⚠ 울타 실패: {repr(e)[:60]}", flush=True)
+        return None
+    inb, outb = [], []
+    for disp, pat, stock in KBRANDS:
+        (inb if re.search(pat, h) else outb).append({"brand": disp, "stock": stock})
+    print(f"  울타: 입점 {len(inb)} / 미입점 {len(outb)}", flush=True)
+    return {"in": inb, "out": outb}
+
+def push_retail_hist(az, sep, ul=None):
+    """이력 누적 → 아마존 랭크 Δ(7일 전 대비)·세포라/울타 신규 입점 계산 (관측치만, 추정 금지)"""
     try:
         h = json.loads(HIST.read_text(encoding="utf-8"))
     except Exception:
@@ -266,7 +284,8 @@ def push_retail_hist(az, sep):
         best[r["brand"]] = min(best.get(r["brand"], 999), r["rank"])
     h["days"] = [d for d in h.get("days", []) if d.get("d") != today]
     h["days"].append({"d": today, "az": best,
-                      "sep": [x["brand"] for x in (sep or {}).get("in", [])]})
+                      "sep": [x["brand"] for x in (sep or {}).get("in", [])],
+                      "ulta": [x["brand"] for x in (ul or {}).get("in", [])]})
     h["days"] = sorted(h["days"], key=lambda x: x["d"])[-400:]
     HIST.write_text(json.dumps(h, ensure_ascii=False), encoding="utf-8")
     days = h["days"]
@@ -275,12 +294,13 @@ def push_retail_hist(az, sep):
         for r in az["rows"]:
             p = (prev or {}).get("az", {}).get(r["brand"])
             r["d7"] = (p - r["rank"]) if p else None      # +면 순위 상승
-    if sep and prev is not None:
-        pset = set(prev.get("sep", []))
-        sep["new"] = [x["brand"] for x in sep["in"] if x["brand"] not in pset] if pset else []
-    elif sep:
-        sep["new"] = []
-    return az, sep
+    for obj, key in ((sep, "sep"), (ul, "ulta")):
+        if obj and prev is not None:
+            pset = set(prev.get(key) or [])
+            obj["new"] = [x["brand"] for x in obj["in"] if x["brand"] not in pset] if pset else []
+        elif obj:
+            obj["new"] = []
+    return az, sep, ul
 
 # ══════════════════════════════════════════════════════════════════════════
 def main():
@@ -289,13 +309,14 @@ def main():
     stocks = collect_stocks()
     az  = collect_amazon()
     sep = collect_sephora()
-    az, sep = push_retail_hist(az, sep)
+    ul  = collect_ulta()
+    az, sep, ul = push_retail_hist(az, sep, ul)
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "themes": [{"name": t, "color": c} for t, c in THEME_COLOR.items()],
         "export": export, "stocks": stocks,
-        "retail": {"az": az, "sep": sep},
+        "retail": {"az": az, "sep": sep, "ulta": ul},
     }, ensure_ascii=False), encoding="utf-8")
     print(f"[kcons] ✅ {len(export['items'])}품목 · {len(export['months'])}개월 · {len(stocks)}종목 → {OUT}", flush=True)
 
