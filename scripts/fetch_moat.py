@@ -8,8 +8,9 @@
   ② 해자 선행지표: 종목별 연결 지표(우라늄 실물신탁·은 선물·SOX·XBI·MU 등, 야후)의 3개월 방향
   ③ 판정 신호등:
      ⚪ top   낙폭 > -10%              — 고점권(빠짐 신호 없음)
-     🟢 buy   낙폭 ≤ -20% & RSI<50 & 선행지표 3개월 ≥0 — '일시적 빠짐 후보'
-     🔴 risk  낙폭 ≤ -20% & 선행지표 3개월 <0          — 선행지표 동반 악화(구조 의심)
+     🟢 buy   낙폭 ≤ -20% & RSI<50 & 선행지표 3개월 ≥ +5% — '일시적 빠짐 후보'
+     🟢~ buy_z 같은 조건, 선행지표 3개월이 ±5% 이내(중립) 또는 악화 3일 미만 — 방향 판단 보류
+     🔴 risk  낙폭 ≤ -20% & 선행지표 3개월 ≤ -5% 가 3거래일 연속 — 선행지표 동반 악화(구조 의심)
      🟡 watch 그 외                                    — 관찰
      선행지표 미연결 종목이 낙폭 조건 충족 시 buy_m(🟢※ 수동 확인 필요).
 ※ 가격·판정은 '검토 후보 알림'이지 매수 신호가 아니다 — 가치함정은 걸러지지 않는다.
@@ -27,6 +28,10 @@ OUT  = BASE / "data" / "db" / "moat.json"
 HIST = BASE / "data" / "db" / "moat_hist.json"   # (Phase2) PER 일일 스냅샷 누적 — 자기 역사 대비 percentile
 UA   = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"}
 KST  = timezone(timedelta(hours=9))
+
+# (2026-09-01) 선행지표 판정 안정화 — 0 근처 부호 뒤집힘 방지
+LEAD_DZ      = 5.0   # 데드존: 선행지표 3개월이 ±5% 이내면 방향으로 읽지 않는다(🟢~ 중립)
+LEAD_PERSIST = 3     # 🔴 는 3거래일 연속 악화(≤ -5%)일 때만 확정한다
 
 # (심볼, 이름, 분야, 해자 한 줄, 선행지표 심볼|None, 선행지표 이름)
 UNIV = [
@@ -259,10 +264,16 @@ def main():
             else:
                 pts = hist(sym, "1y")
                 cl = [c for _, c in pts]
+                # m3_seq = 최근 LEAD_PERSIST 거래일 각각의 '3개월 수익률'.
+                #   지속성 판정을 앞으로 쌓지 않고 가격에서 바로 계산한다 —
+                #   이력 누적 방식이면 첫날엔 🔴 가 하나도 못 나와(라이너스 -22.2% 도 보류) 판정이 마비된다.
+                seq = [pct(cl[-64 - k], cl[-1 - k]) for k in range(LEAD_PERSIST)
+                       if len(cl) > 64 + k]
                 leads[sym] = {"m1": pct(cl[-22], cl[-1]) if len(cl) > 22 else None,
                               "m3": pct(cl[-64], cl[-1]) if len(cl) > 64 else None,
                               "m6": pct(cl[-128], cl[-1]) if len(cl) > 128 else None,
-                              "y1": pct(cl[0], cl[-1]), "cur": round(cl[-1], 2)}
+                              "y1": pct(cl[0], cl[-1]), "cur": round(cl[-1], 2),
+                              "m3_seq": [v for v in seq if v is not None]}
         except Exception as e:
             print(f"  ⚠ lead {sym}: {repr(e)[:50]}", flush=True)
             leads[sym] = None
@@ -313,17 +324,33 @@ def main():
                 sc -= 10                                                                        #    이격 과대 페널티
             sc += 15 if (rsi is not None and rsi >= 55) else (8 if (rsi is not None and rsi >= 45) else 0)  # ⑤ 모멘텀 유지(신고가+낮은 RSI=다이버전스 근사)
             qh = max(0, min(100, sc))
+        lead_pending = None
         if dd is None:
             v = "watch"
         elif dd > -10:
             v = "top_hot" if qh >= 70 else ("top_warn" if qh < 40 else "top")
         elif dd <= -20 and (rsi is None or rsi < 50):
+            # (2026-09-01 개정) 선행지표 3개월의 '부호 하나'로 🟢/🔴 이 뒤집히던 문제를 고친다.
+            #   실측 사고: SK하이닉스 2026-09-01 buy→risk 전환. 마이크론은 전일 +2.8% 상승했는데도
+            #   3개월 기준일이 5/28→5/29 로 하루 밀리며(그날 +5% 급등이 창에 진입) 수익률이
+            #   +3.8% → -1.3% 로 부호만 바뀌어 '선행지표 동반 악화(구조 의심)' 라벨이 붙었다.
+            #   → ① 데드존 ±5%: 0 근처는 방향으로 읽지 않는다  ② 지속성: 3거래일 연속 악화만 🔴
             if lsym is None or lead_m3 is None:
                 v = "buy_m"                        # 🟢※ 선행지표 미연결 — 수동 확인
-            elif lead_m3 >= 0:
-                v = "buy"
+            elif lead_m3 >= LEAD_DZ:
+                v = "buy"                          # 🟢 선행지표 우호
+            elif lead_m3 <= -LEAD_DZ:
+                # 지속성 — 최근 3거래일의 '3개월 수익률'이 모두 ≤ -5% 일 때만 🔴 확정.
+                # 기준일이 하루 밀리며 부호만 바뀌는 잡음은 여기서 걸러진다.
+                _sq = (L or {}).get("m3_seq") or []
+                _bad = sum(1 for x in _sq if x <= -LEAD_DZ)
+                if len(_sq) >= LEAD_PERSIST and _bad >= LEAD_PERSIST:
+                    v = "risk"
+                else:
+                    v = "buy_z"                    # 🟢~ 악화가 아직 하루이틀 — 보류
+                    lead_pending = _bad
             else:
-                v = "risk"
+                v = "buy_z"                        # 🟢~ 선행지표 중립(±5% 이내) — 방향 판단 보류
         else:
             v = "watch"
         step = max(1, len(pts)//60)
@@ -332,9 +359,10 @@ def main():
                      "tier": ("B2+" if sym in SEL_B2 else "B1"), "share": SHARES.get(sym),
                      "val": band.get(sym),
                      "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
-                     "m1": m1, "m3": m3, "y1": y1, "verdict": v, "qh": qh,
+                     "m1": m1, "m3": m3, "y1": y1, "verdict": v, "qh": qh, "lead_pending": lead_pending,
                      "lead": ({"sym": lsym, "name": lnm, "m1": (L or {}).get("m1"), "m3": lead_m3,
-                               "m6": (L or {}).get("m6"), "y1": (L or {}).get("y1")} if lsym else None),
+                               "m6": (L or {}).get("m6"), "y1": (L or {}).get("y1"),
+                               "m3_seq": (L or {}).get("m3_seq")} if lsym else None),
                      "spark": [round(c, 1) for _, c in samp],
                      "spark_d": [datetime.fromtimestamp(t, KST).strftime("%y.%m.%d") for t, _ in samp]})
         time.sleep(0.3)
@@ -344,6 +372,7 @@ def main():
     except Exception:
         h = {"days": []}
     today = datetime.now(KST).strftime("%Y-%m-%d")
+
     vd_today = {r["sym"]: r["verdict"] for r in rows}
     prev_days = [d for d in h.get("days", []) if d.get("d") != today and d.get("vd")]
     prev = prev_days[-1]["vd"] if prev_days else {}
@@ -372,9 +401,9 @@ def main():
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "rows": rows,
-        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_m", "risk", "watch", "top", "top_hot", "top_warn")},
+        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_z", "buy_m", "risk", "watch", "top", "top_hot", "top_warn")},
     }, ensure_ascii=False), encoding="utf-8")
-    vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'buy_m', 'risk')}
+    vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'buy_z', 'buy_m', 'risk')}
     print(f"[moat] ✅ {len(rows)}/{len(UNIV)}종 → {OUT} · 신호: {vc}", flush=True)
 
 if __name__ == "__main__":

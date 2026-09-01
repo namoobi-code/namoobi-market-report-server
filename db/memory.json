@@ -1,19 +1,19 @@
 {
- "marker": "2026-08-31",
- "as_of": "2026-08-31",
+ "marker": "2026-09-01",
+ "as_of": "2026-09-01",
  "data": {
-  "asof": "2026-08-31",
-  "fetched_at": "2026-08-31T06:08:30+09:00",
+  "asof": "2026-09-01",
+  "fetched_at": "2026-09-01T06:08:51+09:00",
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
     "unit": "USD",
-    "last_update": "2026-08-28 18:10",
+    "last_update": "2026-08-31 18:10",
     "rows": [
      {
       "item": "DDR5 16Gb (2Gx8) 4800/5600",
-      "avg": 53.933,
-      "chg_pct": 0.0
+      "avg": 53.917,
+      "chg_pct": -0.03
      },
      {
       "item": "DDR5 16Gb (2Gx8) eTT",
@@ -22,119 +22,119 @@
      },
      {
       "item": "DDR4 16Gb (2Gx8) 3200",
-      "avg": 91.293,
-      "chg_pct": 0.27
+      "avg": 91.78,
+      "chg_pct": 0.53
      },
      {
       "item": "DDR4 16Gb (2Gx8) eTT",
-      "avg": 11.475,
+      "avg": 11.525,
       "chg_pct": 0.44
      },
      {
       "item": "DDR4 8Gb (1Gx8) 3200",
-      "avg": 44.189,
+      "avg": 44.367,
       "chg_pct": 0.4
      },
      {
       "item": "DDR4 8Gb (1Gx8) eTT",
-      "avg": 4.443,
-      "chg_pct": 1.86
+      "avg": 4.507,
+      "chg_pct": 1.44
      },
      {
       "item": "DDR3 4Gb 512Mx8 1600/1866",
-      "avg": 13.883,
-      "chg_pct": -0.35
+      "avg": 13.854,
+      "chg_pct": -0.21
      }
     ]
    },
    "dram_contract": {
     "label": "DRAM 고정거래(계약)",
     "unit": "USD",
-    "last_update": "2026-06-30 11:00",
+    "last_update": "2026-07-31 15:00",
     "rows": [
      {
       "item": "DDR5 8GB SO-DIMM",
-      "avg": 115.0,
-      "chg_pct": 2.68
+      "avg": 130.0,
+      "chg_pct": 13.04
      },
      {
       "item": "DDR4 16GB SO-DIMM",
-      "avg": 227.0,
-      "chg_pct": 0.0
+      "avg": 265.0,
+      "chg_pct": 16.74
      },
      {
       "item": "DDR4 8GB SO-DIMM",
-      "avg": 119.0,
-      "chg_pct": 0.0
+      "avg": 139.0,
+      "chg_pct": 16.81
      },
      {
       "item": "DDR4 16Gb 2Gx8",
-      "avg": 42.0,
-      "chg_pct": 5.0
+      "avg": 48.0,
+      "chg_pct": 14.29
      },
      {
       "item": "DDR4 8Gb 1Gx8",
-      "avg": 21.0,
-      "chg_pct": 5.0
+      "avg": 24.0,
+      "chg_pct": 14.29
      },
      {
       "item": "DDR4 4Gb 256Mx16",
-      "avg": 13.0,
-      "chg_pct": 8.33
+      "avg": 14.5,
+      "chg_pct": 11.54
      },
      {
       "item": "DDR3 4Gb 256Mx16",
-      "avg": 12.5,
-      "chg_pct": 13.64
+      "avg": 14.5,
+      "chg_pct": 16.0
      }
     ]
    },
    "nand_spot": {
     "label": "NAND 현물(스팟)",
     "unit": "USD",
-    "last_update": "2026-08-17 14:40",
+    "last_update": "2026-08-24 14:40",
     "rows": [
      {
       "item": "SLC 2Gb 256MBx8",
-      "avg": 4.283,
-      "chg_pct": -0.4
+      "avg": 4.285,
+      "chg_pct": 0.05
      },
      {
       "item": "SLC 1Gb 128MBx8",
-      "avg": 3.48,
-      "chg_pct": -0.43
+      "avg": 3.445,
+      "chg_pct": -1.01
      },
      {
       "item": "MLC 64Gb 8GBx8",
-      "avg": 36.587,
-      "chg_pct": 2.34
+      "avg": 37.587,
+      "chg_pct": 2.73
      },
      {
       "item": "MLC 32Gb 4GBx8",
-      "avg": 17.938,
-      "chg_pct": 2.87
+      "avg": 18.438,
+      "chg_pct": 2.79
      }
     ]
    },
    "nand_contract": {
     "label": "NAND 고정거래(계약)",
     "unit": "USD",
-    "last_update": "2026-06-30 10:00",
+    "last_update": "2026-07-31 09:00",
     "rows": [
      {
       "item": "NAND 128Gb 16Gx8 MLC",
-      "avg": 28.82,
-      "chg_pct": 8.72
+      "avg": 30.048,
+      "chg_pct": 4.26
      },
      {
       "item": "NAND 64Gb 8Gx8 MLC",
-      "avg": 21.365,
-      "chg_pct": 11.48
+      "avg": 23.11,
+      "chg_pct": 8.17
      },
      {
       "item": "NAND 32Gb 4Gx8 MLC",
-      "avg": 17.075,
-      "chg_pct": 10.21
+      "avg": 17.865,
+      "chg_pct": 4.63
      }
     ]
    }
@@ -300,11 +300,11 @@
    "source": "https://siliconanalysts.com/api/v1/hbm",
    "ddr5_gap": {
     "hbm_per_gb": 50.0,
-    "ddr5_per_gb": 14.38,
-    "ratio": 3.5,
-    "ddr5_spot_per_gb": 26.97,
+    "ddr5_per_gb": 16.25,
+    "ratio": 3.1,
+    "ddr5_spot_per_gb": 26.96,
     "ratio_spot": 1.9,
-    "basis": "HBM3E 36GB 스택 ASP $1,800 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $115.00 ÷ 8GB (환산 추정)",
+    "basis": "HBM3E 36GB 스택 ASP $1,800 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $130.00 ÷ 8GB (환산 추정)",
     "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"
    }
   },
@@ -313,14 +313,10 @@
     "ticker": "^SOX",
     "label": "필라델피아 반도체지수",
     "why": "반도체 업황 종합 체온계",
-    "price": 11469.662,
-    "chg_1y_pct": 109.6,
-    "chg_1m_pct": 13.7,
+    "price": 11535.051,
+    "chg_1y_pct": 105.8,
+    "chg_1m_pct": 2.0,
     "series_1y": [
-     [
-      "2025-08-29",
-      5668.94
-     ],
      [
       "2025-09-02",
       5605.46
@@ -1316,6 +1312,14 @@
      [
       "2026-08-27",
       11882.17
+     ],
+     [
+      "2026-08-28",
+      11469.66
+     ],
+     [
+      "2026-08-31",
+      11535.05
      ]
     ]
    },
@@ -1323,14 +1327,10 @@
     "ticker": "NVDA",
     "label": "엔비디아",
     "why": "HBM 최대 수요처",
-    "price": 217.55,
-    "chg_1y_pct": 30.9,
-    "chg_1m_pct": 20.0,
+    "price": 220.78,
+    "chg_1y_pct": 29.3,
+    "chg_1m_pct": 10.0,
     "series_1y": [
-     [
-      "2025-08-29",
-      174.18
-     ],
      [
       "2025-09-02",
       170.78
@@ -2326,6 +2326,14 @@
      [
       "2026-08-27",
       227.98
+     ],
+     [
+      "2026-08-28",
+      217.55
+     ],
+     [
+      "2026-08-31",
+      220.78
      ]
     ]
    },
@@ -2333,14 +2341,10 @@
     "ticker": "AMD",
     "label": "AMD",
     "why": "HBM 2번째 수요처",
-    "price": 465.58,
-    "chg_1y_pct": 193.1,
-    "chg_1m_pct": 11.0,
+    "price": 470.72,
+    "chg_1y_pct": 190.0,
+    "chg_1m_pct": -1.1,
     "series_1y": [
-     [
-      "2025-08-29",
-      162.63
-     ],
      [
       "2025-09-02",
       162.32
@@ -3336,6 +3340,14 @@
      [
       "2026-08-27",
       476.67
+     ],
+     [
+      "2026-08-28",
+      465.58
+     ],
+     [
+      "2026-08-31",
+      470.72
      ]
     ]
    },
@@ -3343,14 +3355,10 @@
     "ticker": "TSM",
     "label": "TSMC",
     "why": "CoWoS 패키징 = HBM 출하의 물리적 상한",
-    "price": 417.52,
-    "chg_1y_pct": 85.1,
-    "chg_1m_pct": 14.0,
+    "price": 415.32,
+    "chg_1y_pct": 81.8,
+    "chg_1m_pct": 2.7,
     "series_1y": [
-     [
-      "2025-08-29",
-      230.87
-     ],
      [
       "2025-09-02",
       228.39
@@ -4346,6 +4354,14 @@
      [
       "2026-08-27",
       427.3
+     ],
+     [
+      "2026-08-28",
+      417.52
+     ],
+     [
+      "2026-08-31",
+      415.32
      ]
     ]
    },
@@ -4353,18 +4369,10 @@
     "ticker": "^KS11",
     "label": "코스피",
     "why": "삼성+SK 시총 55~60% — 메모리 사이클이 곧 지수",
-    "price": 6788.88,
-    "chg_1y_pct": 116.3,
-    "chg_1m_pct": 14.8,
+    "price": 6820.02,
+    "chg_1y_pct": 116.0,
+    "chg_1m_pct": 19.9,
     "series_1y": [
-     [
-      "2025-08-28",
-      3196.32
-     ],
-     [
-      "2025-08-29",
-      3186.01
-     ],
      [
       "2025-09-01",
       3142.93
@@ -5328,6 +5336,10 @@
      [
       "2026-08-27",
       6912.37
+     ],
+     [
+      "2026-08-28",
+      6788.88
      ]
     ]
    },
@@ -5335,14 +5347,10 @@
     "ticker": "MU",
     "label": "마이크론",
     "why": "메모리 공급자 대표",
-    "price": 932.86,
-    "chg_1y_pct": 686.0,
-    "chg_1m_pct": 26.6,
+    "price": 958.73,
+    "chg_1y_pct": 709.2,
+    "chg_1m_pct": 16.5,
     "series_1y": [
-     [
-      "2025-08-29",
-      119.01
-     ],
      [
       "2025-09-02",
       118.48
@@ -6338,13 +6346,21 @@
      [
       "2026-08-27",
       935.39
+     ],
+     [
+      "2026-08-28",
+      932.86
+     ],
+     [
+      "2026-08-31",
+      958.73
      ]
     ]
    },
    "MEM_VS_GPU": {
     "label": "메모리/GPU 상대강도 (MU ÷ NVDA, 1년)",
     "why": "1 초과 = 가치가 수요처(GPU)에서 공급자(메모리)로 이동 = 공급부족 심화",
-    "value": 6.0,
+    "value": 6.26,
     "signal": "공급자 우위"
    }
   },
@@ -6353,13 +6369,13 @@
     "name": "SK하이닉스",
     "ticker": "000660.KS",
     "currency": "KRW",
-    "price": 1653000.0,
+    "price": 1674000.0,
     "eps_ttm": 224313.0,
     "eps_2026E": 349566,
     "eps_2027E": 436187,
-    "per_ttm": 7.37,
-    "per_2026E": 4.73,
-    "per_2027E": 3.79,
+    "per_ttm": 7.46,
+    "per_2026E": 4.79,
+    "per_2027E": 3.84,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다",
     "annual_naver": {
      "2021": {
@@ -6423,62 +6439,62 @@
      },
      "2026": {
       "is_consensus": true,
-      "revenue": 3458039.0,
-      "net": 2532488.0,
-      "opm": 77.11,
-      "roe": 101.7,
-      "eps": 349566.0,
-      "per": 4.73,
-      "bps": 521034.0,
-      "pbr": 3.17
+      "revenue": 3456989.0,
+      "net": 2530868.0,
+      "opm": 77.07,
+      "roe": 101.67,
+      "eps": 349342.0,
+      "per": 4.79,
+      "bps": 521258.0,
+      "pbr": 3.21
      },
      "2027": {
       "is_consensus": true,
-      "revenue": 5000773.0,
-      "net": 3188775.0,
-      "opm": 78.35,
-      "roe": 60.0,
-      "eps": 436187.0,
+      "revenue": 5071772.0,
+      "net": 3230278.0,
+      "opm": 78.32,
+      "roe": 60.57,
+      "eps": 441864.0,
       "per": 3.79,
-      "bps": 949640.0,
-      "pbr": 1.74
+      "bps": 955916.0,
+      "pbr": 1.75
      },
      "2028": {
       "is_consensus": true,
-      "revenue": 5401960.0,
-      "net": 3290968.0,
-      "opm": 73.89,
-      "roe": 39.12,
-      "eps": 450129.0,
-      "per": 3.67,
-      "bps": 1378134.0,
+      "revenue": 5500797.0,
+      "net": 3349488.0,
+      "opm": 73.94,
+      "roe": 39.54,
+      "eps": 458132.0,
+      "per": 3.65,
+      "bps": 1390007.0,
       "pbr": 1.2
      }
     },
     "consensus_live": {
      "fwd_eps": 349566.0,
-     "fwd_per": 4.73,
+     "fwd_per": 4.79,
      "eps_ttm": 224313.0,
-     "per_ttm": 7.37,
-     "asof": "2026-08-31",
+     "per_ttm": 7.46,
+     "asof": "2026-09-01",
      "target": 3317917.0,
      "recomm": "4.00",
-     "target_asof": "2026-08-27"
+     "target_asof": "2026-08-28"
     },
     "eps_fwd": 349566.0,
-    "per_fwd": 4.73
+    "per_fwd": 4.79
    },
    {
     "name": "삼성전자",
     "ticker": "005930.KS",
     "currency": "KRW",
-    "price": 257000.0,
+    "price": 260000.0,
     "eps_ttm": 22292.0,
     "eps_2026E": 47816,
     "eps_2027E": 66500,
-    "per_ttm": 11.53,
-    "per_2026E": 5.37,
-    "per_2027E": 3.86,
+    "per_ttm": 11.66,
+    "per_2026E": 5.44,
+    "per_2027E": 3.91,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다",
     "annual_naver": {
      "2021": {
@@ -6543,62 +6559,62 @@
      },
      "2026": {
       "is_consensus": true,
-      "revenue": 7384675.0,
-      "net": 3260180.0,
-      "opm": 53.05,
-      "roe": 56.36,
-      "eps": 48139.0,
-      "per": 5.34,
-      "bps": 109013.0,
-      "pbr": 2.36
+      "revenue": 7397268.0,
+      "net": 3274613.0,
+      "opm": 53.17,
+      "roe": 56.51,
+      "eps": 48339.0,
+      "per": 5.38,
+      "bps": 109279.0,
+      "pbr": 2.38
      },
      "2027": {
       "is_consensus": true,
-      "revenue": 9414237.0,
-      "net": 4470053.0,
-      "opm": 57.72,
-      "roe": 48.51,
-      "eps": 66386.0,
-      "per": 3.87,
-      "bps": 168338.0,
+      "revenue": 9543904.0,
+      "net": 4570531.0,
+      "opm": 58.07,
+      "roe": 49.23,
+      "eps": 67792.0,
+      "per": 3.84,
+      "bps": 169906.0,
       "pbr": 1.53
      },
      "2028": {
       "is_consensus": true,
-      "revenue": 9984010.0,
-      "net": 4485057.0,
-      "opm": 53.7,
-      "roe": 33.97,
-      "eps": 66632.0,
-      "per": 3.86,
-      "bps": 229170.0,
+      "revenue": 10174549.0,
+      "net": 4626314.0,
+      "opm": 54.26,
+      "roe": 34.71,
+      "eps": 68696.0,
+      "per": 3.78,
+      "bps": 231322.0,
       "pbr": 1.12
      }
     },
     "consensus_live": {
      "fwd_eps": 48139.0,
-     "fwd_per": 5.34,
+     "fwd_per": 5.4,
      "eps_ttm": 22292.0,
-     "per_ttm": 11.53,
-     "asof": "2026-08-31",
+     "per_ttm": 11.66,
+     "asof": "2026-09-01",
      "target": 491875.0,
      "recomm": "4.04",
-     "target_asof": "2026-08-27"
+     "target_asof": "2026-08-28"
     },
     "eps_fwd": 48139.0,
-    "per_fwd": 5.34
+    "per_fwd": 5.4
    },
    {
     "name": "Micron",
     "ticker": "MU",
     "currency": "USD",
-    "price": 932.86,
+    "price": 958.73,
     "eps_ttm": null,
     "eps_2026E": 73.39,
     "eps_2027E": 154.89,
     "per_ttm": null,
-    "per_2026E": 12.71,
-    "per_2027E": 6.02,
+    "per_2026E": 13.06,
+    "per_2027E": 6.19,
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다"
    }
   ],

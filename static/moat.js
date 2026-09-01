@@ -23,13 +23,14 @@ function mkt(sym){
   return ['🇺🇸','미국'];
 }
 const V={buy:  ['🟢','일시적 빠짐 후보','#166534','#dcfce7','해자 유지 신호 속 큰 낙폭 — 검토 후보'],
+        buy_z:['🟢','빠짐 후보 ~선행지표 중립','#15803d','#dcfce7','큰 낙폭 + 선행지표 3개월이 ±5% 이내(방향 불명) 또는 악화가 3일 미만 — 0 근처 부호 뒤집힘을 판정에 쓰지 않는다'],
         buy_m:['🟢','빠짐 후보 ※수동확인','#166534','#dcfce7','큰 낙폭이나 선행지표 미연결 — 해자 훼손 뉴스 직접 확인 필요'],
-        risk: ['🔴','선행지표 동반 악화','#b91c1c','#fee2e2','낙폭 + 연결 지표도 하락 — 구조적 이유 의심'],
+        risk: ['🔴','선행지표 동반 악화','#b91c1c','#fee2e2','낙폭 + 연결 지표가 3거래일 연속 -5% 이하 — 구조적 이유 의심'],
         watch:['🟡','관찰','#a16207','#fef9c3','중간 지대 — 신호 대기'],
         top:  ['⚪','고점권','#475569','#f1f5f9','52주 고점 부근 — 빠짐 신호 없음'],
         top_hot: ['⚪🔥','추세 건강','#0f766e','#ccfbf1','고점 질 점수 70+ — 신고가 최근·선행지표 동행·밴드 중하위 = 오를 이유가 살아있는 고점'],
         top_warn:['⚪⚠','과열·소진 주의','#b45309','#ffedd5','고점 질 점수 40미만 — 경신 끊김·다이버전스·이격 과대 = 멀티플 의존 고점']};
-const ORDER={buy:0,buy_m:1,risk:2,top_warn:3,watch:4,top_hot:5,top:6};
+const ORDER={buy:0,buy_z:1,buy_m:2,risk:3,top_warn:4,watch:5,top_hot:6,top:7};
 
 function spark(sv,color){
   if(!sv||sv.length<2) return '';
@@ -43,19 +44,19 @@ function render(){
   $('mw_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:30 자동 갱신';
   const rows=D.rows||[], c=D.counts||{};
   // 필터 칩 + 신호등 요약
-  const FL=[['all','전체 '+rows.length],['buy','🟢 빠짐 후보 '+((c.buy||0)+(c.buy_m||0))],['risk','🔴 악화 '+(c.risk||0)],['watch','🟡 관찰 '+(c.watch||0)],['top','⚪ 고점권 '+((c.top||0)+(c.top_hot||0)+(c.top_warn||0))]];
+  const FL=[['all','전체 '+rows.length],['buy','🟢 빠짐 후보 '+((c.buy||0)+(c.buy_z||0)+(c.buy_m||0))],['risk','🔴 악화 '+(c.risk||0)],['watch','🟡 관찰 '+(c.watch||0)],['top','⚪ 고점권 '+((c.top||0)+(c.top_hot||0)+(c.top_warn||0))]];
   $('mw_filt').innerHTML=FL.map(f=>
     `<button data-f="${f[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${FILT===f[0]?'#334155':'#d6d9de'};background:${FILT===f[0]?'#334155':'#fff'};color:${FILT===f[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${f[1]}</button>`).join('');
   $('mw_filt').querySelectorAll('button').forEach(b=>b.onclick=()=>{FILT=b.dataset.f;render();});
 
   // (Phase3) 오늘의 판정 전환 배너
   const chg=rows.filter(r=>r.vd_prev);
-  const VE={buy:'🟢',buy_m:'🟢※',risk:'🔴',watch:'🟡',top:'⚪',top_hot:'⚪🔥',top_warn:'⚪⚠'};
+  const VE={buy:'🟢',buy_z:'🟢~',buy_m:'🟢※',risk:'🔴',watch:'🟡',top:'⚪',top_hot:'⚪🔥',top_warn:'⚪⚠'};
   const bn=$('mw_chg');
   if(bn) bn.innerHTML=chg.length?`<b>⚡ 오늘의 전환</b> — ${chg.map(r=>`${r.name} ${VE[r.vd_prev]||r.vd_prev}→${VE[r.verdict]}`).join(' · ')}`
                                :'오늘 판정 전환 없음 — 신호등은 매일 06:30 재산출';
   let list=[...rows];
-  if(FILT==='buy') list=list.filter(r=>r.verdict==='buy'||r.verdict==='buy_m');
+  if(FILT==='buy') list=list.filter(r=>r.verdict==='buy'||r.verdict==='buy_z'||r.verdict==='buy_m');
   else if(FILT==='top') list=list.filter(r=>r.verdict.startsWith('top'));
   else if(FILT!=='all') list=list.filter(r=>r.verdict===FILT);
   // 정렬: 🟢 우선 → 낙폭 큰 순 (기회 후보가 맨 위)
