@@ -1218,8 +1218,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
                 + ((lv.eps!=null&&lv.est!=null)?` <span class="note">(Actual ${(+lv.eps).toFixed(2)} vs Consensus ${(+lv.est).toFixed(2)})</span>`:''));
               if(r.sspr!=null) bits.push(`<b>Revenue</b> Consensus 대비 ${r.sspr>0?'Beat':'Miss'} ${pct(r.sspr)}`);
             }else{
-              bits.push(`${lv.spr!=null?'영업익 컨센比':'영업익YoY'} ${pct(rv)||'—'}`);
-              if(lv.spr_s!=null) bits.push(`매출 컨센比 ${pct(lv.spr_s)}`);
+              bits.push(`${lv.spr!=null?'영업익 컨센대비':'영업익YoY'} ${pct(rv)||'—'}`);   // (2026-09-02) '比' 한자 금지
+              if(lv.spr_s!=null) bits.push(`매출 컨센대비 ${pct(lv.spr_s)}`);
             }
             if(mk==='kr'){
               const yy=[]; if(lv.sales_yoy!=null) yy.push('매출'+pct(lv.sales_yoy));
@@ -7782,8 +7782,8 @@ await _canvasFlow(c);
           const latest = (sm.d===rw.edl);
           if(latest && mkt==='kr'){
             /* (2026-08-09) KR 상세 — 컨센 대비 / YoY / QoQ(전환) / 마진을 전부 한 팝업에 */
-            const l1=[]; if(rw.spr!=null) l1.push('영업익 컨센比 '+pc(rw.spr));
-            if(rw.sspr!=null) l1.push('매출 컨센比 '+pc(rw.sspr));
+            const l1=[]; if(rw.spr!=null) l1.push('영업익 컨센대비 '+pc(rw.spr));   // (2026-09-02) '比' 한자 금지
+            if(rw.sspr!=null) l1.push('매출 컨센대비 '+pc(rw.sspr));
             rows.push(['컨센', l1.length?l1.join('   '):'컨센서스 미커버']);
             const l2=[]; if(rw.syoy!=null) l2.push('매출 '+pc(rw.syoy));
             if(rw.oyoy!=null) l2.push('영업익 '+pc(rw.oyoy));

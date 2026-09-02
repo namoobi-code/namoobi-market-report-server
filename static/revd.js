@@ -2,7 +2,7 @@
    데이터: /api/kr_rev_daily (tp_history.json + kr_consensus.sqlite 일별 diff · mtime 캐시)
 
    근거(사용자 관찰 · 코스메카코리아 실측 2026-08):
-     8/10 실적발표(영업익 컨센比 +15.7%) → 8/11 증권사 6곳 목표가 일제 상향
+     8/10 실적발표(영업익 컨센대비 +15.7%) → 8/11 증권사 6곳 목표가 일제 상향
      → 8/12 영업익 컨센서스 상향(+7.8~11.4%) → 주가 지속 상승(D+5 +32.6%).
    이 연쇄의 2단계(목표가 변동)·3단계(컨센 리비전)를 매일 전 종목 횡단 리스트로 제공
    → 확인·검토 후 매수 판단용. 개별 종목 심층은 종목 클릭(네이버 팝업) 또는 TICKER 차트로.
@@ -67,15 +67,15 @@ function chips(kind){
     ${['all','up','dn'].map(m=>`<button class="scrrst${MODE[kind]===m?' on':''}" data-m="${m}" style="font-size:11px${MODE[kind]===m?';background:#1e293b;color:#fff':''}">${m==='all'?'전체':m==='up'?'상향만':'하향만'}</button>`).join('')}</span>`;
 }
 
-/* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센比 · spr_s=매출 컨센比 */
+/* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센대비 · spr_s=매출 컨센대비 */
 function spBlock(day){
   const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} <span class="note">발표 ${day.rows.length}건 (수치 파싱분)</span></div>`;
-  /* (2026-09-02 피드백3) 좌측 반폭 배치용 압축 — YoY 3종은 영업익만 남기고 주가반응은 한 칸에 */
-  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익 컨센比</th><th>매출 컨센比</th><th>영업익 YoY</th><th>주가반응</th></tr>';
+  /* (2026-09-02 피드백4) 컬럼 확장 — 영업익·매출 각각 컨센대비('比' 한자 금지)/YoY/QoQ 명시 */
+  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익<br>컨센대비</th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th>매출<br>컨센대비</th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>';
   const tr=day.rows.map(r=>{
     const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
     const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
-    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.spr_s)}</td><td>${pf(r.op_yoy)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
+    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.op_yoy)}</td><td>${pf(r.op_qoq)}</td><td><b>${pf(r.spr_s)}</b></td><td>${pf(r.sales_yoy)}</td><td>${pf(r.sales_qoq)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
   }).join('');
   return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
 }

@@ -2330,7 +2330,8 @@ def kr_rev_daily():
                 rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": m["cap"],
                              "px": m["px"], "chg": m["chg"],
                              "spr": x.get("spr"), "spr_s": x.get("spr_s"),
-                             "op_yoy": x.get("op_yoy"), "sales_yoy": x.get("sales_yoy"),
+                             "op_yoy": x.get("op_yoy"), "op_qoq": x.get("op_qoq"),
+                             "sales_yoy": x.get("sales_yoy"), "sales_qoq": x.get("sales_qoq"),
                              "ni_yoy": x.get("ni_yoy"), "r1": x.get("r1"), "r5": x.get("r5")})
             if rows:
                 rows.sort(key=lambda r: -(r["spr"] if r["spr"] is not None else -1e9))
