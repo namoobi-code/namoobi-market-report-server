@@ -63,7 +63,12 @@ BATTLES = [
     ("hbm", "B", "HBM 점유 (SK하이닉스·삼성·마이크론)", "%", "분기",
      "엔비디아 퀄·배분 뉴스가 3사 주가 즉발 변수 — 삼성 반격 폭이 SK하이닉스 프리미엄을 결정",
      [("SK하이닉스", "000660.KS"), ("삼성전자", "005930.KS"), ("마이크론", "MU")],
-     [], "hbm", "트렌드포스·업계 집계(서버 3.1.9 일일 수집 재활용)"),
+     # (2026-09-02 감사) 자동 시계열의 원천(Silicon Analysts API)은 스스로 editorial estimate
+     # (marketShare ∈ editorialTables · source_type=estimated)라고 명시 — '실측'이 아니다.
+     # 실측 대조: 트렌드포스 계열 보도(2026)는 SKH 50%대 중반, 삼성 20%대 중반(연말 38% 목표),
+     # 마이크론 ~20% — SA 추정의 마이크론 8%는 업계 집계와 크게 다르다. 아래 참조점을 병기.
+     [("2026-02", {"SK하이닉스": 55, "삼성전자": 25, "마이크론": 20}, "트렌드포스 보도 범위 중값(E) — SA 추정과 마이크론 괴리 큼")],
+     "hbm", "Silicon Analysts 편집부 추정(실측 아님·자체 명시) + 트렌드포스 보도 참조점 병기"),
     ("ai_chip", "B", "AI 서버 출하 비중 (GPU vs 커스텀 ASIC)", "%", "분기",
      "ASIC 성장률이 GPU의 3배(+44.6% vs +16.1%) — 2030년 ASIC 40% 전망, 엔비디아 멀티플 압박·브로드컴 수혜의 제로섬. 매출 기준으론 엔비디아 ~86%(2025)로 여전히 압도",
      [("GPU(엔비디아)", "NVDA"), ("커스텀 ASIC", "AVGO")],
@@ -176,8 +181,9 @@ def auto_hbm():
         if wk == last_wk:
             continue
         last_wk = wk
+        # (2026-09-02 감사) '실측' 라벨 정정 — 원천 API 가 editorial estimate 라고 자체 명시
         out.append((dt_, {"SK하이닉스": m.get("SK Hynix"), "삼성전자": m.get("Samsung"),
-                          "마이크론": m.get("Micron")}, "실측(주간 샘플)"))
+                          "마이크론": m.get("Micron")}, "SA 추정(주간 샘플·실측 아님)"))
     return out[-26:]
 
 
@@ -206,7 +212,8 @@ def main():
     for bid, grade, name, unit, freq, why, players, seed, auto, src in BATTLES:
         series = [{"d": d, "v": v, "note": n} for d, v, n in seed]
         if auto == "hbm":
-            series = [{"d": d, "v": v, "note": n} for d, v, n in auto_hbm()]
+            # (2026-09-02) 시드(트렌드포스 참조점) 유지 + 자동(SA 추정) 병합 — 시드를 버리지 않는다
+            series += [{"d": d, "v": v, "note": n} for d, v, n in auto_hbm()]
         elif auto == "amzn":
             ser, players = auto_amzn()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
