@@ -83,7 +83,7 @@ function spBlock(day){
     :`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="${_tt}">영업익 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th title="${_tt}">매출 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>`;
   const tr=day.rows.map(r=>{
     const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${CAPF(r.cap)}</span></td>`;
-    const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
+    const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r3!=null) rr.push('D+3 '+pf(r.r3)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
     if(MKT==='us')   /* US: EPS 실제vs컨센 + 가이던스 갭(8-K 파싱) — 미국식 관전점 */
       return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td style="white-space:nowrap">${r.eps!=null?(+r.eps).toFixed(2):'—'} vs ${r.est!=null?(+r.est).toFixed(2):'—'}</td><td>${pf(r.grev)}</td><td>${pf(r.geps)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
     return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.op_yoy)}</td><td>${pf(r.op_qoq)}</td><td><b>${pf(r.spr_s)}</b></td><td>${pf(r.sales_yoy)}</td><td>${pf(r.sales_qoq)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;

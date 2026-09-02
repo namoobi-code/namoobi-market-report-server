@@ -91,7 +91,7 @@ def react(closes, d8):
     if base is None or not after or base <= 0:
         return {}
     out = {}
-    for lab, i in (("r1", 0), ("r5", 4), ("r20", 19)):
+    for lab, i in (("r1", 0), ("r3", 2), ("r5", 4), ("r20", 19)):   # (2026-09-02) D+3 추가(사용자)
         if len(after) > i:
             out[lab] = round((after[i][1] / base - 1) * 100, 2)
     return out
@@ -110,7 +110,8 @@ def run(path, closes_fn, sym_of):
             continue
         for it in days[d8]:
             # r20 까지 다 찬 항목은 재계산 불필요. 아직 20일이 안 지났으면 매번 갱신한다.
-            if it.get("r20") is not None:
+            # (2026-09-02) r3 신설 — 기존 레코드 백필 위해 r3 없으면 재계산
+            if it.get("r20") is not None and it.get("r3") is not None:
                 skip += 1
                 continue
             cl = closes_fn(sym_of(it), d8)

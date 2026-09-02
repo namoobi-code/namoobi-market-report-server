@@ -2259,7 +2259,7 @@ def _us_rev_daily():
                              "px": m["px"], "chg": m["chg"],
                              "spr": x.get("spr"), "eps": x.get("eps"), "est": x.get("est"),
                              "grev": x.get("g_rev_gap"), "geps": x.get("g_eps_gap"),
-                             "r1": x.get("r1"), "r5": x.get("r5")})
+                             "r1": x.get("r1"), "r3": x.get("r3"), "r5": x.get("r5")})
             if rows:
                 rows.sort(key=lambda r: -(r["spr"] if r["spr"] is not None else -1e9))
                 sp_days.append({"d": f"{d8[:4]}-{d8[4:6]}-{d8[6:]}", "rows": rows})
@@ -2436,7 +2436,7 @@ def kr_rev_daily(mkt: str = "kr"):
                              "spr": x.get("spr"), "spr_s": x.get("spr_s"),
                              "op_yoy": x.get("op_yoy"), "op_qoq": x.get("op_qoq"),
                              "sales_yoy": x.get("sales_yoy"), "sales_qoq": x.get("sales_qoq"),
-                             "ni_yoy": x.get("ni_yoy"), "r1": x.get("r1"), "r5": x.get("r5")})
+                             "ni_yoy": x.get("ni_yoy"), "r1": x.get("r1"), "r3": x.get("r3"), "r5": x.get("r5")})
             if rows:
                 rows.sort(key=lambda r: -(r["spr"] if r["spr"] is not None else -1e9))
                 sp_days.append({"d": f"{d8[:4]}-{d8[4:6]}-{d8[6:]}", "rows": rows})
