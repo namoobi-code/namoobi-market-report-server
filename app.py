@@ -2236,9 +2236,11 @@ def kr_rev_daily():
     tp_p = DB / "tp_history.json"
     cs_p = DB / "kr_consensus.sqlite"
     el_p0 = DB / "earnings_live.json"
+    pl_p0 = DB / "screener_pool.json"
     key = (tp_p.stat().st_mtime if tp_p.exists() else 0,
            cs_p.stat().st_mtime if cs_p.exists() else 0,
-           el_p0.stat().st_mtime if el_p0.exists() else 0)
+           el_p0.stat().st_mtime if el_p0.exists() else 0,
+           pl_p0.stat().st_mtime if pl_p0.exists() else 0)
     if _revd_cache["key"] == key and _revd_cache["data"]:
         return _revd_cache["data"]
     # 종목 메타 (이름·시총·현재가·직전 실적발표일)
@@ -2337,8 +2339,53 @@ def kr_rev_daily():
                 break
     except Exception:
         pass
+    # ㉠ 발표 예정 (향후 7일) + 선행 신호 — 캘린더 팝업의 _leadBits 와 같은 신호를
+    #    리비전 데일리에서도 리스트로 (2026-09-02 사용자 요청). 수출 YoY 는 kcons 매핑 20종만.
+    up_days = []
+    try:
+        import datetime as _dt
+        kexp = {}
+        try:
+            kj = json.loads((DB / "kcons.json").read_text(encoding="utf-8"))
+            it = (kj.get("export") or {}).get("items") or []
+            ms = (kj.get("export") or {}).get("months") or []
+            n = len(ms) - 1
+            ty = {}
+            for th in ("K뷰티", "K푸드", "K패션"):
+                its = [x for x in it if x.get("th") == th]
+                s = lambda i: sum((x.get("exp") or [0] * (i + 1))[i] or 0 for x in its)
+                ty[th] = round((s(n) / s(n - 12) - 1) * 100, 1) if n >= 12 and s(n - 12) else None
+            for st in kj.get("stocks") or []:
+                c = (st.get("sym") or "").split(".")[0]
+                if c:
+                    kexp[c] = {"th": st.get("th"), "yoy": ty.get(st.get("th")), "m": ms[n] if ms else None}
+        except Exception:
+            pass
+        t0 = _dt.date.today()
+        t7 = (t0 + _dt.timedelta(days=7)).isoformat()
+        byd = {}
+        for r in pool.get("kr") or []:
+            ed = r.get("ed")
+            if not ed or not (t0.isoformat() <= ed <= t7):
+                continue
+            t9 = r.get("tprv90")
+            if t9 is None and r.get("rev") is not None:
+                t9 = round(r["rev"] * 100, 1)
+            byd.setdefault(ed, []).append({
+                "c": r.get("c"), "n": r.get("n") or r.get("name"), "cap": r.get("mcap") or r.get("cap"),
+                "px": r.get("px"), "chg": r.get("chg"),
+                "cr30": round(r["cr30"] * 100, 1) if r.get("cr30") is not None else None,
+                "tprv90": t9, "spr": r.get("spr"),
+                "fst": r.get("fst"), "ost": r.get("ost"),
+                "kx": kexp.get(r.get("c"))})
+        for d in sorted(byd):
+            rows = byd[d]
+            rows.sort(key=lambda x: -(x["cap"] or 0))
+            up_days.append({"d": d, "rows": rows})
+    except Exception:
+        pass
     out = {"asof": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"),
-           "sp_days": sp_days, "tp_days": tp_days, "op_days": op_days}
+           "sp_days": sp_days, "up_days": up_days, "tp_days": tp_days, "op_days": op_days}
     _revd_cache["key"] = key; _revd_cache["data"] = out
     return out
 

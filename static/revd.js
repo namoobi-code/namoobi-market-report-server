@@ -78,9 +78,23 @@ function spBlock(day){
   return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
 }
 
+/* ㉠ 발표 예정 + 선행 신호 — 캘린더 팝업 _leadBits 와 동일 신호를 리스트로 (2026-09-02) */
+function upBlock(day){
+  const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} 발표 예정 <span class="note">${day.rows.length}종 · 시총순</span></div>`;
+  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익컨센 30일</th><th>목표가 90일</th><th>직전 서프</th><th>연속순매수</th><th>수출 YoY</th></tr>';
+  const tr=day.rows.map(r=>{
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    const sup=[]; if((r.fst||0)>0) sup.push('외인 '+r.fst+'일'); if((r.ost||0)>0) sup.push('기관 '+r.ost+'일');
+    const kx=r.kx&&r.kx.yoy!=null?`${pf(r.kx.yoy)}<br><span class="note">${E(r.kx.th)} ${E(r.kx.m||'')}</span>`:'—';
+    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td>${pf(r.cr30)}</td><td>${pf(r.tprv90)}</td><td>${pf(r.spr)}</td><td style="white-space:nowrap">${sup.join(' ')||'—'}</td><td>${kx}</td></tr>`;
+  }).join('');
+  return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
+}
+
 function render(){
   if(!D) return;
   $('rv_asof').textContent='기준 '+(D.asof||'')+' · 스냅샷 갱신 시 자동 재계산';
+  $('rv_up').innerHTML=(D.up_days||[]).map(upBlock).join('')||'<div class="note">향후 7일 발표 예정 없음 (예정일은 IR 공시·컨센 커버 종목만 수집됨)</div>';
   $('rv_sp').innerHTML=(D.sp_days||[]).map(spBlock).join('')||'<div class="note">최근 발표 없음</div>';
   $('rv_tp').innerHTML=chips('tp')+(D.tp_days||[]).map(d=>dayBlock(d,'tp')).join('');
   $('rv_op').innerHTML=chips('op')+(D.op_days||[]).map(d=>dayBlock(d,'op')).join('');
