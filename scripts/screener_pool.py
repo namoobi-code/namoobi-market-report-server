@@ -772,6 +772,21 @@ def build():
                     _r["qtoby"]=_v.get("qtoby"); _r["qtobq"]=_v.get("qtobq"); _r["opmch"]=_v.get("opmch")
         print(f"[pool] growth_accel 병합 KR {len(_ga.get('kr') or {})} · US {len(_ga.get('us') or {})}")
     except Exception as e: print("[pool] growth_accel 병합 skip:", repr(e)[:80])
+    # (2026-09-02) KR 발표일 영구 이력 — edl(잠정공시 접수일)은 earnings_live 45일 유지라
+    # 풀에서도 45일 뒤 소멸한다. 다음 예정일 추정(직전 발표일+91일)은 발표 91일 후에야
+    # 필요한데 그땐 edl이 이미 사라져 있어 **추정이 항상 불가**(실측: 향후7일 추정 0건).
+    # → 여기서 종목별 최신 발표일을 kr_edl_hist.json 에 영구 병합해 둔다(정본, 매 빌드 갱신).
+    try:
+        _ehp=os.path.join(T.BASE,"data","db","kr_edl_hist.json")
+        try: _eh=json.load(open(_ehp,encoding="utf-8"))
+        except Exception: _eh={}
+        _n0=len(_eh)
+        for _r in kr:
+            _e=_r.get("edl")
+            if _e and str(_e)>str(_eh.get(_r["c"]) or ""): _eh[_r["c"]]=str(_e)
+        json.dump(_eh,open(_ehp,"w",encoding="utf-8"))
+        print(f"[pool] kr_edl_hist 병합 {_n0}→{len(_eh)}종")
+    except Exception as e: print("[pool] kr_edl_hist skip:", repr(e)[:80])
     _pd=T.kr_price_date()
     out={"asof":T.now_kst(),"price_date":_pd,
          "kr":sorted(kr,key=lambda r:-(r["cap"] or 0)),

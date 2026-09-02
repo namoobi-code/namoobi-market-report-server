@@ -70,10 +70,12 @@ function chips(kind){
 /* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센比 · spr_s=매출 컨센比 */
 function spBlock(day){
   const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} <span class="note">발표 ${day.rows.length}건 (수치 파싱분)</span></div>`;
-  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익 컨센比</th><th>매출 컨센比</th><th>영업익 YoY</th><th>매출 YoY</th><th>순익 YoY</th><th>D+1</th><th>D+5</th></tr>';
+  /* (2026-09-02 피드백3) 좌측 반폭 배치용 압축 — YoY 3종은 영업익만 남기고 주가반응은 한 칸에 */
+  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익 컨센比</th><th>매출 컨센比</th><th>영업익 YoY</th><th>주가반응</th></tr>';
   const tr=day.rows.map(r=>{
     const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
-    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.spr_s)}</td><td>${pf(r.op_yoy)}</td><td>${pf(r.sales_yoy)}</td><td>${pf(r.ni_yoy)}</td><td>${pf(r.r1)}</td><td>${pf(r.r5)}</td></tr>`;
+    const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
+    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.spr_s)}</td><td>${pf(r.op_yoy)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
   }).join('');
   return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
 }
@@ -83,7 +85,9 @@ function upBlock(day){
   const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} 발표 예정 <span class="note">${day.rows.length}종 · 시총순</span></div>`;
   const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익컨센 30일</th><th>목표가 90일</th><th>직전 서프</th><th>연속순매수</th><th>수출 YoY</th></tr>';
   const tr=day.rows.map(r=>{
-    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    /* 확정(IR 공시) vs 추정(직전 발표일+91일 — 전종목 확대, 2026-09-02) 뱃지 */
+    const sb=r.src==='추정'?'<span style="color:#b45309;font-size:9.5px;border:1px solid #fcd34d;border-radius:4px;padding:0 3px;margin-left:3px">추정</span>':'';
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b>${sb}<br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
     const sup=[]; if((r.fst||0)>0) sup.push('외인 '+r.fst+'일'); if((r.ost||0)>0) sup.push('기관 '+r.ost+'일');
     const kx=r.kx&&r.kx.yoy!=null?`${pf(r.kx.yoy)}<br><span class="note">${E(r.kx.th)} ${E(r.kx.m||'')}</span>`:'—';
     return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td>${pf(r.cr30)}</td><td>${pf(r.tprv90)}</td><td>${pf(r.spr)}</td><td style="white-space:nowrap">${sup.join(' ')||'—'}</td><td>${kx}</td></tr>`;

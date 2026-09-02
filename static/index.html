@@ -743,12 +743,18 @@
       리스트에서 확인 → 종목 클릭(네이버) 또는 TICKER 차트로 검토 → 매수 판단.
       ※ 평균 목표가는 증권사 리포트 ~24건 롤링 평균이라 액면병합·오래된 리포트 이탈 시 급변할 수 있음(원자료 그대로 표시).
       참고용이며 투자권유가 아님.</div>
-    <!-- (2026-09-02 피드백) ⓪ 발표 당일 서프라이즈 — 연쇄 1단계를 같은 화면 맨 위에 -->
-    <h3>⓪ 실적발표 서프라이즈 <span class="note">최근 7 발표일 · 잠정실적(공시) vs WISEreport 컨센 · 영업익 컨센比 순</span></h3>
-    <div class="box" style="padding:10px 10px;margin-bottom:10px"><div id="rv_sp"><div class="note">불러오는 중…</div></div></div>
-    <!-- (2026-09-02 피드백2) ㉠ 발표 예정 + 선행 신호 — 캘린더 팝업과 같은 신호를 리스트로 -->
-    <h3>㉠ 발표 예정 (향후 7일) — 선행 신호 <span class="note">발표 전에 리비전·목표가·수급·수출이 이미 우호적인가 · 캘린더 팝업과 동일 신호</span></h3>
-    <div class="box" style="padding:10px 10px;margin-bottom:10px"><div id="rv_up"><div class="note">불러오는 중…</div></div></div>
+    <!-- (2026-09-02 피드백3) ⓪ 서프라이즈(좌) · ㉠ 발표 예정(우) — 발표 전후를 한눈에 -->
+    <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px">
+      <div style="flex:1;min-width:460px">
+        <h3>⓪ 실적발표 서프라이즈 <span class="note">최근 7 발표일 · 공시 vs 컨센</span></h3>
+        <div class="box" style="padding:10px 10px"><div id="rv_sp"><div class="note">불러오는 중…</div></div></div>
+      </div>
+      <div style="flex:1;min-width:460px">
+        <h3>㉠ 발표 예정 (향후 7일) — 선행 신호 <span class="note">확정=IR 공시 · 추정=직전 발표일+91일(±수일)</span></h3>
+        <div class="box" style="padding:10px 10px"><div id="rv_up"><div class="note">불러오는 중…</div></div></div>
+      </div>
+    </div>
+
     <!-- (2026-09-02 피드백) ①·② 좌우 병렬 — 목표가와 컨센 리비전을 한눈에 비교 -->
     <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
       <div style="flex:1;min-width:460px">
@@ -2106,7 +2112,7 @@
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
-<script src="/revd.js?v=09021324"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
+<script src="/revd.js?v=09021337"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=09021150"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09010700"></script>

@@ -2363,21 +2363,37 @@ def kr_rev_daily():
             pass
         t0 = _dt.date.today()
         t7 = (t0 + _dt.timedelta(days=7)).isoformat()
+        # (2026-09-02 전종목 확대) 확정 예정일(네이버 IR — 대형주 위주)만으론 커버리지가
+        # 좁다(실측 6종) → kr_edl_hist(발표일 영구 이력, 풀 빌드가 매일 병합)의
+        # 직전 발표일 + 91일(분기 전형 간격)로 **추정** 예정일을 병기한다.
+        # 확정(ed)이 있으면 확정 우선. src: "확정" | "추정(±수일)".
+        eh = {}
+        try:
+            eh = json.loads((DB / "kr_edl_hist.json").read_text(encoding="utf-8"))
+        except Exception:
+            pass
         byd = {}
         for r in pool.get("kr") or []:
-            ed = r.get("ed")
+            c = r.get("c")
+            ed, src = r.get("ed"), "확정"
+            if not ed and eh.get(c):
+                try:
+                    d0 = _dt.datetime.strptime(eh[c], "%Y%m%d").date()
+                    ed, src = (d0 + _dt.timedelta(days=91)).isoformat(), "추정"
+                except Exception:
+                    pass
             if not ed or not (t0.isoformat() <= ed <= t7):
                 continue
             t9 = r.get("tprv90")
             if t9 is None and r.get("rev") is not None:
                 t9 = round(r["rev"] * 100, 1)
             byd.setdefault(ed, []).append({
-                "c": r.get("c"), "n": r.get("n") or r.get("name"), "cap": r.get("mcap") or r.get("cap"),
-                "px": r.get("px"), "chg": r.get("chg"),
+                "c": c, "n": r.get("n") or r.get("name"), "cap": r.get("mcap") or r.get("cap"),
+                "px": r.get("px"), "chg": r.get("chg"), "src": src,
                 "cr30": round(r["cr30"] * 100, 1) if r.get("cr30") is not None else None,
                 "tprv90": t9, "spr": r.get("spr"),
                 "fst": r.get("fst"), "ost": r.get("ost"),
-                "kx": kexp.get(r.get("c"))})
+                "kx": kexp.get(c)})
         for d in sorted(byd):
             rows = byd[d]
             rows.sort(key=lambda x: -(x["cap"] or 0))
