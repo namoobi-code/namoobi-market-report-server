@@ -70,8 +70,11 @@ function chips(kind){
 /* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센대비 · spr_s=매출 컨센대비 */
 function spBlock(day){
   const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} <span class="note">발표 ${day.rows.length}건 (수치 파싱분)</span></div>`;
-  /* (2026-09-02 피드백4) 컬럼 확장 — 영업익·매출 각각 컨센대비('比' 한자 금지)/YoY/QoQ 명시 */
-  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익<br>컨센대비</th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th>매출<br>컨센대비</th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>';
+  /* (2026-09-02 피드백4·5) 컬럼 확장 + 기준 명시 — 컨센대비는 YoY/QoQ 가 아니라
+     '발표한 분기의 실제치 vs 같은 분기의 증권사 컨센서스 추정치'다. 헤더에 (당분기 추정대비)
+     를 병기하고 툴팁으로 풀어쓴다. */
+  const _tt='발표 분기 실제치 vs 같은 분기 증권사 컨센서스 추정치 — 전년동기(YoY)·전분기(QoQ) 비교가 아님';
+  const th=`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="${_tt}">영업익 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th title="${_tt}">매출 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>`;
   const tr=day.rows.map(r=>{
     const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
     const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
