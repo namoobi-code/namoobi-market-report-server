@@ -28,7 +28,7 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 KR = BASE / "data" / "db" / "earnings_live.json"
 US = BASE / "data" / "db" / "earnings_live_us.json"
-UA = {"User-Agent": "Mozilla/5.0"}
+UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"}
 DAYS = int(sys.argv[sys.argv.index("--days") + 1]) if "--days" in sys.argv else 45
 
 
@@ -99,6 +99,25 @@ def us_calendar():
     return cal
 
 
+def sa_closes(sym):
+    """stockanalysis 일별 히스토리(서버렌더 표) → [(YYYYMMDD, 종가)] 최근 ~60일. Yahoo 봉 결함 보완용."""
+    import re, html as _h
+    try:
+        b = get(f"https://stockanalysis.com/stocks/{sym.lower().replace('.', '-')}/history/").decode("utf-8", "ignore")
+    except Exception:
+        return []
+    out = []
+    for r in re.findall(r"<tr[^>]*>(.*?)</tr>", b, re.S):
+        c = [_h.unescape(re.sub(r"<[^>]+>", "", x)).strip() for x in re.findall(r"<td[^>]*>(.*?)</td>", r, re.S)]
+        if len(c) >= 5:
+            try:
+                d = datetime.strptime(c[0], "%b %d, %Y").strftime("%Y%m%d")
+                out.append((d, float(c[4].replace(",", ""))))
+            except Exception:
+                continue
+    return sorted(out)[-60:]
+
+
 def react(closes, d8, cal=None):
     """발표일(d8) 기준 반응률.
 
@@ -117,7 +136,7 @@ def react(closes, d8, cal=None):
     after = [(d, c) for d, c in closes if d >= d8]
     if base is None or not after or base <= 0:
         return {}
-    out = {}
+    out = {"px0": round(base, 4)}   # (2026-09-02) 발표 직전 종가 — 발표시점 상승여력 계산용
     horizons = (("r1", 0), ("r3", 2), ("r5", 4), ("r20", 19))   # (2026-09-02) D+3 추가(사용자)
     cal_after = [d for d in (cal or []) if d >= d8] if cal else None
     if cal_after and cal_after[0] <= after[0][0]:
@@ -146,23 +165,30 @@ def run(path, closes_fn, sym_of, cal=None):
         for it in days[d8]:
             # r20 까지 다 찬 항목은 재계산 불필요. 아직 20일이 안 지났으면 매번 갱신한다.
             # (2026-09-02) r3 신설 — 기존 레코드 백필 위해 r3 없으면 재계산
-            if it.get("r20") is not None and it.get("r3") is not None:
+            if it.get("r20") is not None and it.get("r3") is not None and it.get("px0") is not None:
                 skip += 1
                 continue
             cl = closes_fn(sym_of(it), d8)
             # (2026-09-02 실측) 같은 종목도 요청 구간(period2)에 따라 빠지는 봉이 다르다
             # (ANF: p2=발표+45일 이면 8/28 누락, p2=지금 이면 있음). 달력상 있어야 할 날이
             # 비면 구간을 바꿔 한 번 더 받아 합친다.
+            # (2026-09-02 실측 정정) 구간을 바꿔도 같은 봉이 계속 null 이다(ANF 8/28 close=None,
+            # range=1mo/3mo/period 어느 조합이든 동일 — Yahoo 데이터 결함). → 달력상 있어야 할
+            # 날이 비면 stockanalysis 일별 히스토리(8/28 148.42 실측)로 그 날짜만 메운다.
             if cal and cl and closes_fn is us_closes:
                 have = {d for d, _ in cl}
                 need = [d for d in cal if d8 <= d <= cl[-1][0]]
                 if any(d not in have for d in need):
-                    cl2 = us_closes(sym_of(it), d8, p2=int(time.time()) + 86400)
+                    cl2 = sa_closes(sym_of(it))
                     if cl2:
                         cl = sorted(dict(cl + cl2).items())
             r = react(cl, d8, cal)
             if r:
-                it.update(r); n += 1
+                # 달력 기준으로 다시 계산했으면 예전 위치 기준(봉 누락 시 날짜가 밀린) 값을
+                # 덮어쓴다 — 아직 못 채운 칸은 None 으로 두고 다음 실행에서 재시도.
+                for lab in ("r1", "r3", "r5", "r20", "px0"):
+                    it[lab] = r.get(lab)
+                n += 1
             # (2026-08-09) 200건마다 중간 저장 — US 는 한 번에 2,500건이라 끝에서만 쓰면
             # 중단 시 수십 분치 작업이 통째로 날아간다.
             if n and n % 200 == 0:

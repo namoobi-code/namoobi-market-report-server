@@ -2269,7 +2269,26 @@ def _us_rev_daily():
     def _m(c):
         return meta.get(c) or {"n": c, "cap": None, "px": None, "chg": None, "edl": None}
     # ⓪ 발표 서프라이즈 — 최근 7 발표일 (EPS 실제 vs 컨센 + 가이던스 갭 + 주가반응)
+    # (2026-09-02 사용자) 발표시점 가격(px0=발표 직전 종가 · earnings_reaction) + 발표시점 목표가
+    # (tp0=발표일 이전 마지막 스냅샷 평균 목표가) + 그때 상승여력(up0) — "발표 당시 눈높이"와
+    # "지금"을 나란히 보려는 것. 스냅샷은 8/9 부터라 그 전 발표는 tp0 없음.
     sp_days = []
+    _tp0 = {}
+    try:
+        cx0 = sqlite3.connect(f"file:{cs_p}?mode=ro", uri=True, timeout=10)
+        for sym, d, tp in cx0.execute("SELECT sym, d, tp FROM snap WHERE tp IS NOT NULL ORDER BY d"):
+            _tp0.setdefault(sym, []).append((d.replace("-", ""), tp))
+        cx0.close()
+    except Exception:
+        pass
+    def _tp_at(sym, d8):
+        v = None
+        for d, tp in _tp0.get(sym) or []:
+            if d <= d8:
+                v = tp
+            else:
+                break
+        return v
     try:
         el = json.loads(el_p.read_text(encoding="utf-8")).get("days") or {}
         for d8 in sorted(el, reverse=True):
@@ -2278,8 +2297,11 @@ def _us_rev_daily():
                 if not isinstance(x, dict) or x.get("eps") is None:
                     continue   # 수치 미채움(8-K 접수만) 제외
                 m = _m(x.get("c"))
+                px0, tp0 = x.get("px0"), _tp_at(x.get("c"), d8)
                 rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": x.get("cap") or m["cap"],
                              "px": m["px"], "chg": m["chg"], "tp": m.get("tp"), "up": m.get("up"),
+                             "px0": px0, "tp0": tp0,
+                             "up0": round((tp0 / px0 - 1) * 100, 1) if (px0 and tp0) else None,
                              "spr": x.get("spr"), "eps": x.get("eps"), "est": x.get("est"),
                              "grev": x.get("g_rev_gap"), "geps": x.get("g_eps_gap"),
                              "r1": x.get("r1"), "r3": x.get("r3"), "r5": x.get("r5")})
@@ -2322,6 +2344,10 @@ def _us_rev_daily():
                     "SELECT a.sym, b.tp, a.tp, b.eq0, a.eq0, b.ey0, a.ey0 FROM snap a "
                     "JOIN snap b ON a.sym=b.sym WHERE a.d=? AND b.d=?", (d1, d0)):
                 m = _m(sym)
+                # (2026-09-02 사용자) 동전주(주가 $5 미만) 제외 — 미국은 하루 목표가 변동이
+                # 200~500종목이라 리스트가 너무 길다(실측 8/25 516건 중 $5 미만 63건).
+                if m.get("px") is not None and m["px"] < 5:
+                    continue
                 if tp0 and tp1 and tp0 != tp1:
                     trs.append({"c": sym, **m, "old": tp0, "new": tp1,
                                 "pct": round((tp1 / tp0 - 1) * 100, 1),
@@ -2446,6 +2472,21 @@ def kr_rev_daily(mkt: str = "kr"):
     # ⓪ 발표 당일 서프라이즈 — 잠정실적 감시(earnings_live.json) 최근 7 발표일 (2026-09-02 추가)
     #    연쇄의 1단계(실적발표)를 같은 화면 맨 위에 — spr=영업익 컨센比% · spr_s=매출 컨센比%.
     sp_days = []
+    # (2026-09-02 사용자) 발표시점 가격·목표가·상승여력 — px0 는 earnings_reaction(발표 직전 종가),
+    # tp0 는 tp_history.json 에서 발표일 이전 마지막 평균 목표가(90일 보관).
+    _h0 = {}
+    try:
+        _h0 = json.loads(tp_p.read_text(encoding="utf-8")).get("hist") or {}
+    except Exception:
+        pass
+    def _tp_at(code, d8):
+        v = None
+        for d in sorted(_h0.get(code) or {}):
+            if d.replace("-", "") <= d8:
+                v = _h0[code][d]
+            else:
+                break
+        return v
     try:
         el_p = DB / "earnings_live.json"
         el = json.loads(el_p.read_text(encoding="utf-8")).get("days") or {}
@@ -2456,8 +2497,11 @@ def kr_rev_daily(mkt: str = "kr"):
                         ("spr", "spr_s", "op_yoy", "sales_yoy")):
                     continue   # 수치 미파싱(공시 직후) 레코드 제외
                 m = _m(x.get("c"))
+                px0, tp0 = x.get("px0"), _tp_at(x.get("c"), d8)
                 rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": m["cap"],
                              "px": m["px"], "chg": m["chg"], "tp": m.get("tp"), "up": m.get("up"),
+                             "px0": px0, "tp0": tp0,
+                             "up0": round((tp0 / px0 - 1) * 100, 1) if (px0 and tp0) else None,
                              "spr": x.get("spr"), "spr_s": x.get("spr_s"),
                              "op_yoy": x.get("op_yoy"), "op_qoq": x.get("op_qoq"),
                              "sales_yoy": x.get("sales_yoy"), "sales_qoq": x.get("sales_qoq"),
