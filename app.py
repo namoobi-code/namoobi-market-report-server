@@ -2219,9 +2219,113 @@ def popular():
     except Exception:
         return _pop_cache["data"] or {"asof": None, "rows": []}
 
+_revd_us_cache = {"key": None, "data": None}
+def _us_rev_daily():
+    """(2026-09-02) 리비전 데일리 미국판 — KR 과 동일 컨셉.
+    소스: us_consensus.sqlite snap(sym,d,eq0=당분기EPS컨센,ey0=올해FY,tp=평균목표가 — 3,848종목 일별)
+          + earnings_live_us.json(EPS 실제vs컨센·가이던스 갭·주가반응) + pool us(ed 전종목 커버).
+    KR 과 달리 ①목표가·②EPS리비전이 같은 스냅샷 테이블에서 나오고, 예정일(ed)은 야후 제공이라
+    추정 불필요(향후 2주 ~115종 실측). 컨센 단위는 달러(EPS)·목표가 달러."""
+    cs_p = DB / "us_consensus.sqlite"
+    el_p = DB / "earnings_live_us.json"
+    pl_p = DB / "screener_pool.json"
+    key = tuple(p.stat().st_mtime if p.exists() else 0 for p in (cs_p, el_p, pl_p))
+    if _revd_us_cache["key"] == key and _revd_us_cache["data"]:
+        return _revd_us_cache["data"]
+    import datetime as _dt
+    meta = {}
+    try:
+        pool = json.loads(pl_p.read_text(encoding="utf-8"))
+        for r in pool.get("us") or []:
+            c = r.get("c")
+            if c:
+                meta[c] = {"n": r.get("kn") or r.get("n") or c, "cap": r.get("mcap") or r.get("cap"),
+                           "px": r.get("px"), "chg": r.get("chg"), "edl": r.get("edl")}
+    except Exception:
+        pool = {}
+    def _m(c):
+        return meta.get(c) or {"n": c, "cap": None, "px": None, "chg": None, "edl": None}
+    # ⓪ 발표 서프라이즈 — 최근 7 발표일 (EPS 실제 vs 컨센 + 가이던스 갭 + 주가반응)
+    sp_days = []
+    try:
+        el = json.loads(el_p.read_text(encoding="utf-8")).get("days") or {}
+        for d8 in sorted(el, reverse=True):
+            rows = []
+            for x in el[d8]:
+                if not isinstance(x, dict) or x.get("eps") is None:
+                    continue   # 수치 미채움(8-K 접수만) 제외
+                m = _m(x.get("c"))
+                rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": x.get("cap") or m["cap"],
+                             "px": m["px"], "chg": m["chg"],
+                             "spr": x.get("spr"), "eps": x.get("eps"), "est": x.get("est"),
+                             "grev": x.get("g_rev_gap"), "geps": x.get("g_eps_gap"),
+                             "r1": x.get("r1"), "r5": x.get("r5")})
+            if rows:
+                rows.sort(key=lambda r: -(r["spr"] if r["spr"] is not None else -1e9))
+                sp_days.append({"d": f"{d8[:4]}-{d8[4:6]}-{d8[6:]}", "rows": rows})
+            if len(sp_days) >= 7:
+                break
+    except Exception:
+        pass
+    # ㉠ 발표 예정 (향후 2주) + 선행 신호 — 야후 ed 는 전종목 커버라 추정 불필요
+    up_days = []
+    try:
+        t0 = _dt.date.today()
+        t14 = (t0 + _dt.timedelta(days=14)).isoformat()
+        byd = {}
+        for r in pool.get("us") or []:
+            ed = r.get("ed")
+            if not ed or not (t0.isoformat() <= ed <= t14):
+                continue
+            byd.setdefault(ed, []).append({
+                "c": r.get("c"), "n": r.get("kn") or r.get("n"), "cap": r.get("mcap") or r.get("cap"),
+                "px": r.get("px"), "chg": r.get("chg"), "src": "야후",
+                "cr30": round(r["cr30"] * 100, 1) if r.get("cr30") is not None else None,
+                "tprv90": r.get("tprv90"), "spr": r.get("spr")})
+        for d in sorted(byd):
+            byd[d].sort(key=lambda x: -(x["cap"] or 0))
+            up_days.append({"d": d, "rows": byd[d]})
+    except Exception:
+        pass
+    # ①②: 목표가(tp)·당분기 EPS 컨센(eq0, 없으면 ey0) 일별 diff — 같은 snap 테이블
+    tp_days, op_days = [], []
+    try:
+        cx = sqlite3.connect(f"file:{cs_p}?mode=ro", uri=True, timeout=10)
+        sdates = [r0[0] for r0 in cx.execute("SELECT DISTINCT d FROM snap ORDER BY d DESC LIMIT 8")][::-1]
+        for i in range(len(sdates) - 1, 0, -1):
+            d0, d1 = sdates[i - 1], sdates[i]
+            trs, ors = [], []
+            for sym, tp0, tp1, eq00, eq01, ey00, ey01 in cx.execute(
+                    "SELECT a.sym, b.tp, a.tp, b.eq0, a.eq0, b.ey0, a.ey0 FROM snap a "
+                    "JOIN snap b ON a.sym=b.sym WHERE a.d=? AND b.d=?", (d1, d0)):
+                m = _m(sym)
+                if tp0 and tp1 and tp0 != tp1:
+                    trs.append({"c": sym, **m, "old": tp0, "new": tp1,
+                                "pct": round((tp1 / tp0 - 1) * 100, 1),
+                                "up": round((tp1 / m["px"] - 1) * 100, 1) if m.get("px") else None})
+                # EPS 컨센: 당분기(eq0) 우선, 없으면 올해FY(ey0)
+                per, a, b = ("당분기", eq00, eq01) if (eq00 is not None and eq01 is not None and eq00 != eq01) \
+                    else (("올해FY", ey00, ey01) if (ey00 is not None and ey01 is not None and ey00 != ey01)
+                          else (None, None, None))
+                if per and a:
+                    ors.append({"c": sym, **m, "per": per, "old": a, "new": b,
+                                "pct": round((b - a) / abs(a) * 100, 1), "nch": 1})
+            trs.sort(key=lambda x: -x["pct"]); ors.sort(key=lambda x: -x["pct"])
+            tp_days.append({"d": d1, "prev": d0, "rows": trs})
+            op_days.append({"d": d1, "prev": d0, "rows": ors})
+        cx.close()
+    except Exception:
+        pass
+    out = {"asof": _dt.datetime.now().strftime("%Y-%m-%d %H:%M"), "mkt": "us",
+           "sp_days": sp_days, "up_days": up_days, "tp_days": tp_days, "op_days": op_days}
+    _revd_us_cache["key"] = key; _revd_us_cache["data"] = out
+    return out
+
 _revd_cache = {"key": None, "data": None}
 @app.get("/api/kr_rev_daily")
-def kr_rev_daily():
+def kr_rev_daily(mkt: str = "kr"):
+    if mkt == "us":
+        return _us_rev_daily()
     """(2026-09-02) KR 리비전 데일리 — 목표주가·영업익 컨센 변동리스트 (최근 7 스냅샷일 횡단).
 
     근거(사용자 관찰 · 코스메카코리아 실측): 8/10 실적발표(호실적) → 8/11 증권사 목표가 상향

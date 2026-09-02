@@ -13,7 +13,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-let D=null, MODE={tp:'all', op:'all'};   // all | up | dn
+let D=null, MKT='kr', CACHE={}, MODE={tp:'all', op:'all'};   // MKT: kr|us (2026-09-02 미국판)
 
 const WD=['일','월','화','수','목','금','토'];
 const nf=n=>n==null?'—':Number(n).toLocaleString();
@@ -38,8 +38,12 @@ function opch(o,n,pct){
   if(o>=0&&n<0) return '<b style="color:#2563eb">적자전환</b>';
   return pf(pct);
 }
-const openNv=c=>window.open(`https://m.stock.naver.com/domestic/stock/${c}/total`,'gm_pop_w','width=480,height=860');
+const openNv=c=>MKT==='us'
+  ? window.open(`https://finance.yahoo.com/quote/${c}`,'gm_pop_w','width=1000,height=860')
+  : window.open(`https://m.stock.naver.com/domestic/stock/${c}/total`,'gm_pop_w','width=480,height=860');
 window._revdNv=openNv;
+const capfU=v=>v==null?'—':'$'+(v/1e9>=1000?(v/1e12).toFixed(1)+'T':v/1e9>=1?(v/1e9).toFixed(0)+'B':(v/1e6).toFixed(0)+'M');
+const CAPF=v=>MKT==='us'?capfU(v):capf(v);
 
 function dayBlock(day,kind){
   let rows=day.rows;
@@ -51,9 +55,9 @@ function dayBlock(day,kind){
   /* (2026-09-02 피드백) 좌우 병렬 배치용 가로 압축 — 시총은 종목 셀 둘째 줄, 변동기간 수는 변동률 옆 첨자 */
   const th=kind==='tp'
     ?'<tr><th style="text-align:left">종목</th><th>현재가</th><th>목표가 전→후</th><th>변동률</th><th>여력</th><th>실적발표</th></tr>'
-    :'<tr><th style="text-align:left">종목</th><th>현재가</th><th>기간</th><th>영업익 전→후(억)</th><th>변동률</th><th>실적발표</th></tr>';
+    :`<tr><th style="text-align:left">종목</th><th>현재가</th><th>기간</th><th>${MKT==='us'?'EPS 컨센 전→후($)':'영업익 전→후(억)'}</th><th>변동률</th><th>실적발표</th></tr>`;
   const tr=rows.map(r=>{
-    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${CAPF(r.cap)}</span></td>`;
     const px=`<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td>`;
     if(kind==='tp')
       return `<tr>${nm}${px}<td style="white-space:nowrap">${nf(r.old)} → <b>${nf(r.new)}</b></td><td>${pf(r.pct)}</td><td>${pf(r.up)}</td><td style="white-space:nowrap">${edd(r.edl,day.d)}</td></tr>`;
@@ -74,10 +78,14 @@ function spBlock(day){
      '발표한 분기의 실제치 vs 같은 분기의 증권사 컨센서스 추정치'다. 헤더에 (당분기 추정대비)
      를 병기하고 툴팁으로 풀어쓴다. */
   const _tt='발표 분기 실제치 vs 같은 분기 증권사 컨센서스 추정치 — 전년동기(YoY)·전분기(QoQ) 비교가 아님';
-  const th=`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="${_tt}">영업익 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th title="${_tt}">매출 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>`;
+  const th=MKT==='us'
+    ?`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="발표 분기 실제 EPS vs 같은 분기 컨센서스 — YoY/QoQ 아님">EPS 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>EPS<br>실제 vs 컨센</th><th>가이던스<br>매출 갭</th><th>가이던스<br>EPS 갭</th><th>주가반응</th></tr>`
+    :`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="${_tt}">영업익 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th title="${_tt}">매출 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>`;
   const tr=day.rows.map(r=>{
-    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${CAPF(r.cap)}</span></td>`;
     const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
+    if(MKT==='us')   /* US: EPS 실제vs컨센 + 가이던스 갭(8-K 파싱) — 미국식 관전점 */
+      return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td style="white-space:nowrap">${r.eps!=null?(+r.eps).toFixed(2):'—'} vs ${r.est!=null?(+r.est).toFixed(2):'—'}</td><td>${pf(r.grev)}</td><td>${pf(r.geps)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
     return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.op_yoy)}</td><td>${pf(r.op_qoq)}</td><td><b>${pf(r.spr_s)}</b></td><td>${pf(r.sales_yoy)}</td><td>${pf(r.sales_qoq)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
   }).join('');
   return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
@@ -86,13 +94,17 @@ function spBlock(day){
 /* ㉠ 발표 예정 + 선행 신호 — 캘린더 팝업 _leadBits 와 동일 신호를 리스트로 (2026-09-02) */
 function upBlock(day){
   const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} 발표 예정 <span class="note">${day.rows.length}종 · 시총순</span></div>`;
-  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익컨센 30일</th><th>목표가 90일</th><th>직전 서프</th><th>연속순매수</th><th>수출 YoY</th></tr>';
+  const th=MKT==='us'
+    ?'<tr><th style="text-align:left">종목</th><th>현재가</th><th>EPS컨센 30일</th><th>목표가 90일</th><th>직전 서프</th></tr>'
+    :'<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익컨센 30일</th><th>목표가 90일</th><th>직전 서프</th><th>연속순매수</th><th>수출 YoY</th></tr>';
   const tr=day.rows.map(r=>{
     /* 확정(IR 공시) vs 추정(직전 발표일+91일 — 전종목 확대, 2026-09-02) 뱃지 */
     const sb=r.src==='추정'?'<span style="color:#b45309;font-size:9.5px;border:1px solid #fcd34d;border-radius:4px;padding:0 3px;margin-left:3px">추정</span>':'';
-    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b>${sb}<br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b>${sb}<br><span class="note">${E(r.c)} · ${CAPF(r.cap)}</span></td>`;
     const sup=[]; if((r.fst||0)>0) sup.push('외인 '+r.fst+'일'); if((r.ost||0)>0) sup.push('기관 '+r.ost+'일');
     const kx=r.kx&&r.kx.yoy!=null?`${pf(r.kx.yoy)}<br><span class="note">${E(r.kx.th)} ${E(r.kx.m||'')}</span>`:'—';
+    if(MKT==='us')
+      return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td>${pf(r.cr30)}</td><td>${pf(r.tprv90)}</td><td>${pf(r.spr)}</td></tr>`;
     return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td>${pf(r.cr30)}</td><td>${pf(r.tprv90)}</td><td>${pf(r.spr)}</td><td style="white-space:nowrap">${sup.join(' ')||'—'}</td><td>${kx}</td></tr>`;
   }).join('');
   return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
@@ -110,17 +122,28 @@ function render(){
 }
 
 function load(force){
-  if(D&&!force){ render(); return; }
+  if(CACHE[MKT]&&!force){ D=CACHE[MKT]; render(); return; }
   $('rv_asof').textContent='불러오는 중…';
-  fetch('/api/kr_rev_daily',{cache:'no-cache'}).then(r=>{
+  const mk=MKT;   // (2026-09-02 실측 버그) 시장 전환 직후 늦게 도착한 이전 시장 응답이
+                  // D 를 덮어써 'US 라벨 + KR 데이터'가 됐다 → 요청 시점 시장을 캡처해
+                  // 도착 시 현재 시장과 다르면 캐시에만 넣고 화면은 갱신하지 않는다.
+  fetch('/api/kr_rev_daily?mkt='+mk,{cache:'no-cache'}).then(r=>{
     if(!r.ok) throw new Error('HTTP '+r.status);
     return r.json();
-  }).then(j=>{ D=j; render(); })
+  }).then(j=>{ CACHE[mk]=j; if(mk!==MKT) return; D=j; render(); })
   .catch(e=>{ $('rv_asof').textContent='로드 실패: '+e.message; });
 }
 
 window.renderRevd=function(){ load(false); };
+function mkBtn(){ const k=$('rv_mkr'), u=$('rv_mus');
+  const on=b=>{b.style.background='#1e293b';b.style.color='#fff';};
+  const off=b=>{b.style.background='';b.style.color='';};
+  if(k&&u){ (MKT==='kr'?on:off)(k); (MKT==='us'?on:off)(u); } }
 document.addEventListener('DOMContentLoaded',function(){
   const b=$('rv_reload'); if(b) b.onclick=()=>load(true);
+  const k=$('rv_mkr'), u=$('rv_mus');
+  if(k) k.onclick=()=>{ MKT='kr'; mkBtn(); load(false); };
+  if(u) u.onclick=()=>{ MKT='us'; mkBtn(); load(false); };
+  mkBtn();
 });
 })();

@@ -736,7 +736,12 @@
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
   <!-- (2026-09-02) 📋 리비전 데일리 페인 — /api/kr_rev_daily · revd.js -->
   <div class="pane" id="p_revd" style="overflow:auto">
-    <h2>📋 리비전 데일리 — 목표주가·영업익 컨센 변동리스트 <em id="rv_asof"></em> <button id="rv_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <h2>📋 리비전 데일리 — 목표주가·이익 컨센 변동리스트
+      <span style="display:inline-flex;gap:4px;margin-left:8px;vertical-align:middle">
+        <button id="rv_mkr" class="scrrst" style="font-size:11.5px">🇰🇷 한국</button>
+        <button id="rv_mus" class="scrrst" style="font-size:11.5px">🇺🇸 미국</button>
+      </span>
+      <em id="rv_asof"></em> <button id="rv_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
     <div class="note" style="margin:-4px 0 10px;line-height:1.7">
       한국 주식의 실측 패턴(코스메카코리아 2026-08): <b>실적발표(8/10 호실적) → 증권사 목표가 일제 상향(8/11)
       → 영업익 컨센서스 상향(8/12) → 주가 지속 상승</b>. 이 연쇄의 2·3단계 '변동'을 매일 전 종목 횡단으로 잡는다 —
@@ -2112,7 +2117,7 @@
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
-<script src="/revd.js?v=09021954"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
+<script src="/revd.js?v=09022004"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/kcons.js?v=09021150"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09010700"></script>
