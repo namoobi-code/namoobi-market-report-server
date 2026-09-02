@@ -113,7 +113,7 @@ function upBlock(day){
 function render(){
   if(!D) return;
   $('rv_asof').textContent='기준 '+(D.asof||'')+' · 스냅샷 갱신 시 자동 재계산';
-  $('rv_up').innerHTML=(D.up_days||[]).map(upBlock).join('')||'<div class="note">향후 2주 발표 예정 없음 (예정일은 IR 공시·컨센 커버 종목만 수집됨)</div>';
+  $('rv_up').innerHTML=(D.up_days||[]).map(upBlock).join('')||'<div class="note">향후 1주 발표 예정 없음 (예정일은 IR 공시·컨센 커버 종목만 수집됨)</div>';
   $('rv_sp').innerHTML=(D.sp_days||[]).map(spBlock).join('')||'<div class="note">최근 발표 없음</div>';
   $('rv_tp').innerHTML=chips('tp')+(D.tp_days||[]).map(d=>dayBlock(d,'tp')).join('');
   $('rv_op').innerHTML=chips('op')+(D.op_days||[]).map(d=>dayBlock(d,'op')).join('');
