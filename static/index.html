@@ -743,10 +743,20 @@
       리스트에서 확인 → 종목 클릭(네이버) 또는 TICKER 차트로 검토 → 매수 판단.
       ※ 평균 목표가는 증권사 리포트 ~24건 롤링 평균이라 액면병합·오래된 리포트 이탈 시 급변할 수 있음(원자료 그대로 표시).
       참고용이며 투자권유가 아님.</div>
-    <h3>① 증권사 평균 목표주가 변동 <span class="note">일별 스냅샷 대비 · ~520종목 커버 · 개별 증권사 리포트는 종목 차트 하단 표</span></h3>
-    <div class="box" style="padding:12px 14px"><div id="rv_tp"><div class="note">불러오는 중…</div></div></div>
-    <h3>② 영업이익 컨센서스 리비전 <span class="note">일별 스냅샷 대비 · 2,513종목 · 종목당 가장 가까운 미래 추정 기간 대표 표시</span></h3>
-    <div class="box" style="padding:12px 14px"><div id="rv_op"><div class="note">불러오는 중…</div></div></div>
+    <!-- (2026-09-02 피드백) ⓪ 발표 당일 서프라이즈 — 연쇄 1단계를 같은 화면 맨 위에 -->
+    <h3>⓪ 실적발표 서프라이즈 <span class="note">최근 7 발표일 · 잠정실적(공시) vs WISEreport 컨센 · 영업익 컨센比 순</span></h3>
+    <div class="box" style="padding:10px 10px;margin-bottom:10px"><div id="rv_sp"><div class="note">불러오는 중…</div></div></div>
+    <!-- (2026-09-02 피드백) ①·② 좌우 병렬 — 목표가와 컨센 리비전을 한눈에 비교 -->
+    <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
+      <div style="flex:1;min-width:460px">
+        <h3>① 증권사 평균 목표주가 변동 <span class="note">일별 · ~520종목 커버</span></h3>
+        <div class="box" style="padding:10px 10px"><div id="rv_tp"><div class="note">불러오는 중…</div></div></div>
+      </div>
+      <div style="flex:1;min-width:460px">
+        <h3>② 영업이익 컨센서스 리비전 <span class="note">일별 · 2,513종목 · 가장 가까운 미래 기간 대표</span></h3>
+        <div class="box" style="padding:10px 10px"><div id="rv_op"><div class="note">불러오는 중…</div></div></div>
+      </div>
+    </div>
   </div>
   <!-- (2026-09-01) 📈 이익성장 모니터링 페인 — screener_pool + stlead 재사용 · eg.js -->
   <div class="pane" id="p_eg" style="overflow:auto">
@@ -2093,9 +2103,9 @@
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
-<script src="/revd.js?v=09012356"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
+<script src="/revd.js?v=09021309"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/kcons.js?v=09021130"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
+<script src="/kcons.js?v=09021150"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09010700"></script>
 <script src="/share.js?v=08312100"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}

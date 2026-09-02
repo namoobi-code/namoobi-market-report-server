@@ -294,12 +294,25 @@ def push_retail_hist(az, sep, ul=None):
         for r in az["rows"]:
             p = (prev or {}).get("az", {}).get(r["brand"])
             r["d7"] = (p - r["rank"]) if p else None      # +면 순위 상승
+    # (2026-09-02 사용자 요청) 입점일 표시 — 이력에서 브랜드가 처음 관측된 날.
+    # 채널 관측 시작일(세포라 2026-08-29 · 울타 2026-09-01)에 이미 있었으면 실제 입점일을
+    # 알 수 없다 → since=None(화면에 '모름'). 외부 실측으로 확인된 것만 KNOWN_SINCE 에 명시.
+    KNOWN_SINCE = {("sep", "닥터그루트"): "2026-03"}   # 3월 입점 실측 확인(추정 금지 원칙)
     for obj, key in ((sep, "sep"), (ul, "ulta")):
         if obj and prev is not None:
             pset = set(prev.get(key) or [])
             obj["new"] = [x["brand"] for x in obj["in"] if x["brand"] not in pset] if pset else []
         elif obj:
             obj["new"] = []
+        if obj:
+            first = next((d["d"] for d in days if d.get(key)), None)   # 채널 관측 시작일
+            obj["obs0"] = first
+            for x in obj["in"]:
+                seen = next((d["d"] for d in days if x["brand"] in (d.get(key) or [])), None)
+                x["since"] = seen if (seen and seen != first) else KNOWN_SINCE.get((key, x["brand"]))
+            # 최근 입점이 앞으로 — 입점일 아는 것(최신순) 먼저, 모르는 것 뒤 (안정 정렬 2단)
+            obj["in"].sort(key=lambda x: x["since"] or "", reverse=True)
+            obj["in"].sort(key=lambda x: x["since"] is None)
     return az, sep, ul
 
 # ══════════════════════════════════════════════════════════════════════════

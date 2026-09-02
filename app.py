@@ -2235,8 +2235,10 @@ def kr_rev_daily():
     캐시: 두 소스 mtime 키 — 파일이 바뀔 때만 재계산."""
     tp_p = DB / "tp_history.json"
     cs_p = DB / "kr_consensus.sqlite"
+    el_p0 = DB / "earnings_live.json"
     key = (tp_p.stat().st_mtime if tp_p.exists() else 0,
-           cs_p.stat().st_mtime if cs_p.exists() else 0)
+           cs_p.stat().st_mtime if cs_p.exists() else 0,
+           el_p0.stat().st_mtime if el_p0.exists() else 0)
     if _revd_cache["key"] == key and _revd_cache["data"]:
         return _revd_cache["data"]
     # 종목 메타 (이름·시총·현재가·직전 실적발표일)
@@ -2310,8 +2312,33 @@ def kr_rev_daily():
         cx.close()
     except Exception:
         pass
+    # ⓪ 발표 당일 서프라이즈 — 잠정실적 감시(earnings_live.json) 최근 7 발표일 (2026-09-02 추가)
+    #    연쇄의 1단계(실적발표)를 같은 화면 맨 위에 — spr=영업익 컨센比% · spr_s=매출 컨센比%.
+    sp_days = []
+    try:
+        el_p = DB / "earnings_live.json"
+        el = json.loads(el_p.read_text(encoding="utf-8")).get("days") or {}
+        for d8 in sorted(el, reverse=True):
+            rows = []
+            for x in el[d8]:
+                if not isinstance(x, dict) or all(x.get(k) is None for k in
+                        ("spr", "spr_s", "op_yoy", "sales_yoy")):
+                    continue   # 수치 미파싱(공시 직후) 레코드 제외
+                m = _m(x.get("c"))
+                rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": m["cap"],
+                             "px": m["px"], "chg": m["chg"],
+                             "spr": x.get("spr"), "spr_s": x.get("spr_s"),
+                             "op_yoy": x.get("op_yoy"), "sales_yoy": x.get("sales_yoy"),
+                             "ni_yoy": x.get("ni_yoy"), "r1": x.get("r1"), "r5": x.get("r5")})
+            if rows:
+                rows.sort(key=lambda r: -(r["spr"] if r["spr"] is not None else -1e9))
+                sp_days.append({"d": f"{d8[:4]}-{d8[4:6]}-{d8[6:]}", "rows": rows})
+            if len(sp_days) >= 7:
+                break
+    except Exception:
+        pass
     out = {"asof": __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M"),
-           "tp_days": tp_days, "op_days": op_days}
+           "sp_days": sp_days, "tp_days": tp_days, "op_days": op_days}
     _revd_cache["key"] = key; _revd_cache["data"] = out
     return out
 

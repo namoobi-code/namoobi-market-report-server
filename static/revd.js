@@ -46,19 +46,20 @@ function dayBlock(day,kind){
   if(MODE[kind]==='up') rows=rows.filter(r=>(r.pct??0)>0||(kind==='op'&&r.old<0&&r.new>=0));
   if(MODE[kind]==='dn') rows=rows.filter(r=>(r.pct??0)<0||(kind==='op'&&r.old>=0&&r.new<0));
   const nu=day.rows.filter(r=>(r.pct??0)>0).length, nd=day.rows.filter(r=>(r.pct??0)<0).length;
-  const head=`<div style="margin:14px 0 4px;font-weight:700">${dstr(day.d)} <span class="note">전영업일 ${E(day.prev.slice(5))} 대비 · <span style="color:#dc2626">상향 ${nu}</span> · <span style="color:#2563eb">하향 ${nd}</span></span></div>`;
+  const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} <span class="note">전영업일 ${E(day.prev.slice(5))} 대비 · <span style="color:#dc2626">상향 ${nu}</span> · <span style="color:#2563eb">하향 ${nd}</span></span></div>`;
   if(!rows.length) return head+'<div class="note">변동 없음</div>';
+  /* (2026-09-02 피드백) 좌우 병렬 배치용 가로 압축 — 시총은 종목 셀 둘째 줄, 변동기간 수는 변동률 옆 첨자 */
   const th=kind==='tp'
-    ?'<tr><th style="text-align:left">종목</th><th>시총</th><th>현재가</th><th>평균목표가 전→후</th><th>변동률</th><th>상승여력</th><th>직전 실적발표</th></tr>'
-    :'<tr><th style="text-align:left">종목</th><th>시총</th><th>현재가</th><th>기간</th><th>컨센 영업익 전→후(억)</th><th>변동률</th><th>변동기간</th><th>직전 실적발표</th></tr>';
+    ?'<tr><th style="text-align:left">종목</th><th>현재가</th><th>목표가 전→후</th><th>변동률</th><th>여력</th><th>실적발표</th></tr>'
+    :'<tr><th style="text-align:left">종목</th><th>현재가</th><th>기간</th><th>영업익 전→후(억)</th><th>변동률</th><th>실적발표</th></tr>';
   const tr=rows.map(r=>{
-    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b> <span class="note">${E(r.c)}</span></td>`;
-    const px=`<td style="white-space:nowrap">${nf(r.px)} ${pf(r.chg)}</td>`;
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    const px=`<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td>`;
     if(kind==='tp')
-      return `<tr>${nm}<td>${capf(r.cap)}</td>${px}<td style="white-space:nowrap">${nf(r.old)} → <b>${nf(r.new)}</b></td><td>${pf(r.pct)}</td><td>${pf(r.up)}</td><td>${edd(r.edl,r.d||day.d)}</td></tr>`;
-    return `<tr>${nm}<td>${capf(r.cap)}</td>${px}<td>${E(r.per)}</td><td style="white-space:nowrap">${nf(r.old)} → <b>${nf(r.new)}</b></td><td>${opch(r.old,r.new,r.pct)}</td><td>${r.nch}개</td><td>${edd(r.edl,day.d)}</td></tr>`;
+      return `<tr>${nm}${px}<td style="white-space:nowrap">${nf(r.old)} → <b>${nf(r.new)}</b></td><td>${pf(r.pct)}</td><td>${pf(r.up)}</td><td style="white-space:nowrap">${edd(r.edl,day.d)}</td></tr>`;
+    return `<tr>${nm}${px}<td>${E(r.per)}</td><td style="white-space:nowrap">${nf(r.old)} → <b>${nf(r.new)}</b></td><td style="white-space:nowrap">${opch(r.old,r.new,r.pct)}<span class="note"> ${r.nch>1?'외'+(r.nch-1):''}</span></td><td style="white-space:nowrap">${edd(r.edl,day.d)}</td></tr>`;
   }).join('');
-  return head+`<table class="mini" style="width:100%;font-size:12px;text-align:center">${th}${tr}</table>`;
+  return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
 }
 
 function chips(kind){
@@ -66,9 +67,21 @@ function chips(kind){
     ${['all','up','dn'].map(m=>`<button class="scrrst${MODE[kind]===m?' on':''}" data-m="${m}" style="font-size:11px${MODE[kind]===m?';background:#1e293b;color:#fff':''}">${m==='all'?'전체':m==='up'?'상향만':'하향만'}</button>`).join('')}</span>`;
 }
 
+/* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센比 · spr_s=매출 컨센比 */
+function spBlock(day){
+  const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} <span class="note">발표 ${day.rows.length}건 (수치 파싱분)</span></div>`;
+  const th='<tr><th style="text-align:left">종목</th><th>현재가</th><th>영업익 컨센比</th><th>매출 컨센比</th><th>영업익 YoY</th><th>매출 YoY</th><th>순익 YoY</th><th>D+1</th><th>D+5</th></tr>';
+  const tr=day.rows.map(r=>{
+    const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${capf(r.cap)}</span></td>`;
+    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.spr_s)}</td><td>${pf(r.op_yoy)}</td><td>${pf(r.sales_yoy)}</td><td>${pf(r.ni_yoy)}</td><td>${pf(r.r1)}</td><td>${pf(r.r5)}</td></tr>`;
+  }).join('');
+  return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
+}
+
 function render(){
   if(!D) return;
   $('rv_asof').textContent='기준 '+(D.asof||'')+' · 스냅샷 갱신 시 자동 재계산';
+  $('rv_sp').innerHTML=(D.sp_days||[]).map(spBlock).join('')||'<div class="note">최근 발표 없음</div>';
   $('rv_tp').innerHTML=chips('tp')+(D.tp_days||[]).map(d=>dayBlock(d,'tp')).join('');
   $('rv_op').innerHTML=chips('op')+(D.op_days||[]).map(d=>dayBlock(d,'op')).join('');
   document.querySelectorAll('.revd_chips button').forEach(b=>b.onclick=()=>{
