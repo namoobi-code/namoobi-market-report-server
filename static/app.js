@@ -1098,9 +1098,43 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       inp.onkeydown=e=>{ if(e.key==='Enter') doAdd(); };
     }).catch(()=>{ box.style.display='none'; });
   }
+  /* (2026-09-02) 발표 예정 종목 선행 신호용 — K-소비재 수출 YoY 를 종목 코드로 매핑.
+     kcons.json 연동 종목(20개)만 커버 — 수출 매핑이 없는 종목은 리비전·목표가·수급만 표시.
+     테마 YoY 는 kcons.js 요약 카드와 동일 산식(품목 합산 최근월 vs 전년동월). */
+  let _KEXP=null;
+  function _loadKexp(){ if(_KEXP) return; _KEXP={};
+    fetch('/api/db/kcons').then(r=>r.ok?r.json():null).then(j=>{ if(!j) return;
+      const IT=(j.export||{}).items||[], M=(j.export||{}).months||[], n=M.length-1;
+      const ty={};
+      for(const th of ['K뷰티','K푸드','K패션']){
+        const its=IT.filter(x=>x.th===th);
+        const sum=i=>its.reduce((a,x)=>a+((x.exp||[])[i]||0),0);
+        ty[th]=(n>=12&&sum(n-12))?((sum(n)/sum(n-12)-1)*100):null;
+      }
+      for(const s of j.stocks||[]){ const c=(s.sym||'').split('.')[0];
+        if(c) _KEXP[c]={th:s.th, yoy:ty[s.th], m:M[n]}; }
+    }).catch(()=>{});
+  }
+  /* (2026-09-02) 발표 예정 종목의 선행 신호 문자열 — 달력 팝업·차트 '예' 팝업 공용.
+     근거(코스메카 패턴 역방향): 발표 **전에** 리비전·목표가·수급이 이미 우호적이면
+     호실적 확률이 높다 — 연쇄 1단계(실적 예측)를 시장 신호로 근사. r 은 풀 레코드.
+     스케일 실측: cr30=소수(×100) · tprv90/spr=% · fst/ost=연속일. */
+  function _leadBits(r,mk,pct){ const b=[];
+    if(r.cr30!=null) b.push(`<span class="note">${mk==='us'?'EPS컨센30일':'영업익컨센30일'}</span> ${pct(r.cr30*100)}`);
+    const t9=r.tprv90!=null?r.tprv90:(mk==='kr'&&r.rev!=null?r.rev*100:null);
+    if(t9!=null) b.push(`<span class="note">목표가90일</span> ${pct(t9)}`);
+    if(r.spr!=null) b.push(`<span class="note">직전서프</span> ${pct(r.spr)}`);
+    if(mk==='kr'&&((r.fst||0)>0||(r.ost||0)>0)){ const s=[];
+      if((r.fst||0)>0) s.push(`외인 ${r.fst}일`); if((r.ost||0)>0) s.push(`기관 ${r.ost}일`);
+      b.push(`<span class="note">연속순매수</span> ${s.join(' ')}`); }
+    const kx=mk==='kr'&&_KEXP&&_KEXP[r.c];
+    if(kx&&kx.yoy!=null) b.push(`<span class="note">${kx.th} 수출YoY(${kx.m})</span> ${pct(kx.yoy)}`);
+    return b;
+  }
   function renderMonthCal(mk){
     const grid=document.getElementById('mc_grid'); if(!grid) return;
     _w8kBox(mk);
+    if(mk==='kr') _loadKexp();
     const done=pool=>{ const build=LV=>{
       const LIVEBY=(LV&&LV.byCode)||{};
       const evs={};
@@ -1211,6 +1245,11 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
             const tg=(lv.tags||[]).filter(t=>!t.includes('접수'));
             if(tg.length) bits.push(esc(tg.join(' · ')));
             res=` <span class="note">— ${bits.join(' · ')}</span>`;
+          }else if(r.ed){
+            /* (2026-09-02) 발표 **예정** 종목 — 선행 신호(리비전·목표가·직전서프·수급·수출)
+               를 미리 보여줘 '잘 나올지'를 발표 전에 가늠(코스메카 패턴 1단계). */
+            const lb=_leadBits(r,mk,pct);
+            if(lb.length) res=` <span class="note">— 선행:</span> <span class="note">${lb.join(' · ')}</span>`;
           }
           return `<div class="mc-pi" title="${esc(r.n)} (${esc(r.c)})"><span class="note">${i+1}.</span> ${lv?'✅':''}<b>${esc(mk==='kr'?r.n:r.c)}</b> ${mk==='us'&&r.kn?`<b class="uskn">${esc(r.kn)}</b> `:''}<span class="note">${esc(mk==='kr'?r.c:r.n)}</span>${res}</div>`;};
         /* (2026-08-05) 정렬 토글 — 시가총액순 / 서프라이즈순(발표분 우선, |값| 큰 순) */
@@ -7732,7 +7771,12 @@ await _canvasFlow(c);
       if(sm){ _epop=()=>{
         const pc=(v,suf)=>v==null?null:`${v>0?'+':''}${(+v).toFixed(1)}${suf||'%'}`;
         const rows=[];
-        if(sm.t==='예'){ rows.push(['다음 실적발표 예정일','IR 공시 기준 — 확정 아님']); }
+        if(sm.t==='예'){ rows.push(['다음 실적발표 예정일','IR 공시 기준 — 확정 아님']);
+          /* (2026-09-02) 예정 마커에도 선행 신호 — 달력 팝업과 같은 _leadBits 공용 */
+          const _pcL=v=>v==null?'—':`${v>0?'+':''}${(+v).toFixed(1)}%`;
+          _leadBits(rw,mkt,_pcL).forEach(b=>{ const t=b.replace(/<[^>]*>/g,'');
+            const i2=t.indexOf(' '); rows.push(['선행 '+t.slice(0,i2), t.slice(i2+1)]); });
+        }
         else{
           // 서프·전망은 '최근 발표분'에만 값이 있다(풀에 1건). 과거 분기는 주가 반응만 보여준다.
           const latest = (sm.d===rw.edl);
