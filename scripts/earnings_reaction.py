@@ -21,7 +21,7 @@ PEAD(Post-Earnings-Announcement Drift): 서프라이즈 방향으로 주가가 �
 출력  같은 파일의 각 항목에 r1·r5·r20 (%) 추가 — 이미 계산된 건 건너뛴다.
 사용  earnings_reaction.py [--days N]   기본 45일치 전부 재확인
 """
-import json, sys, time, urllib.request
+import json, re, sys, time, urllib.request
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -118,27 +118,29 @@ def sa_closes(sym):
     return sorted(out)[-60:]
 
 
-def react(closes, d8, cal=None):
+def react(closes, d8, cal=None, after_close=False):
     """발표일(d8) 기준 반응률.
 
-    기준가 = 발표일 **이전 마지막** 종가(발표 전 마지막 시세). 장 마감 후·개장 전 발표가
-    대부분이라 발표 당일 종가를 기준으로 삼으면 반응이 통째로 잘려 나간다.
+    기준가 = 발표 **직전 마지막** 종가. 개장 전·장중 발표면 발표일 전날 종가, 장 마감 후
+    발표(after_close)면 **발표 당일 종가**가 기준이고 D+1 은 다음 거래일이다.
+    (2026-09-02 실측 CRM: 8/26 16:03ET 접수 → 종전엔 8/26 종가(발표 전)를 D+1 로 잡아
+     D+1 -0.0% · D+3 +24.5% 로 나왔다. 실제 반응은 8/27 +22.6%.)
     cal(거래일 달력)이 있으면 D+n 을 달력 날짜로 잡아 종가를 찾는다(봉 누락 내성).
     """
     if not closes:
         return {}
     base = None
     for d, c in closes:
-        if d < d8:
+        if (d <= d8) if after_close else (d < d8):
             base = c
         else:
             break
-    after = [(d, c) for d, c in closes if d >= d8]
+    after = [(d, c) for d, c in closes if ((d > d8) if after_close else (d >= d8))]
     if base is None or not after or base <= 0:
         return {}
     out = {"px0": round(base, 4)}   # (2026-09-02) 발표 직전 종가 — 발표시점 상승여력 계산용
     horizons = (("r1", 0), ("r3", 2), ("r5", 4), ("r20", 19))   # (2026-09-02) D+3 추가(사용자)
-    cal_after = [d for d in (cal or []) if d >= d8] if cal else None
+    cal_after = [d for d in (cal or []) if ((d > d8) if after_close else (d >= d8))] if cal else None
     if cal_after and cal_after[0] <= after[0][0]:
         bymap = dict(after)
         for lab, i in horizons:
@@ -151,7 +153,24 @@ def react(closes, d8, cal=None):
     return out
 
 
-def run(path, closes_fn, sym_of, cal=None):
+def us_after_close(it):
+    """US: 8-K 접수 시각(태그 '접수 HH:MMET') 이 16:00ET 이후면 장 마감 후 발표.
+    시각 태그가 없는 레코드(야후 캘린더 유래)는 판정 불가 → 종전 방식(개장 전 가정)."""
+    import re
+    for t in it.get("tags") or []:
+        m = re.search(r"접수 (\d\d):(\d\d)ET", t)
+        if m:
+            return int(m.group(1)) * 60 + int(m.group(2)) >= 16 * 60
+    return False
+
+
+def kr_after_close(it):
+    """KR: DART 접수 시각 t(KST) 가 15:30 이후면 장 마감 후 발표(잠정실적 대부분)."""
+    t = it.get("t") or ""
+    return bool(re.match(r"\d\d:\d\d", t)) and t >= "15:30"
+
+
+def run(path, closes_fn, sym_of, cal=None, after_close_fn=None):
     if not path.exists():
         print(f"[react] {path.name} 없음 — 건너뜀")
         return
@@ -182,7 +201,7 @@ def run(path, closes_fn, sym_of, cal=None):
                     cl2 = sa_closes(sym_of(it))
                     if cl2:
                         cl = sorted(dict(cl + cl2).items())
-            r = react(cl, d8, cal)
+            r = react(cl, d8, cal, after_close_fn(it) if after_close_fn else False)
             if r:
                 # 달력 기준으로 다시 계산했으면 예전 위치 기준(봉 누락 시 날짜가 밀린) 값을
                 # 덮어쓴다 — 아직 못 채운 칸은 None 으로 두고 다음 실행에서 재시도.
@@ -202,5 +221,5 @@ def run(path, closes_fn, sym_of, cal=None):
 
 
 if __name__ == "__main__":
-    run(KR, kr_closes, lambda it: it.get("c"))
-    run(US, us_closes, lambda it: it.get("c"), us_calendar())
+    run(KR, kr_closes, lambda it: it.get("c"), None, kr_after_close)
+    run(US, us_closes, lambda it: it.get("c"), us_calendar(), us_after_close)
