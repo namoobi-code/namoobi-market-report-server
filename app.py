@@ -2363,7 +2363,7 @@ def kr_rev_daily():
         except Exception:
             pass
         t0 = _dt.date.today()
-        t7 = (t0 + _dt.timedelta(days=7)).isoformat()
+        t7 = (t0 + _dt.timedelta(days=14)).isoformat()   # (2026-09-02) 사용자 요청 — 2주치
         # (2026-09-02 전종목 확대) 확정 예정일(네이버 IR — 대형주 위주)만으론 커버리지가
         # 좁다(실측 6종) → kr_edl_hist(발표일 영구 이력, 풀 빌드가 매일 병합)의
         # 직전 발표일 + 91일(분기 전형 간격)로 **추정** 예정일을 병기한다.
