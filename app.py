@@ -553,7 +553,7 @@ def us_fin(sym: str):
         # 위 stockanalysis 가 매출·영업익·순익·희석EPS 를 20분기 한 번에 주므로 그것만 쓴다.
         # 실패했을 때만(sa_ok=False) 위 Yahoo timeseries 5분기가 폴백으로 남는다.
         # ② 컨센 추정 + 리비전 곡선 (quoteSummary — crumb 필요)
-        est, rev = [], []
+        est, rev, tp = [], [], []
         try:
             import http.cookiejar
             cj = http.cookiejar.CookieJar()
@@ -566,8 +566,29 @@ def us_fin(sym: str):
             crumb = op.open("https://query1.finance.yahoo.com/v1/test/getcrumb", timeout=10).read().decode()
             j = json.loads(op.open(
                 f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{sym}"
-                f"?modules=earningsTrend,earningsHistory&crumb={urllib.parse.quote(crumb)}", timeout=15).read())
+                f"?modules=earningsTrend,earningsHistory,upgradeDowngradeHistory&crumb={urllib.parse.quote(crumb)}", timeout=15).read())
             _res0 = (j["quoteSummary"]["result"] or [{}])[0]
+            # (2026-09-02) 증권사별 목표가 변동 — Yahoo upgradeDowngradeHistory 에
+            # priceTargetAction/currentPriceTarget/priorPriceTarget 이 들어온다(실측 A:
+            # 8/27 Stifel 170→180, BofA 155→180, Citi 185→190, GS 155→175, JPM 180→190 …).
+            # KR cTB24 표와 같은 스키마 {b,d,tp,prev,chg,op} 로 만들어 같은 렌더러를 쓴다.
+            # 목표가 없는 등급변경만(act) 도 남긴다 — 표에서 '—' 로 보인다.
+            for h0 in ((_res0.get("upgradeDowngradeHistory") or {}).get("history") or [])[:60]:
+                try:
+                    ts = h0.get("epochGradeDate")
+                    if not ts:
+                        continue
+                    d0 = datetime.utcfromtimestamp(ts)
+                    if (datetime.utcnow() - d0).days > 120:
+                        continue
+                    cpt, ppt = h0.get("currentPriceTarget"), h0.get("priorPriceTarget")
+                    tp.append({"b": h0.get("firm") or "", "d": d0.strftime("%y/%m/%d"),
+                               "tp": cpt, "prev": ppt,
+                               "chg": round((cpt / ppt - 1) * 100, 1) if (cpt and ppt) else None,
+                               "op": h0.get("toGrade") or "", "act": h0.get("action") or "",
+                               "pta": h0.get("priceTargetAction") or ""})
+                except Exception:
+                    pass
             et = (_res0.get("earningsTrend") or {}).get("trend") or []
             # (2026-08-09) 발표 시점 EPS 컨센 + 서프라이즈 — 최근 4분기(earningsHistory).
             # 분기표의 'EPS컨센(발표시점)·서프판정' 열 재료. 매출 쪽은 소스가 없어(야후 미제공)
@@ -911,7 +932,7 @@ def us_fin(sym: str):
                         r2["cxr"] = round(abs(r2["capexY"]) / accs * 100, 1)
         except Exception:
             pass
-        res = {"q": q[-20:], "est": est, "rev": rev, "snap": snap, "gd": gd, "seg": sa_seg, "cur": cur,
+        res = {"q": q[-20:], "est": est, "rev": rev, "tp": tp, "snap": snap, "gd": gd, "seg": sa_seg, "cur": cur,
                "unit": "백만$ · EPS=$",
                "src": "stockanalysis 분기 손익(실적) + Yahoo earningsTrend(컨센) + Zacks(발표시점 매출·EPS컨센·판정) + 일별 스냅샷"}
         _usfin_cache[sym] = (now, res)
@@ -2240,7 +2261,9 @@ def _us_rev_daily():
             c = r.get("c")
             if c:
                 meta[c] = {"n": r.get("kn") or r.get("n") or c, "cap": r.get("mcap") or r.get("cap"),
-                           "px": r.get("px"), "chg": r.get("chg"), "edl": r.get("edl")}
+                           "px": r.get("px"), "chg": r.get("chg"), "edl": r.get("edl"),
+                           "tp": r.get("tp"),   # (2026-09-02) 평균 목표가 — 발표표 상승여력 열
+                           "up": (round((r["tp"] / r["px"] - 1) * 100, 1) if (r.get("tp") and r.get("px")) else None)}
     except Exception:
         pool = {}
     def _m(c):
@@ -2256,7 +2279,7 @@ def _us_rev_daily():
                     continue   # 수치 미채움(8-K 접수만) 제외
                 m = _m(x.get("c"))
                 rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": x.get("cap") or m["cap"],
-                             "px": m["px"], "chg": m["chg"],
+                             "px": m["px"], "chg": m["chg"], "tp": m.get("tp"), "up": m.get("up"),
                              "spr": x.get("spr"), "eps": x.get("eps"), "est": x.get("est"),
                              "grev": x.get("g_rev_gap"), "geps": x.get("g_eps_gap"),
                              "r1": x.get("r1"), "r3": x.get("r3"), "r5": x.get("r5")})
@@ -2355,7 +2378,9 @@ def kr_rev_daily(mkt: str = "kr"):
             c = r.get("c") or r.get("code")
             if c:
                 meta[c] = {"n": r.get("n") or r.get("name") or c, "cap": r.get("mcap") or r.get("cap"),
-                           "px": r.get("px"), "chg": r.get("chg"), "edl": r.get("edl")}
+                           "px": r.get("px"), "chg": r.get("chg"), "edl": r.get("edl"),
+                           "tp": r.get("tp"),   # (2026-09-02) 평균 목표가 — 발표표 상승여력 열
+                           "up": (round((r["tp"] / r["px"] - 1) * 100, 1) if (r.get("tp") and r.get("px")) else None)}
     except Exception:
         pass
     def _m(c):
@@ -2432,7 +2457,7 @@ def kr_rev_daily(mkt: str = "kr"):
                     continue   # 수치 미파싱(공시 직후) 레코드 제외
                 m = _m(x.get("c"))
                 rows.append({"c": x.get("c"), "n": x.get("n") or m["n"], "cap": m["cap"],
-                             "px": m["px"], "chg": m["chg"],
+                             "px": m["px"], "chg": m["chg"], "tp": m.get("tp"), "up": m.get("up"),
                              "spr": x.get("spr"), "spr_s": x.get("spr_s"),
                              "op_yoy": x.get("op_yoy"), "op_qoq": x.get("op_qoq"),
                              "sales_yoy": x.get("sales_yoy"), "sales_qoq": x.get("sales_qoq"),

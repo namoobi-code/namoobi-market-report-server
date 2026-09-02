@@ -71,7 +71,8 @@ function chips(kind){
     ${['all','up','dn'].map(m=>`<button class="scrrst${MODE[kind]===m?' on':''}" data-m="${m}" style="font-size:11px${MODE[kind]===m?';background:#1e293b;color:#fff':''}">${m==='all'?'전체':m==='up'?'상향만':'하향만'}</button>`).join('')}</span>`;
 }
 
-/* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센대비 · spr_s=매출 컨센대비 */
+/* ⓪ 발표 당일 서프라이즈 — 연쇄 1단계 (2026-09-02 추가). spr=영업익 컨센대비 · spr_s=매출 컨센대비
+   (2026-09-02 사용자) 목표가·상승여력 열 추가 — '비트인데 목표가 아래/위' 를 같이 본다. */
 function spBlock(day){
   const head=`<div style="margin:12px 0 4px;font-weight:700;font-size:12.5px">${dstr(day.d)} <span class="note">발표 ${day.rows.length}건 (수치 파싱분)</span></div>`;
   /* (2026-09-02 피드백4·5) 컬럼 확장 + 기준 명시 — 컨센대비는 YoY/QoQ 가 아니라
@@ -79,14 +80,14 @@ function spBlock(day){
      를 병기하고 툴팁으로 풀어쓴다. */
   const _tt='발표 분기 실제치 vs 같은 분기 증권사 컨센서스 추정치 — 전년동기(YoY)·전분기(QoQ) 비교가 아님';
   const th=MKT==='us'
-    ?`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="발표 분기 실제 EPS vs 같은 분기 컨센서스 — YoY/QoQ 아님">EPS 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>EPS<br>실제 vs 컨센</th><th>가이던스<br>매출 갭</th><th>가이던스<br>EPS 갭</th><th>주가반응</th></tr>`
-    :`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="${_tt}">영업익 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th title="${_tt}">매출 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>`;
+    ?`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="풀의 평균 목표가(US=Yahoo targetMeanPrice · KR=네이버 컨센) · % = 현재가 대비 상승여력">목표가<br>상승여력</th><th title="발표 분기 실제 EPS vs 같은 분기 컨센서스 — YoY/QoQ 아님">EPS 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>EPS<br>실제 vs 컨센</th><th>가이던스<br>매출 갭</th><th>가이던스<br>EPS 갭</th><th>주가반응</th></tr>`
+    :`<tr><th style="text-align:left">종목</th><th>현재가</th><th title="풀의 평균 목표가(US=Yahoo targetMeanPrice · KR=네이버 컨센) · % = 현재가 대비 상승여력">목표가<br>상승여력</th><th title="${_tt}">영업익 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>영업익<br>YoY</th><th>영업익<br>QoQ</th><th title="${_tt}">매출 컨센대비<br><span style="font-weight:400;font-size:9.5px">(당분기 추정대비)</span></th><th>매출<br>YoY</th><th>매출<br>QoQ</th><th>주가반응</th></tr>`;
   const tr=day.rows.map(r=>{
     const nm=`<td style="text-align:left;cursor:pointer;white-space:nowrap" onclick="_revdNv('${E(r.c)}')"><b>${E(r.n)}</b><br><span class="note">${E(r.c)} · ${CAPF(r.cap)}</span></td>`;
     const rr=[]; if(r.r1!=null) rr.push('D+1 '+pf(r.r1)); if(r.r3!=null) rr.push('D+3 '+pf(r.r3)); if(r.r5!=null) rr.push('D+5 '+pf(r.r5));
     if(MKT==='us')   /* US: EPS 실제vs컨센 + 가이던스 갭(8-K 파싱) — 미국식 관전점 */
-      return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td style="white-space:nowrap">${r.eps!=null?(+r.eps).toFixed(2):'—'} vs ${r.est!=null?(+r.est).toFixed(2):'—'}</td><td>${pf(r.grev)}</td><td>${pf(r.geps)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
-    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.op_yoy)}</td><td>${pf(r.op_qoq)}</td><td><b>${pf(r.spr_s)}</b></td><td>${pf(r.sales_yoy)}</td><td>${pf(r.sales_qoq)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
+      return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td style="white-space:nowrap">${r.tp!=null?nf(+(+r.tp).toFixed(MKT==='us'?1:0)):'—'}<br>${pf(r.up)}</td><td><b>${pf(r.spr)}</b></td><td style="white-space:nowrap">${r.eps!=null?(+r.eps).toFixed(2):'—'} vs ${r.est!=null?(+r.est).toFixed(2):'—'}</td><td>${pf(r.grev)}</td><td>${pf(r.geps)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
+    return `<tr>${nm}<td style="white-space:nowrap">${nf(r.px)}<br>${pf(r.chg)}</td><td style="white-space:nowrap">${r.tp!=null?nf(+(+r.tp).toFixed(MKT==='us'?1:0)):'—'}<br>${pf(r.up)}</td><td><b>${pf(r.spr)}</b></td><td>${pf(r.op_yoy)}</td><td>${pf(r.op_qoq)}</td><td><b>${pf(r.spr_s)}</b></td><td>${pf(r.sales_yoy)}</td><td>${pf(r.sales_qoq)}</td><td style="white-space:nowrap">${rr.join('<br>')||'—'}</td></tr>`;
   }).join('');
   return head+`<table class="mini" style="width:100%;font-size:11px;text-align:center">${th}${tr}</table>`;
 }

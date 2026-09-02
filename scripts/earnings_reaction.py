@@ -58,10 +58,10 @@ def kr_closes(code, d8):
     return sorted(out)
 
 
-def us_closes(sym, d8):
-    """Yahoo 일봉 → [(YYYYMMDD, 종가)]."""
+def us_closes(sym, d8, p2=None):
+    """Yahoo 일봉 → [(YYYYMMDD, 종가)]. p2(epoch) 를 주면 그 시각까지."""
     p1 = int((datetime.strptime(d8, "%Y%m%d") - timedelta(days=10)).timestamp())
-    p2 = int((datetime.strptime(d8, "%Y%m%d") + timedelta(days=45)).timestamp())
+    p2 = p2 or int((datetime.strptime(d8, "%Y%m%d") + timedelta(days=45)).timestamp())
     try:
         j = json.loads(get(f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
                            f"?interval=1d&period1={p1}&period2={p2}"))
@@ -73,11 +73,38 @@ def us_closes(sym, d8):
                   for t, c in zip(ts, cl) if c is not None)
 
 
-def react(closes, d8):
+_CAL = {}   # 거래일 달력 캐시 {"us": [YYYYMMDD…]}
+
+
+def us_calendar():
+    """미국 거래일 달력 — SPY 일봉 날짜(최근 90일). 실패하면 None(위치 기반 폴백).
+
+    (2026-09-02 실측) Yahoo v8 chart 가 종목별로 **중간 일봉을 무작위로 빠뜨린다**
+    (ANF·SFL 8/26 발표건: 8/28 봉 누락 → after[2]=8/31 이 D+3 으로 잘못 계산되고
+    D+5 는 아예 안 채워짐. 같은 날 발표한 CRM 은 봉이 다 있어 D+5 까지 채워져
+    '같은 날인데 종목마다 D+n 이 다른' 표가 됐다). 재요청하면 있기도 하다.
+    → 위치(after[i]) 대신 **달력 기준 D+n 날짜의 종가**를 찾고, 그 날짜 봉이 없으면
+    그 칸만 비워 두고(다음 실행에서 재시도) 다른 칸은 정확히 채운다.
+    """
+    if "us" in _CAL:
+        return _CAL["us"]
+    cal = None
+    try:
+        cal = [d for d, _ in us_closes("SPY", (datetime.now() - timedelta(days=80)).strftime("%Y%m%d"),
+                                       p2=int(time.time()) + 86400)]
+        cal = sorted(set(cal)) or None
+    except Exception:
+        cal = None
+    _CAL["us"] = cal
+    return cal
+
+
+def react(closes, d8, cal=None):
     """발표일(d8) 기준 반응률.
 
     기준가 = 발표일 **이전 마지막** 종가(발표 전 마지막 시세). 장 마감 후·개장 전 발표가
     대부분이라 발표 당일 종가를 기준으로 삼으면 반응이 통째로 잘려 나간다.
+    cal(거래일 달력)이 있으면 D+n 을 달력 날짜로 잡아 종가를 찾는다(봉 누락 내성).
     """
     if not closes:
         return {}
@@ -91,13 +118,21 @@ def react(closes, d8):
     if base is None or not after or base <= 0:
         return {}
     out = {}
-    for lab, i in (("r1", 0), ("r3", 2), ("r5", 4), ("r20", 19)):   # (2026-09-02) D+3 추가(사용자)
+    horizons = (("r1", 0), ("r3", 2), ("r5", 4), ("r20", 19))   # (2026-09-02) D+3 추가(사용자)
+    cal_after = [d for d in (cal or []) if d >= d8] if cal else None
+    if cal_after and cal_after[0] <= after[0][0]:
+        bymap = dict(after)
+        for lab, i in horizons:
+            if len(cal_after) > i and cal_after[i] in bymap:
+                out[lab] = round((bymap[cal_after[i]] / base - 1) * 100, 2)
+        return out
+    for lab, i in horizons:
         if len(after) > i:
             out[lab] = round((after[i][1] / base - 1) * 100, 2)
     return out
 
 
-def run(path, closes_fn, sym_of):
+def run(path, closes_fn, sym_of, cal=None):
     if not path.exists():
         print(f"[react] {path.name} 없음 — 건너뜀")
         return
@@ -115,7 +150,17 @@ def run(path, closes_fn, sym_of):
                 skip += 1
                 continue
             cl = closes_fn(sym_of(it), d8)
-            r = react(cl, d8)
+            # (2026-09-02 실측) 같은 종목도 요청 구간(period2)에 따라 빠지는 봉이 다르다
+            # (ANF: p2=발표+45일 이면 8/28 누락, p2=지금 이면 있음). 달력상 있어야 할 날이
+            # 비면 구간을 바꿔 한 번 더 받아 합친다.
+            if cal and cl and closes_fn is us_closes:
+                have = {d for d, _ in cl}
+                need = [d for d in cal if d8 <= d <= cl[-1][0]]
+                if any(d not in have for d in need):
+                    cl2 = us_closes(sym_of(it), d8, p2=int(time.time()) + 86400)
+                    if cl2:
+                        cl = sorted(dict(cl + cl2).items())
+            r = react(cl, d8, cal)
             if r:
                 it.update(r); n += 1
             # (2026-08-09) 200건마다 중간 저장 — US 는 한 번에 2,500건이라 끝에서만 쓰면
@@ -132,4 +177,4 @@ def run(path, closes_fn, sym_of):
 
 if __name__ == "__main__":
     run(KR, kr_closes, lambda it: it.get("c"))
-    run(US, us_closes, lambda it: it.get("c"))
+    run(US, us_closes, lambda it: it.get("c"), us_calendar())
