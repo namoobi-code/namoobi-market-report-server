@@ -24,7 +24,8 @@ const CO_COLOR={
   'HD현대일렉트릭':'#be185d','효성중공업':'#0ea5e9','센트러스':'#b45309','스페이스X':'#4f46e5','로켓랩':'#ca8a04',
   '삼성바이오':'#0ea5e9','론자':'#b45309','우시바이오':'#e11d48','베링거':'#7c3aed',
   '1위 고객':'#be185d','2위 고객':'#0ea5e9','3위 고객':'#b45309','4위 고객':'#7c3aed',
-  'OpenAI':'#0f766e','Anthropic':'#b45309','Google':'#4f46e5','DeepSeek':'#be185d','xAI':'#334155'};
+  'OpenAI':'#0f766e','Anthropic':'#b45309','Google':'#4f46e5','DeepSeek':'#be185d','xAI':'#334155',
+  '알테오젠':'#be185d','할로자임':'#0ea5e9'};
 function colorOf(name,i){
   const n=String(name||'');
   // 긴 키 우선 매칭 — 'SK하이닉스'가 '삼성'보다 먼저 걸리도록
