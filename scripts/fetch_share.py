@@ -93,9 +93,20 @@ BATTLES = [
     ("dram_ctr", "A", "D램 계약가 ($/개·모듈)", "$", "월간",
      "실제 기업 간 거래가 — 현물가를 한 박자 늦게 따라간다. 계약가가 오르면 그 분기 메모리 3사 실적에 "
      "그대로 반영되므로, 현물 급등 → 계약 반영 → 실적 서프라이즈의 경로를 여기서 확인한다. "
-     "2026년 D램 시장 매출이 YoY +385%(카운터포인트)로 튄 것이 이 가격 때문이다. ⚠ 반대로 HBM 단가는 내렸다 — HBM3E 가격 하락 + HBM4 출시 지연(카운터포인트)이 겹쳐, HBM 비중이 가장 높은 SK하이닉스가 D램 전체 점유를 39%→25%로 내준 직접 원인이 됐다. 즉 지금 돈은 HBM 이 아니라 범용 D램에서 난다. (HBM ASP 자체 시계열은 벤더 호가가 고정값으로 반복되고 HBM4 $500 같은 오류가 있어 배틀에서 제외)",
+     "2026년 D램 시장 매출이 YoY +385%(카운터포인트)로 튄 것이 이 가격 때문이다. ★ DDR4 8Gb 는 2025-06 $2.6 → 2026-06 $21.0 으로 1년 새 8배 올랐다 — 이 사이클의 본체. HBM 가격은 반대로 움직였다(옆 HBM 카드 참조).",
      [("삼성전자", "005930.KS"), ("SK하이닉스", "000660.KS"), ("마이크론", "MU")],
      [], "dram_ctr", "트렌드포스 공개 계약 가격표(서버 매일 수집 재활용)"),
+    ("hbm_asp", "B", "HBM 스택당 가격 ($/스택)", "$", "반기",
+     "⚠ 범용 D램과 정반대다 — D램 계약가가 1년 새 8배 오르는 동안 HBM3E 는 오히려 내렸다"
+     "(8단 420→360, 12단 630→540, 1H25→2H25 각 -14%). "
+     "HBM 비중이 가장 높은 SK하이닉스가 D램 전체 점유를 39%→25%로 내준 직접 원인이며, "
+     "'AI = HBM = 무조건 좋다'가 아니라 지금 돈은 범용 D램에서 난다는 뜻이다. "
+     "HBM4 12단은 SK하이닉스→엔비디아 공급가 보도치 $500 — HBM3E 12단(540)과 비슷한 수준에서 시작했다. "
+     "HBM4 양산이 본격화되면 방향이 다시 뒤집힐 수 있어, 이 카드가 그 전환점을 잡는 자리다. "
+     "※ 스택가 절대치를 공개하는 자료가 드물어 $/GB 집계표를 용량으로 환산한 값이다 — "
+     "같은 방법으로 계산된 점끼리만 이었고, 계산 기반이 다른 보도치는 제외했다.",
+     [("SK하이닉스", "000660.KS"), ("삼성전자", "005930.KS"), ("마이크론", "MU")],
+     [], "hbm_asp", "Silicon Analysts $/GB 집계표(원출처 트렌드포스·세미애널리시스) 환산 + HBM4 는 보도치 — 서버 mem_backfill 정본"),
     ("tok_in", "A", "AI 토큰 가격 — 입력 ($/100만 토큰)", "$", "월간",
      "★ 3년간 167배 압축됐던 가격이 2026년 들어 '반등'했다 — 이 탭에서 유일하게 방향이 꺾인 대결. "
      "GPT-4 출시가 $30(2023-03) → 오늘 프론티어급 최저 $0.18(Llama 4 Scout). "
@@ -545,9 +556,53 @@ def auto_dram_spot():
 
 
 def auto_dram_contract():
-    return _series_db("series_mem_dram_contract.json",
+    """계약가 — 백필(월별 보도치 2025-06~) + 일별 수집(2026-07~)을 이어 붙인다.
+
+    일별 DB만 쓰면 2026-07 부터라 '1년 새 8배'라는 이 사이클의 본체가 안 보인다.
+    mem_backfill.json 은 D램익스체인지 월말 고정거래가를 국내 언론 보도에서 수집해 둔 정본
+    (출처 21건이 sources 에 기록돼 있다). 두 구간이 겹치는 지점에서 값이 이어지는지 확인함:
+    백필 2026-06 = $21.0 / 일별 2026-07-11 = $20.0 (스냅샷 시점 차이, 연속성 정상).
+    """
+    out = []
+    bf = load("mem_backfill.json") or {}
+    for d, v in ((bf.get("data") or {}).get("dram_contract_monthly") or {}).get(
+            "DDR4 8Gb (1Gx8, PC용 범용)", []):
+        out.append((d, {"DDR4 8Gb": v}, "D램익스체인지 월말 고정거래가(보도 백필)"))
+    out += _series_db("series_mem_dram_contract.json",
                       {"DDR4 16Gb 2Gx8": "DDR4 16Gb", "DDR4 8Gb 1Gx8": "DDR4 8Gb",
-                       "DDR5 8GB SO-DIMM": "DDR5 8GB 모듈", "DDR4 16GB SO-DIMM": "DDR4 16GB 모듈"})
+                       "DDR5 8GB SO-DIMM": "DDR5 8GB 모듈", "DDR4 16GB SO-DIMM": "DDR4 16GB 모듈"},
+                      every=6, tail=12)
+    return out
+
+
+def auto_hbm_asp():
+    """HBM 스택당 가격 — mem_backfill 의 분기 시계열(출처 명시)만 사용한다.
+
+    ⚠ 일별 series_mem_hbm_asp.json 은 배틀로 못 쓴다(2026-09-04 검증):
+      HBM3 $1200·HBM3E 8단 $1800 이 2개월 내내 변동 0(벤더 호가표 반복이지 거래가 아님),
+      HBM4 12단 $500 이 HBM3E 8단보다 3.6배 싸게 나오는 등 오류가 있고 결측도 잦다.
+    ⚠ 여기 쓰는 값은 Silicon Analysts 의 $/GB 집계표(원출처 TrendForce·SemiAnalysis)를
+      용량으로 곱해 스택가로 환산한 것 — 같은 방법으로 계산된 점끼리만 이으므로 내부 정합은 맞는다.
+      2025Q3 의 'HBM3E 12단 $294'(TweakTown 기사 배율 역산)는 계산 기반이 달라 선이 튀므로 제외.
+    """
+    bf = load("mem_backfill.json") or {}
+    q = dict((bf.get("data") or {}).get("hbm_asp_quarterly") or [])
+    lab = {"2024Q1": "2024-03", "2025Q2": "2025-06", "2025Q3": "2025-09", "2025Q4": "2025-12"}
+    out = []
+    for k in ("2024Q1", "2025Q2", "2025Q3", "2025Q4"):
+        v = q.get(k) or {}
+        vv = {}
+        for src, dst in (("HBM3 8-Hi", "HBM3 8단"), ("HBM3E 8-Hi", "HBM3E 8단"),
+                         ("HBM3E 12-Hi", "HBM3E 12단"), ("HBM4 12-Hi", "HBM4 12단")):
+            if src in v and not (k == "2025Q3" and src == "HBM3E 12-Hi"):
+                vv[dst] = v[src]
+        if vv:
+            note = {"2024Q1": "$12.50/GB×16GB 환산",
+                    "2025Q2": "1H25 $17.50/GB 환산 — HBM3E 최고가 구간",
+                    "2025Q3": "SK하이닉스→엔비디아 HBM4 공급가 보도치",
+                    "2025Q4": "2H25 $15.00/GB 환산 — HBM3E 8단 420→360(-14%) 하락"}[k]
+            out.append((lab[k], vv, note))
+    return out
 
 
 # ⚠ HBM ASP 배틀은 폐기(2026-09-04) — series_mem_hbm_asp.json 은 배틀로 쓸 수 없다.
@@ -606,10 +661,17 @@ def main():
         elif auto == "amzn":
             ser, players = auto_amzn()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
-        elif auto in ("dram_spot", "dram_ctr"):
-            ser = {"dram_spot": auto_dram_spot, "dram_ctr": auto_dram_contract}[auto]()
+        elif auto in ("dram_spot", "dram_ctr", "hbm_asp"):
+            ser = {"dram_spot": auto_dram_spot, "dram_ctr": auto_dram_contract,
+                   "hbm_asp": auto_hbm_asp}[auto]()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
-            players = [(k, "") for k in (ser[-1][1] if ser else {})]
+            # ⚠ 마지막 시점의 키만 쓰면 도중에 사라진 품목이 표에서 빠진다
+            #   (HBM3 8단·HBM4 12단이 열 자체가 없어졌던 실측 사고) → 전 시점 합집합으로 만든다
+            _seen = []
+            for _, _v, _ in ser:
+                for _k in _v:
+                    if _k not in _seen: _seen.append(_k)
+            players = [(k, "") for k in _seen]
         elif auto == "ai_accel":
             ser = auto_ai_accel()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
