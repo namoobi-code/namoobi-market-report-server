@@ -83,6 +83,19 @@ BATTLES = [
     ("amzn_kb", "A", "아마존 US 뷰티 톱60 내 K뷰티 최고 랭크", "위", "일간",
      "온라인 점유의 일간 프록시 — 메디큐브(에이피알) 랭크 상승이 실적 컨센 상향으로 이어지는 경로",
      [], [], "amzn", "아마존 베스트셀러(K-소비재 탭 파이프라인 재활용)"),
+    ("dram_spot", "A", "D램 현물가 ($/개)", "$", "일간",
+     "★ AI 토큰 가격이 오른 '원인'이 여기 있다 — 삼성·SK가 HBM 에 캐파를 몰아준 사이 범용 D램이 모자라 "
+     "현물가가 급등 중이다. 서버가 트렌드포스 공개 가격표를 매일 긁어온다(무토큰). "
+     "현물(spot)은 계약가보다 먼저 움직이는 선행 지표 — 여기가 꺾이면 메모리 사이클 전환 신호다. "
+     "eTT(등급 미달품)는 변동이 커 대표 품목만 표시. D램 탭(점유)·조달구조 탭(빅테크 차입)과 한 세트.",
+     [("삼성전자", "005930.KS"), ("SK하이닉스", "000660.KS"), ("마이크론", "MU")],
+     [], "dram_spot", "트렌드포스 공개 현물 가격표(서버 fetch_memory.py 매일 수집 재활용)"),
+    ("dram_ctr", "A", "D램 계약가 ($/개·모듈)", "$", "월간",
+     "실제 기업 간 거래가 — 현물가를 한 박자 늦게 따라간다. 계약가가 오르면 그 분기 메모리 3사 실적에 "
+     "그대로 반영되므로, 현물 급등 → 계약 반영 → 실적 서프라이즈의 경로를 여기서 확인한다. "
+     "2026년 D램 시장 매출이 YoY +385%(카운터포인트)로 튄 것이 이 가격 때문이다. ⚠ 반대로 HBM 단가는 내렸다 — HBM3E 가격 하락 + HBM4 출시 지연(카운터포인트)이 겹쳐, HBM 비중이 가장 높은 SK하이닉스가 D램 전체 점유를 39%→25%로 내준 직접 원인이 됐다. 즉 지금 돈은 HBM 이 아니라 범용 D램에서 난다. (HBM ASP 자체 시계열은 벤더 호가가 고정값으로 반복되고 HBM4 $500 같은 오류가 있어 배틀에서 제외)",
+     [("삼성전자", "005930.KS"), ("SK하이닉스", "000660.KS"), ("마이크론", "MU")],
+     [], "dram_ctr", "트렌드포스 공개 계약 가격표(서버 매일 수집 재활용)"),
     ("tok_in", "A", "AI 토큰 가격 — 입력 ($/100만 토큰)", "$", "월간",
      "★ 3년간 167배 압축됐던 가격이 2026년 들어 '반등'했다 — 이 탭에서 유일하게 방향이 꺾인 대결. "
      "GPT-4 출시가 $30(2023-03) → 오늘 프론티어급 최저 $0.18(Llama 4 Scout). "
@@ -506,6 +519,46 @@ def auto_nvda_cust():
     return out
 
 
+def _series_db(name, keys, every=3, tail=40):
+    """서버가 매일 수집 중인 메모리 가격 DB 재활용 → [(날짜, {품목:값}, 비고)].
+    every 일 간격으로 솎아 최근 tail 개만 (일별 원본은 점이 너무 촘촘해 차트가 뭉갠다)."""
+    d = load(name)
+    if not d or not d.get("data"):
+        return []
+    rows = d["data"]
+    out = []
+    for i, (dt_, m) in enumerate(rows):
+        if i % every and i != len(rows) - 1:      # 마지막 점은 항상 포함(최신값 보존)
+            continue
+        v = {lab: m[k] for k, lab in keys.items() if m.get(k) is not None}
+        if v:
+            out.append((dt_, v, ""))
+    return out[-tail:]
+
+
+def auto_dram_spot():
+    return _series_db("series_mem_dram_spot.json",
+                      {"DDR5 16Gb (2Gx8) 4800/5600": "DDR5 16Gb",
+                       "DDR4 16Gb (2Gx8) 3200": "DDR4 16Gb",
+                       "DDR4 8Gb (1Gx8) 3200": "DDR4 8Gb",
+                       "DDR3 4Gb 512Mx8 1600/1866": "DDR3 4Gb"})
+
+
+def auto_dram_contract():
+    return _series_db("series_mem_dram_contract.json",
+                      {"DDR4 16Gb 2Gx8": "DDR4 16Gb", "DDR4 8Gb 1Gx8": "DDR4 8Gb",
+                       "DDR5 8GB SO-DIMM": "DDR5 8GB 모듈", "DDR4 16GB SO-DIMM": "DDR4 16GB 모듈"})
+
+
+# ⚠ HBM ASP 배틀은 폐기(2026-09-04) — series_mem_hbm_asp.json 은 배틀로 쓸 수 없다.
+#   ① HBM3 $1200·HBM3E 8단 $1800 이 2개월 내내 변동 0(벤더 호가표를 그대로 반복, 거래가 아님)
+#   ② HBM3E 12단 $2600 은 1회만 등장 후 소멸 — 품목 구성이 날마다 바뀜
+#   ③ HBM4 12단 $500 은 HBM3E 8단($1800)보다 3.6배 싸다 — 상위 세대가 더 쌀 수 없어 명백한 오류
+#   ④ 결측 잦음(8/17 은 HBM3 한 줄뿐)
+#   같은 소스(실리콘애널리스츠)의 HBM 점유율도 2026-09-02 에 'editorial estimate' 라 폐기한 바 있다.
+#   HBM 가격 방향은 카운터포인트 서술(HBM3E 가격 하락·HBM4 출시 지연)로 D램 카드 why 에 기록한다.
+
+
 def auto_hbm():
     """series_mem_hbm_share.json(일별) → 주 1회 샘플 시계열"""
     d = load("series_mem_hbm_share.json")
@@ -553,6 +606,10 @@ def main():
         elif auto == "amzn":
             ser, players = auto_amzn()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+        elif auto in ("dram_spot", "dram_ctr"):
+            ser = {"dram_spot": auto_dram_spot, "dram_ctr": auto_dram_contract}[auto]()
+            series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+            players = [(k, "") for k in (ser[-1][1] if ser else {})]
         elif auto == "ai_accel":
             ser = auto_ai_accel()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
