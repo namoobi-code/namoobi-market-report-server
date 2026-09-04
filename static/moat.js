@@ -5,7 +5,7 @@
    판정은 '검토 후보 알림'이지 매수 신호가 아니다 — 가치함정은 가격 신호로 안 걸러진다. */
 (function(){
 'use strict';
-let D=null, FILT='all';
+let D=null, FILT='all', MT='all';
 const $=id=>document.getElementById(id);
 const pf=v=>v==null?'—':(v>0?'+':'')+v.toFixed(1)+'%';
 const pc=v=>v==null?'#64748b':(v>0?'#dc2626':v<0?'#2563eb':'#64748b');
@@ -39,6 +39,16 @@ function spark(sv,color){
   return `<svg width="${w}" height="${h}" style="display:block"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
 }
 
+// (2026-09-04) 해자 '유형' 배지 — 모닝스타 5분류.
+//   tier(B1/B2)는 해자의 '강도'만 본다. 유형은 '어떻게 무너지는가'를 알려주므로 감시 대상이 정해진다.
+//   (노보노디스크 제거 사례 = 무형자산형이 대체 기술에 뚫린 경우)
+function mtBadges(r){
+  const T=(D&&D.moat_types)||{};
+  return (r.mtype||[]).map((k,i)=>{const t=T[k]; if(!t) return '';
+    return `<span title="${t.name} — ${t.risk}" style="background:${t.bg};color:${t.fg};border-radius:8px;padding:1px 7px;margin-right:4px;font-weight:${i===0?700:400}">${t.name}</span>`;
+  }).join('');
+}
+
 function render(){
   if(!D) return;
   $('mw_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:30 자동 갱신';
@@ -48,6 +58,17 @@ function render(){
   $('mw_filt').innerHTML=FL.map(f=>
     `<button data-f="${f[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${FILT===f[0]?'#334155':'#d6d9de'};background:${FILT===f[0]?'#334155':'#fff'};color:${FILT===f[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${f[1]}</button>`).join('');
   $('mw_filt').querySelectorAll('button').forEach(b=>b.onclick=()=>{FILT=b.dataset.f;render();});
+  // 유형 필터 — 해자가 '어떻게 무너지는지'로 골라 보기
+  const T=D.moat_types||{}, mc={};
+  rows.forEach(r=>(r.mtype||[]).forEach(k=>mc[k]=(mc[k]||0)+1));
+  const nreg=rows.filter(r=>r.reg).length;
+  const MF=[['all','유형 전체']].concat(Object.keys(T).map(k=>[k,T[k].name+' '+(mc[k]||0)])).concat([['reg','⚖️ 규제 '+nreg]]);
+  const mf=$('mw_mtype');
+  if(mf){
+    mf.innerHTML=MF.map(f=>{const t=T[f[0]];
+      return `<button data-m="${f[0]}" title="${t?t.risk:''}" style="margin-right:5px;padding:2px 10px;border-radius:12px;border:1px solid ${MT===f[0]?(t?t.fg:'#334155'):'#d6d9de'};background:${MT===f[0]?(t?t.bg:'#334155'):'#fff'};color:${MT===f[0]?(t?t.fg:'#fff'):'#333'};cursor:pointer;font-size:11.5px">${f[1]}</button>`;}).join('');
+    mf.querySelectorAll('button').forEach(b=>b.onclick=()=>{MT=b.dataset.m;render();});
+  }
 
   // (Phase3) 오늘의 판정 전환 배너
   const chg=rows.filter(r=>r.vd_prev);
@@ -56,6 +77,8 @@ function render(){
   if(bn) bn.innerHTML=chg.length?`<b>⚡ 오늘의 전환</b> — ${chg.map(r=>`${r.name} ${VE[r.vd_prev]||r.vd_prev}→${VE[r.verdict]}`).join(' · ')}`
                                :'오늘 판정 전환 없음 — 신호등은 매일 06:30 재산출';
   let list=[...rows];
+  if(MT==='reg') list=list.filter(r=>r.reg);
+  else if(MT!=='all') list=list.filter(r=>(r.mtype||[]).indexOf(MT)>=0);
   if(FILT==='buy') list=list.filter(r=>r.verdict==='buy'||r.verdict==='buy_z'||r.verdict==='buy_m');
   else if(FILT==='top') list=list.filter(r=>r.verdict.startsWith('top'));
   else if(FILT!=='all') list=list.filter(r=>r.verdict===FILT);
@@ -70,7 +93,8 @@ function render(){
         <b style="font-size:14px">${r.name} <span style="font-size:10.5px;color:#94a3b8">${r.sym}</span>
           <span style="font-size:10.5px;background:#f1f5f9;color:#475569;border-radius:8px;padding:1px 7px;margin-left:3px">${mkt(r.sym)[0]} ${mkt(r.sym)[1]}</span></b>
         <span title="${v[4]}" style="background:${v[3]};color:${v[2]};border-radius:10px;padding:2px 9px;font-size:11.5px;font-weight:700">${v[0]} ${v[1]}${r.qh!=null?` <span style=\"font-weight:400;opacity:.85\">${r.qh}점</span>`:''}${r.vd_days>1?` <span style="font-weight:400;opacity:.8">D+${r.vd_days}</span>`:r.vd_prev?' <span style="font-weight:400">⚡오늘 전환</span>':''}</span></div>
-      <div style="font-size:11px;color:#64748b;margin:3px 0 6px"><span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:1px 7px;margin-right:5px">${r.sec}</span>${r.tier==='B2+'?'<span title="관계도 배지는 황색(복점·양강)이나 해자 실질이 독점급이라 선별 편입" style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 7px;margin-right:5px">선별 B2</span>':''}${r.moat}</div>
+      <div style="font-size:11px;color:#64748b;margin:3px 0 6px"><span style="background:#eef2ff;color:#4338ca;border-radius:8px;padding:1px 7px;margin-right:5px">${r.sec}</span>${r.tier==='B2+'?'<span title="관계도 배지는 황색(복점·양강)이나 해자 실질이 독점급이라 선별 편입" style="background:#fef3c7;color:#b45309;border-radius:8px;padding:1px 7px;margin-right:5px">선별 B2</span>':''}${mtBadges(r)}${r.moat}</div>
+      ${r.reg?`<div style="font-size:10.5px;color:#b91c1c;background:#fef2f2;border-left:3px solid #b91c1c;padding:3px 7px;margin:0 0 5px">⚖️ 규제 리스크 — ${r.reg}</div>`:''}
       <div style="display:flex;gap:10px;align-items:center">
         ${spark(r.spark,v[2])}
         <table style="font-size:11.5px;border-collapse:collapse;flex:1;white-space:nowrap">

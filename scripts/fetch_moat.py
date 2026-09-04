@@ -93,6 +93,62 @@ UNIV = [
 #   기준: 스위칭 비용 극단(EDA)·출하 병목(테스터·MLCC·감속기)·규모 락인(CDMO)·수년 백로그(터빈·변압기)·듀오폴리(비만약)
 SEL_B2 = {"SNPS","CDNS","6857.T","6981.T","6268.T","207940.KS","GEV","4063.T","267260.KS","298040.KS","LLY","AVGO"}
 
+# ══════════════════════════════════════════════════════════════════════════════
+# (2026-09-04 신설) 해자 '유형' 5분류 — 모닝스타 표준(무형자산·전환비용·네트워크효과·원가우위·효율적규모)
+#   기존 tier(B1/B2)는 해자의 '강도'만 본다. 하지만 실전에서 갈리는 건 '어떻게 무너지느냐'다.
+#   노보노디스크 제거 사례가 정확히 이 문제였다 — 무형자산(특허)형 해자였고 릴리에 효능으로 밀렸다.
+#   유형을 알면 '무엇을 감시해야 하는지'가 정해진다.
+MOAT_TYPE = {
+    "intangible": ("무형자산", "#7c3aed", "#ede9fe",
+                   "브랜드·특허·규제 승인 — 대체 기술/신약이 나오면 무너진다. 특허 만료일이 정해져 있어 시한이 있다"),
+    "switching":  ("전환비용", "#1d4ed8", "#dbeafe",
+                   "바꾸려면 돈·시간·리스크가 커서 못 떠난다 — 가장 안 깨지는 유형. 다만 세대 교체기(새 표준 등장)에 한꺼번에 열린다"),
+    "network":    ("네트워크효과", "#166534", "#dcfce7",
+                   "쓸수록 가치가 커진다 — 오래 안 깨지다가 임계점을 넘으면 '한 번에' 무너진다(노키아형)"),
+    "cost":       ("원가우위", "#b45309", "#ffedd5",
+                   "규모·공정으로 싸게 만든다 — 경쟁사 증설·보조금으로 가장 빨리 깨지는 유형. 캐파 증설 뉴스가 곧 경보"),
+    "scale":      ("효율적 규모", "#0f766e", "#ccfbf1",
+                   "시장이 작아 소수만 감당 가능 — 수요가 갑자기 커지면 신규 진입이 열린다"),
+}
+
+# 종목별 유형(복수 가능, 앞이 주된 유형) — 49종 전수
+MOAT_TYPES = {
+    "ASML": ["intangible", "switching"], "TSM": ["cost", "switching"], "NVDA": ["network", "switching"],
+    "ARM": ["network", "intangible"], "4062.T": ["switching", "cost"], "VRT": ["scale", "switching"],
+    "000660.KS": ["cost", "switching"], "042700.KS": ["switching", "intangible"],
+    "SNPS": ["switching", "network"], "CDNS": ["switching", "network"], "AVGO": ["switching", "intangible"],
+    "6857.T": ["switching", "intangible"], "6981.T": ["cost", "intangible"], "4063.T": ["cost", "intangible"],
+    "6268.T": ["intangible", "switching"], "207940.KS": ["cost", "switching"], "LLY": ["intangible"],
+    "GEV": ["scale", "intangible"], "267260.KS": ["scale", "cost"], "298040.KS": ["scale", "cost"],
+    "KLAC": ["intangible", "switching"], "8035.T": ["intangible", "switching"], "6146.T": ["intangible", "switching"],
+    "GOOGL": ["network", "intangible"], "CEG": ["scale", "intangible"],
+    "600111.SS": ["cost", "scale"], "300748.SZ": ["cost"], "300750.SZ": ["cost", "scale"],
+    "600438.SS": ["cost"], "WCH.DE": ["cost", "scale"],
+    "SPCX": ["cost", "network"], "6324.T": ["intangible", "switching"], "6758.T": ["intangible", "cost"],
+    "3402.T": ["intangible", "cost"],
+    "034020.KS": ["scale", "intangible"], "LEU": ["intangible", "scale"], "KAP.L": ["cost", "scale"],
+    "MP": ["intangible", "scale"], "LYC.AX": ["intangible", "scale"], "010130.KS": ["cost", "scale"],
+    "196170.KQ": ["intangible"], "VRTX": ["intangible"], "ILMN": ["switching", "intangible"],
+    "CRSP": ["intangible"],
+    "047810.KS": ["scale", "intangible"], "012450.KS": ["scale", "intangible"], "IRDM": ["scale", "network"],
+    "QBTS": ["intangible"], "294630.KQ": ["intangible", "scale"],
+}
+
+# 반독점·수출통제 등 '해자가 강해서 생기는' 규제 리스크 — 기사가 짚은 축(잘나갈수록 규제 대상)
+REGULATORY = {
+    "GOOGL": "美 반독점 소송 — 검색 기본계약·애드테크 분리 명령 리스크(해자 자체가 소송 사유)",
+    "NVDA":  "對中 수출통제 + 각국 AI칩 반독점 조사 — 점유율이 높을수록 표적",
+    "ASML":  "네덜란드·美 대중 수출통제로 EUV 중국 판매 제한 — 해자를 정부가 관리",
+    "AVGO":  "빅테크 ASIC 집중·VM웨어 인수 후 라이선스 정책에 EU 조사 이력",
+    "TSM":   "대만 집중 리스크 + 美 생산 이전 압력(정치적 해자 훼손 경로)",
+    "300750.SZ": "美 국방수권법상 조달 배제·관세 — 중국 배터리 공통 리스크",
+    "600111.SS": "희토류 수출허가제 — 중국 정부가 해자를 통제(양날)",
+    "300748.SZ": "희토류 자석 수출통제 대상",
+    "ILMN":  "反독점(그레일 인수 무효화 이력) + 중국 시장 배제",
+    "010130.KS": "경영권 분쟁·공개매수 관련 규제 심사 진행",
+    "LLY":   "美 약가 인하 압박(IRA 협상 품목 확대) — 특허 해자의 가격 상한",
+}
+
 # (2026-08-31) 선별 B2 점유율 추이 — 경쟁사 대비 점유 변화(수동 큐레이션·분기 갱신, Phase 3.6 LLM 점검이 보강)
 SHARES = {
     "SNPS":      "EDA 점유 시놉시스 ~31% vs 케이던스 ~30% — 수년째 안정 복점(3위 지멘스EDA ~13%)",
@@ -357,6 +413,7 @@ def main():
         samp = pts[::step][-60:]
         rows.append({"sym": sym, "name": nm, "sec": sec, "moat": moat, "risk": RISKS.get(sym),
                      "tier": ("B2+" if sym in SEL_B2 else "B1"), "share": SHARES.get(sym),
+                     "mtype": MOAT_TYPES.get(sym, []), "reg": REGULATORY.get(sym),
                      "val": band.get(sym),
                      "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
                      "m1": m1, "m3": m3, "y1": y1, "verdict": v, "qh": qh, "lead_pending": lead_pending,
@@ -401,6 +458,7 @@ def main():
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "rows": rows,
+        "moat_types": {k: {"name": v[0], "fg": v[1], "bg": v[2], "risk": v[3]} for k, v in MOAT_TYPE.items()},
         "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_z", "buy_m", "risk", "watch", "top", "top_hot", "top_warn")},
     }, ensure_ascii=False), encoding="utf-8")
     vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'buy_z', 'buy_m', 'risk')}
