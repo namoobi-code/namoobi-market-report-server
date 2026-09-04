@@ -25,7 +25,8 @@ const CO_COLOR={
   '삼성바이오':'#0ea5e9','론자':'#b45309','우시바이오':'#e11d48','베링거':'#7c3aed',
   '1위 고객':'#be185d','2위 고객':'#0ea5e9','3위 고객':'#b45309','4위 고객':'#7c3aed',
   'OpenAI':'#0f766e','Anthropic':'#b45309','Google':'#4f46e5','DeepSeek':'#be185d','xAI':'#334155',
-  '알테오젠':'#be185d','할로자임':'#0ea5e9'};
+  '알테오젠(플랫폼 누적)':'#7c3aed','알테오젠':'#be185d','할로자임':'#0ea5e9',
+  '삼성바이오로직스':'#0ea5e9','한화에어로':'#166534','HD현대일렉':'#be185d','효성중공업':'#b45309'};
 function colorOf(name,i){
   const n=String(name||'');
   // 긴 키 우선 매칭 — 'SK하이닉스'가 '삼성'보다 먼저 걸리도록
@@ -59,6 +60,35 @@ function render(){
     `<button data-g="${g[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${GR===g[0]?'#334155':'#d6d9de'};background:${GR===g[0]?'#334155':'#fff'};color:${GR===g[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${g[1]}</button>`).join('');
   $('sh_chips').querySelectorAll('button').forEach(x=>x.onclick=()=>{GR=x.dataset.g;render();});
 
+  // (2026-09-04) 요약 대시보드 — 배틀이 27개까지 늘어 카드만으론 한눈에 안 들어온다.
+  //   리더·격차·방향을 한 표로 접고, '역전 진행'(격차 축소)을 맨 위로 올려 강조한다.
+  const sum=bs.map(b=>({b,g:latestGap(b)})).filter(x=>x.g);
+  sum.sort((x,y)=>{
+    const rx=(x.g.dgap!=null&&x.g.dgap<0)?0:1, ry=(y.g.dgap!=null&&y.g.dgap<0)?0:1;
+    if(rx!==ry) return rx-ry;                        // 역전 진행 먼저
+    return (x.g.dgap??0)-(y.g.dgap??0);              // 그 안에서 축소 폭 큰 순
+  });
+  const nrev=sum.filter(x=>x.g.dgap!=null&&x.g.dgap<0).length;
+  const sd=$('sh_dash');
+  if(sd) sd.innerHTML=`
+    <div style="font-size:12.5px;margin-bottom:6px">전체 <b>${bs.length}</b>개 대결 ·
+      <b style="color:#b91c1c">역전 방향 진행 ${nrev}</b>건 ·
+      <span class="note">행을 누르면 해당 카드로 이동. 격차는 리더−2위, 음수 변화 = 추격 중</span></div>
+    <table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%">
+    <thead><tr style="background:#f8fafc">${['대결','리더','2위','격차','직전 대비','최신','상태'].map(h=>`<th style="border:1px solid #e2e8f0;padding:3px 6px">${h}</th>`).join('')}</tr></thead>
+    <tbody>${sum.map(({b,g})=>{
+      const rev=(g.dgap!=null&&g.dgap<0);
+      const last=b.series[b.series.length-1];
+      return `<tr data-go="${b.id}" style="cursor:pointer;background:${rev?'#fef2f2':'#fff'}">
+        <td style="border:1px solid #e2e8f0;padding:2px 6px"><b>${b.name}</b> <span class="note">${b.grade}급</span></td>
+        <td style="border:1px solid #e2e8f0;padding:2px 6px;white-space:nowrap;color:${colorOf(g.lead,0)};font-weight:700">${g.lead}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 6px;white-space:nowrap;color:${colorOf(g.second,1)}">${g.second}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 6px;text-align:right;font-weight:600">${g.gap}${b.unit==='위'?'위':b.unit}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 6px;text-align:right;font-weight:${rev?700:400};color:${g.dgap==null?'#94a3b8':g.dgap>0?'#166534':g.dgap<0?'#b91c1c':'#64748b'}">${g.dgap==null?'—':(g.dgap>0?'확대 +':g.dgap<0?'축소 ':'')+g.dgap}${rev?' ⚔️':''}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 6px;white-space:nowrap;color:#64748b">${last?last.d:'-'}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 6px;text-align:center;white-space:nowrap">${b.auto?'<span style="color:#166534">자동</span>':(b.stale?'<span style="color:#b45309">⏳</span>':'최신')}</td></tr>`;}).join('')}
+    </tbody></table>`;
+
   Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}}); charts={};
   $('sh_grid').innerHTML=bs.map(b=>{
     const g=GB[b.grade]||GB.B;
@@ -83,6 +113,15 @@ function render(){
       ${tbl}
       <div style="font-size:10.5px;color:#94a3b8;margin-top:5px">관련 종목: ${(b.players||[]).map(p=>p.stock?`${p.k}(${p.stock})`:p.k).join(' · ')||'—'} · 출처: ${b.src} · (E)=기관 추정치</div>
     </div>`;}).join('');
+
+  const sd2=$('sh_dash');
+  if(sd2) sd2.querySelectorAll('tr[data-go]').forEach(tr=>tr.onclick=()=>{
+    const el=$('sh_cv_'+tr.dataset.go);
+    if(el){ const card=el.closest('div[style*="flex:1 1 480px"]')||el;
+      card.scrollIntoView({behavior:'smooth',block:'center'});
+      card.style.transition='box-shadow .3s'; card.style.boxShadow='0 0 0 3px #fbbf24';
+      setTimeout(()=>{card.style.boxShadow='';},1600); }
+  });
 
   // 차트 — 전 플레이어 동시 라인 + 값 높은 순 툴팁
   bs.forEach(b=>{
