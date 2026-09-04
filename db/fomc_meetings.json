@@ -1,6 +1,6 @@
 {
  "marker": "2026-10-27|19",
- "as_of": "2026-09-02",
+ "as_of": "2026-09-04",
  "data": [
   {
    "date": "2025-09-16~17",
@@ -10,7 +10,7 @@
   {
    "date": "2025-09-17",
    "stance": "인하",
-   "note": "25bp 인하 -> 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran 50bp 인하 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
+   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran 50bp 인하 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
   },
   {
    "date": "2025-10-28~29",
@@ -20,7 +20,7 @@
   {
    "date": "2025-10-29",
    "stance": "인하",
-   "note": "25bp 추가 인하 -> 3.75~4.00%. 2인 반대(50bp 인하 1명, 동결 1명), 리스크관리성 인하. SEP 미실시. (출처: federalreserve.gov FOMC statement 2025-10-29)"
+   "note": "25bp 추가 인하 → 3.75~4.00%. 2인 반대(50bp 인하 1명, 동결 1명), 리스크관리성 인하. SEP 미실시. (출처: federalreserve.gov FOMC statement 2025-10-29)"
   },
   {
    "date": "2025-12-09~10",
@@ -30,7 +30,7 @@
   {
    "date": "2025-12-10",
    "stance": "인하",
-   "note": "25bp 인하 -> 3.50~3.75%(2025년 3연속 인하 마무리). 9-2 가결(Miran 50bp 인하, Goolsbee·Schmid 동결 소수의견). SEP 실시 - 2026년 1회·2027년 1회 추가 인하 시사(종착점 3.125%). (출처: federalreserve.gov FOMC statement·SEP 2025-12-10)"
+   "note": "25bp 인하 → 3.50~3.75%(2025년 3연속 인하 마무리). 9-2 가결(Miran 50bp 인하, Goolsbee·Schmid 동결 소수의견). SEP 실시 — 2026년 1회·2027년 1회 추가 인하 시사. (출처: federalreserve.gov FOMC statement·SEP 2025-12-10)"
   },
   {
    "date": "2026-01-27~28",
@@ -50,7 +50,7 @@
   {
    "date": "2026-03-18",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(2연속). 11-1 가결(Miran 25bp 인하 소수의견). SEP 실시 - 2026년말 중간값 3.4%(추가 1회 인하 시사), 2027·2028년 3.125%, 장기중립 3.125%. (출처: federalreserve.gov FOMC statement·SEP 2026-03-18)"
+   "note": "3.50~3.75% 동결(2연속). 11-1 가결(Miran 25bp 인하 소수의견). SEP 실시 — 2026년말 중간값 3.4%(추가 1회 인하 시사), 2027·2028년 3.1%, 장기중립 3.1%. (출처: federalreserve.gov FOMC statement·SEP 2026-03-18)"
   },
   {
    "date": "2026-04-28~29",
@@ -60,7 +60,7 @@
   {
    "date": "2026-04-29",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(3연속). 8-4 가결 - 1992년 10월 이후 최다 소수의견(Miran 인하 주장, Hammack·Logan·Kashkari는 '완화 편향' 문구 반대). SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-04-29)"
+   "note": "3.50~3.75% 동결(3연속). 8-4 가결 — 1992년 10월 이후 최다 소수의견(Miran 인하 주장, Hammack·Logan·Kashkari는 '완화 편향' 문구 반대). SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-04-29)"
   },
   {
    "date": "2026-06-16~17",
@@ -70,7 +70,7 @@
   {
    "date": "2026-06-17",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(4연속). 12-0 만장일치(Kevin Warsh 신임 의장 첫 회의, 의장은 SEP 미제출). SEP 실시 - 2026년말 중간값 3월 3.4%->6월 3.8%로 매파적 상향(18명 중 9명 연내 1회+ 인상 전망), 2027년말 3.6%, 2028년말 3.4%, 장기중립 3.1% 유지. (출처: federalreserve.gov FOMC statement·SEP 2026-06-17)"
+   "note": "3.50~3.75% 동결(4연속). 12-0 만장일치(Kevin Warsh 신임 의장 첫 회의). SEP 실시 — 2026년말 중간값 3월 3.4%→6월 3.8%로 매파적 상향(18명 중 9명 연내 1회+ 인상 전망), 2027년말 3.6%, 2028년말 3.4%, 장기중립 3.1% 유지. (출처: federalreserve.gov FOMC statement·SEP 2026-06-17)"
   },
   {
    "date": "2026-07-28~29",
@@ -80,7 +80,7 @@
   {
    "date": "2026-07-29",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(5회 연속). 9-3 가결 - Hammack·Kashkari·Logan 3인이 25bp 인상을 주장하며 반대(2016년 9월 이후 처음 3인 동일방향 소수의견). 물가는 공급충격 영향으로 2% 목표 대비 여전히 높다고 평가. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-07-29)"
+   "note": "3.50~3.75% 동결(5연속). SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-07-29, cnbc.com 2026-07-29 Fed meeting recap — Warsh, 인플레 억제 위해 주저하지 않겠다 발언)"
   },
   {
    "date": "2026-09-15~16",
@@ -90,7 +90,7 @@
   {
    "date": "2026-09-16",
    "stance": "예정",
-   "note": "SEP(점도표) 발표 예정 정례회의(9/15~16, 3·6·9·12월 분기 공개 주기). 8/28 잭슨홀 심포지엄에서 Warsh 의장이 '물가 기저추세 개선 확인 안 됨·해야 할 일이 남았다'는 매파적 연설을 하며 CME FedWatch 9월 인상 확률이 하루 만에 35.4%->57.5%로 급등. 7/29 회의에서 3인(Hammack·Kashkari·Logan)이 인상을 주장한 것과 맞물려 9월 인상 가능성 부각. (출처: federalreserve.gov FOMC calendar 2026, cnbc.com 2026-08-28 Warsh Jackson Hole 보도, WebSearch 2026-09-02 재확인 — 공식 일정 9/15~16)"
+   "note": "9/15~16 예정. SEP·점도표 갱신 예정. Kevin Warsh 의장 잭슨홀 매파 발언(8/28) 이후 CME FedWatch 25bp 인상 확률 약 60~66%(2026-08-31 기준) — 인상 가능성 부각. (출처: cnbc.com 2026-08-31 Jackson Hole 애널리스트 라운드업)"
   },
   {
    "date": "2026-10-27~28",
