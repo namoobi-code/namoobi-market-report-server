@@ -15,7 +15,7 @@
 산출: data/db/share.json
 cron: 35 6 * * *
 """
-import json, time
+import json, time, subprocess
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -60,6 +60,31 @@ BATTLES = [
     ("amzn_kb", "A", "아마존 US 뷰티 톱60 내 K뷰티 최고 랭크", "위", "일간",
      "온라인 점유의 일간 프록시 — 메디큐브(에이피알) 랭크 상승이 실적 컨센 상향으로 이어지는 경로",
      [], [], "amzn", "아마존 베스트셀러(K-소비재 탭 파이프라인 재활용)"),
+    ("ai_accel", "A", "AI 가속기 분기 매출 (엔비디아·AMD·브로드컴)", "십억$", "분기",
+     "★ 점유율(%)이 아니라 매출액으로 재는 이유 — 기관마다 'AI 반도체'의 정의가 달라 엔비디아 점유가 "
+     "75~86% 로 11%p 나 벌어진다(엔비디아 데이터센터엔 네트워킹 포함, 브로드컴 AI 매출도 마찬가지). "
+     "그래서 각사가 공시하는 분기 매출을 그대로 쌓아 정의를 우리가 고정한다 — 매 분기 검증 가능. "
+     "고객 구성도 갈린다: 엔비디아 데이터센터 안에서 하이퍼스케일(2Q26 487억$·+102% YoY)보다 "
+     "AI클라우드·기업·소버린(403억$·+138%)이 더 빨리 큰다 — 고객 저변이 빅테크 밖으로 넓어지는 중. "
+     "시장 전망은 2030년 2,860억$(Omdia)~2033년 6,000억$+(블룸버그인텔리전스)로 출처 간 2배 차이라 "
+     "단일 시계열로 그리지 않는다(거짓 정밀도 방지).",
+     [("엔비디아 데이터센터", "NVDA"), ("AMD 데이터센터", "AMD"), ("브로드컴 AI반도체", "AVGO")],
+     [("2025-07", {"엔비디아 데이터센터": 41.1}, "FY26 2Q — CFO 코멘터리 실측(41,096백만$)"),
+      ("2026-04", {"엔비디아 데이터센터": 75.2}, "FY27 1Q 실측(75,246백만$)"),
+      ("2026-07", {"엔비디아 데이터센터": 89.0, "AMD 데이터센터": 6.7},
+       "엔비디아 89,023백만$(+117% YoY·+18% QoQ, 블랙웰 울트라) · AMD 6.7십억$(+107% YoY) · "
+       "브로드컴은 3Q26 AI반도체 16십억$ 가이던스(분기 시점 상이로 미기입)")],
+     None, "각사 실적 공시 — 엔비디아 8-K CFO 코멘터리·AMD 보도자료(정의를 우리가 고정한 자체 계산)"),
+    ("nvda_cust", "B", "엔비디아 고객 집중도 (익명 상위 고객, SEC 실측)", "%", "분기",
+     "★ 'AI 반도체를 누가 사는가' — 엔비디아 10-Q/10-K 의 XBRL 을 직접 파싱한다(매 분기 자동 갱신). "
+     "개별 10% 이상 고객만 익명으로 공시되며 라벨(Customer A/1/One)은 공시마다 재할당돼 "
+     "같은 고객 추적은 불가 — 순위별 비중만 읽는다. ⚠ 미공시는 0% 가 아니라 '10% 미만'이라 "
+     "합계 비교는 공시 문턱 탓에 무의미하고, 항상 공시되는 1위 고객 비중이 진짜 비교 대상이다. "
+     "매출채권 기준은 더 극단적이다 — 2026 상반기 상위 5곳이 70%(2025 상반기 3곳 56%, 2024 상반기 3곳 49%). "
+     "엔비디아 스스로 '투자등급 대형 고객과의 다분기 계약에 결제조건을 늘려줘' DSO 가 45→60일로 늘었다고 밝혔다. "
+     "조달구조 탭의 하이퍼스케일러 5사와 같은 얼굴들이다 — 그들이 빚내서 사고, 엔비디아가 외상을 준다. "
+     "AMD·브로드컴은 이 항목을 XBRL 로 태깅하지 않아 자동 수집 불가(엔비디아 단독).",
+     [], [], "nvda_cust", "SEC EDGAR 10-Q/10-K XBRL (us-gaap:ConcentrationRiskPercentage1)"),
     ("dram", "B", "D램 전체 매출 점유 (HBM 포함 — 범용 D램이 승부처)", "%", "분기",
      "★ HBM 점유만 보면 놓치는 판 — SK하이닉스는 매출이 YoY +214% 인데도 D램 전체 점유가 39%→26% 로 밀렸다. "
      "HBM 비중이 가장 높아 HBM3E 가격 하락·HBM4 지연을 직격당했고, 일찍 맺은 장기계약(LTA)의 가격 상한에 묶인 사이 "
@@ -204,6 +229,84 @@ def load(p):
         return None
 
 
+def auto_nvda_cust():
+    """엔비디아 고객 집중도 — SEC EDGAR 10-Q/10-K 의 XBRL 을 직접 파싱해 분기 시계열화.
+
+    엔비디아는 개별 10% 이상 고객만 익명(Customer A/1/One…)으로 공시한다.
+    ⚠ 라벨은 공시마다 재할당돼 '같은 고객'을 추적할 수 없다 — 순위별 비중만 의미 있다.
+    ⚠ 미공시 = 0% 가 아니라 '10% 미만'이다. 그래서 합계 비교는 무의미하고(공시 문턱 때문),
+      1위 고객 비중처럼 항상 공시되는 값만 시계열로 비교한다.
+    태그명이 공시마다 CustomerA / CustomerOne / RevenueCustomer1 로 달라 정규식으로 흡수한다.
+    """
+    import re as _re
+    UA = "namoobi-market-report namoobi@gmail.com"
+    CUST = _re.compile(r"^(?:Revenue)?(?:AccountsReceivable)?Customer"
+                       r"(?:[A-H]|\d+|One|Two|Three|Four|Five|Six|Seven|Eight)$")
+    BAD = {"NonUs", "SG", "UnitedStatesBasedEndCustomers", "ControlledDataCenterComputeProducts"}
+
+    def _get(u, to=150):
+        try:
+            return subprocess.run(["curl", "-s", "--compressed", "--max-time", str(to),
+                                   "-H", "User-Agent: " + UA, u],
+                                  capture_output=True, text=True, timeout=to + 10).stdout or ""
+        except Exception:
+            return ""
+    try:
+        j = json.loads(_get("https://data.sec.gov/submissions/CIK0001045810.json", 30))
+    except Exception:
+        return []
+    r = j.get("filings", {}).get("recent", {})
+    fils = [(f, a.replace("-", ""), p) for f, a, p in
+            zip(r.get("form", []), r.get("accessionNumber", []), r.get("primaryDocument", []))
+            if f in ("10-Q", "10-K")][:9]
+    q = {}
+    for f, acc, doc in fils:
+        h = _get("https://www.sec.gov/Archives/edgar/data/1045810/%s/%s" % (acc, doc))
+        if len(h) < 50000:
+            continue
+        ctx = {}
+        for m in _re.finditer(r'<xbrli:context id="([^"]+)"[^>]*>(.*?)</xbrli:context>', h, _re.S):
+            mem = [x.split(":")[-1].replace("Member", "") for x in
+                   _re.findall(r'explicitMember dimension="[^"]*">([^<]+)<', m.group(2))]
+            sd = _re.search(r"<xbrli:startDate>([^<]+)", m.group(2))
+            ed = _re.search(r"<xbrli:endDate>([^<]+)", m.group(2))
+            ctx[m.group(1)] = {"mem": mem, "s": sd.group(1) if sd else "", "e": ed.group(1) if ed else ""}
+        for m in _re.finditer(r"<ix:nonFraction\b([^>]*)>([^<]*)</ix:nonFraction>", h):
+            at, val = m.group(1), m.group(2).strip()
+            if "ConcentrationRiskPercentage1" not in at:
+                continue
+            cr = _re.search(r'contextRef="([^"]+)"', at)
+            c = ctx.get(cr.group(1), {}) if cr else {}
+            mem = c.get("mem", [])
+            if "CustomerConcentrationRisk" not in mem or (set(mem) & BAD):
+                continue
+            if "SalesRevenueNet" not in mem or not any(CUST.match(x) for x in mem):
+                continue
+            try:
+                v = int(val)
+            except Exception:
+                continue
+            s, e = c.get("s", ""), c.get("e", "")
+            if not s or not e:
+                continue
+            try:
+                days = (datetime.strptime(e, "%Y-%m-%d") - datetime.strptime(s, "%Y-%m-%d")).days
+            except Exception:
+                continue
+            if not (80 <= days <= 100):        # 분기 단독만 (누적 구간은 서로 비교 불가)
+                continue
+            q.setdefault(e, set()).add(v)
+        time.sleep(0.35)
+    out = []
+    for e in sorted(q):
+        vs = sorted(q[e], reverse=True)
+        v = {}
+        for i, x in enumerate(vs[:4]):
+            v["%d위 고객" % (i + 1)] = x
+        out.append((e[:7], v, "%d곳이 10%% 이상 (미공시=10%% 미만, 0 아님)" % len(vs)))
+    return out
+
+
 def auto_hbm():
     """series_mem_hbm_share.json(일별) → 주 1회 샘플 시계열"""
     d = load("series_mem_hbm_share.json")
@@ -251,6 +354,10 @@ def main():
         elif auto == "amzn":
             ser, players = auto_amzn()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+        elif auto == "nvda_cust":
+            ser = auto_nvda_cust()
+            series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+            players = [(k, "NVDA") for k in ("1위 고객", "2위 고객", "3위 고객", "4위 고객")]
         for u in ups.get(bid, []):   # Phase 3.7 LLM 갱신 upsert (같은 날짜면 교체)
             series = [s for s in series if s["d"] != u["d"]]
             series.append({"d": u["d"], "v": u["v"], "note": "🧠 " + (u.get("note") or "보고서 갱신"),
