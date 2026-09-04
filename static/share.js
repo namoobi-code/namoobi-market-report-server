@@ -8,6 +8,28 @@
 let D=null, M=null, GR='all', charts={};
 const $=id=>document.getElementById(id);
 const COLS=['#be185d','#0ea5e9','#b45309','#7c3aed','#0f766e','#e11d48','#4f46e5','#ca8a04','#334155','#16a34a'];
+// (2026-09-04) 회사별 고정 색상 — 인덱스 순 배정이면 같은 회사가 카드마다 다른 색이 돼
+//   (예: 삼성전자가 D램 카드에선 파랑, HBM 카드에선 하늘색) 카드 간 비교가 어긋난다.
+//   키가 이름에 '포함'되면 매칭하므로 '삼성 파운드리'·'엔비디아 데이터센터' 같은 변형도 같은 색으로 묶인다.
+const CO_COLOR={
+  '삼성':'#0ea5e9','SK하이닉스':'#be185d','마이크론':'#b45309','CXMT':'#7c3aed','난야':'#0f766e',
+  '엔비디아':'#166534','GPU(엔비디아)':'#166534','AMD':'#e11d48','브로드컴':'#4f46e5','커스텀 ASIC':'#4f46e5',
+  'TSMC':'#be185d','SMIC':'#ca8a04','Amkor':'#0f766e','어드밴테스트':'#4f46e5','테라다인':'#ca8a04',
+  '무라타':'#7c3aed','삼성전기':'#0ea5e9',
+  'AWS':'#b45309','Azure':'#0ea5e9','GCP':'#16a34a',
+  '릴리':'#be185d','노보':'#0ea5e9','다케다':'#4f46e5','알케르메스':'#ca8a04',
+  'CATL':'#be185d','LG엔솔':'#0ea5e9','삼성SDI':'#7c3aed','BYD':'#16a34a','EVE':'#b45309',
+  '테슬라':'#e11d48','현대차그룹':'#0f766e','GM':'#ca8a04','포드':'#4f46e5','지리':'#7c3aed',
+  'HD현대일렉트릭':'#be185d','효성중공업':'#0ea5e9','센트러스':'#b45309','스페이스X':'#4f46e5','로켓랩':'#ca8a04',
+  '삼성바이오':'#0ea5e9','론자':'#b45309','우시바이오':'#e11d48','베링거':'#7c3aed',
+  '1위 고객':'#be185d','2위 고객':'#0ea5e9','3위 고객':'#b45309','4위 고객':'#7c3aed'};
+function colorOf(name,i){
+  const n=String(name||'');
+  // 긴 키 우선 매칭 — 'SK하이닉스'가 '삼성'보다 먼저 걸리도록
+  const keys=Object.keys(CO_COLOR).sort((a,b)=>b.length-a.length);
+  for(const k of keys) if(n.indexOf(k)>=0) return CO_COLOR[k];
+  return COLS[i%COLS.length];
+}
 const GB={'A':['#166534','#dcfce7','A급 — 월간·주간 공개 데이터'],'B':['#1d4ed8','#dbeafe','B급 — 분기·반기(보고서 실행 시 자동 갱신)'],'C':['#7c3aed','#ede9fe','C급 — 캐파(증설) 시계열: 수요 초과 시장에서 캐파가 곧 미래 매출']};
 
 function latestGap(b){
@@ -66,7 +88,7 @@ function render(){
             :[...new Set(b.series.flatMap(s=>Object.keys(s.v)))];
     charts[b.id]=new Chart(el,{type:'line',data:{labels:b.series.map(s=>s.d),
       datasets:ks.map((k,i)=>({label:k,data:b.series.map(s=>s.v[k]??null),
-        borderColor:COLS[i%COLS.length],backgroundColor:COLS[i%COLS.length],
+        borderColor:colorOf(k,i),backgroundColor:colorOf(k,i),
         pointRadius:3,borderWidth:1.8,spanGaps:true}))},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},

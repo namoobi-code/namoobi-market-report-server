@@ -63,18 +63,15 @@ BATTLES = [
     ("ai_accel", "A", "AI 가속기 분기 매출 (엔비디아·AMD·브로드컴)", "십억$", "분기",
      "★ 점유율(%)이 아니라 매출액으로 재는 이유 — 기관마다 'AI 반도체'의 정의가 달라 엔비디아 점유가 "
      "75~86% 로 11%p 나 벌어진다(엔비디아 데이터센터엔 네트워킹 포함, 브로드컴 AI 매출도 마찬가지). "
-     "그래서 각사가 공시하는 분기 매출을 그대로 쌓아 정의를 우리가 고정한다 — 매 분기 검증 가능. "
+     "그래서 각사 공시 분기 매출을 그대로 쌓아 정의를 우리가 고정한다 — 매 분기 SEC 에서 자동 검증. "
+     "엔비디아·AMD 는 SEC 공시 부문 매출 실측(자동), 브로드컴 AI 반도체 매출은 비GAAP 구두 공시라 "
+     "세그먼트 태그가 없어 실적발표 실측을 시드로 넣는다(분기 결산일도 회사마다 다르다 — 같은 달로 묶어 표시). "
      "고객 구성도 갈린다: 엔비디아 데이터센터 안에서 하이퍼스케일(2Q26 487억$·+102% YoY)보다 "
      "AI클라우드·기업·소버린(403억$·+138%)이 더 빨리 큰다 — 고객 저변이 빅테크 밖으로 넓어지는 중. "
      "시장 전망은 2030년 2,860억$(Omdia)~2033년 6,000억$+(블룸버그인텔리전스)로 출처 간 2배 차이라 "
      "단일 시계열로 그리지 않는다(거짓 정밀도 방지).",
      [("엔비디아 데이터센터", "NVDA"), ("AMD 데이터센터", "AMD"), ("브로드컴 AI반도체", "AVGO")],
-     [("2025-07", {"엔비디아 데이터센터": 41.1}, "FY26 2Q — CFO 코멘터리 실측(41,096백만$)"),
-      ("2026-04", {"엔비디아 데이터센터": 75.2}, "FY27 1Q 실측(75,246백만$)"),
-      ("2026-07", {"엔비디아 데이터센터": 89.0, "AMD 데이터센터": 6.7},
-       "엔비디아 89,023백만$(+117% YoY·+18% QoQ, 블랙웰 울트라) · AMD 6.7십억$(+107% YoY) · "
-       "브로드컴은 3Q26 AI반도체 16십억$ 가이던스(분기 시점 상이로 미기입)")],
-     None, "각사 실적 공시 — 엔비디아 8-K CFO 코멘터리·AMD 보도자료(정의를 우리가 고정한 자체 계산)"),
+     [], "ai_accel", "SEC EDGAR 공시 부문 매출(엔비디아·AMD) + 브로드컴 실적발표 AI 반도체 매출"),
     ("nvda_cust", "B", "엔비디아 고객 집중도 (익명 상위 고객, SEC 실측)", "%", "분기",
      "★ 'AI 반도체를 누가 사는가' — 엔비디아 10-Q/10-K 의 XBRL 을 직접 파싱한다(매 분기 자동 갱신). "
      "개별 10% 이상 고객만 익명으로 공시되며 라벨(Customer A/1/One)은 공시마다 재할당돼 "
@@ -229,6 +226,113 @@ def load(p):
         return None
 
 
+def _edgar_seg(cik, keyword, tagpat, n=9):
+    """SEC 공시 원문에서 '부문(세그먼트)별 분기 매출'을 파싱해 {기말: 십억$}.
+
+    ⚠ XBRL companyfacts/companyconcept API 는 차원(세그먼트) 없는 연결 수치만 준다 —
+      부문 값은 공시 HTML 의 컨텍스트를 직접 읽어야 한다.
+    ⚠ 같은 분기에 여러 사실이 잡히면(제품·시점 축이 겹친 하위 항목) 최댓값을 부문 총매출로 본다.
+      단일 차원만 허용하면 AMD 처럼 축이 2개인 회사가 하위 항목을 물어 3.5 → 0.5 로 깨진다(실측 확인).
+    """
+    import re as _re, datetime as _d
+    UA = "namoobi-market-report namoobi@gmail.com"
+
+    def _get(u, to=150):
+        try:
+            return subprocess.run(["curl", "-s", "--compressed", "--max-time", str(to),
+                                   "-H", "User-Agent: " + UA, u],
+                                  capture_output=True, text=True, timeout=to + 10).stdout or ""
+        except Exception:
+            return ""
+    try:
+        j = json.loads(_get("https://data.sec.gov/submissions/CIK%s.json" % cik, 30))
+    except Exception:
+        return {}
+    r = j.get("filings", {}).get("recent", {})
+    fils = [(f, a.replace("-", ""), p) for f, a, p in
+            zip(r.get("form", []), r.get("accessionNumber", []), r.get("primaryDocument", []))
+            if f in ("10-Q", "10-K")][:n]
+    out = {}
+    for f, a, p in fils:
+        h = _get("https://www.sec.gov/Archives/edgar/data/%d/%s/%s" % (int(cik), a, p))
+        if len(h) < 50000:
+            continue
+        ctx = {}
+        for m in _re.finditer(r'<xbrli:context id="([^"]+)"[^>]*>(.*?)</xbrli:context>', h, _re.S):
+            mem = [x.split(":")[-1].replace("Member", "") for x in
+                   _re.findall(r'explicitMember dimension="[^"]*">([^<]+)<', m.group(2))]
+            sd = _re.search(r"<xbrli:startDate>([^<]+)", m.group(2))
+            ed = _re.search(r"<xbrli:endDate>([^<]+)", m.group(2))
+            ctx[m.group(1)] = {"mem": mem, "s": sd.group(1) if sd else "", "e": ed.group(1) if ed else ""}
+        for m in _re.finditer(r"<ix:nonFraction\b([^>]*)>([^<]*)</ix:nonFraction>", h):
+            at, val = m.group(1), m.group(2).strip().replace(",", "")
+            if not _re.search(tagpat, at):
+                continue
+            cr = _re.search(r'contextRef="([^"]+)"', at)
+            c = ctx.get(cr.group(1), {}) if cr else {}
+            if not any(keyword in x for x in c.get("mem", [])):
+                continue
+            sc = _re.search(r'scale="(-?\d+)"', at)
+            sc = int(sc.group(1)) if sc else 0
+            try:
+                v = float(val) * (10 ** sc)
+            except Exception:
+                continue
+            s, e = c.get("s", ""), c.get("e", "")
+            if not s or not e:
+                continue
+            try:
+                days = (_d.date.fromisoformat(e) - _d.date.fromisoformat(s)).days
+            except Exception:
+                continue
+            if not (80 <= days <= 100):        # 분기 단독만
+                continue
+            out[e] = max(out.get(e, 0), round(v / 1e9, 1))
+        time.sleep(0.3)
+    return out
+
+
+# 브로드컴 'AI 반도체 매출'은 비GAAP 구두 공시라 세그먼트 태그가 없다 → 실적발표 실측 시드.
+#   키는 이미 '달력 분기'로 환산해 둔다(브로드컴 회계분기는 11·2·5·8월 종료라 한 분기씩 앞선다).
+AVGO_AI = {"2025-Q3": 6.5, "2025-Q4": 8.4, "2026-Q1": 10.8, "2026-Q2": 16.7}
+
+
+def _cal_q(end, days=91):
+    """회계 기말일 → 달력 분기 라벨. 기간의 '중간점'이 속한 분기로 매긴다.
+
+    엔비디아(7/10/1/4월 종료)·AMD(6/9/12/3월)·브로드컴(8/11/2/5월)이 제각각이라
+    기말일 그대로 쓰면 같은 실적 분기가 다른 시점에 찍혀 차트가 톱니처럼 흩어진다(실측 확인).
+    """
+    import datetime as _d
+    try:
+        mid = _d.date.fromisoformat(end) - _d.timedelta(days=days // 2)
+    except Exception:
+        return None
+    return "%d-Q%d" % (mid.year, (mid.month - 1) // 3 + 1)
+
+
+def auto_ai_accel():
+    """엔비디아·AMD 부문 매출은 SEC 실측 자동, 브로드컴 AI 매출은 실적발표 시드.
+    셋 다 달력 분기로 정규화해 같은 시점에 겹쳐 그린다."""
+    nv = _edgar_seg("0001045810", "DataCenter", r'name="us-gaap:Revenues"')
+    am = _edgar_seg("0000002488", "DataCenter", r"RevenueFromContractWithCustomer")
+    q = {}
+    for src, lab in ((nv, "엔비디아 데이터센터"), (am, "AMD 데이터센터")):
+        for e, v in src.items():
+            k = _cal_q(e)
+            if k: q.setdefault(k, {})[lab] = v
+    for k, v in AVGO_AI.items():
+        q.setdefault(k, {})["브로드컴 AI반도체"] = v
+    out = []
+    for k in sorted(q):
+        v = q[k]
+        n = "SEC 공시 부문 매출 실측"
+        if "브로드컴 AI반도체" in v:
+            n += " · 브로드컴은 실적발표 AI 매출(비GAAP)"
+        out.append((k, v, n))
+    return out
+
+
 def auto_nvda_cust():
     """엔비디아 고객 집중도 — SEC EDGAR 10-Q/10-K 의 XBRL 을 직접 파싱해 분기 시계열화.
 
@@ -353,6 +457,9 @@ def main():
             series += [{"d": d, "v": v, "note": n} for d, v, n in auto_hbm()]
         elif auto == "amzn":
             ser, players = auto_amzn()
+            series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+        elif auto == "ai_accel":
+            ser = auto_ai_accel()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
         elif auto == "nvda_cust":
             ser = auto_nvda_cust()
