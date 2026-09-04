@@ -1,17 +1,17 @@
 {
  "marker": "2026-09",
- "as_of": "2026-09-04",
+ "as_of": "2026-09-05",
  "data": [
   {
    "country": "미국",
    "rate": "3.50~3.75",
-   "asof": "2026-09-03",
+   "asof": "2026-09-04",
    "note": "FRED DFEDTARU/L(실측)"
   },
   {
    "country": "유로존",
    "rate": "2.25",
-   "asof": "2026-09-03",
+   "asof": "2026-09-04",
    "note": "FRED ECBDFR(예금금리·실측)"
   },
   {
@@ -23,19 +23,19 @@
   {
    "country": "일본",
    "rate": "1.00",
-   "asof": "2026-09-04",
+   "asof": "2026-09-05",
    "note": "global-rates(실측 스크랩)"
   },
   {
    "country": "중국",
    "rate": "3.00",
-   "asof": "2026-09-04",
+   "asof": "2026-09-05",
    "note": "global-rates(실측 스크랩)"
   },
   {
    "country": "영국",
    "rate": "3.75",
-   "asof": "2026-09-04",
+   "asof": "2026-09-05",
    "note": "global-rates(실측 스크랩)"
   }
  ]

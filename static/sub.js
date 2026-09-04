@@ -28,7 +28,45 @@
   const scRange=i=>{const v=(i.ty||[]).filter(t=>t.sc).map(t=>t.sc);
     if(!v.length) return null; return [Math.min(...v.map(x=>x[0])),Math.max(...v.map(x=>x[2]))];};
 
+  /* ── (2026-09-05) 🔭 분양예정 — applyhome_plan.json (주 1회 웹 리서치 · /namoobi-sub-plan)
+     청약홈 API 는 '공고가 난 것'만 준다. 성남·판교처럼 공고가 뜸한 지역은 목록이 비어
+     보여서, 공고 전 단계(재개발·재건축·공공택지 계획)를 따로 조사해 붙인다.
+     보도·계획 기반이라 확정 공고와 성격이 다르므로 표·색을 분리하고 출처를 행마다 남긴다. ── */
+  let _pd=null, _pband='전체';
+  function renderPlan(){
+    const root=$('sub_tbl'); if(!root) return;
+    if(!_pd){ root.innerHTML='<div class="note">분양예정 자료를 불러오는 중…</div>'; return; }
+    const rows=(_pd.items||[]).filter(i=>{
+      if(_reg!=='전체'&&i.reg!==_reg) return false;
+      if(_sgg!=='전체'&&(i.sgg||'')!==_sgg) return false;
+      if(_pband!=='전체'&&i.band!==_pband) return false;
+      if(_q&&!((i.name||'')+(i.addr||'')+(i.kind||'')+(i.note||'')).toLowerCase().includes(_q)) return false;
+      return true;
+    });
+    const F=v=>v==null?'—':(typeof v==='number'?v.toLocaleString():E(v));
+    const BC={'임박':'#b91c1c','2027':'#b45309','2028+':'#0e7490','미정':'#6b7280'};
+    root.innerHTML=`<div class="note" style="margin-bottom:6px;line-height:1.6;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:7px 10px">
+        ⚠ <b>공고 전 단계</b>입니다 — 언론 보도·지자체 계획 기반이라 <b>일정이 밀리는 일이 잦습니다</b>(서울 정비사업 336곳 중 실제 공사 중 32곳).
+        일반분양 세대수·시기는 확정치가 아니며, 확정 정보는 입주자모집공고로 확인하세요. 행마다 <b>출처·보도일</b>을 달았습니다.</div>
+      <table><thead><tr>
+      <th>분양시기</th><th>사업명 <span class="note">(🔗=출처 기사)</span></th><th>지역</th><th>구분</th>
+      <th style="text-align:right">총세대</th><th style="text-align:right" title="일반분양 예상 세대 — 조합원분을 뺀 물량">일반분양</th>
+      <th>사업단계</th><th>비고</th><th>출처</th></tr></thead><tbody>${
+      rows.map(i=>`<tr>
+        <td><b style="color:${BC[i.band]||'#333'}">${F(i.when)}</b></td>
+        <td><b>${E(i.name)}</b>${i.src?` <a href="${E(i.src)}" target="_blank" rel="noopener" title="출처 기사 열기">🔗</a>`:''}
+            ${i.addr?`<br><span class="note">${E(i.addr)}</span>`:''}</td>
+        <td>${E(i.reg)} ${E(i.sgg||'')}</td><td>${F(i.kind)}</td>
+        <td class="num">${F(i.total)}</td>
+        <td class="num" style="color:#0f766e;font-weight:700">${F(i.gen)}</td>
+        <td>${F(i.stage)}</td>
+        <td class="note" style="max-width:420px;white-space:normal">${E(i.note||'')}${i.price?`<br><b>예상가:</b> ${E(i.price)}`:''}</td>
+        <td class="note" style="white-space:nowrap">${E(i.srcname||'')}${i.asof?`<br>${E(i.asof)}`:''}</td></tr>`).join('')}</tbody></table>`;
+    $('sub_cnt').textContent=`${rows.length}건`;
+  }
+
   function render(){
+    if(_st==='예정'){ renderPlan(); return; }
     if(!_d){ init(); return; }
     const d=_d, root=$('sub_tbl'); if(!root) return;
     const rows=(d.items||[]).filter(i=>{
@@ -136,15 +174,23 @@
     el.querySelectorAll('button').forEach(b=>b.onclick=()=>fn(b.dataset.v));
   }
   function bars(){
-    bar($('sub_reg'),['전체'].concat(_d.sido||[]),_reg,v=>{_reg=v;_sgg='전체';_n=60;bars();render();});
-    bar($('sub_st'),['모집중','발표대기','완료','전체'],_st,v=>{_st=v;_n=60;bars();render();});
-    bar($('sub_typ'),['전체','민영','국민'],_typ,v=>{_typ=v;_n=60;bars();render();});
-    // 2단계: 시도를 고르면 그 안의 구(광역시)·시군(도) 칩 — 공고 수 많은 순
+    const plan=(_st==='예정');
+    // 예정 모드에선 시도 칩도 예정 자료 기준으로(서울·경기만 조사 대상)
+    bar($('sub_reg'),['전체'].concat(plan?(_pd&&_pd.regions||[]):(_d.sido||[])),_reg,
+        v=>{_reg=v;_sgg='전체';_n=60;bars();render();});
+    bar($('sub_st'),['모집중','발표대기','완료','전체','예정'],_st,v=>{
+      _st=v; _sgg='전체'; _n=60;
+      if(v==='예정'&&!_pd){ initPlan(); return; }     // 첫 진입 시 로드 후 bars/render
+      bars(); render();});
+    // 유형(민영/국민) 대신 예정 모드에선 시기 구간 칩
+    if(plan) bar($('sub_typ'),['전체'].concat(_pd&&_pd.bands||[]),_pband,v=>{_pband=v;_n=60;bars();render();});
+    else bar($('sub_typ'),['전체','민영','국민'],_typ,v=>{_typ=v;_n=60;bars();render();});
+    // 2단계: 시도를 고르면 그 안의 구(광역시)·시군(도) 칩 — 건수 많은 순
     const el=$('sub_sgg');
     if(_reg==='전체'){ el.innerHTML=''; el.style.display='none'; }
     else{
       const cnt={};
-      (_d.items||[]).forEach(i=>{ if(i.reg===_reg){ const g=i.sgg||'기타'; cnt[g]=(cnt[g]||0)+1; }});
+      ((plan?_pd&&_pd.items:_d.items)||[]).forEach(i=>{ if(i.reg===_reg){ const g=i.sgg||'기타'; cnt[g]=(cnt[g]||0)+1; }});
       const list=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
       el.style.display='flex';
       el.innerHTML=['전체'].concat(list).map(v=>`<button data-v="${E(v)}" style="padding:3px 9px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${v===_sgg?'#0f766e':'#fff'};color:${v===_sgg?'#fff':'#333'}">${E(v)}${v!=='전체'?` <span style="opacity:.65">${cnt[v]}</span>`:''}</button>`).join('');
@@ -161,6 +207,14 @@
       const q=$('sub_q'); if(q) q.oninput=()=>{_q=q.value.trim().toLowerCase();_n=60;render();};
       bars(); render();
     }).catch(()=>{ $('sub_tbl').innerHTML='<div class="note">불러오기 실패 — 새로고침 해주세요.</div>'; });
+  }
+  // 분양예정 자료는 '예정' 칩을 처음 누를 때만 받는다(평소엔 트래픽 0)
+  function initPlan(){
+    $('sub_tbl').innerHTML='<div class="note">분양예정 자료를 불러오는 중…</div>';
+    fetch('/api/db/applyhome_plan').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.items){ $('sub_tbl').innerHTML='<div class="note">분양예정 자료 준비 중 — 주 1회(월요일) 갱신됩니다.</div>'; return; }
+      _pd=d; bars(); render();
+    }).catch(()=>{ $('sub_tbl').innerHTML='<div class="note">분양예정 자료 불러오기 실패.</div>'; });
   }
   tab.addEventListener('click',()=>{ init(); render(); });
 })();
