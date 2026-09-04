@@ -545,8 +545,8 @@
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
       <button class="tab"    data-pane="p_re" style="background:#7c2d12;border-color:#7c2d12;color:#fff">🔮 RE 예측<small style="color:#fed7aa">r가중 합성·조절</small></button>
       <button class="tab"    data-pane="p_re3" style="background:#9a3412;border-color:#9a3412;color:#fff">🏘️ RE3<small style="color:#ffedd5">국면 신호등</small></button>
-      <!-- (2026-08-16) 청약 탭 — namoobi 로그인 시에만 노출 (sub.js 가 /api/auth/me 로 표시) -->
-      <button class="tab" id="tab_sub" data-pane="p_sub" style="display:none;background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
+      <!-- (2026-09-04) 청약 탭 — 로그인 게이트 해제, 상시 노출 (청약홈 공공데이터) -->
+      <button class="tab" id="tab_sub" data-pane="p_sub" style="background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
       <button class="tab"    data-pane="p_daily">AI Daily 조사<small>매 실행 신규 수집</small></button>
       <button class="tab"    data-pane="p_db">DB Server<small>누적·버전관리</small></button>
@@ -2119,7 +2119,7 @@
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
 <script src="/app.js?v=09022040"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
-<script src="/sub.js?v=08261803n"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
+<script src="/sub.js?v=09042245b"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->

@@ -6,10 +6,11 @@
   const $=id=>document.getElementById(id);
   const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const tab=$('tab_sub'); if(!tab) return;
-  // 로그인 시에만 탭 노출 (재로그인 반영 위해 visitors.js 와 동일하게 포커스 시 재확인)
-  const chk=()=>fetch('/api/auth/me').then(r=>r.json())
-    .then(d=>{ tab.style.display=(d&&d.ok)?'':'none'; }).catch(()=>{});
-  chk(); window.addEventListener('focus',chk);
+  /* (2026-09-04) 로그인 게이트 해제 — 누구나 보이게.
+     원래 visitors.js 패턴을 따라 로그인 시에만 노출했는데, 세션이 풀리면 탭이 사라져
+     '없어졌다'고 보였다. 청약홈(data.go.kr) 공공데이터라 가릴 이유가 없어 상시 공개로 바꾼다.
+     (KIS 실계정을 쓰는 분봉·호가와 달리 서버 자원·유량 문제도 없다) */
+  tab.style.display='';
 
   let _d=null,_reg='전체',_sgg='전체',_st='모집중',_typ='전체',_q='',_open={},_n=60;
   const TODAY=new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
