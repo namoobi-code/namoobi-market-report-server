@@ -33,6 +33,18 @@
      보여서, 공고 전 단계(재개발·재건축·공공택지 계획)를 따로 조사해 붙인다.
      보도·계획 기반이라 확정 공고와 성격이 다르므로 표·색을 분리하고 출처를 행마다 남긴다. ── */
   let _pd=null, _pband='전체';
+  /* (2026-09-05) 📍 네이버지도 검색 링크 — 위치를 바로 확인하려는 용도.
+     공급위치·사업지 주소는 '…355번지 외 13필지', '…686 일대 38만6364㎡' 처럼
+     꼬리가 붙어 그대로 넣으면 검색이 안 잡힌다 → 지번까지만 남기고 자른다.
+     주소가 너무 짧거나 없으면(구역명만 있는 계획 단계) 단지명으로 검색한다. */
+  const mapQ=(addr,name)=>{
+    let q=String(addr||'').replace(/\s*(일원|일대|외\s*\d+\s*필지|번지).*$/,'')
+                          .replace(/\s*[\d,]+만?\s*[\d,]*㎡.*$/,'').trim();
+    if(q.length<6) q=String(name||'').trim();
+    return q?`https://map.naver.com/p/search/${encodeURIComponent(q)}`:null;
+  };
+  const mapLink=(addr,name)=>{const u=mapQ(addr,name);
+    return u?` <a href="${E(u)}" target="_blank" rel="noopener" title="네이버지도에서 위치 보기" onclick="event.stopPropagation()">📍</a>`:'';};
   function renderPlan(){
     const root=$('sub_tbl'); if(!root) return;
     if(!_pd){ root.innerHTML='<div class="note">분양예정 자료를 불러오는 중…</div>'; return; }
@@ -49,12 +61,12 @@
         ⚠ <b>공고 전 단계</b>입니다 — 언론 보도·지자체 계획 기반이라 <b>일정이 밀리는 일이 잦습니다</b>(서울 정비사업 336곳 중 실제 공사 중 32곳).
         일반분양 세대수·시기는 확정치가 아니며, 확정 정보는 입주자모집공고로 확인하세요. 행마다 <b>출처·보도일</b>을 달았습니다.</div>
       <table><thead><tr>
-      <th>분양시기</th><th>사업명 <span class="note">(🔗=출처 기사)</span></th><th>지역</th><th>구분</th>
+      <th>분양시기</th><th>사업명 <span class="note">(🔗=출처 기사 · 📍=네이버지도)</span></th><th>지역</th><th>구분</th>
       <th style="text-align:right">총세대</th><th style="text-align:right" title="일반분양 예상 세대 — 조합원분을 뺀 물량">일반분양</th>
       <th>사업단계</th><th>비고</th><th>출처</th></tr></thead><tbody>${
       rows.map(i=>`<tr>
         <td><b style="color:${BC[i.band]||'#333'}">${F(i.when)}</b></td>
-        <td><b>${E(i.name)}</b>${i.src?` <a href="${E(i.src)}" target="_blank" rel="noopener" title="출처 기사 열기">🔗</a>`:''}
+        <td><b>${E(i.name)}</b>${i.src?` <a href="${E(i.src)}" target="_blank" rel="noopener" title="출처 기사 열기">🔗</a>`:''}${mapLink(i.addr,i.name)}
             ${i.addr?`<br><span class="note">${E(i.addr)}</span>`:''}</td>
         <td>${E(i.reg)} ${E(i.sgg||'')}</td><td>${F(i.kind)}</td>
         <td class="num">${F(i.total)}</td>
@@ -88,7 +100,7 @@
     const F=v=>v==null?'—':(typeof v==='number'?v.toLocaleString():v);
     const fr1=v=>v==null?'—':(v>=100?Math.round(v).toLocaleString():v.toFixed(v>=10?1:2))+':1';
     root.innerHTML=`<table><thead><tr>
-      <th>상태</th><th>단지명 <span class="note">(클릭=주택형 상세 · 🔗=청약홈 원문)</span></th><th>지역</th>
+      <th>상태</th><th>단지명 <span class="note">(클릭=주택형 상세 · 🔗=청약홈 원문 · 📍=네이버지도)</span></th><th>지역</th>
       <th>유형</th><th style="text-align:right">총공급</th>
       <th style="text-align:right" title="일반공급 중 추첨제 추정 세대 (민영: 규제·면적별 20~100% · 국민: 20%)">일반추첨*</th>
       <th style="text-align:right" title="신혼부부 특공 배정 (괄호=30% 추첨 추정)">신혼특공*</th>
@@ -104,7 +116,7 @@
                  +(i.cap==='Y'?'<span title="분양가상한제" style="color:#0e7490;font-weight:700"> 상</span>':'');
         const main=`<tr data-no="${E(i.no)}" style="cursor:pointer" title="${E(i.addr||'')} · ${E(i.cons||'')}">
           <td><b style="color:${SCOL[s]}">${s}</b></td>
-          <td><b>${E(i.name)}</b> <a href="${E(i.url||'#')}" target="_blank" rel="noopener" title="청약홈 공고 원문" onclick="event.stopPropagation()">🔗</a></td>
+          <td><b>${E(i.name)}</b> <a href="${E(i.url||'#')}" target="_blank" rel="noopener" title="청약홈 공고 원문" onclick="event.stopPropagation()">🔗</a>${mapLink(i.addr,i.name)}</td>
           <td>${E(i.reg)}${i.sgg?' '+E(i.sgg):''}${reg}</td><td>${E(i.typ||'—')}</td>
           <td class="num">${F(i.sup)}</td>
           <td class="num" style="color:#0f766e;font-weight:700">${F(a.lot)}</td>
