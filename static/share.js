@@ -126,6 +126,13 @@ function render(){
       setTimeout(()=>{card.style.boxShadow='';},1600); }
   });
 
+  // (2026-09-05) 로그 눈금 배틀 — 플레이어 간 자릿수가 달라 선형축이면 하위 플레이어가 바닥에 눌리는 경우.
+  //   secarr: MS 보안 총매출(200~370억$) vs 순수 3사 ARR(24~91억$) — 최대/최소 15배.
+  //   이 배틀은 애초에 ARR 정의가 달라(PANW=차세대보안만) 절대 크기 비교가 무의미하고
+  //   '증가 속도·격차 추이'로 읽어야 하므로, 기울기가 곧 성장률인 로그축이 오히려 정확하다.
+  //   ⚠ 자동 판정(최대/최소 비율)으로 하면 기존 배틀(ai_accel 등) 모양이 말없이 바뀌므로 명시 지정만 한다.
+  const LOGY=new Set(['secarr']);
+
   // 차트 — 전 플레이어 동시 라인 + 값 높은 순 툴팁
   bs.forEach(b=>{
     const el=$('sh_cv_'+b.id); if(!el||!b.series.length) return;
@@ -139,9 +146,12 @@ function render(){
         plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},
           tooltip:{itemSort:(a,c)=>(c.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+c.raw+(b.unit==='위'?'위':b.unit)}}},
         scales:{x:{ticks:{maxTicksLimit:10,font:{size:9.5}}},
-          y:{reverse:(b.unit==='위'),min:(b.unit==='단계'?0:undefined),max:(b.unit==='단계'?8:undefined),
+          y:{type:(LOGY.has(b.id)?'logarithmic':'linear'),
+             reverse:(b.unit==='위'),min:(b.unit==='단계'?0:undefined),max:(b.unit==='단계'?8:undefined),
              ticks:{stepSize:(b.unit==='단계'?1:undefined),font:{size:10}},
-             title:{display:true,text:b.unit==='위'?'랭크(낮을수록 상위)':(b.unit==='단계'?'개발 단계 (1 Ph1 → 8 다국가 승인)':b.unit),font:{size:10}}}}}});
+             title:{display:true,text:b.unit==='위'?'랭크(낮을수록 상위)'
+                    :(b.unit==='단계'?'개발 단계 (1 Ph1 → 8 다국가 승인)'
+                    :(LOGY.has(b.id)?b.unit+' (로그 눈금)':b.unit)),font:{size:10}}}}}});
   });
 
   // B2 점유 구도 표 (moat.json SHARES — Phase 3.6 이 점검·갱신 제안)
