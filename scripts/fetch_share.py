@@ -301,9 +301,15 @@ BATTLES = [
      "클로드코드는 출시 9개월 만에 $2.5B 로 1위. 개발자 선호도(JetBrains 2026) 클로드코드 46 · 커서 19 · 코파일럿 9%와 정합. "
      "이전 판 Copilot 70→42% 는 SEO 집적 사이트발 오류로 폐기(매출 실측과 모순)",
      [("클로드코드", "앤트로픽(IPO 예정)"), ("Cursor", "비상장"), ("GitHub Copilot", "MSFT")],
-     [("2025-11", {"Cursor": 14, "GitHub Copilot": 12}, "공표 ARR 역산(E) — Cursor $1B·Copilot ~$0.8B / 시장 ~$7B · 클로드코드 램프업 중"),
+     # (2026-09-02 시계열 백필) 전 시점 공표 ARR 마일스톤 기반 — Cursor $0.1B(24-12)→$0.5B(25-06
+     # 시리즈C 공시)→$1B(25-11)→$2B(26-03) · 클로드코드 GA(25-05) 6개월 만에 $1B(25-11)→$2.5B(26-02)
+     # · Copilot 구독 1.3M(24-Q2)→4.7M(25-12), 매출 ~$0.5B(2024)→~$1B. 시장 $5.1B(2024)→$12.8B(2026).
+     [("2024-12", {"GitHub Copilot": 10, "Cursor": 2}, "ARR 역산(E) — Copilot ~$0.5B·Cursor $0.1B / 시장 $5.1B · 클로드코드 미출시(Copilot 독주기)"),
+      ("2025-06", {"GitHub Copilot": 10, "Cursor": 8}, "ARR 역산(E) — Cursor $0.5B(시리즈C 공시)·Copilot ~$0.6B / 시장 ~$6B · 클로드코드 GA 직후"),
+      ("2025-11", {"클로드코드": 14, "Cursor": 14, "GitHub Copilot": 11},
+       "ARR 역산(E) — 클로드코드 $1B(GA 6개월)·Cursor $1B·Copilot ~$0.8B / 시장 ~$7B — 3파전 균형점"),
       ("2026-03", {"클로드코드": 20, "Cursor": 16, "GitHub Copilot": 8},
-       "공표 ARR 역산(E) — 클로드코드 $2.5B·Cursor $2B·Copilot ~$1B / 시장 $12.8B")],
+       "ARR 역산(E) — 클로드코드 $2.5B·Cursor $2B·Copilot ~$1B / 시장 $12.8B — 클로드코드 1위 확정")],
      None, "공표 ARR ÷ 시장규모 역산(E) — AgentMarketCap·AI Business 보도 기반"),
     ("ai_chip", "B", "AI 서버 출하 비중 (GPU vs 커스텀 ASIC)", "%", "분기",
      "ASIC 성장률이 GPU의 3배(+44.6% vs +16.1%) — 2030년 ASIC 40% 전망, 엔비디아 멀티플 압박·브로드컴 수혜의 제로섬. 매출 기준으론 엔비디아 ~86%(2025)로 여전히 압도",
