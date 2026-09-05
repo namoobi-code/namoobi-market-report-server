@@ -507,7 +507,7 @@ def main():
     hist = jload(HIST)
     try:
         d_px, qv, wk = price_btc()
-        IND["_px"] = {"s": trim(d_px, 400)}
+        IND["_px"] = {"s": trim(d_px, 1000)}     # (2026-09-05 피드백) 전 카드 차트에 BTC 가격 오버레이 — Binance 일봉 최대 1000일
     except Exception as e:
         err("price", e); d_px, qv, wk = [], [], []
     for name, fn in (("sentiment", lambda: c_sentiment(qv)), ("coinmetrics", c_coinmetrics),

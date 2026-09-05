@@ -27,18 +27,30 @@ function fmtV(k,e){
   if(u==='%') return nf(v,1)+'%';
   return nf(v, Math.abs(v)>=100?0:Math.abs(v)>=10?1:2)+(u?' '+u:'');
 }
+/* BTC 가격 오버레이 — (2026-09-05 피드백) 지표와 가격을 같은 기간에 겹쳐야 "이 지표가 가격에 얼마나 앞서/따라가나"가 보인다.
+   서버 동봉 _px(Binance 일봉 1000일). 지표 날짜에 정확히 없으면 직전 거래일 종가. 범위 밖(5년 구글트렌드 앞부분)은 null. */
+let PX=null;           // [[date,close],...] 오름차순
+function pxAt(d){
+  if(!PX||!PX.length||d<PX[0][0]) return null;
+  let lo=0,hi=PX.length-1;
+  while(lo<hi){const m=(lo+hi+1)>>1; if(PX[m][0]<=d) lo=m; else hi=m-1;}
+  return PX[lo][1];
+}
 function spark(cv,s,color,k){
   if(!s||s.length<2) return;
   const labels=s.map(x=>x[0]), data=s.map(x=>x[1]);
   // 판정 임계선(참고선) — 지표별 대표 밴드
   const TH={fng:[25,75],kimp:[0,5],mvrv:[1,3],mvrv_z:[0,6],sopr:[1],nupl:[0,0.75],puell:[0.6,3],mayer:[0.85,2.2],funding:[0,0.05],ls_ratio:[0.9,2],taker:[0.9,1.1],cb_prem:[0],ex_netflow:[0],ibit_flow:[0],cot_am:[0],cot_lev:[0],altbreadth:[25,75],dvol:[40,80],gt_world:[],gt_kr:[]}[k]||[];
-  const ds=[{data,borderColor:color,backgroundColor:color+'22',fill:true,pointRadius:0,borderWidth:1.3,tension:0.15}];
-  TH.forEach(t=>ds.push({data:data.map(()=>t),borderColor:'#94a3b8',borderDash:[3,3],borderWidth:0.8,pointRadius:0,fill:false}));
+  const ds=[{label:'지표',data,borderColor:color,backgroundColor:color+'22',fill:true,pointRadius:0,borderWidth:1.3,tension:0.15,yAxisID:'y',order:2}];
+  TH.forEach(t=>ds.push({label:'_th',data:data.map(()=>t),borderColor:'#94a3b8',borderDash:[3,3],borderWidth:0.8,pointRadius:0,fill:false,yAxisID:'y',order:3}));
+  const px=labels.map(pxAt); const hasPx=px.some(v=>v!=null);
+  if(hasPx) ds.push({label:'BTC',data:px,borderColor:'#f59e0b',backgroundColor:'transparent',fill:false,pointRadius:0,borderWidth:1.4,tension:0.15,yAxisID:'y2',order:1,spanGaps:false});
   charts.push(new Chart(cv,{type:'line',data:{labels,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{display:false},tooltip:{filter:i=>i.datasetIndex===0,callbacks:{label:c=>nf(c.raw,4)}}},
+      plugins:{legend:{display:false},tooltip:{filter:i=>i.dataset.label!=='_th',callbacks:{label:c=>c.dataset.label==='BTC'?'BTC $'+nf(c.raw,0):'지표 '+nf(c.raw,4)}}},
       scales:{x:{display:true,ticks:{maxTicksLimit:4,font:{size:9},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(2,7):''},grid:{display:false}},
-              y:{ticks:{font:{size:9},maxTicksLimit:4},grid:{color:'#f1f5f9'}}}}}));
+              y:{position:'left',ticks:{font:{size:9},maxTicksLimit:4,color:color},grid:{color:'#f1f5f9'}},
+              y2:{display:hasPx,position:'right',ticks:{font:{size:9},maxTicksLimit:4,color:'#d97706',callback:v=>'$'+(v>=1000?(v/1000).toFixed(0)+'k':v)},grid:{display:false}}}}}));
 }
 
 /* ── (2026-09-05 피드백 "어떤 지표인지, 의미와 해석방법이 어렵다") 쉬운 설명 + 눈금 게이지 ──
@@ -132,7 +144,7 @@ function card(k,e){
     <div style="font-size:19px;font-weight:800;margin:2px 0 0;line-height:1.2">${fmtV(k,e)}<span class="note" style="font-weight:400"> ${e.d||''}</span></div>
     <div class="note" style="min-height:14px">${extra}</div>
     ${gauge(k,e.v,e)}
-    ${e.s&&e.s.length>1?`<div class="clsp" style="position:relative;height:90px;flex:0 0 90px;overflow:hidden;margin:4px 0"><canvas id="${cvid}"></canvas></div>`:'<div style="height:12px"></div>'}
+    ${e.s&&e.s.length>1?`<div class="clsp" style="position:relative;height:100px;flex:0 0 100px;overflow:hidden;margin:4px 0"><canvas id="${cvid}"></canvas></div><div class="note" style="font-size:9.5px;margin-top:-2px"><span style="color:${GCOL[e.group]||'#334155'}">■</span> 지표(왼쪽 축) <span style="color:#f59e0b">━</span> BTC 가격(오른쪽 축)</div>`:'<div style="height:12px"></div>'}
     <div style="font-size:11.5px;color:#0f172a;margin-top:2px"><b>판정</b> ${e.judge||'—'}</div>
     <div class="note" style="margin-top:3px;color:#64748b"><b>왜 선행</b> ${e.why||''}</div>
     ${helpBox(k)}
@@ -150,6 +162,7 @@ function axisBox(a){
 function render(){
   if(!D) return;
   charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
+  PX=((D.ind||{})._px||{}).s||null;
   $('cl_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:55 자동 수집'+(D.errors&&D.errors.length?` · 수집 실패 ${D.errors.length}건`:'');
   const O=D.overall||{}, A=D.axes||{};
   const oc=O.score==null?'#94a3b8':O.score>=0.25?'#16a34a':O.score<=-0.25?'#dc2626':'#ca8a04';
