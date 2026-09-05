@@ -22,8 +22,9 @@ screener_pool.json 은 매일 **덮어쓰기**라 "3개월 전 이 종목의 리
   연 ~1GB. 서버 여유 89GB 대비 무시 가능)
 - meta 테이블(코드→이름·섹터)은 별도 — 패널을 숫자만으로 가볍게 유지
 
-사용:  python3 scripts/stock_panel.py            (기본 경로)
-       python3 scripts/stock_panel.py --stat     (적재 현황만 출력)
+사용:  python3 scripts/stock_panel.py            (일별 적재)
+       python3 scripts/stock_panel.py --stat     (적재 현황)
+       python3 scripts/stock_panel.py --backup   (panel 테이블만 gzip 백업·4개 회전)
 """
 import json
 import sqlite3
@@ -127,6 +128,37 @@ def main():
     print(f"[panel] {d} 적재 {total}행 · 누적 {nd}일 {nr}행 ({rng[0]}~{rng[1]}) · {mb:.1f}MB", flush=True)
 
 
+def backup():
+    """panel 테이블만 주간 gzip 백업 (2026-09-05).
+
+    px(종가)는 야후에서 언제든 5년치를 다시 받을 수 있으므로 백업하지 않는다.
+    반면 panel(컨센·리비전·수급 스냅샷)은 **그날 지나면 어디서도 못 구한다** —
+    서버 디스크 사고·코드 버그로 한 번 날아가면 축적한 개월 수만큼 되돌아간다.
+    그래서 재현 가능한 것과 불가능한 것을 갈라 후자만 따로 뜬다(용량도 1/40).
+    최근 4개만 남기고 회전.
+    """
+    import gzip
+    import shutil as _sh
+    bdir = DB.parent / "backup"
+    bdir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d")
+    tmp = bdir / f"panel_{stamp}.sqlite"
+    src = sqlite3.connect(f"file:{DB}?mode=ro", uri=True, timeout=180)
+    dst = sqlite3.connect(tmp)
+    src.backup(dst)                      # 온라인 백업 — 크론 적재 중이어도 안전
+    dst.execute("DROP TABLE IF EXISTS px")   # 재현 가능한 것은 버려 용량 축소
+    dst.execute("VACUUM")
+    dst.close(); src.close()
+    out = bdir / f"panel_{stamp}.sqlite.gz"
+    with open(tmp, "rb") as fi, gzip.open(out, "wb", compresslevel=6) as fo:
+        _sh.copyfileobj(fi, fo)
+    tmp.unlink()
+    olds = sorted(bdir.glob("panel_*.sqlite.gz"))
+    for f in olds[:-4]:
+        f.unlink()
+    print(f"[backup] {out.name} · {out.stat().st_size/1024/1024:.1f}MB · 보관 {len(olds[-4:])}개", flush=True)
+
+
 def stat():
     if not DB.exists():
         print("panel DB 없음"); return
@@ -142,5 +174,7 @@ def stat():
 if __name__ == "__main__":
     if "--stat" in sys.argv:
         stat()
+    elif "--backup" in sys.argv:
+        backup()
     else:
         main()

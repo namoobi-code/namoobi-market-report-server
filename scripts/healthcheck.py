@@ -15,7 +15,7 @@
 #   결과 → data/db/health.json (대시보드 배지), 이상 시 keys/gmail_app_password.txt 로 메일.
 #
 #   사용: python3 scripts/healthcheck.py [--mail]
-import json, os, shutil, subprocess, sys, time, urllib.request, datetime as dt
+import json, os, shutil, sqlite3, subprocess, sys, time, urllib.request, datetime as dt
 
 BASE = "/home/ubuntu/namoobi"
 DB   = os.path.join(BASE, "data", "db")
@@ -138,6 +138,43 @@ def main():
                                  " (ern 플래그·야후 ed 확인 필요)")
     except Exception as e:
         out["checks"]["calendar"] = {"err": repr(e)[:80]}
+
+    # D-3. 종목 패널 적재 감시 (2026-09-05 신설 — 횡단면 예측모델의 원자료)
+    #   왜 mtime(신선도 D)만으론 부족한가: stock_panel.py 가 돌아도 풀이 갱신되지 않았거나
+    #   price_date 가 그대로면 **같은 키를 덮어쓰기만** 해 파일 mtime 은 최신인데 날짜는
+    #   하루도 안 늘어난다. 그러면 6개월 뒤 재검증(2027-03 예약) 때 표본이 통째로 비어 있다.
+    #   컨센·리비전·수급은 소급 불가라 그때 복구할 방법이 없으므로, 파일이 아니라
+    #   **DB 안의 날짜 수가 실제로 늘고 있는지**를 직접 조회해 감시한다.
+    try:
+        pdb = os.path.join(DB, "stock_panel.sqlite")
+        pan = {}
+        if not os.path.exists(pdb):
+            out["alerts"].append("[패널] stock_panel.sqlite 없음 — 적재 크론(09:00/17:00) 확인")
+        else:
+            cx = sqlite3.connect(f"file:{pdb}?mode=ro", uri=True, timeout=20)
+            nd, last = cx.execute("SELECT COUNT(DISTINCT d), MAX(d) FROM panel").fetchone()
+            nrec = cx.execute("SELECT COUNT(*) FROM panel WHERE d=?", (last,)).fetchone()[0]
+            d7 = cx.execute("SELECT COUNT(DISTINCT d) FROM panel WHERE d >= ?",
+                            ((dt.date.today() - dt.timedelta(days=10)).isoformat(),)).fetchone()[0]
+            px_n, px_last = cx.execute("SELECT COUNT(DISTINCT mk||c), MAX(d) FROM px").fetchone()
+            cx.close()
+            lag = (dt.date.today() - dt.date.fromisoformat(last)).days
+            pxlag = (dt.date.today() - dt.date.fromisoformat(px_last)).days
+            pan = {"days": nd, "last": last, "lag_d": lag, "rows_last": nrec,
+                   "days_in_10d": d7, "px_syms": px_n, "px_last": px_last, "px_lag_d": pxlag}
+            # 주말·휴일을 감안해 4일까지는 정상으로 본다(연휴가 3일까지 붙는다)
+            if lag > 4:
+                out["alerts"].append(f"[패널] 팩터 스냅샷 최신 {last} — {lag}일 밀림(크론 09:00/17:00 확인)")
+            if nrec < 5000:
+                out["alerts"].append(f"[패널] 최신일 {last} 적재 {nrec}행 — 평시 7,700행 대비 결손")
+            if nd >= 3 and d7 < 3:
+                out["alerts"].append(f"[패널] 최근 10일 중 {d7}일치만 적재 — 누락 발생(재검증 표본 손실)")
+            if pxlag > 5:
+                out["alerts"].append(f"[패널] 종가 패널 최신 {px_last} — {pxlag}일 밀림(크론 17:10 확인)")
+        out["checks"]["stock_panel"] = pan
+    except Exception as e:
+        out["checks"]["stock_panel"] = {"err": repr(e)[:100]}
+        out["alerts"].append(f"[패널] 점검 실패 {repr(e)[:60]}")
 
     # E. 자원
     du = shutil.disk_usage("/")
