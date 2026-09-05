@@ -97,11 +97,14 @@ function render(){
             :[...new Set(b.series.flatMap(s=>Object.keys(s.v)))];
     // 시점별 전원 비교 표 (최근 5시점, 최신이 위)
     const recent=[...b.series].slice(-5).reverse();
+    /* (2026-09-05 피드백) 비고를 표 컬럼에서 분리 — 값 컬럼이 좁아져 비고가 세로로 길게
+       뭉개지던 문제. 표는 시점×값만, 비고는 표 아래 시점별 각주 목록으로. */
     const tbl=recent.length?`<table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%;margin-top:8px">
-      <thead><tr style="background:#f8fafc"><th style="border:1px solid #e2e8f0;padding:3px 6px">시점</th>${ks.map(k=>`<th style="border:1px solid #e2e8f0;padding:3px 6px">${k}</th>`).join('')}<th style="border:1px solid #e2e8f0;padding:3px 6px">비고</th></tr></thead>
+      <thead><tr style="background:#f8fafc"><th style="border:1px solid #e2e8f0;padding:3px 6px">시점</th>${ks.map(k=>`<th style="border:1px solid #e2e8f0;padding:3px 6px">${k}</th>`).join('')}</tr></thead>
       <tbody>${recent.map(s=>`<tr><td style="border:1px solid #e2e8f0;padding:2px 6px;white-space:nowrap">${s.d}</td>
-        ${ks.map(k=>`<td style="border:1px solid #e2e8f0;padding:2px 6px;text-align:right;font-weight:${s.v[k]!=null?600:400}">${s.v[k]!=null?s.v[k]+(b.unit==='위'?'위':b.unit):'—'}</td>`).join('')}
-        <td style="border:1px solid #e2e8f0;padding:2px 6px;color:#94a3b8;font-size:10.5px">${s.note||''}${s.src?` <a href="${s.src}" target="_blank" rel="noopener" style="color:#94a3b8">[근거]</a>`:''}</td></tr>`).join('')}</tbody></table>`:'';
+        ${ks.map(k=>`<td style="border:1px solid #e2e8f0;padding:2px 6px;text-align:right;font-weight:${s.v[k]!=null?600:400}">${s.v[k]!=null?s.v[k]+(b.unit==='위'?'위':b.unit):'—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`
+      +`<div style="font-size:10.5px;color:#94a3b8;line-height:1.6;margin-top:4px">${recent.filter(s=>s.note||s.src).map(s=>
+         `<div><b style="color:#64748b">${s.d}</b> — ${s.note||''}${s.src?` <a href="${s.src}" target="_blank" rel="noopener" style="color:#94a3b8">[근거]</a>`:''}</div>`).join('')}</div>`:'';
     return `<div style="flex:1 1 480px;max-width:640px;border:1px solid #e2e8f0;border-top:3px solid ${g[0]};border-radius:10px;background:#fff;padding:12px 14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
         <b style="font-size:13.5px">${b.name}</b>
