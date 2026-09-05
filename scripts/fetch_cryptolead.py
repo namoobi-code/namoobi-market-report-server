@@ -112,7 +112,7 @@ def price_btc():
     d = [[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[4])] for r in k]
     qv = [[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[7])] for r in k]   # quote volume USDT
     w = jget("https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=300")
-    wk = [float(r[4]) for r in w]
+    wk = [[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[4])] for r in w]     # (2026-09-05) 날짜 동봉 — 200주 배율 시계열용
     return d, qv, wk
 
 def c_sentiment(qv_bn):
@@ -200,8 +200,16 @@ def c_cycle(d_px, wk):
     m200 = sma(d_px, 200)
     if m200: put("mayer", s=[[d, v / (sum(x[1] for x in d_px[i - 199:i + 1]) / 200)] for i, (d, v) in enumerate(d_px) if i >= 199])
     if len(wk) >= 200:
-        w200 = sum(wk[-200:]) / 200
-        put("w200", v=px / w200, w200=w200)
+        # (2026-09-05 피드백 "추세 차트 없는 건 왜") 200주 배율 시계열 — 각 일자에 그 시점까지의 200주 이평 적용
+        wd = [d for d, _ in wk]; wv = [v for _, v in wk]
+        import bisect
+        s = []
+        for d, v in d_px[-400:]:
+            i = bisect.bisect_right(wd, d)        # d 이전(포함) 주봉 개수
+            if i >= 200: s.append([d, v / (sum(wv[i - 200:i]) / 200)])
+        w200 = sum(wv[-200:]) / 200
+        if s: put("w200", s=s, w200=w200)
+        else: put("w200", v=px / w200, w200=w200)
     halv = date(2024, 4, 20); nxt = date(2028, 4, 15)
     put("halving", v=(date.today() - halv).days, next_days=(nxt - date.today()).days, last=halv.isoformat(), next=nxt.isoformat())
 
@@ -337,6 +345,35 @@ def c_alt(hist):
     beat = sum(1 for x in alts if x["price_change_percentage_30d_in_currency"] > btc)
     ratio = beat / len(alts) * 100
     H = hist.setdefault("alt", {}); H[today()] = round(ratio, 1)
+    if len(H) < 30 and not hist.get("alt_backfilled"):
+        # (2026-09-05) 1회 백필 — CoinGecko market_chart(무료·1년 일봉)로 코인별 30일 수익률을 재구성해 과거 알트 강세폭 계산.
+        #   50코인+BTC 51콜, 무료 분당 제한(~30) 때문에 2.5초 간격 ≈ 2분. 실패 코인은 제외(분모에서 뺌).
+        try:
+            def mc(cid):
+                j2 = jget(f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart?vs_currency=usd&days=365&interval=daily", t=30, tries=2)
+                out = {}
+                for ts, pr in j2["prices"]: out[utc(ts / 1000).strftime("%Y-%m-%d")] = pr
+                return out
+            btcp = mc("bitcoin"); time.sleep(2.5)
+            series = []
+            for x in alts:
+                try: series.append(mc(x["id"]))
+                except Exception as e2: log(f"    alt backfill skip {x['id']}: {repr(e2)[:50]}")
+                time.sleep(2.5)
+            days = sorted(btcp)
+            for i, d in enumerate(days):
+                if i < 30 or d in H: continue
+                d0 = days[i - 30]
+                if d0 not in btcp or not btcp[d0]: continue
+                b = btcp[d] / btcp[d0] - 1
+                cnt = beat2 = 0
+                for sc in series:
+                    if d in sc and d0 in sc and sc[d0]:
+                        cnt += 1; beat2 += (sc[d] / sc[d0] - 1) > b
+                if cnt >= 20: H[d] = round(beat2 / cnt * 100, 1)
+            hist["alt_backfilled"] = today()
+            log(f"    alt backfill: {len(H)}일")
+        except Exception as e: err("alt_backfill", e)
     put("altbreadth", s=sorted([[d, v] for d, v in H.items()]), n=len(alts), btc30=btc,
         top=[[x["symbol"].upper(), round(x["price_change_percentage_30d_in_currency"], 1)] for x in sorted(alts, key=lambda x: -x["price_change_percentage_30d_in_currency"])[:8]])
     ov = jload(DB / "crypto_overview.json")

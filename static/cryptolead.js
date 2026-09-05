@@ -56,6 +56,11 @@ function spark(cv,s,color,k){
 /* ── (2026-09-05 피드백 "어떤 지표인지, 의미와 해석방법이 어렵다") 쉬운 설명 + 눈금 게이지 ──
    HELP: what=한 줄로 뭔지(비유) · read=숫자로 읽는 법 · low/high=낮을 때/높을 때 뜻
    GAUGE: [min,max,lo,hi,dir] — 막대 위 현재값 위치. dir 'hot'=높을수록 과열(오른쪽 빨강), 'cool'=높을수록 좋음(오른쪽 초록), 'mid'=양끝 다 경계 */
+const NOCHART={   // 추세 차트가 없는 이유 (피드백 2026-09-05)
+ halving:'📅 날짜 계산 지표 — 추세가 아니라 "사이클의 어디쯤인가"만 본다.',
+ btc_dom:'⏳ 무료 API 가 과거치를 주지 않아 서버가 오늘부터 매일 쌓는다 — 며칠 뒤부터 추세가 그려진다.',
+ ibit_flow:'⏳ iShares 페이지는 당일 발행주식수만 공개 — 서버가 매일 기록해 유입액을 계산한다. 1주일쯤 뒤부터 추세 표시.',
+ altbreadth:'⏳ 서버 일간 누적 중 — 며칠 뒤부터 추세 표시.'};
 const HELP={
  fng:{what:'투자자들이 지금 겁먹었는지 들떠 있는지를 0~100 점수로 만든 것(변동성·거래량·SNS·설문 합산).',read:'0~25 극단 공포 · 25~75 보통 · 75~100 극단 탐욕.',low:'다들 무서워 팔았다 → 팔 사람이 줄어 반등 여지(역발상 매수).',high:'다들 들떠 이미 샀다 → 살 사람이 줄어 단기 고점 경계.'},
  kimp:{what:'같은 비트코인이 한국 거래소(업비트)에서 해외(바이낸스)보다 몇 % 비싼가.',read:'0% 근처 정상 · +3~5% 국내 과열 · 마이너스는 국내 무관심.',low:'국내 사람들이 관심을 끊었다 → 바닥권에서 흔히 보이는 모습.',high:'국내 개인이 웃돈 주고 산다 → 과거 김프 5%↑ 뒤엔 단기 고점이 잦았다.'},
@@ -144,7 +149,7 @@ function card(k,e){
     <div style="font-size:19px;font-weight:800;margin:2px 0 0;line-height:1.2">${fmtV(k,e)}<span class="note" style="font-weight:400"> ${e.d||''}</span></div>
     <div class="note" style="min-height:14px">${extra}</div>
     ${gauge(k,e.v,e)}
-    ${e.s&&e.s.length>1?`<div class="clsp" style="position:relative;height:100px;flex:0 0 100px;overflow:hidden;margin:4px 0"><canvas id="${cvid}"></canvas></div><div class="note" style="font-size:9.5px;margin-top:-2px"><span style="color:${GCOL[e.group]||'#334155'}">■</span> 지표(왼쪽 축) <span style="color:#f59e0b">━</span> BTC 가격(오른쪽 축)</div>`:'<div style="height:12px"></div>'}
+    ${e.s&&e.s.length>1?`<div class="clsp" style="position:relative;height:100px;flex:0 0 100px;overflow:hidden;margin:4px 0"><canvas id="${cvid}"></canvas></div><div class="note" style="font-size:9.5px;margin-top:-2px"><span style="color:${GCOL[e.group]||'#334155'}">■</span> 지표(왼쪽 축) <span style="color:#f59e0b">━</span> BTC 가격(오른쪽 축)</div>`:`<div class="note" style="margin:6px 0;padding:5px 8px;background:#f8fafc;border-radius:6px">${NOCHART[k]||'추세 시계열 없음'}${e.s&&e.s.length===1?' (누적 시작 '+e.s[0][0]+')':''}</div>`}
     <div style="font-size:11.5px;color:#0f172a;margin-top:2px"><b>판정</b> ${e.judge||'—'}</div>
     <div class="note" style="margin-top:3px;color:#64748b"><b>왜 선행</b> ${e.why||''}</div>
     ${helpBox(k)}
