@@ -107,6 +107,35 @@ function render(){
   //     아마존·세포라는 K뷰티 전용 데이터 — K푸드·K패션 선택 시 섹션 숨김(사용자 피드백)
   const showRet=(TH==='K뷰티');
   ['kc_ret_h3','kc_ret_box'].forEach(id=>{const el=$(id); if(el) el.style.display=showRet?'':'none';});
+  /* (2026-09-05) K푸드 전용 — 라면 글로벌 위상 카드. 이코노미스트 커버스토리 실측 전재:
+     '수출 사상 최대(+28%)인데 글로벌 점유는 한 자릿수'라는 갭이 투자 논점. 분기 갱신. */
+  const showRm=(TH==='K푸드');
+  ['kc_rm_h3','kc_rm_box'].forEach(id=>{const el=$(id); if(el) el.style.display=showRm?'':'none';});
+  if(showRm&&$('kc_rm')&&!$('kc_rm').innerHTML){
+    const card=(t,rows)=>`<div style="flex:1;min-width:250px;border:1px solid #e2e8f0;border-radius:8px;padding:10px 12px;background:#fff">
+      <div style="font-size:12.5px;font-weight:700;margin-bottom:6px">${t}</div>
+      <div style="font-size:12px;line-height:1.8">${rows.join('<br>')}</div></div>`;
+    $('kc_rm').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+      ${card('🌏 글로벌 점유 (유로모니터 2024 소매액)',[
+        '중국 <b>14.78%</b> · 일본 <b>10.64%</b> · 한국 <b style="color:#dc2626">2.35%</b> — 일본의 1/4',
+        '글로벌 톱5: 딩신·닛신·도요수산·인도푸드·<b>농심(5위 유일)</b> — 2019년과 동일(정체)',
+        '<span class="note">수출은 반기 사상 최대(9.4억$ · +28%)인데 점유는 한 자릿수 — 이 갭이 핵심</span>'])}
+      ${card('🇺🇸 미국 — 일본계 70% 아성',[
+        '마루찬·닛신 등 일본계 점유 <b>~70%</b> 견고',
+        '삼양 점유 11.4% → <b>2028E 23.9%</b>(매쿼리 전망)',
+        '불닭 입점 <b>4만개 매장</b>(23년말 1.5만 → 2년반 만에 2.7배) · 삼양아메리카 매출 $0.5억(22)→$4.2억(25)',
+        '<span class="note">과제: 입점은 끝 — 재구매 확산·간식→한 끼 식사 인식 전환(신용식 법인장)</span>'])}
+      ${card('🇯🇵 일본 — 원조 시장 침투 개시',[
+        '농심재팬 반기 117억엔(<b>+17%</b>) · 対일 수출 $7,730만 사상 최대(25년)',
+        '유통 1,300개 채널 — 90%+ 가 아시안 코너 아닌 <b>일반 라면 매대</b>',
+        '닛케이 히트상품 30에 신라면 툼바 — 한국 라면 최초'])}
+      ${card('🏭 구조적 격차 — 해외 생산',[
+        '해외 공장: <b>닛신 23곳 vs 농심 6곳</b>(국내 전체 <10곳)',
+        '농심 부산 녹산 <b>수출전용 공장 10월 말 완공</b>(수출 라면 연 12억개) — K-수출 탭 1902 메모 연동',
+        '삼양 중국 자싱 공장 내년 1월(캐파 +40% · 현지생산 전환) · 오뚜기 美 2028',
+        '<span class="note">기타: 러시아 팔도 도시락 50%+ · 1인당 소비 베트남 81>한국 79>태국 60</span>'])}
+    </div>`;
+  }
   const RT=D.retail||{}, AZ=RT.az, SP=RT.sep;
   if($('kc_az')) $('kc_az').innerHTML=(AZ&&AZ.rows&&AZ.rows.length)?`<table style="border-collapse:collapse;font-size:12.5px;background:#fff;width:100%">
     <thead><tr style="background:#f8fafc">${['랭크','브랜드','7일Δ','관련 종목','상품(대표)'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px;font-size:11.5px">${h}</th>`).join('')}</tr></thead>
