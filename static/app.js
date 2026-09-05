@@ -4226,7 +4226,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     if(obj.asof)    html+=`<div class="src">기준 ${E(obj.asof)}</div>`;
     box.innerHTML=html||'<div class="note">데이터 없음</div>';};
 
-  etfGroups('d_usetf',M.us_etfs,{index:'지수',sector:'섹터',theme:'테마',defensive:'방어형',bond:'채권'});
+  etfGroups('d_usetf',M.us_etfs,{index:'지수',sector:'섹터',theme:'테마',aitheme:'AI 세부테마',defensive:'방어형',bond:'채권'});
   etfGroups('d_asetf',M.asia_etfs,{asia:'아시아',kr_listed:'한국 상장',us_listed:'미국 상장',country:'국가',theme:'테마'});
   etfGroups('d_euetf',M.europe_etfs,{items:'유럽 ETF',region:'지역',country:'국가',sector:'섹터',theme:'테마'});
   etfGroups('d_ametf',M.americas_etfs,{items:'북미·중남미 국가 ETF'});
