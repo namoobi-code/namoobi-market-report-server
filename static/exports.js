@@ -115,8 +115,48 @@ function renderHsi(){
         scales:{x:{ticks:{maxTicksLimit:7,font:{size:9}}},y:{ticks:{font:{size:9}}}}}}); });
 }
 
+/* ── ③ K방산 수출 공식 (2026-09-05 · 이코노믹리뷰 커버스토리 실측 전재 · 분기 갱신) ──
+   층 구분: 통관 통계(선적) ≠ 수출 실적(계약·방사청) ≠ 수주잔고(계약 누적) — 셋을 한 탭에.
+   핵심 논점: 수출 공식이 '완제품 납품'에서 '현지생산×기술이전×정부원팀'으로 바뀌는 중 —
+   대형 수주전 4연속 고배가 그 신호(성장 스토리의 반증 데이터로 병기). */
+let DF_DONE=false;
+function renderDefense(){
+  if(DF_DONE||!$('ex_df_cv1')) return; DF_DONE=true;
+  new Chart($('ex_df_cv1'),{type:'bar',data:{labels:['2021','2022','2023','2024','2025'],
+    datasets:[{data:[47.7,69.6,79.1,96,120.5],backgroundColor:'#1e3a5f'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>c.raw+'조원'}}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10},callback:v=>v+'조'}}}}});
+  new Chart($('ex_df_cv2'),{type:'bar',data:{labels:['2019','2020','2021','2022','2023','2024','2025'],
+    datasets:[{data:[25,30,73,173,135,96,154],backgroundColor:'#b91c1c'}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>'$'+c.raw+'억'}}},scales:{x:{ticks:{font:{size:10}}},y:{ticks:{font:{size:10},callback:v=>'$'+v+'억'}}}}});
+  const card=(t,rows,bd)=>`<div style="flex:1;min-width:280px;border:1px solid #e2e8f0;border-left:4px solid ${bd};border-radius:8px;padding:10px 12px;background:#fff">
+    <div style="font-size:12.5px;font-weight:700;margin-bottom:6px">${t}</div>
+    <div style="font-size:12px;line-height:1.8">${rows.join('<br>')}</div></div>`;
+  $('ex_df_cards').innerHTML=`<div style="display:flex;gap:10px;flex-wrap:wrap">
+    ${card('📈 2Q26 — 역대 최대 분기',[
+      '4사 합산 영업익 <b>1조 7,000억+</b> · 수주잔고 <b>120.5조</b>(4년 만에 2.5배)',
+      '한화에어로 분기 영업익 <b>첫 1조 돌파</b>(1.37조) · 잔고 38.3조',
+      '현대로템 잔고 30.4조 역대최대 · LIG 잔고 57% 수출 · KAI 매출 +41%',
+      '<span class="note">수출 체질 전환: 한화 지상방산 잔고 수출비중 33%(22)→66%(23)→<b>75%</b>(2Q26)</span>'],'#1e3a5f')}
+    ${card('📜 대형 계약 이력 (계약 기준)',[
+      '한화: 폴란드 K9 364문 <b>6.6조</b> · 천무 288대 <b>12.6조</b>(3회) + 핀란드·에스토니아·이집트',
+      '로템: 폴란드 K2 1차 4.5조 + 2차 <b>9조(단일 역대최대 · 현지생산 포함)</b>',
+      'LIG: 천궁-II 중동 3연타 — UAE 4.1조(22)·사우디 4.25조(24)·이라크 3.7조(25)',
+      'KAI: FA-50 폴란드 48대 4조 · 말레이시아 18대 1.2조 · 필리핀 12대 1조',
+      '<span class="note">📌 미국 첫 진출(K9MH)은 위 93류 행 수주 메모 참조</span>'],'#0f766e')}
+    ${card('⚠ 공식 변화 신호 — 대형 수주전 4연속 고배',[
+      '캐나다 잠수함 <b>20조</b> → 獨 TKMS(26.7) · 폴란드 잠수함 8조 → 瑞 SAAB(25.11)',
+      '루마니아 장갑차 6조 → 獨 라인메탈(26.5) · 프랑스 로켓 1조 → MBDA·사프란(26.6)',
+      '유럽 방산 블록화 공식화 — NATO SYNC(산업계 협력 전략) · EU Readiness 2030 <b>1,290조</b> · GDP 5%(2035)',
+      '<span class="note">새 공식: 패키지형 수출 × 현지 방산 생태계 구축 × 정부·기업 원팀 — 빠른 납기·가격만으론 부족. '
+      +'현지거점: 한화 호주 H-ACE·폴란드 JV·UAE / 로템 폴란드 K2PL / LIG 인니·라인메탈 / KAI 폴란드 MRO</span>'],'#b45309')}
+  </div>
+  <div class="note" style="margin-top:8px">SIPRI 무기 수출 점유(한국 0.9→2.2%)는 📊 점유율 추이 탭 '글로벌 무기 수출' 배틀 · 실제 선적 흐름은 위 93류·8710 통관 행 참조. 출처: 이코노믹리뷰 2026-09 커버스토리·각사 IR·방위사업청 — 분기 갱신.</div>`;
+}
+
 function load(force){
-  if(CUS&&HSI&&!force){ renderCus(); renderHsi(); return; }
+  if(CUS&&HSI&&!force){ renderCus(); renderHsi(); renderDefense(); return; }
   $('ex_asof').textContent='불러오는 중…';
   Promise.all([
     fetch('/api/db/customs',{cache:'no-cache'}).then(r=>r.ok?r.json():null),
@@ -124,7 +164,7 @@ function load(force){
   ]).then(([c,h])=>{
     CUS=(c&&c.data)||c; HSI=h;
     $('ex_asof').textContent='잠정치 '+((CUS&&CUS.latest&&CUS.latest.yyyymm)||'')+' · 품목별 수집 '+((h&&h.asof)||'');
-    renderCus(); renderHsi();
+    renderCus(); renderHsi(); renderDefense();
   }).catch(e=>{ $('ex_asof').textContent='로드 실패: '+e.message; });
 }
 
