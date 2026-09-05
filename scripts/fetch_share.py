@@ -28,6 +28,10 @@ KST  = timezone(timedelta(hours=9))
 FRESH = {"주간": 10, "월간": 40, "분기": 100, "반기": 200, "연간": 400}
 
 # (id, 등급, 이름, 단위, 갱신주기, 주가 연결 논리, 플레이어[(표시명, 관련종목)], 시드 시계열, auto, 출처)
+# (2026-09-05) AI 병목 릴레이 대표주 — 축별 벨웨더 1종. 상세 근거는 auto_bottleneck() 주석 참조.
+BNECK = [("연산 (엔비디아)", "NVDA"), ("메모리 (마이크론)", "MU"),
+         ("광통신 (코히런트)", "COHR"), ("전력 (버티브)", "VRT")]
+
 BATTLES = [
     ("glp1", "A", "美 비만약(GLP-1) 처방 점유", "%", "분기",
      "점유 역전(2023 2:8 → 2026 6:4)이 릴리·노보 주가를 완전히 갈랐다 — 본 탭의 원형 사례",
@@ -505,6 +509,14 @@ BATTLES = [
        "ZS +25%(레드카나리 인수분 1.41억$ 제외 시 +20%) / MS 미공시(2023-01 이후 중단)")],
      None, "각사 분기 실적발표(PANW FY26Q4 2026-09-01 · CRWD FY27Q2 2026-08-26 · ZS FY26Q4 2026-09-03) · "
            "MS = 나델라 FY23Q2 콜 공시 + FY2025 3자 추정(E)"),
+    # (2026-09-05 신설) AI 병목 릴레이 — 상세 설명은 auto_bottleneck() 주석 참조. 야후 월봉 자동 산출.
+    ("bneck", "A", "AI 병목 릴레이 — 축별 12개월 수익률 (%)", "%", "분기",
+     "AI 발전은 병목을 하나씩 푸는 과정이고 돈도 그 병목을 따라 옮겨 다닌다(연산→메모리→광통신→전력). "
+     "가장 위에 있는 선이 '지금 돈이 몰린 병목'이고, 순위가 뒤바뀌는 지점이 곧 병목 이동이다. "
+     "리더가 꺾이기 시작하면 그 병목은 해소 국면 — 3.1.9 의 메모리/GPU 상대강도를 4축으로 넓힌 지표다. "
+     "⚠ 점유율이 아니라 주가 수익률이므로 '누가 이겼나'가 아니라 '자금이 어디에 있나'로 읽어야 한다",
+     list(BNECK),
+     [], "bneck", "야후 월봉 5년 (매일 자동 재계산) — 축별 벨웨더 1종: NVDA·MU·COHR·VRT"),
 ]
 
 
@@ -819,6 +831,62 @@ def auto_amzn():
     return ser[-60:], [(b, "") for b in brands]
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# (2026-09-05 신설 · 한경MONEY 2026.08 'ETF 심층해부' 프레임) AI 병목 릴레이
+#   기사의 핵심 논지 = "AI 기술 발전은 병목을 하나씩 푸는 과정이고, 투자 트렌드도 그 병목을 따라 이동한다"
+#   (연산 → 메모리 → 광통신 → 전력). 우리는 이미 3.1.9 에 축소판(메모리/GPU 상대강도 = MU÷NVDA)을
+#   갖고 있었는데, 그걸 2축에서 4축으로 일반화한 것이 이 배틀이다.
+#   읽는 법: 각 선은 그 병목 대표주의 '12개월 수익률(%)'. 가장 위에 있는 선이 지금 돈이 몰린 병목이고,
+#           선들의 순위가 바뀌는 지점이 곧 '병목 이동'이다. 리더가 꺾이면 그 병목은 해소 국면.
+#   대표주는 각 축에서 가장 순수한 벨웨더 1종씩 — ETF 는 구성이 섞이거나(SOXX 에 메모리 포함)
+#   신규상장이라 이력이 짧아(DRAM ETF 6개월·LUMA/LYTE 1~2개월) 5년 비교가 불가능했다(실측 확인).
+#   ※ BNECK 상수는 BATTLES 가 참조하므로 파일 상단(BATTLES 앞)에 정의돼 있다.
+
+
+def auto_bottleneck():
+    """야후 월봉 5년 → 축별 12개월 롤링 수익률(%)을 분기 시점으로 샘플링."""
+    import datetime as _d
+    UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120"
+
+    def _get(u, to=25):
+        try:
+            return subprocess.run(["curl", "-s", "--compressed", "--max-time", str(to),
+                                   "-H", "User-Agent: " + UA, u],
+                                  capture_output=True, text=True, timeout=to + 8).stdout or ""
+        except Exception:
+            return ""
+
+    px = {}
+    for lab, tk in BNECK:
+        try:
+            j = json.loads(_get("https://query1.finance.yahoo.com/v8/finance/chart/"
+                                "%s?range=5y&interval=1mo" % tk))
+            r = j["chart"]["result"][0]
+            ts, cl = r["timestamp"], r["indicators"]["quote"][0]["close"]
+            px[lab] = {_d.datetime.utcfromtimestamp(t).strftime("%Y-%m"): c
+                       for t, c in zip(ts, cl) if c}
+        except Exception:
+            continue
+    if len(px) < 2:
+        return []
+    months = sorted(set().union(*[set(v) for v in px.values()]))
+    out = []
+    for i, m in enumerate(months):
+        if i < 12 or m[5:] not in ("03", "06", "09", "12"):
+            continue          # 12개월 수익률이 성립하는 시점부터, 분기 끝 달만
+        base = months[i - 12]
+        v = {}
+        for lab in px:
+            a, b = px[lab].get(base), px[lab].get(m)
+            if a and b:
+                v[lab] = round((b / a - 1) * 100, 1)
+        if len(v) < 2:
+            continue
+        top = max(v, key=v.get)
+        out.append((m, v, "12개월 수익률 · 선두 %s(%+.0f%%)" % (top.split(" (")[0], v[top])))
+    return out
+
+
 def main():
     print("[share] 생성 시작", flush=True)
     llm = load("share_llm.json") or {}
@@ -848,6 +916,11 @@ def main():
         elif auto == "ai_accel":
             ser = auto_ai_accel()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+        elif auto == "bneck":
+            ser = auto_bottleneck()
+            if ser:
+                series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
+                players = list(BNECK)
         elif auto == "nvda_cust":
             ser = auto_nvda_cust()
             series = [{"d": d, "v": v, "note": n} for d, v, n in ser]
