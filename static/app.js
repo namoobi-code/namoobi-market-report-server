@@ -569,6 +569,12 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
         const s3=_sum(e,li-2,li),  p3=_sum(e,li-14,li-12), y3=(s3!=null&&p3)?(s3/p3-1)*100:null;
         const s6=_sum(e,li-5,li),  p6=_sum(e,li-17,li-12), y6=(s6!=null&&p6)?(s6/p6-1)*100:null;
         const s12=_sum(e,li-11,li), p12=_sum(e,li-23,li-12), y12=(s12!=null&&p12)?(s12/p12-1)*100:null;
+        /* (2026-09-05) 수주 이벤트 메모 행 — 계약·수주는 통관 통계에 안 잡히므로(선적 시점 반영)
+           해당 품목 행 아래에 '언제·얼마 유입 예상(E)'을 메모로 병기 (fetch_hs_invest.py EVENTS) */
+        const _evs=(hv.events||[]).filter(ev=>ev.hs===r.hs).map(ev=>
+          `<tr style="background:#fffbeb"><td colspan="14" style="font-size:12px;padding:6px 10px;border-left:3px solid #f59e0b">
+             📌 <b>${esc(ev.d)}</b> ${esc(ev.txt)}<br>
+             <span class="note" style="margin-left:20px">${esc(ev.est||'')}</span></td></tr>`).join('');
         return `<tr><td><b>${esc(r.th)}</b></td><td>${esc(r.nm)}</td>
           <td class="note">${esc(r.hs)}</td><td class="note">${esc(r.note||'')}</td>
           <td style="font-size:12px;max-width:190px">${_rel(r.hs)}</td>
@@ -576,7 +582,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
           <td class="num">${_fmtM(s3)}</td>${_fmtY(y3)}
           <td class="num">${_fmtM(s6)}</td>${_fmtY(y6)}
           <td class="num">${_fmtM(s12)}</td>${_fmtY(y12)}
-          <td><canvas id="c_hsi_${i}" style="max-height:56px"></canvas></td></tr>`;
+          <td><canvas id="c_hsi_${i}" style="max-height:56px"></canvas></td></tr>`+_evs;
       }).join('');
     hv.items.forEach((r,i)=>{ const cv=$('c_hsi_'+i); if(!cv) return;
       const e=(r.exp||[]).slice(off).map(v=>v!=null?v/1000:null);

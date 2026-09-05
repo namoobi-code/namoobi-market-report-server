@@ -14,6 +14,21 @@ import json, re, time, urllib.request, urllib.parse
 from datetime import datetime
 from pathlib import Path
 
+# ── 수주 이벤트 메모 (2026-09-05 신설 — 사용자 요청) ─────────────────────────
+# 계약·수주는 통관 통계에 영원히 안 잡힌다(수출 통계 = 실제 선적 시점) → 품목 행 아래
+# 메모 행으로 표시해 '앞으로 이 행에 얼마가 언제 유입될지'를 미리 적어 둔다.
+# est(반영 예상)는 계약 조건 기반 추정(E) — 실제 통관되면 그 달 수치로 검증한다.
+# 스키마: {hs: 품목 행의 hs 문자열과 일치, d: 계약일, txt: 내용, est: 몇월·얼마 예상}
+EVENTS = [
+    {"hs": "93", "d": "2026-06-19",
+     "txt": "🏆 한화에어로 K9 차륜형 자주포(K9MH) 미 육군 시제품 계약 — 미국 첫 수출. "
+            "시제품 6문 $1.00억(1,417억원) + 옵션 12문(누적 액면 $2.63억) · 향후 양산 ~500문·약 10조원 추산",
+     "est": "반영 예상: 자주포는 HS 9301(자주식 화포) → 이 행(93류)에 잡힘. 이행기간 4년(~2030) 중 "
+            "시제품 제작·시험 후 선적 — 통상 12~24개월 후인 2027H2~2028 통관 예상(E). "
+            "6문 일괄 선적 시 해당 월 +$1.0억(93류 월 $3~7억 대비 +15~30% 점프), 분할 선적 시 월 +$0.2~0.5억 분산. "
+            "옵션 12문 행사 시 최대 +$2.6억 추가"},
+]
+
 BASE = Path(__file__).resolve().parent.parent
 OUT = BASE / "data" / "db" / "hs_invest.json"
 URL = "https://tradedata.go.kr/cts/hmpg/retrieveTrade.do"
@@ -110,7 +125,7 @@ def main():
         d = it.pop("_d")
         it["exp"] = [d.get(k) for k in ms]
     OUT.write_text(json.dumps({"asof": now.strftime("%Y-%m-%d %H:%M"), "months": ms,
-                               "items": items}, ensure_ascii=False), encoding="utf-8")
+                               "items": items, "events": EVENTS}, ensure_ascii=False), encoding="utf-8")
     print(f"[hsinv] ✅ {len(items)}품목 · {len(ms)}개월 → {OUT}", flush=True)
 
 if __name__ == "__main__":
