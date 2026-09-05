@@ -133,6 +133,36 @@ def main():
         months |= set(acc.keys())
         items.append({"th": th, "nm": nm, "hs": "+".join(codes), "note": note, "_d": acc})
         print(f"  {th}/{nm}: {len(acc)}개월", flush=True)
+    # (2026-09-05) 지역별 정밀 행 — 부산발 라면(1902) 수출: 농심 녹산 수출전용 공장(10월 말 완공)
+    # 램프업을 분리 추적하는 프록시. 엔드포인트는 지역별 실적(품목별) 화면에서 실측 캡처:
+    #   POST /cts/hmpg/retrieveTradeRegion.do  tradeKind=ETS_MNK_1040000A, sidosggKind=sido,
+    #   sidoCd=26(부산), imexTpcd=EXP_TMPR_CD, hsSgn=1902 (무인증 · 35개월 재현 확인)
+    # ⚠ 지역 기준은 수출신고업체 소재지 — 농심 본사(서울) 명의 신고면 부산에 안 잡힐 수 있다.
+    #   10월 완공 후 이 행이 계단식 증가하면 프록시 확정, 안 움직이면 폐기(가설 검증형 행).
+    try:
+        rbody = urllib.parse.urlencode({
+            "tradeKind": "ETS_MNK_1040000A", "sidosggKind": "sido", "priodKind": "MON",
+            "priodFr": fr, "priodTo": to, "statsBase": "acptDd", "sidoCd": "26", "sggCd": "%",
+            "imexTpcd": "EXP_TMPR_CD", "showPagingLine": "100",
+            "hsSgnGrpCol": "HS4_SGN", "hsSgnWhrCol": "HS4_SGN", "hsSgn": "1902"}).encode()
+        rj = json.loads(urllib.request.urlopen(urllib.request.Request(
+            "https://tradedata.go.kr/cts/hmpg/retrieveTradeRegion.do", data=rbody, headers=H), timeout=30).read())
+        racc = {}
+        for x in rj.get("items") or []:
+            p = (x.get("priodTitle") or "").strip()
+            if not re.match(r"^\d{4}\.\d{2}$", p):
+                continue
+            v = (x.get("expUsdAmt") or "").replace(",", "").strip()
+            racc[p] = int(v) if v else 0
+        if racc:
+            months |= set(racc.keys())
+            ri = next((i for i, it in enumerate(items) if it["hs"] == "1902"), len(items) - 1)
+            items.insert(ri + 1, {"th": "K푸드", "nm": "└ 라면(부산발 — 녹산 프록시)", "hs": "1902·부산",
+                                  "note": "농심 녹산 수출전용 공장(10월 말 완공) 램프업 추적 — 신고업체 소재지 기준이라 프록시(가설 검증형)",
+                                  "_d": racc})
+            print(f"  K푸드/라면(부산발): {len(racc)}개월", flush=True)
+    except Exception as e:
+        print(f"  ⚠ 라면(부산발) 실패: {repr(e)[:60]}", flush=True)
     ms = sorted(months)
     for it in items:
         d = it.pop("_d")
