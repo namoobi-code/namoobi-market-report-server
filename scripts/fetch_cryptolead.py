@@ -544,7 +544,7 @@ def judge():
     c = chg(s("alt_mcap_ratio"), 30)
     if c is not None: S("alt_mcap_ratio", "bull" if c > 5 else "bear" if c < -5 else "neu", f"알트12/BTC 시총비 {v('alt_mcap_ratio'):.1f}% (30일 {c:+.1f}%) — " + ("알트로 시총 이동" if c > 5 else "BTC 로 시총 집중" if c < -5 else "보합"), jv=c, jl="30일 변화 %")
     c = chg(s("stable_ratio"), 30)
-    if c is not None: S("stable_ratio", "bull" if c < -5 else "bear" if c > 5 else "neu", f"스테이블/(BTC+ETH) {v('stable_ratio'):.1f}% (30일 {c:+.1f}%) — " + ("대기자금이 코인으로 투입=위험선호" if c < -5 else "코인→스테이블 대피=위험회피" if c > 5 else "보합"), jv=c, jl="30일 변화 %")
+    if c is not None: S("stable_ratio", "bull" if c < -10 else "bear" if c > 10 else "neu", f"스테이블/(BTC+ETH) {v('stable_ratio'):.1f}% (30일 {c:+.1f}%) — " + ("대기자금이 코인으로 투입=위험선호" if c < -10 else "코인→스테이블 대피=위험회피" if c > 10 else "보합"), jv=c, jl="30일 변화 %")
     x = v("eth_netflow")
     if x is not None: S("eth_netflow", "bull" if x < -300 else "bear" if x > 300 else "neu", f"ETH 7일 순유입 {x:+,.0f}M$ — " + ("거래소 유출=보관(알트 대장 수급 우호)" if x < -300 else "거래소 유입=매도 대기" if x > 300 else "균형"))
     r = rank(s("upbit_alt_share"), 200)
