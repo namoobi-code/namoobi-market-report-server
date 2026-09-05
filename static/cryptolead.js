@@ -5,7 +5,7 @@
              사이클 밸류(온체인), 매크로 유동성의 4축을 분리해 서로 다른 시간축의 신호가 뒤섞이지 않게 한다. 리서치용, 투자권유 아님. */
 (function(){
 'use strict';
-let D=null; const charts=[];
+let D=null; const charts=[]; let SHOWHELP=true; try{ SHOWHELP=localStorage.getItem('cl_help')!=='0'; }catch(e){}
 const $=id=>document.getElementById(id);
 const ST={bull:['🟢','상승 우호','#16a34a','#dcfce7'],neu:['🟡','중립','#a16207','#fef9c3'],bear:['🔴','과열·역풍','#dc2626','#fee2e2']};
 const GCOL={'심리·한국':'#be185d','지갑·거래소':'#0f766e','온체인 밸류':'#7c3aed','기관':'#1d4ed8','파생':'#b45309','매크로':'#334155','대기자금':'#0e7490','알트':'#9333ea'};
@@ -40,6 +40,81 @@ function spark(cv,s,color,k){
       scales:{x:{display:true,ticks:{maxTicksLimit:4,font:{size:9},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(2,7):''},grid:{display:false}},
               y:{ticks:{font:{size:9},maxTicksLimit:4},grid:{color:'#f1f5f9'}}}}}));
 }
+
+/* ── (2026-09-05 피드백 "어떤 지표인지, 의미와 해석방법이 어렵다") 쉬운 설명 + 눈금 게이지 ──
+   HELP: what=한 줄로 뭔지(비유) · read=숫자로 읽는 법 · low/high=낮을 때/높을 때 뜻
+   GAUGE: [min,max,lo,hi,dir] — 막대 위 현재값 위치. dir 'hot'=높을수록 과열(오른쪽 빨강), 'cool'=높을수록 좋음(오른쪽 초록), 'mid'=양끝 다 경계 */
+const HELP={
+ fng:{what:'투자자들이 지금 겁먹었는지 들떠 있는지를 0~100 점수로 만든 것(변동성·거래량·SNS·설문 합산).',read:'0~25 극단 공포 · 25~75 보통 · 75~100 극단 탐욕.',low:'다들 무서워 팔았다 → 팔 사람이 줄어 반등 여지(역발상 매수).',high:'다들 들떠 이미 샀다 → 살 사람이 줄어 단기 고점 경계.'},
+ kimp:{what:'같은 비트코인이 한국 거래소(업비트)에서 해외(바이낸스)보다 몇 % 비싼가.',read:'0% 근처 정상 · +3~5% 국내 과열 · 마이너스는 국내 무관심.',low:'국내 사람들이 관심을 끊었다 → 바닥권에서 흔히 보이는 모습.',high:'국내 개인이 웃돈 주고 산다 → 과거 김프 5%↑ 뒤엔 단기 고점이 잦았다.'},
+ upbit_ratio:{what:'업비트 하루 BTC 거래대금이 바이낸스의 몇 %인가 — 한국 개인의 참여 열기.',read:'절대값보다 200일 중 순위(백분위)로 본다. 상위 10% 과열 · 하위 15% 무관심.',low:'개미가 빠져나간 상태 → 바닥권 특징.',high:'개미가 몰린 상태 → 국내 주도 과열.'},
+ gt_world:{what:'전 세계 사람들이 구글에 "bitcoin"을 얼마나 검색했나(5년 중 최고=100).',read:'5년 중 순위로 본다. 상위 10% 관심 정점 · 하위 20% 무관심.',low:'아무도 안 찾는다 → 역발상 매수 구간이 많았다.',high:'모두가 찾는다 → 2017·2021 고점이 검색 정점과 겹쳤다.'},
+ gt_kr:{what:'한국에서 구글에 "bitcoin"을 얼마나 검색했나(5년 중 최고=100).',read:'전세계와 같은 방식. 한국만 높으면 국내 주도 과열.',low:'국내 무관심.',high:'국내 대중 관심 정점.'},
+ wiki_ko:{what:'한국어 위키 "비트코인" 문서 하루 조회수(7일 평균) — 처음 알아보는 사람의 수.',read:'2년 중 순위. 상위 10% 관심 정점 · 하위 20% 무관심.',low:'신규 유입 없음.',high:'대중이 처음 알아보기 시작 = 관심 정점.'},
+ wiki_en:{what:'영어 위키 "Bitcoin" 문서 하루 조회수(7일 평균).',read:'2년 중 순위. 상위 10% 관심 정점 · 하위 20% 무관심.',low:'글로벌 신규 유입 없음.',high:'글로벌 대중 관심 정점.'},
+ ex_netflow:{what:'지난 7일간 거래소 지갑으로 들어온 돈 − 나간 돈(백만$). 거래소에 넣는 건 팔려는 것, 빼서 개인지갑에 두는 건 오래 갖고 있으려는 것.',read:'−500M$ 미만 = 유출 우세(좋음) · ±500 균형 · +500M$ 초과 = 유입 우세(매도 대기).',low:'코인이 거래소 밖으로 빠져나감 → 팔 물량 감소 → 상승에 우호.',high:'코인이 거래소로 몰림 → 팔 준비 → 하락 압력.'},
+ ex_supply:{what:'전 세계 거래소가 보관 중인 비트코인 총량. "당장 팔 수 있는 재고".',read:'값 자체보다 30일 변화율. −1% 이하 감소(좋음) · +1% 이상 증가(경계).',low:'재고가 줄어든다 → 공급 부족 → 가격에 우호.',high:'재고가 는다 → 팔려고 갖다 놓는 중.'},
+ adr_act:{what:'하루에 실제로 거래에 쓰인 지갑 주소 수 — 네트워크를 쓰는 사람 수.',read:'30일 변화율. +5% 이상 활발 · −5% 이하 한산.',low:'쓰는 사람이 줄어든다 → 가격보다 먼저 꺾이는 일이 많다.',high:'쓰는 사람이 는다 → 실수요 증가.'},
+ hashrate:{what:'채굴 컴퓨터들의 총 연산력(7일 평균). 채굴자가 돈이 되면 늘리고 손해면 끈다.',read:'30일 변화율. −10% 이하 급락 = 채굴자 항복 · +5% 이상 확장.',low:'채굴자가 기계를 끈다 = 손해 구간. 역사적으로 바닥 근처지만 채굴자 매도가 잠깐 나온다.',high:'채굴자가 투자를 늘린다 = 앞으로도 돈이 된다고 본다.'},
+ mvrv:{what:'지금 시가총액 ÷ 모두가 산 가격의 합(실현 시총). "평균적으로 몇 배 벌고 있나".',read:'1 미만 = 평균 손실(바닥권) · 1~3 정상 · 3 이상 과열 · 3.5~4 사이클 고점.',low:'평균적으로 손해 중 → 더 팔 사람이 적다 → 역사적 바닥권.',high:'평균 3배 이상 수익 → 차익실현 욕구 최고 → 고점권.'},
+ mvrv_z:{what:'MVRV 를 "평소 대비 얼마나 튀었나"로 표준화한 점수(변동성으로 나눈 값).',read:'0 근처 바닥 밴드 · 0.5~6 중간 · 6~7 이상 고점 밴드(과거 모든 고점이 이 밴드에 닿음).',low:'역사적 바닥 밴드.',high:'역사적 고점 밴드.'},
+ sopr:{what:'오늘 움직인 코인들이 "산 가격 대비 얼마에 팔렸나"의 평균(7일). 1 = 본전.',read:'1 미만 지속 = 손절 매도 · 1 부근 균형 · 1.05 초과 = 이익 실현 활발.',low:'사람들이 손해 보고 판다 → 항복 국면. 오래 지속되면 팔 사람 소진.',high:'사람들이 이익 실현 중. 상승장에서는 1 까지 내려왔다 튕기는 곳이 매수점.'},
+ nupl:{what:'전체 보유자의 미실현 이익−손실을 시총으로 나눈 비율. 시장 전체가 얼마나 벌고 있나.',read:'0 미만 항복 · 0~0.25 희망 · 0.25~0.5 낙관 · 0.5~0.75 믿음 · 0.75 이상 도취(고점).',low:'시장 전체가 손실 → 바닥권.',high:'시장 전체가 큰 이익 → 도취 = 고점권.'},
+ puell:{what:'채굴자가 오늘 번 돈 ÷ 지난 1년 평균 수입. 채굴자 수익이 평소 대비 얼마나 좋은가.',read:'0.6 미만 채굴자 불황(바닥) · 0.6~3 정상 · 3 이상 채굴자 호황(고점).',low:'채굴자가 못 번다 → 역사적 바닥 신호.',high:'채굴자가 너무 잘 번다 → 채굴자 매도 압력 + 고점 신호.'},
+ mayer:{what:'현재가 ÷ 200일 평균가. 장기 평균에서 얼마나 떨어져 있나.',read:'0.8 이하 저평가 · 0.85~2.2 정상 · 2.4 이상 과열.',low:'장기 평균보다 많이 싸다.',high:'장기 평균보다 너무 올랐다 → 되돌림 잦음.'},
+ w200:{what:'현재가 ÷ 200주(약 4년) 평균가. 비트코인 역사상 모든 약세장 바닥이 이 선 근처에서 멈췄다.',read:'1.1 미만 바닥선 근접 · 1~4 중간 · 4 이상 사이클 고점권.',low:'역사적 바닥선에 닿음 → 장기 매수 구간.',high:'장기 평균의 4배 → 과거 고점 배율.'},
+ halving:{what:'채굴 보상이 절반으로 줄어든 날(반감기)로부터 며칠 지났나. 4년마다 공급이 줄어 사이클을 만든다.',read:'과거 3번 모두 반감기 후 12~18개월(365~550일)에 고점, 그 뒤 약 1년 약세, 다음 반감기 전 회복.',low:'반감기 직후 = 공급 충격 시작.',high:'550일 넘으면 과거 패턴상 고점 이후 구간.'},
+ cb_prem:{what:'미국 거래소 코인베이스 가격이 바이낸스보다 몇 % 비싼가. 미국 기관·ETF 는 코인베이스에서 산다.',read:'+0.05% 이상 미국이 사는 중 · ±0.05 중립 · −0.05% 이하 미국이 파는 중.',low:'미국 기관이 팔거나 안 산다.',high:'미국 기관·ETF 매수가 들어오고 있다.'},
+ ibit_flow:{what:'세계 최대 비트코인 현물 ETF(블랙록 IBIT)에 돈이 들어왔나 나갔나(백만$). 발행주식 증감×주당가치로 계산.',read:'최근 5일 합 +200M$ 이상 유입 · −200M$ 이하 유출. IBIT 는 전체 ETF 유입의 약 절반.',low:'기관·개인의 ETF 환매 → 매도 압력.',high:'ETF 로 새 돈이 들어옴 → 2024년 이후 가장 큰 매수 주체.'},
+ cot_am:{what:'CME 비트코인 선물에서 자산운용사(연기금·펀드)가 순매수한 계약 수(주간). 진짜 기관 수요.',read:'4주 변화율 +10% 이상 늘면 좋음 · −10% 이하 줄면 경계.',low:'기관이 포지션을 줄인다.',high:'기관이 포지션을 늘린다.'},
+ cot_lev:{what:'헤지펀드(레버리지 펀드)의 순포지션. 보통 큰 마이너스인데, 이건 "현물 ETF 사고 선물 파는" 무위험 차익거래라 방향 신호가 아니다.',read:'숫자 자체보다 갑자기 숏이 줄어드는지 본다.',low:'숏이 크다 = 차익거래 활발 = 정상.',high:'숏이 급감 = 차익거래 청산 = 시장 전체 위험선호 후퇴 신호.'},
+ funding:{what:'무기한 선물에서 롱(상승 베팅)이 숏에게 8시간마다 내는 이자. 롱이 많으면 양수, 숏이 많으면 음수.',read:'0.01% 기본 · 0.05% 이상 롱 과열(연 55%) · 음수 숏 과밀.',low:'숏이 너무 많다 → 가격이 조금만 오르면 숏 청산으로 급등(숏스퀴즈).',high:'롱이 너무 많다 → 조금만 떨어지면 롱 청산 연쇄(롱 스퀴즈).'},
+ oi:{what:'아직 청산되지 않은 선물 계약 총액(십억$). 시장에 쌓인 레버리지(빚) 규모.',read:'30일 변화율을 가격 변화와 같이 본다. OI 급증 + 가격 정체 = 위험.',low:'레버리지가 정리됨(디레버리징 완료) → 바닥 다지기.',high:'빚으로 산 포지션이 쌓임 → 청산 연쇄로 변동성 폭발 전조.'},
+ ls_ratio:{what:'바이낸스 개인 계좌 중 롱 계좌 수 ÷ 숏 계좌 수.',read:'0.9 이하 숏 우세 · 1 균형 · 2 이상 롱 쏠림.',low:'개미가 하락에 베팅 → 거꾸로 상승 여지(역발상).',high:'개미가 상승에 몰림 → 거꾸로 하락 위험(역발상).'},
+ taker:{what:'"지금 당장 사겠다"(시장가 매수) 물량 ÷ "지금 당장 팔겠다" 물량.',read:'1.1 이상 공격적 매수 · 0.9 이하 공격적 매도.',low:'급하게 파는 사람이 많다.',high:'급하게 사는 사람이 많다 = 실제 수요.'},
+ dvol:{what:'옵션 시장이 예상하는 앞으로 30일 비트코인 변동폭(연율 %). 주식의 VIX 와 같다.',read:'40 미만 조용함(큰 움직임 전조, 방향은 모름) · 40~80 보통 · 80 이상 패닉.',low:'너무 조용하다 → 곧 큰 움직임(위든 아래든).',high:'공포 극대 → 역사적으로 바닥 근처.'},
+ netliq:{what:'미국 연준이 시장에 풀어둔 달러 = 연준 자산 − 재무부 계좌(TGA) − 역레포(RRP). "시장에 실제로 돌아다니는 달러".',read:'13주 변화율. +1% 이상 확대(좋음) · −1% 이하 축소(역풍).',low:'시장에서 달러가 빠져나감 → 위험자산 전체 역풍.',high:'달러가 풀림 → 비트코인이 가장 민감하게 반응하는 변수.'},
+ m2:{what:'미국 통화량(M2)이 1년 전보다 몇 % 늘었나. 돈이 많이 풀리면 약 10주 뒤 비트코인이 따라 오른다는 것이 가장 유명한 매크로 선행.',read:'+3% 이상이고 상승 중이면 좋음 · +1% 미만 정체.',low:'돈이 안 풀린다 → 유동성 부족.',high:'돈이 풀린다 → 2~3개월 뒤 우호.'},
+ dff:{what:'미국 기준금리(연방기금 실효금리).',read:'6개월 변화. 내려가는 중이면 좋음, 올라가면 역풍.',low:'금리 인하 사이클 = 위험자산 우호(단, 경기침체 때문에 내리면 예외).',high:'금리 인상 = 위험자산 역풍.'},
+ dxy:{what:'달러 가치를 주요 6개 통화 대비로 지수화한 것. 비트코인과 반대로 움직이는 경향.',read:'3개월 변화율. −2% 이하 달러 약세(좋음) · +2% 이상 달러 강세(역풍).',low:'달러 약세 → 비트코인 강세 경향.',high:'달러 강세 → 비트코인 약세 경향.'},
+ us10y:{what:'미국 10년 국채 금리. "안전하게 벌 수 있는 이자"가 높으면 위험자산 매력이 준다.',read:'3개월 변화율. −5% 이하 금리 하락(좋음) · +5% 이상 상승(역풍).',low:'안전자산 이자가 줄어 위험자산으로 이동.',high:'안전자산 이자가 높아져 위험자산 이탈.'},
+ stable:{what:'USDT·USDC 등 달러 스테이블코인 총 발행량(십억$). 코인을 사려고 거래소에 대기 중인 달러.',read:'30일 변화율. +1.5% 이상 신규 발행(좋음) · −1% 이하 소각(이탈).',low:'대기 자금이 빠져나감.',high:'새 달러가 코인판에 들어옴 → 매수 대기 자금 증가.'},
+ altbreadth:{what:'시총 상위 50개 알트코인 중 지난 30일 수익률이 비트코인을 이긴 비율.',read:'25% 이하 비트코인 시즌(사이클 초·중반) · 75% 이상 알트시즌(사이클 후반 과열).',low:'돈이 비트코인에만 몰림 = 사이클 초반 특징.',high:'잡코인까지 다 오름 = 사이클 후반, 고점 근처가 잦았다.'},
+ btc_dom:{what:'전체 코인 시총 중 비트코인 비중.',read:'오르는 중이면 자금이 비트코인으로 집중(사이클 초기), 꺾이면 알트로 순환(후기).',low:'알트 순환 국면.',high:'비트코인 집중 국면.'},
+};
+const GAUGE={
+ fng:[0,100,25,75,'hot'],kimp:[-3,8,0,5,'hot'],mvrv:[0.5,4,1,3,'hot'],mvrv_z:[-1,8,0.5,6,'hot'],sopr:[0.95,1.08,0.98,1.05,'hot'],
+ nupl:[-0.3,1,0.25,0.7,'hot'],puell:[0.2,4,0.6,3,'hot'],mayer:[0.5,2.8,0.85,2.2,'hot'],w200:[0.7,5,1.1,4,'hot'],
+ funding:[-0.03,0.1,0,0.05,'hot'],ls_ratio:[0.5,3,0.9,2,'hot'],taker:[0.7,1.3,0.9,1.1,'cool'],dvol:[20,120,40,80,'mid',['압축=폭발 전조','정상','패닉=바닥 근처']],
+ cb_prem:[-0.3,0.3,-0.05,0.05,'cool'],altbreadth:[0,100,25,75,'hot'],
+ // 아래는 판정에 쓴 파생값(e.jv: 변화율·백분위)으로 그린다
+ upbit_ratio:[0,100,15,90,'hot',['개미 이탈','보통','개미 과열'],1],gt_world:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],gt_kr:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],
+ wiki_ko:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],wiki_en:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],
+ ex_netflow:[-2500,2500,-500,500,'hot',['유출=보관','균형','유입=매도 대기']],ex_supply:[-6,6,-1,1,'hot',['감소=축적','보합','증가=매도'],1],
+ adr_act:[-25,25,-5,5,'cool',['사용 감소','보합','사용 증가'],1],hashrate:[-25,25,-10,5,'cool',['채굴자 항복','보합','확장'],1],
+ ibit_flow:[-1500,1500,-200,200,'cool',['유출','보합','유입'],1],cot_am:[-60,60,-10,10,'cool',['기관 축소','보합','기관 확대'],1],
+ oi:[-40,60,-15,25,'hot',['디레버리징','보통','레버리지 누적'],1],netliq:[-6,6,-1,1,'cool',['유동성 축소','보합','유동성 확대'],1],
+ m2:[-2,10,1,3,'cool',['정체','완만','확장'],1],dff:[-40,40,-3,3,'hot',['인하 중','동결','인상 중'],1],
+ us10y:[-25,25,-5,5,'hot',['금리 하락','보합','금리 상승'],1],dxy:[-8,8,-2,2,'hot',['달러 약세','보합','달러 강세'],1],
+ stable:[-5,7,-1,1.5,'cool',['소각=이탈','정체','발행=유입'],1],halving:[0,1460,365,550,'hot',['상승 국면','과거 고점 구간','고점 이후·약세']],
+};
+function gauge(k,v,E){
+  const g=GAUGE[k]; if(!g||v==null) return '';
+  const [mn,mx,lo,hi,dir,custom,useJv]=g; if(useJv){ v=E&&E.jv; if(v==null) return ''; } const P=x=>Math.max(0,Math.min(100,(x-mn)/(mx-mn)*100));
+  const c={hot:['#bbf7d0','#fef9c3','#fecaca'],cool:['#fecaca','#fef9c3','#bbf7d0'],mid:['#fef9c3','#bbf7d0','#fef9c3']}[dir];
+  const lbl=custom||{hot:['바닥권','정상','과열'],cool:['약세','중립','강세'],mid:['경계','정상','경계']}[dir];
+  return `<div style="margin:3px 0 1px">
+    <div style="position:relative;height:8px;border-radius:4px;overflow:hidden;background:linear-gradient(90deg,${c[0]} 0 ${P(lo)}%,${c[1]} ${P(lo)}% ${P(hi)}%,${c[2]} ${P(hi)}% 100%)">
+      <div style="position:absolute;left:${P(v)}%;top:-1px;width:3px;height:10px;background:#0f172a;border-radius:2px;transform:translateX(-50%)"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:9.5px;color:#94a3b8"><span>${lbl[0]} ${lo}</span><span>${lbl[1]}${useJv&&E.jl?' · '+E.jl+' '+(E.jv>0?'+':'')+E.jv.toFixed(1):''}</span><span>${hi} ${lbl[2]}</span></div></div>`;
+}
+function helpBox(k){
+  const h=HELP[k]; if(!h) return '';
+  return `<div class="clhelp" style="margin-top:6px;padding:6px 8px;border-radius:6px;background:#f0f9ff;border:1px solid #bae6fd;font-size:11.5px;line-height:1.5;color:#0c4a6e">
+    <div><b>이게 뭐지?</b> ${h.what}</div>
+    <div><b>읽는 법</b> ${h.read}</div>
+    <div><b>낮으면</b> ${h.low} <b style="margin-left:4px">높으면</b> ${h.high}</div></div>`;
+}
 function card(k,e){
   const st=ST[e.status]||['⚪','—','#64748b','#f1f5f9'];
   const stale=e.stale?'<span title="이번 수집 실패 — 직전 값" style="color:#b45309;font-size:10px"> ⚠직전값</span>':'';
@@ -56,9 +131,11 @@ function card(k,e){
       <span style="font-size:10.5px;padding:1px 7px;border-radius:9px;background:${st[3]};color:${st[2]};font-weight:700;white-space:nowrap">${st[0]} ${st[1]}</span></div>
     <div style="font-size:19px;font-weight:800;margin:2px 0 0;line-height:1.2">${fmtV(k,e)}<span class="note" style="font-weight:400"> ${e.d||''}</span></div>
     <div class="note" style="min-height:14px">${extra}</div>
+    ${gauge(k,e.v,e)}
     ${e.s&&e.s.length>1?`<div class="clsp" style="position:relative;height:90px;flex:0 0 90px;overflow:hidden;margin:4px 0"><canvas id="${cvid}"></canvas></div>`:'<div style="height:12px"></div>'}
     <div style="font-size:11.5px;color:#0f172a;margin-top:2px"><b>판정</b> ${e.judge||'—'}</div>
     <div class="note" style="margin-top:3px;color:#64748b"><b>왜 선행</b> ${e.why||''}</div>
+    ${helpBox(k)}
   </div>`;
 }
 function axisBox(a){
@@ -77,6 +154,7 @@ function render(){
   const O=D.overall||{}, A=D.axes||{};
   const oc=O.score==null?'#94a3b8':O.score>=0.25?'#16a34a':O.score<=-0.25?'#dc2626':'#ca8a04';
   $('cl_overall').innerHTML=`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap">
+      <label style="font-size:11.5px;color:#475569;cursor:pointer;margin-left:auto"><input type="checkbox" id="cl_helpchk" ${SHOWHELP?'checked':''}> 쉬운 설명 보기</label>
       <div style="font-size:22px;font-weight:900;color:${oc}">${O.text||'—'}</div>
       <div class="note">종합 ${O.score==null?'—':(O.score>0?'+':'')+O.score.toFixed(2)} (−1 ~ +1 · 4축 평균)</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${['short','flow','cycle','macro'].filter(k=>A[k]).map(k=>axisBox(A[k])).join('')}</div>
@@ -89,6 +167,8 @@ function render(){
     return `<h3 style="color:${GCOL[g]||'#334155'}">${g} <span class="note">${ks.length}개</span></h3>
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px">${ks.map(k=>card(k,IND[k])).join('')}</div>`;}).join('');
   keys.forEach(k=>{const cv=$('cl_cv_'+k); if(cv) spark(cv,IND[k].s,GCOL[IND[k].group]||'#334155',k);});
+  document.querySelectorAll('#p_cl .clhelp').forEach(el=>el.hidden=!SHOWHELP);
+  const hc=$('cl_helpchk'); if(hc) hc.onchange=()=>{ SHOWHELP=hc.checked; try{localStorage.setItem('cl_help',SHOWHELP?'1':'0');}catch(e){} document.querySelectorAll('#p_cl .clhelp').forEach(el=>el.hidden=!SHOWHELP); };
   // 정책
   const P=D.policy||{};
   const ev=P.events||[];

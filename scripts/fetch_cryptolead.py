@@ -347,7 +347,9 @@ def c_alt(hist):
 # ══════════════════════════════════════════════════════════════════════════
 # 판정 — status: bull(상승 우호) / neu / bear(하락·과열 경계). 각 지표에 threshold 설명(thr)도 동봉.
 def judge():
-    def S(k, st, txt): IND.setdefault(k, {}).update(status=st, judge=txt)
+    def S(k, st, txt, jv=None, jl=None):
+        e = IND.setdefault(k, {}); e.update(status=st, judge=txt)
+        if jv is not None: e.update(jv=round(jv, 3), jl=jl)     # 판정에 쓴 파생값(변화율·백분위) — 화면 게이지용
     g = lambda k: IND.get(k, {})
     v = lambda k: g(k).get("v")
     s = lambda k: g(k).get("s") or []
@@ -357,22 +359,22 @@ def judge():
     x = v("kimp")
     if x is not None: S("kimp", "bear" if x >= 5 else "bull" if x <= 0 else "neu", f"{x:+.2f}% — " + ("국내 과열(김프 5%↑는 역사적 단기 고점 신호)" if x >= 5 else "역프/무프=국내 관심 식음, 바닥권 특징" if x <= 0 else "정상 범위"))
     r = rank(s("upbit_ratio"), 200)
-    if r is not None: S("upbit_ratio", "bear" if r >= 90 else "bull" if r <= 15 else "neu", f"200일 백분위 {r:.0f}% — " + ("개미 거래대금 급증=과열" if r >= 90 else "개미 이탈=바닥권 특징" if r <= 15 else "보통"))
+    if r is not None: S("upbit_ratio", "bear" if r >= 90 else "bull" if r <= 15 else "neu", f"200일 백분위 {r:.0f}% — " + ("개미 거래대금 급증=과열" if r >= 90 else "개미 이탈=바닥권 특징" if r <= 15 else "보통"), jv=r, jl="200일 백분위 %")
     for k in ("gt_world", "gt_kr"):
         r = rank(s(k), 261)
-        if r is not None: S(k, "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"5년 백분위 {r:.0f}% (지수 {v(k):.0f}/100) — " + ("검색 폭증=대중 관심 정점(2017·2021 고점 동행)" if r >= 90 else "무관심=역발상 구간" if r <= 20 else "보통"))
+        if r is not None: S(k, "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"5년 백분위 {r:.0f}% (지수 {v(k):.0f}/100) — " + ("검색 폭증=대중 관심 정점(2017·2021 고점 동행)" if r >= 90 else "무관심=역발상 구간" if r <= 20 else "보통"), jv=r, jl="5년 백분위 %")
     for k in ("wiki_ko", "wiki_en"):
         r = rank(s(k), 730)
-        if r is not None: S(k, "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"2년 백분위 {r:.0f}% — " + ("조회 폭증=대중 관심 정점(단기 고점 동행)" if r >= 90 else "무관심=역발상 구간" if r <= 20 else "보통"))
+        if r is not None: S(k, "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"2년 백분위 {r:.0f}% — " + ("조회 폭증=대중 관심 정점(단기 고점 동행)" if r >= 90 else "무관심=역발상 구간" if r <= 20 else "보통"), jv=r, jl="2년 백분위 %")
 
     x = v("ex_netflow")
     if x is not None: S("ex_netflow", "bull" if x < -500 else "bear" if x > 500 else "neu", f"7일 순유입 {x:+,.0f}M$ — " + ("거래소 유출 우세=장기 보관, 매도 압력↓" if x < -500 else "거래소 유입 우세=매도 대기 물량↑" if x > 500 else "균형"))
     c = chg(s("ex_supply"), 30)
-    if c is not None: S("ex_supply", "bull" if c < -1 else "bear" if c > 1 else "neu", f"거래소 보유량 30일 {c:+.1f}% — " + ("감소=축적 국면" if c < -1 else "증가=분산·매도 국면" if c > 1 else "보합"))
+    if c is not None: S("ex_supply", "bull" if c < -1 else "bear" if c > 1 else "neu", f"거래소 보유량 30일 {c:+.1f}% — " + ("감소=축적 국면" if c < -1 else "증가=분산·매도 국면" if c > 1 else "보합"), jv=c, jl="30일 변화 %")
     c = chg(s("adr_act"), 30)
-    if c is not None: S("adr_act", "bull" if c > 5 else "bear" if c < -5 else "neu", f"활성주소 30일 {c:+.1f}% — 네트워크 사용 " + ("증가" if c > 5 else "감소" if c < -5 else "보합"))
+    if c is not None: S("adr_act", "bull" if c > 5 else "bear" if c < -5 else "neu", f"활성주소 30일 {c:+.1f}% — 네트워크 사용 " + ("증가" if c > 5 else "감소" if c < -5 else "보합"), jv=c, jl="30일 변화 %")
     c = chg(s("hashrate"), 30)
-    if c is not None: S("hashrate", "bear" if c < -10 else "bull" if c > 5 else "neu", f"해시레이트(7D) 30일 {c:+.1f}% — " + ("급락=채굴자 항복(역사적 바닥 근처지만 단기 매도 압력)" if c < -10 else "상승=채굴자 확신" if c > 5 else "보합"))
+    if c is not None: S("hashrate", "bear" if c < -10 else "bull" if c > 5 else "neu", f"해시레이트(7D) 30일 {c:+.1f}% — " + ("급락=채굴자 항복(역사적 바닥 근처지만 단기 매도 압력)" if c < -10 else "상승=채굴자 확신" if c > 5 else "보합"), jv=c, jl="30일 변화 %")
 
     x = v("mvrv")
     if x is not None: S("mvrv", "bull" if x < 1.0 else "bear" if x >= 3.0 else "neu", f"MVRV {x:.2f} — " + ("1 미만=시장 전체 손실=역사적 바닥권" if x < 1 else "3 이상=과열, 3.5~4 는 사이클 고점" if x >= 3 else "1~3 정상"))
@@ -396,16 +398,16 @@ def judge():
     fs = s("ibit_flow")
     if fs:
         w = sum(v_ for _, v_ in fs[-5:])
-        S("ibit_flow", "bull" if w > 200 else "bear" if w < -200 else "neu", f"IBIT 최근 {min(5, len(fs))}일 {w:+,.0f}M$ — " + ("순유입" if w > 200 else "순유출" if w < -200 else "보합") + (" (관측 축적 중)" if g("ibit_flow").get("pts", 0) < 7 else ""))
+        S("ibit_flow", "bull" if w > 200 else "bear" if w < -200 else "neu", f"IBIT 최근 {min(5, len(fs))}일 {w:+,.0f}M$ — " + ("순유입" if w > 200 else "순유출" if w < -200 else "보합") + (" (관측 축적 중)" if g("ibit_flow").get("pts", 0) < 7 else ""), jv=w, jl="최근 5일 합 M$")
     x = v("cot_am"); c = chg(s("cot_am"), 28)
-    if x is not None: S("cot_am", "bull" if (c or 0) > 10 else "bear" if (c or 0) < -10 else "neu", f"자산운용사 순포지션 {x:+,} 계약 (4주 {c:+.0f}%)" if c is not None else f"{x:+,} 계약")
+    if x is not None: S("cot_am", "bull" if (c or 0) > 10 else "bear" if (c or 0) < -10 else "neu", f"자산운용사 순포지션 {x:+,} 계약 (4주 {c:+.0f}%)" if c is not None else f"{x:+,} 계약", jv=c, jl="4주 변화 %")
     x = v("cot_lev")
     if x is not None: S("cot_lev", "neu", f"레버리지펀드 순 {x:+,} — 순숏은 베이시스 차익거래(현물 ETF 롱+선물 숏)라 방향 신호 아님. 숏 축소는 베이시스 붕괴=위험선호 후퇴")
 
     x = v("funding")
     if x is not None: S("funding", "bear" if x >= 0.05 else "bull" if x < 0 else "neu", f"일평균 {x:+.4f}%(8h) — " + ("롱 과열(연 55%↑)=청산 캐스케이드 위험" if x >= 0.05 else "음수=숏 과밀, 숏스퀴즈 여지" if x < 0 else "정상(0.01% 기본)"))
     so = s("oi"); c = pct(last(so), so[0][1]) if 14 <= len(so) < 32 else chg(so, 30); px = chg(IND.get("_px", {}).get("s") or [], min(30, max(1, len(so) - 1)))
-    if c is not None: S("oi", "bear" if (c > 25 and (px or 0) < 5) else "bull" if c < -15 else "neu", f"미결제약정 30일 {c:+.0f}% (가격 {px:+.0f}%) — " + ("레버리지 누적+가격 정체=변동성 폭발 전조" if (c > 25 and (px or 0) < 5) else "디레버리징 완료" if c < -15 else "보통") if px is not None else f"OI 30일 {c:+.0f}%")
+    if c is not None: S("oi", "bear" if (c > 25 and (px or 0) < 5) else "bull" if c < -15 else "neu", f"미결제약정 30일 {c:+.0f}% (가격 {px:+.0f}%) — " + ("레버리지 누적+가격 정체=변동성 폭발 전조" if (c > 25 and (px or 0) < 5) else "디레버리징 완료" if c < -15 else "보통") if px is not None else f"OI 30일 {c:+.0f}%", jv=c, jl="30일 변화 %")
     x = v("ls_ratio")
     if x is not None: S("ls_ratio", "bear" if x >= 2 else "bull" if x <= 0.9 else "neu", f"롱/숏 계좌비 {x:.2f} — " + ("롱 쏠림(역발상 하락 위험)" if x >= 2 else "숏 우세(역발상 상승 여지)" if x <= 0.9 else "균형"))
     x = v("taker")
@@ -414,18 +416,18 @@ def judge():
     if x is not None: S("dvol", "neu", f"DVOL {x:.0f} — " + ("40 미만=변동성 압축, 큰 움직임 전조(방향 미정)" if x < 40 else "80 이상=패닉·항복 국면(역사적 바닥 근처)" if x >= 80 else "정상"))
 
     c = chg(s("netliq"), 91)
-    if c is not None: S("netliq", "bull" if c > 1 else "bear" if c < -1 else "neu", f"Fed 순유동성 13주 {c:+.1f}% — " + ("확대=위험자산 우호" if c > 1 else "축소=위험자산 역풍" if c < -1 else "보합"))
+    if c is not None: S("netliq", "bull" if c > 1 else "bear" if c < -1 else "neu", f"Fed 순유동성 13주 {c:+.1f}% — " + ("확대=위험자산 우호" if c > 1 else "축소=위험자산 역풍" if c < -1 else "보합"), jv=c, jl="13주 변화 %")
     x = v("m2"); c = chg(s("m2"), 91)
-    if x is not None: S("m2", "bull" if (x > 3 and (c or 0) >= 0) else "bear" if x < 1 else "neu", f"M2 YoY {x:+.1f}% — " + ("확장, BTC 는 M2 를 약 10주 후행" if x > 3 else "정체=유동성 부족" if x < 1 else "완만"))
+    if x is not None: S("m2", "bull" if (x > 3 and (c or 0) >= 0) else "bear" if x < 1 else "neu", f"M2 YoY {x:+.1f}% — " + ("확장, BTC 는 M2 를 약 10주 후행" if x > 3 else "정체=유동성 부족" if x < 1 else "완만"), jv=x, jl="YoY %")
     x = v("dff"); c = chg(s("dff"), 180)
-    if x is not None: S("dff", "bull" if (c or 0) < -3 else "bear" if (c or 0) > 3 else "neu", f"기준금리 {x:.2f}% (6개월 {c:+.0f}%)" if c is not None else f"{x:.2f}%")
+    if x is not None: S("dff", "bull" if (c or 0) < -3 else "bear" if (c or 0) > 3 else "neu", f"기준금리 {x:.2f}% (6개월 {c:+.0f}%)" if c is not None else f"{x:.2f}%", jv=c, jl="6개월 변화 %")
     c = chg(s("dxy"), 91)
-    if c is not None: S("dxy", "bull" if c < -2 else "bear" if c > 2 else "neu", f"DXY 3개월 {c:+.1f}% — 달러 " + ("약세=BTC 우호" if c < -2 else "강세=BTC 역풍" if c > 2 else "보합"))
+    if c is not None: S("dxy", "bull" if c < -2 else "bear" if c > 2 else "neu", f"DXY 3개월 {c:+.1f}% — 달러 " + ("약세=BTC 우호" if c < -2 else "강세=BTC 역풍" if c > 2 else "보합"), jv=c, jl="3개월 변화 %")
     c = chg(s("us10y"), 91)
-    if c is not None: S("us10y", "bull" if c < -5 else "bear" if c > 5 else "neu", f"美10년 3개월 {c:+.0f}% — 금리 " + ("하락=할인율↓" if c < -5 else "상승=할인율↑" if c > 5 else "보합"))
+    if c is not None: S("us10y", "bull" if c < -5 else "bear" if c > 5 else "neu", f"美10년 3개월 {c:+.0f}% — 금리 " + ("하락=할인율↓" if c < -5 else "상승=할인율↑" if c > 5 else "보합"), jv=c, jl="3개월 변화 %")
 
     c = chg(s("stable"), 30)
-    if c is not None: S("stable", "bull" if c > 1.5 else "bear" if c < -1 else "neu", f"스테이블 공급 30일 {c:+.1f}% — " + ("신규 발행=매수 대기자금 유입" if c > 1.5 else "소각=자금 이탈" if c < -1 else "정체"))
+    if c is not None: S("stable", "bull" if c > 1.5 else "bear" if c < -1 else "neu", f"스테이블 공급 30일 {c:+.1f}% — " + ("신규 발행=매수 대기자금 유입" if c > 1.5 else "소각=자금 이탈" if c < -1 else "정체"), jv=c, jl="30일 변화 %")
     x = v("altbreadth")
     if x is not None: S("altbreadth", "bear" if x >= 75 else "bull" if x <= 25 else "neu", f"알트 50 중 {x:.0f}% 가 BTC 를 이김(30D) — " + ("알트시즌=사이클 후반 과열 특징" if x >= 75 else "BTC 시즌=사이클 초·중반" if x <= 25 else "혼재"))
     x = v("btc_dom")
