@@ -7,7 +7,7 @@
 LLM 토큰 0 — 전부 무인증/기보유 키. 각 수집기는 독립 try/except — 실패한 항목은 직전 값 유지.
 
   ① 심리·한국 수급 : 공포탐욕(crypto_fng DB 재사용) · 김프(kimp_series DB 재사용)
-                    · 업비트/바이낸스 BTC 거래대금 비율(개미 열기) · 네이버 '비트코인' 검색량(데이터랩 API, 키 scope 필요)
+                    · 업비트/바이낸스 BTC 거래대금 비율(개미 열기) · 구글 트렌드 'bitcoin' 전세계·한국(pytrends, 5년 주간) — 실패 시 위키 페이지뷰 폴백(네이버 데이터랩은 2026 유료 이관으로 제외)
   ② 지갑·거래소   : Coin Metrics Community — 거래소 유입/유출($)·거래소 보유량·활성주소·해시레이트·MVRV
                     (실측 2026-09-05: community-api.coinmetrics.io 무인증, 일간, 2년 800행 OK)
   ③ 온체인 밸류   : bitcoin-data.com — MVRV Z·SOPR·NUPL·Puell (무인증이나 분당 제한 엄격 → 20초 간격, 429 면 직전값)
@@ -136,18 +136,32 @@ def c_sentiment(qv_bn):
         s = sorted([[d, ups[d] / bn[d] * 100] for d in ups if d in bn and bn[d]])
         put("upbit_ratio", s=s)
     except Exception as e: err("upbit_ratio", e)
-    # 네이버 '비트코인' 검색량 — 데이터랩 API (앱에 '데이터랩(검색어트렌드)' 권한이 있어야 200)
+    # 구글 트렌드 'bitcoin' — 전세계·한국, 5년 주간 (pytrends 비공식 · 서버 실측 2026-09-05 OK. retries 인자는 urllib3 신버전과 충돌하므로 주지 말 것)
+    #   (사용자 피드백 2026-09-05 "위키보다 구글") — 구글이 주지표, 아래 위키는 구글 실패 시 폴백
+    gt_ok = False
     try:
-        raw = (KEYS / "naver_datalab.txt").read_text().strip()
-        cid, sec = re.split(r"[:\s]+", raw)[0], re.split(r"[:\s]+", raw)[-1]
-        end = date.today(); start = end - timedelta(days=730)
-        body = json.dumps({"startDate": start.isoformat(), "endDate": end.isoformat(), "timeUnit": "week",
-                           "keywordGroups": [{"groupName": "비트코인", "keywords": ["비트코인", "bitcoin"]}]}).encode()
-        j = jget("https://openapi.naver.com/v1/datalab/search", data=body,
-                 hdr={"X-Naver-Client-Id": cid, "X-Naver-Client-Secret": sec, "Content-Type": "application/json"})
-        s = [[r["period"], f(r["ratio"])] for r in j["results"][0]["data"]]
-        put("naver", s=s)
-    except Exception as e: err("naver", e)
+        import warnings; warnings.filterwarnings("ignore")
+        from pytrends.request import TrendReq
+        for geo, key in (("", "gt_world"), ("KR", "gt_kr")):
+            pt = TrendReq(hl="en-US", tz=540, timeout=(10, 25))
+            pt.build_payload(["bitcoin"], timeframe="today 5-y", geo=geo)
+            df = pt.interest_over_time()
+            s = [[str(i)[:10], float(v)] for i, v in zip(df.index, df["bitcoin"])]
+            if len(s) > 50: put(key, s=s); gt_ok = True
+            time.sleep(4)
+    except Exception as e: err("google_trends", e)
+    if gt_ok: return
+    # (폴백) 위키피디아 '비트코인'(ko)·'Bitcoin'(en) 일간 페이지뷰 — 대중 관심 대리지표. 7일 평균, 2년
+    #   (2026-09-05) 네이버 데이터랩 검색어트렌드는 NAVER API HUB(NCP 유료)로 이관·종료 공지 → 무료 공식 API 인 위키미디어로 교체
+    for proj, art, key in (("ko.wikipedia", "%EB%B9%84%ED%8A%B8%EC%BD%94%EC%9D%B8", "wiki_ko"), ("en.wikipedia", "Bitcoin", "wiki_en")):
+        try:
+            d1 = date.today() - timedelta(days=1); d0 = d1 - timedelta(days=730)
+            j = jget(f"https://wikimedia.org/api/rest_v1/metrics/pageviews/per-article/{proj}/all-access/user/{art}/daily/"
+                     f"{d0.strftime('%Y%m%d')}/{d1.strftime('%Y%m%d')}", hdr={"User-Agent": "namoobi-terminal/1.0 (namoobi@gmail.com)"})
+            raw_s = [[r["timestamp"][:4] + "-" + r["timestamp"][4:6] + "-" + r["timestamp"][6:8], r["views"]] for r in j["items"]]
+            s = [[raw_s[i][0], sum(v for _, v in raw_s[max(0, i - 6):i + 1]) / len(raw_s[max(0, i - 6):i + 1])] for i in range(len(raw_s))]
+            put(key, s=s)
+        except Exception as e: err(key, e)
 
 def c_coinmetrics():
     j = jget("https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc"
@@ -344,8 +358,12 @@ def judge():
     if x is not None: S("kimp", "bear" if x >= 5 else "bull" if x <= 0 else "neu", f"{x:+.2f}% — " + ("국내 과열(김프 5%↑는 역사적 단기 고점 신호)" if x >= 5 else "역프/무프=국내 관심 식음, 바닥권 특징" if x <= 0 else "정상 범위"))
     r = rank(s("upbit_ratio"), 200)
     if r is not None: S("upbit_ratio", "bear" if r >= 90 else "bull" if r <= 15 else "neu", f"200일 백분위 {r:.0f}% — " + ("개미 거래대금 급증=과열" if r >= 90 else "개미 이탈=바닥권 특징" if r <= 15 else "보통"))
-    r = rank(s("naver"), 104)
-    if r is not None: S("naver", "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"2년 백분위 {r:.0f}% — " + ("검색 폭증=대중 관심 정점" if r >= 90 else "무관심=역발상" if r <= 20 else "보통"))
+    for k in ("gt_world", "gt_kr"):
+        r = rank(s(k), 261)
+        if r is not None: S(k, "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"5년 백분위 {r:.0f}% (지수 {v(k):.0f}/100) — " + ("검색 폭증=대중 관심 정점(2017·2021 고점 동행)" if r >= 90 else "무관심=역발상 구간" if r <= 20 else "보통"))
+    for k in ("wiki_ko", "wiki_en"):
+        r = rank(s(k), 730)
+        if r is not None: S(k, "bear" if r >= 90 else "bull" if r <= 20 else "neu", f"2년 백분위 {r:.0f}% — " + ("조회 폭증=대중 관심 정점(단기 고점 동행)" if r >= 90 else "무관심=역발상 구간" if r <= 20 else "보통"))
 
     x = v("ex_netflow")
     if x is not None: S("ex_netflow", "bull" if x < -500 else "bear" if x > 500 else "neu", f"7일 순유입 {x:+,.0f}M$ — " + ("거래소 유출 우세=장기 보관, 매도 압력↓" if x < -500 else "거래소 유입 우세=매도 대기 물량↑" if x > 500 else "균형"))
@@ -414,7 +432,7 @@ def judge():
     if x is not None: S("btc_dom", "neu", f"BTC 도미넌스 {x:.1f}% — 상승 중이면 자금이 BTC 로 집중(초기), 하락 전환은 알트 순환")
 
     # 축 점수
-    AX = {"short": ["fng", "kimp", "upbit_ratio", "naver", "funding", "ls_ratio", "taker", "oi"],
+    AX = {"short": ["fng", "kimp", "upbit_ratio", "gt_world", "gt_kr", "wiki_ko", "wiki_en", "funding", "ls_ratio", "taker", "oi"],
           "flow":  ["ex_netflow", "ex_supply", "cb_prem", "ibit_flow", "cot_am", "stable", "adr_act"],
           "cycle": ["mvrv", "mvrv_z", "sopr", "nupl", "puell", "mayer", "w200", "altbreadth", "hashrate"],
           "macro": ["netliq", "m2", "dff", "dxy", "us10y"]}
@@ -446,7 +464,10 @@ META = {   # 화면 표기용 이름·단위·그룹·왜 선행인가 (JS 가 �
  "fng":        ("공포·탐욕 지수", "", "심리·한국", "군중 심리의 극단이 단기 반전점을 만든다 — alternative.me"),
  "kimp":       ("김치 프리미엄 BTC", "%", "심리·한국", "업비트÷(바이낸스×환율)−1. 국내 개인 과열·이탈의 온도계"),
  "upbit_ratio":("업비트/바이낸스 BTC 거래대금", "%", "심리·한국", "국내 개인 참여 강도 — 급증은 국내 주도 과열, 급감은 무관심"),
- "naver":      ("네이버 '비트코인' 검색량", "", "심리·한국", "대중 관심의 정점=가격 정점과 동행·선행 (데이터랩 주간)"),
+ "gt_world":   ("구글 트렌드 'bitcoin' (전세계)", "", "심리·한국", "검색 관심 지수(5년 주간, 최대=100) — 2017·2021 고점이 모두 검색 정점과 일치"),
+ "gt_kr":      ("구글 트렌드 'bitcoin' (한국)", "", "심리·한국", "국내 대중 관심 — 급등은 국내 주도 과열, 바닥권은 무관심"),
+ "wiki_ko":    ("위키 '비트코인' 조회수 (KO·7D)", "", "심리·한국", "국내 대중 관심 — 검색 폭증은 가격 정점과 동행 (위키미디어 페이지뷰)"),
+ "wiki_en":    ("위키 'Bitcoin' 조회수 (EN·7D)", "", "심리·한국", "글로벌 대중 관심 — 2017·2021 고점 모두 조회수 정점과 일치"),
  "ex_netflow": ("거래소 순유입 (7일 합)", "M$", "지갑·거래소", "거래소로 들어오면 팔려는 것, 나가면 보관하려는 것 — Coin Metrics"),
  "ex_supply":  ("거래소 BTC 보유량", "BTC", "지갑·거래소", "거래소 잔고 감소 = 매도 가능 물량 감소 = 공급 충격 준비"),
  "adr_act":    ("활성 주소 수", "", "지갑·거래소", "실사용·신규 유입의 대리변수 — 가격보다 먼저 꺾이는 경우가 많다"),
@@ -498,6 +519,8 @@ def main():
     for k, e in prev.items():
         if k not in IND and e.get("s"):
             IND[k] = e; IND[k]["stale"] = True
+    if IND.get("gt_world", {}).get("s"):            # 구글 트렌드가 살아 있으면 위키 폴백은 화면에서 뺀다(직전값 잔존 방지)
+        IND.pop("wiki_ko", None); IND.pop("wiki_en", None)
     axes, overall = judge()
     for k, m in META.items():
         if k in IND: IND[k].update(name=m[0], unit=m[1], group=m[2], why=m[3])

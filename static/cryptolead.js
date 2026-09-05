@@ -31,7 +31,7 @@ function spark(cv,s,color,k){
   if(!s||s.length<2) return;
   const labels=s.map(x=>x[0]), data=s.map(x=>x[1]);
   // 판정 임계선(참고선) — 지표별 대표 밴드
-  const TH={fng:[25,75],kimp:[0,5],mvrv:[1,3],mvrv_z:[0,6],sopr:[1],nupl:[0,0.75],puell:[0.6,3],mayer:[0.85,2.2],funding:[0,0.05],ls_ratio:[0.9,2],taker:[0.9,1.1],cb_prem:[0],ex_netflow:[0],ibit_flow:[0],cot_am:[0],cot_lev:[0],altbreadth:[25,75],dvol:[40,80]}[k]||[];
+  const TH={fng:[25,75],kimp:[0,5],mvrv:[1,3],mvrv_z:[0,6],sopr:[1],nupl:[0,0.75],puell:[0.6,3],mayer:[0.85,2.2],funding:[0,0.05],ls_ratio:[0.9,2],taker:[0.9,1.1],cb_prem:[0],ex_netflow:[0],ibit_flow:[0],cot_am:[0],cot_lev:[0],altbreadth:[25,75],dvol:[40,80],gt_world:[],gt_kr:[]}[k]||[];
   const ds=[{data,borderColor:color,backgroundColor:color+'22',fill:true,pointRadius:0,borderWidth:1.3,tension:0.15}];
   TH.forEach(t=>ds.push({data:data.map(()=>t),borderColor:'#94a3b8',borderDash:[3,3],borderWidth:0.8,pointRadius:0,fill:false}));
   charts.push(new Chart(cv,{type:'line',data:{labels,datasets:ds},
