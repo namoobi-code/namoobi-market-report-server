@@ -337,7 +337,7 @@ def c_stable():
     put("stable", s=s[-760:])
 
 def c_alt(hist):
-    STABLE = {"usdt", "usdc", "dai", "usds", "fdusd", "usde", "tusd", "pyusd", "usd1", "usdd", "frax", "busd", "usdtb", "rlusd", "usd0", "buidl", "gho", "lusd"}
+    STABLE = {"usdt", "usdc", "dai", "usds", "fdusd", "usde", "tusd", "pyusd", "usd1", "usdd", "frax", "busd", "usdtb", "rlusd", "usd0", "buidl", "gho", "lusd", "paxg", "xaut", "usdy", "usyc", "susds", "susde"}
     WRAP = {"wbtc", "steth", "weth", "wsteth", "weeth", "cbbtc", "reth", "wbeth", "rseth", "lbtc", "meth", "ezeth", "jitosol", "bnsol", "tbtc"}
     j = jget("https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=80&page=1&price_change_percentage=30d")
     btc = next(x for x in j if x["symbol"] == "btc")["price_change_percentage_30d_in_currency"]
@@ -350,16 +350,20 @@ def c_alt(hist):
         #   50코인+BTC 51콜, 무료 분당 제한(~30) 때문에 2.5초 간격 ≈ 2분. 실패 코인은 제외(분모에서 뺌).
         try:
             def mc(cid):
-                j2 = jget(f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart?vs_currency=usd&days=365&interval=daily", t=30, tries=2)
+                # 무료 CoinGecko 는 실측 분당 ~10콜 — 429 면 40초 쉬고 1회 재시도
+                u = f"https://api.coingecko.com/api/v3/coins/{cid}/market_chart?vs_currency=usd&days=365&interval=daily"
+                try: j2 = jget(u, t=30, tries=1)
+                except Exception:
+                    time.sleep(40); j2 = jget(u, t=30, tries=1)
                 out = {}
                 for ts, pr in j2["prices"]: out[utc(ts / 1000).strftime("%Y-%m-%d")] = pr
                 return out
-            btcp = mc("bitcoin"); time.sleep(2.5)
+            btcp = mc("bitcoin"); time.sleep(6)
             series = []
             for x in alts:
                 try: series.append(mc(x["id"]))
                 except Exception as e2: log(f"    alt backfill skip {x['id']}: {repr(e2)[:50]}")
-                time.sleep(2.5)
+                time.sleep(6)
             days = sorted(btcp)
             for i, d in enumerate(days):
                 if i < 30 or d in H: continue
@@ -371,8 +375,8 @@ def c_alt(hist):
                     if d in sc and d0 in sc and sc[d0]:
                         cnt += 1; beat2 += (sc[d] / sc[d0] - 1) > b
                 if cnt >= 20: H[d] = round(beat2 / cnt * 100, 1)
-            hist["alt_backfilled"] = today()
-            log(f"    alt backfill: {len(H)}일")
+            if len(H) >= 30: hist["alt_backfilled"] = today()     # 충분히 채웠을 때만 완료 표시 — 아니면 다음 실행에 재시도
+            log(f"    alt backfill: {len(H)}일 (코인 {len(series)}개)")
         except Exception as e: err("alt_backfill", e)
     put("altbreadth", s=sorted([[d, v] for d, v in H.items()]), n=len(alts), btc30=btc,
         top=[[x["symbol"].upper(), round(x["price_change_percentage_30d_in_currency"], 1)] for x in sorted(alts, key=lambda x: -x["price_change_percentage_30d_in_currency"])[:8]])
