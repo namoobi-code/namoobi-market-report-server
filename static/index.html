@@ -53,6 +53,8 @@
   canvas{height:200px!important;max-height:200px!important;width:100%!important}
   .cbox{position:relative}
   .cbox canvas{height:100%!important;max-height:none!important}
+  /* (2026-09-05) 코인 선행지표 카드 스파크 — 전역 canvas 200px 캡 해제(90px 컨테이너에 맞춤. 캡 때문에 판정 텍스트를 덮었다 — 실측) */
+  #p_cl .clsp canvas{height:90px!important;max-height:90px!important}
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
   #re_rt_big{height:680px!important;max-height:none!important} /* 부동산 지역비교 대형차트 — 동일 캡 해제 */
   /* (2026-08-16) 통합차트 — 지표를 여러 개 겹치면 세로가 좁아 선이 뭉친다. 캔버스 높이 캡 해제 */
@@ -562,6 +564,8 @@
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
       <button class="tab"    data-pane="p_revd" style="background:#7c2d12;border-color:#7c2d12;color:#fff">📋 리비전 데일리<small style="color:#fed7aa">목표가·컨센 변동 일별</small></button>
+      <!-- (2026-09-05) 코인 선행지표 탭 — cryptolead.js · scripts/fetch_cryptolead.py (매일 06:55) -->
+      <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -825,6 +829,22 @@
       <div class="note" style="margin-top:6px">브랜드(아모레·삼양·F&F)는 수출 통계와 직접, ODM·유통(코스맥스·실리콘투·영원무역)은 물량으로 연동.
         현지 생산 비중이 큰 기업(CJ제일제당 미국공장·오리온 현지법인)은 수출 통계에 안 잡히는 매출이 있어 괴리가 정상.</div>
     </div>
+  </div>
+
+  <!-- (2026-09-05) 🪙 코인 선행지표 탭 — cryptolead.js · 데이터 scripts/fetch_cryptolead.py (매일 06:55) -->
+  <div class="pane" id="p_cl" style="overflow:auto">
+    <h2>🪙 코인 선행지표 <em id="cl_asof"></em> <button id="cl_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px">"앞으로 오를지 / 오름이 <b>유지</b>될지"를 서로 다른 시간축의 4축으로 나눠 본다 —
+      <b>단기 과열·심리</b>(공포탐욕·김프·개미·펀딩비·롱숏) · <b>중기 수급</b>(거래소 유출입·코인베이스 프리미엄·ETF·CFTC·스테이블 발행) ·
+      <b>사이클 밸류</b>(MVRV·SOPR·NUPL·Puell·200주선·반감기) · <b>매크로 유동성</b>(Fed 순유동성·M2·금리·달러).
+      전부 무료 공개 API 서버 자동 수집(LLM 토큰 0). 고래 지갑 추적(Glassnode·CryptoQuant)은 유료라 거래소 유출입·대형 기관 지표로 대신한다. 리서치용이며 투자권유가 아님.</div>
+    <div class="box" style="padding:12px 14px;margin-bottom:6px" id="cl_overall"></div>
+    <div id="cl_err"></div>
+    <div id="cl_groups"></div>
+    <h3>정책·이벤트 <span class="note">SEC·스테이블코인 법안·FOMC·ETF — 시황 보고서 세션(LLM)이 채움</span></h3>
+    <div class="box" style="padding:10px 12px" id="cl_policy"></div>
+    <div class="note" style="margin-top:10px">출처: alternative.me · 업비트·바이낸스·코인베이스·Deribit 공개 API · Coin Metrics Community · bitcoin-data.com · iShares · CFTC TFF · FRED · DefiLlama · CoinGecko.
+      임계값은 각 지표의 역사적 사이클 밴드(2015·2018·2022 바닥, 2017·2021 고점)에서 통용되는 값이며 절대 기준이 아니다.</div>
   </div>
 
   <!-- (2026-08-29) K-POP 선행지표 탭 — kpop.js · 데이터 scripts/fetch_kpop.py (매일 06:20) -->
@@ -2117,7 +2137,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09022040"></script>
+<script src="/app.js?v=09051530"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -2126,6 +2146,7 @@
 <script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
+<script src="/cryptolead.js?v=09051520"></script><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09021150"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=09040700"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

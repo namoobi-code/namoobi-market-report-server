@@ -782,6 +782,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     crypto_overview:'암호화폐 시장 개요 — 시총·거래대금·도미넌스 (6.1)',
     crypto_movers:'암호화폐 Top Gainers/Losers 각 10종 (6.4)',
     crypto_fng:'크립토 공포·탐욕 지수 1년 이력 (6.2)',
+    cryptolead:'코인 선행지표 30종 시계열 + 4축 판정 (🪙 코인 선행 탭 · 2026-09-05)',cryptolead_hist:'코인 선행지표 일간 누적(OI·롱숏·IBIT·CFTC·알트폭)',cryptolead_policy:'코인 정책 이벤트 LLM 판정 (보고서 Phase 3.9)',
     kimp_series:'김치프리미엄 10분 시계열(BTC·ETH·XRP·SOL, 1년 백필) (6.3)',
     semi_cycle:'반도체 사이클→코스피 점검판 3대 신호 (3.1.11)',
     series_curve_10_2:'미국 장단기 금리차 10Y−2Y 일별 시계열 (3.1.1 차트)',
@@ -838,6 +839,7 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     ipo_news:'07:20',employment:'07:40',series_emp_nfp:'07:40',series_emp_unemp:'07:40',series_emp_retail:'07:40',
     series_emp_gdp:'07:40',series_emp_jobless:'07:40',
     crypto_overview:'매시',crypto_movers:'매시',crypto_fng:'매시',kimp_series:'10분',
+    cryptolead:'06:55',cryptolead_hist:'06:55',cryptolead_policy:'보고서 실행 시',
     series_mem_dram_spot:'06:45·15:45',series_mem_dram_contract:'06:45·15:45',series_mem_nand_spot:'06:45·15:45',
     series_mem_nand_contract:'06:45·15:45',series_mem_hbm_asp:'06:45·15:45',series_mem_hbm_share:'06:45·15:45',
     series_mem_hbm_ddr5_gap:'06:45·15:45',series_mem_leading_px:'06:45·15:45',series_mem_mem_vs_gpu:'06:45·15:45',
@@ -1314,7 +1316,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_kpop','p_kcons','p_moat','p_share','p_debt','p_sub','p_pf','p_re','p_re3','p_eg','p_revd'];  // p_revd: (2026-09-02) 리비전 데일리 탭 (revd.js)  // p_eg: (2026-09-01) 이익성장 탭 (eg.js)  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) · p_re: (2026-08-23) RE 예측 탭 (re.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_kpop','p_kcons','p_moat','p_share','p_debt','p_sub','p_pf','p_re','p_re3','p_eg','p_revd','p_cl'];  // p_cl: (2026-09-05) 코인 선행지표 탭 (cryptolead.js) // p_revd: (2026-09-02) 리비전 데일리 탭 (revd.js)  // p_eg: (2026-09-01) 이익성장 탭 (eg.js)  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) · p_re: (2026-08-23) RE 예측 탭 (re.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -1343,6 +1345,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
     if(b.dataset.pane==='p_share'&&window.renderShare) window.renderShare();  // (2026-08-31) 점유율 추이
     if(b.dataset.pane==='p_debt'&&window.renderDebt) window.renderDebt();    // (2026-08-31) 빅테크 조달구조
     if(b.dataset.pane==='p_revd'&&window.renderRevd) window.renderRevd();    // (2026-09-02) 리비전 데일리
+    if(b.dataset.pane==='p_cl'&&window.renderCryptolead) window.renderCryptolead(); // (2026-09-05) 코인 선행지표
     /* (2026-08-05) 숨김 상태에서 생성된 Chart.js 는 0×0 으로 남는다(실측: 3.1.10 3×3 그리드)
        → 탭을 열 때 크기 없는 차트만 골라 resize */
     if(window.Chart&&Chart.getChart) setTimeout(()=>{
