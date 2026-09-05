@@ -40,7 +40,7 @@ function spark(cv,s,color,k){
   if(!s||s.length<2) return;
   const labels=s.map(x=>x[0]), data=s.map(x=>x[1]);
   // 판정 임계선(참고선) — 지표별 대표 밴드
-  const TH={fng:[25,75],kimp:[0,5],mvrv:[1,3],mvrv_z:[0,6],sopr:[1],nupl:[0,0.75],puell:[0.6,3],mayer:[0.85,2.2],funding:[0,0.05],ls_ratio:[0.9,2],taker:[0.9,1.1],cb_prem:[0],ex_netflow:[0],ibit_flow:[0],cot_am:[0],cot_lev:[0],altbreadth:[25,75],dvol:[40,80],gt_world:[],gt_kr:[]}[k]||[];
+  const TH={fng:[25,75],kimp:[0,5],mvrv:[1,3],mvrv_z:[0,6],sopr:[1],nupl:[0,0.75],puell:[0.6,3],mayer:[0.85,2.2],funding:[0,0.05],ls_ratio:[0.9,2],taker:[0.9,1.1],cb_prem:[0],ex_netflow:[0],ibit_flow:[0],cot_am:[0],cot_lev:[0],altbreadth:[25,75],dvol:[40,80],gt_world:[],gt_kr:[],eth_netflow:[0],alt_funding:[0],upbit_alt_share:[]}[k]||[];
   const ds=[{label:'지표',data,borderColor:color,backgroundColor:color+'22',fill:true,pointRadius:0,borderWidth:1.3,tension:0.15,yAxisID:'y',order:2}];
   TH.forEach(t=>ds.push({label:'_th',data:data.map(()=>t),borderColor:'#94a3b8',borderDash:[3,3],borderWidth:0.8,pointRadius:0,fill:false,yAxisID:'y',order:3}));
   const px=labels.map(pxAt); const hasPx=px.some(v=>v!=null);
@@ -96,14 +96,20 @@ const HELP={
  dxy:{what:'달러 가치를 주요 6개 통화 대비로 지수화한 것. 비트코인과 반대로 움직이는 경향.',read:'3개월 변화율. −2% 이하 달러 약세(좋음) · +2% 이상 달러 강세(역풍).',low:'달러 약세 → 비트코인 강세 경향.',high:'달러 강세 → 비트코인 약세 경향.'},
  us10y:{what:'미국 10년 국채 금리. "안전하게 벌 수 있는 이자"가 높으면 위험자산 매력이 준다.',read:'3개월 변화율. −5% 이하 금리 하락(좋음) · +5% 이상 상승(역풍).',low:'안전자산 이자가 줄어 위험자산으로 이동.',high:'안전자산 이자가 높아져 위험자산 이탈.'},
  stable:{what:'USDT·USDC 등 달러 스테이블코인 총 발행량(십억$). 코인을 사려고 거래소에 대기 중인 달러.',read:'30일 변화율. +1.5% 이상 신규 발행(좋음) · −1% 이하 소각(이탈).',low:'대기 자금이 빠져나감.',high:'새 달러가 코인판에 들어옴 → 매수 대기 자금 증가.'},
+ eth_btc:{what:'이더리움 가격을 비트코인으로 나눈 값. "ETH 1개 = BTC 몇 개". 알트 대장이 BTC 보다 잘 가는지의 대표 척도.',read:'30일 변화율. +8% 이상 ETH 우세(알트 순환 시작) · −8% 이하 BTC 우세.',low:'돈이 BTC 로 집중 → 알트는 참을 때.',high:'ETH 가 BTC 를 이기기 시작 → 역사적으로 알트 전체로 번지는 첫 신호.'},
+ alt_mcap_ratio:{what:'주요 알트 12종(ETH·BNB·ADA·DOGE·DOT·LINK·LTC·BCH 등) 시총 합 ÷ BTC 시총. 시총이 어느 쪽으로 이동하는지.',read:'30일 변화율. +5% 이상 알트로 이동 · −5% 이하 BTC 로 집중.',low:'BTC 국면.',high:'알트 순환 진행.'},
+ stable_ratio:{what:'스테이블코인 총공급 ÷ (BTC+ETH 시총). "대기 중인 달러가 시장 대비 얼마나 큰가".',read:'30일 변화율. −5% 이하 = 대기자금이 코인으로 들어감(위험선호) · +5% 이상 = 코인에서 스테이블로 대피(위험회피).',low:'돈이 코인으로 투입되는 중 → 알트까지 온기가 퍼지는 국면.',high:'대피 중 → 알트가 가장 먼저 맞는다.'},
+ eth_netflow:{what:'지난 7일 ETH 가 거래소로 들어온 돈 − 나간 돈(백만$). BTC 거래소 순유입과 같은 논리.',read:'−300M$ 미만 유출(좋음) · ±300 균형 · +300M$ 초과 유입(매도 대기).',low:'ETH 를 빼서 보관 → 알트 대장 수급 우호.',high:'ETH 를 팔려고 거래소로 → 알트 전체 하락 압력.'},
+ upbit_alt_share:{what:'업비트에서 알트(거래대금 상위 30종) 거래대금이 전체(알트+BTC)의 몇 %인가. 한국 개미의 알트 쏠림.',read:'200일 중 백분위. 상위 20% 알트 순환 진행(90%↑ 과열) · 하위 20% 알트 무관심.',low:'개미가 알트를 안 본다 → BTC 국면.',high:'개미가 알트로 몰림 → 순환 진행. 극단이면 국내 주도 과열(김프보다 먼저 나타난다).'},
+ alt_funding:{what:'ETH·SOL·XRP·DOGE·BNB 펀딩비 평균 − BTC 펀딩비. 알트 선물 롱이 BTC 보다 얼마나 과열됐나.',read:'+0.02% 이상 알트 롱 과열 · −0.01% 이하 알트 숏 과밀 · 사이는 정상.',low:'알트에 숏이 몰림 → 숏스퀴즈로 급등 여지.',high:'알트에 빚으로 롱이 몰림 → 조금만 떨어져도 연쇄 청산 → 알트 급락.'},
  altbreadth:{what:'시총 상위 50개 알트코인 중 지난 30일 수익률이 비트코인을 이긴 비율.',read:'25% 이하 비트코인 시즌(사이클 초·중반) · 75% 이상 알트시즌(사이클 후반 과열).',low:'돈이 비트코인에만 몰림 = 사이클 초반 특징.',high:'잡코인까지 다 오름 = 사이클 후반, 고점 근처가 잦았다.'},
- btc_dom:{what:'전체 코인 시총 중 비트코인 비중.',read:'오르는 중이면 자금이 비트코인으로 집중(사이클 초기), 꺾이면 알트로 순환(후기).',low:'알트 순환 국면.',high:'비트코인 집중 국면.'},
+ btc_dom:{what:'전체 코인 시총 중 비트코인 비중.',read:'30일 변화(%p). −2p 이하 = 알트로 순환 · +2p 이상 = BTC 집중. (서버 누적 30일 뒤부터 판정)',low:'알트 순환 국면.',high:'비트코인 집중 국면.'},
 };
 const GAUGE={
  fng:[0,100,25,75,'hot'],kimp:[-3,8,0,5,'hot'],mvrv:[0.5,4,1,3,'hot'],mvrv_z:[-1,8,0.5,6,'hot'],sopr:[0.95,1.08,0.98,1.05,'hot'],
  nupl:[-0.3,1,0.25,0.7,'hot'],puell:[0.2,4,0.6,3,'hot'],mayer:[0.5,2.8,0.85,2.2,'hot'],w200:[0.7,5,1.1,4,'hot'],
  funding:[-0.03,0.1,0,0.05,'hot'],ls_ratio:[0.5,3,0.9,2,'hot'],taker:[0.7,1.3,0.9,1.1,'cool'],dvol:[20,120,40,80,'mid',['압축=폭발 전조','정상','패닉=바닥 근처']],
- cb_prem:[-0.3,0.3,-0.05,0.05,'cool'],altbreadth:[0,100,25,75,'hot'],
+ cb_prem:[-0.3,0.3,-0.05,0.05,'cool'],altbreadth:[0,100,25,75,'cool',['BTC 시즌','혼재','알트시즌(과열 경계)']],
  // 아래는 판정에 쓴 파생값(e.jv: 변화율·백분위)으로 그린다
  upbit_ratio:[0,100,15,90,'hot',['개미 이탈','보통','개미 과열'],1],gt_world:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],gt_kr:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],
  wiki_ko:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],wiki_en:[0,100,20,90,'hot',['무관심','보통','관심 정점'],1],
@@ -113,7 +119,12 @@ const GAUGE={
  oi:[-40,60,-15,25,'hot',['디레버리징','보통','레버리지 누적'],1],netliq:[-6,6,-1,1,'cool',['유동성 축소','보합','유동성 확대'],1],
  m2:[-2,10,1,3,'cool',['정체','완만','확장'],1],dff:[-40,40,-3,3,'hot',['인하 중','동결','인상 중'],1],
  us10y:[-25,25,-5,5,'hot',['금리 하락','보합','금리 상승'],1],dxy:[-8,8,-2,2,'hot',['달러 약세','보합','달러 강세'],1],
- stable:[-5,7,-1,1.5,'cool',['소각=이탈','정체','발행=유입'],1],halving:[0,1460,365,550,'hot',['상승 국면','과거 고점 구간','고점 이후·약세']],
+ stable:[-5,7,-1,1.5,'cool',['소각=이탈','정체','발행=유입'],1],
+ // 알트 순환 축 — 오른쪽(초록)=알트 순환 진행, 왼쪽(빨강)=BTC 국면
+ eth_btc:[-25,25,-8,8,'cool',['BTC 우세','보합','ETH 우세'],1],alt_mcap_ratio:[-20,20,-5,5,'cool',['BTC 집중','보합','알트로 이동'],1],
+ stable_ratio:[-20,20,-5,5,'hot',['코인 투입','보합','스테이블 대피'],1],eth_netflow:[-1500,1500,-300,300,'hot',['유출=보관','균형','유입=매도 대기']],
+ upbit_alt_share:[0,100,20,80,'cool',['알트 무관심','보통','알트 쏠림'],1],alt_funding:[-0.04,0.06,-0.01,0.02,'hot',['알트 숏 과밀','정상','알트 롱 과열']],
+ btc_dom:[-6,6,-2,2,'hot',['알트 순환','보합','BTC 집중'],1],halving:[0,1460,365,550,'hot',['상승 국면','과거 고점 구간','고점 이후·약세']],
 };
 function gauge(k,v,E){
   const g=GAUGE[k]; if(!g||v==null) return '';
@@ -155,11 +166,11 @@ function card(k,e){
     ${helpBox(k)}
   </div>`;
 }
-function axisBox(a){
+function axisBox(a,isAlt){
   const col=a.score==null?'#94a3b8':a.score>=0.3?'#16a34a':a.score<=-0.3?'#dc2626':'#ca8a04';
   const pos=a.score==null?50:(a.score+1)/2*100;
   return `<div style="flex:1;min-width:190px;border:1px solid #e2e8f0;border-left:4px solid ${col};border-radius:8px;padding:8px 12px;background:#fff">
-    <div style="font-size:12px;color:#475569">${a.name}</div>
+    <div style="font-size:12px;color:#475569">${a.name}${isAlt?' <span style="font-size:10px;color:#9333ea">— 시장 종합점수에 미포함(순환 위치 질문)</span>':''}</div>
     <div style="font-size:17px;font-weight:800;color:${col}">${a.label} <span style="font-size:11px;font-weight:400;color:#64748b">${a.score==null?'':(a.score>0?'+':'')+a.score.toFixed(2)} · 🟢${a.bull} 🔴${a.bear} /${a.n}</span></div>
     <div style="position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,#fecaca,#fef9c3,#bbf7d0);margin-top:6px"><div style="position:absolute;left:${pos}%;top:-3px;width:3px;height:12px;background:#0f172a;border-radius:2px;transform:translateX(-50%)"></div></div>
   </div>`;
@@ -175,9 +186,10 @@ function render(){
       <label style="font-size:11.5px;color:#475569;cursor:pointer;margin-left:auto"><input type="checkbox" id="cl_helpchk" ${SHOWHELP?'checked':''}> 쉬운 설명 보기</label>
       <div style="font-size:22px;font-weight:900;color:${oc}">${O.text||'—'}</div>
       <div class="note">종합 ${O.score==null?'—':(O.score>0?'+':'')+O.score.toFixed(2)} (−1 ~ +1 · 4축 평균)</div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${['short','flow','cycle','macro'].filter(k=>A[k]).map(k=>axisBox(A[k])).join('')}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${['short','flow','cycle','macro','alt'].filter(k=>A[k]).map(k=>axisBox(A[k],k==='alt')).join('')}</div>
     <div class="note" style="margin-top:8px">읽는 법: <b>단기</b>축이 🔴면 지금 사기엔 과열(눌림 대기), 🟢면 공포 국면(역발상). <b>수급</b>축은 지갑·기관·대기자금이 실제로 사고 있는지 — 상승이 <u>유지</u>될지를 가르는 축.
-      <b>밸류</b>축은 사이클 상 위치(바닥권/고점권). <b>매크로</b>축은 달러 유동성 — BTC 는 유동성에 약 2~3개월 후행. 네 축이 모두 🟢인 시점은 드물고, 보통 "수급🟢 + 단기🔴" 같은 조합으로 나타난다.</div>`;
+      <b>밸류</b>축은 사이클 상 위치(바닥권/고점권). <b>매크로</b>축은 달러 유동성 — BTC 는 유동성에 약 2~3개월 후행. 네 축이 모두 🟢인 시점은 드물고, 보통 "수급🟢 + 단기🔴" 같은 조합으로 나타난다.
+      <b>알트 순환</b>축은 질문이 다르다 — "시장이 오를까"가 아니라 <u>"BTC 를 들고 있을 때냐, 알트로 갈아탈 때냐"</u>. 알트는 BTC 방향을 1.5~3배로 증폭해 따라가므로 위 4축이 🔴면 알트는 더 크게 맞는다. 🟢(순환 진행)이면서 알트 강세폭 75%↑면 사이클 후반 과열.</div>`;
   // 그룹별 카드
   const IND=D.ind||{}; const keys=Object.keys(IND).filter(k=>!k.startsWith('_')&&IND[k].name);
   $('cl_groups').innerHTML=(D.groups||[]).map(g=>{

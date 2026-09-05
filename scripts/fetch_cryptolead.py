@@ -387,6 +387,69 @@ def c_alt(hist):
 
 # ══════════════════════════════════════════════════════════════════════════
 # 판정 — status: bull(상승 우호) / neu / bear(하락·과열 경계). 각 지표에 threshold 설명(thr)도 동봉.
+
+# ── ⑩ 알트 순환 축 (2026-09-05 사용자 결정 "BTC/알트 분리 → 5번째 축") ─────────────────────
+#   질문이 다르다: 위 4축은 "시장(=BTC)이 오를까", 이 축은 "BTC 를 들고 있을 때냐 알트로 갈아탈 때냐"(자금 순환 위치).
+#   알트는 BTC 방향을 증폭해 따라가므로 BTC 지표를 복제하지 않고 '순환'에만 있는 지표를 모은다.
+def c_altcycle(hist):
+    # a) ETH/BTC — 알트시즌의 고전적 방아쇠 (Binance 일봉 1000일)
+    try:
+        k = jget("https://api.binance.com/api/v3/klines?symbol=ETHBTC&interval=1d&limit=1000")
+        put("eth_btc", s=[[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[4])] for r in k])
+    except Exception as e: err("eth_btc", e)
+    # b) 주요 알트 시총 / BTC 시총 + 스테이블 공급 / (BTC+ETH 시총) — Coin Metrics Community(시총은 구형 100자산만 제공 → 12종 바스켓)
+    try:
+        basket = "eth,bnb,ada,doge,dot,link,ltc,bch,aave,algo,etc,icp"
+        j = jget("https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=btc," + basket +
+                 "&metrics=CapMrktCurUSD&frequency=1d&page_size=10000&start_time=" + (date.today() - timedelta(days=760)).isoformat(), t=60)
+        by = {}
+        for r in j["data"]:
+            v = f(r.get("CapMrktCurUSD"))
+            if v: by.setdefault(r["time"][:10], {})[r["asset"]] = v
+        ratio = sorted([[d, sum(v for a, v in m.items() if a != "btc") / m["btc"] * 100] for d, m in by.items() if "btc" in m and len(m) >= 8])
+        put("alt_mcap_ratio", s=ratio, n=len(basket.split(",")))
+        st = IND.get("stable", {}).get("s") or []
+        if st:
+            bm = {d: m.get("btc", 0) + m.get("eth", 0) for d, m in by.items() if "btc" in m and "eth" in m}
+            put("stable_ratio", s=sorted([[d, v / (bm[d] / 1e9) * 100] for d, v in st if d in bm and bm[d]]))
+    except Exception as e: err("alt_mcap", e)
+    # c) ETH 거래소 순유입 7일합 (Coin Metrics — flow 는 btc·eth 만 제공)
+    try:
+        j = jget("https://community-api.coinmetrics.io/v4/timeseries/asset-metrics?assets=eth&metrics=FlowInExUSD,FlowOutExUSD&frequency=1d&page_size=800"
+                 "&start_time=" + (date.today() - timedelta(days=420)).isoformat(), t=40)
+        net = [[r["time"][:10], (f(r["FlowInExUSD"]) - f(r["FlowOutExUSD"])) / 1e6] for r in j["data"] if f(r.get("FlowInExUSD")) is not None and f(r.get("FlowOutExUSD")) is not None]
+        put("eth_netflow", s=[[net[i][0], sum(v for _, v in net[max(0, i - 6):i + 1])] for i in range(len(net))])
+    except Exception as e: err("eth_netflow", e)
+    # d) 업비트 알트 거래대금 비중 — 거래대금 상위 30 알트 200일 일봉 합 ÷ (알트+BTC). 국내 개미는 알트에 몰린다.
+    try:
+        kr = [m["market"] for m in jget("https://api.upbit.com/v1/market/all") if m["market"].startswith("KRW-")]
+        tk = []
+        for i in range(0, len(kr), 100):
+            tk += jget("https://api.upbit.com/v1/ticker?markets=" + ",".join(kr[i:i + 100])); time.sleep(0.2)
+        top = [x["market"] for x in sorted(tk, key=lambda x: -x["acc_trade_price_24h"]) if x["market"] != "KRW-BTC"][:30]
+        agg = {}
+        for m in ["KRW-BTC"] + top:
+            for r in jget(f"https://api.upbit.com/v1/candles/days?market={m}&count=200"):
+                d = r["candle_date_time_utc"][:10]; a = agg.setdefault(d, [0.0, 0.0])
+                a[0 if m == "KRW-BTC" else 1] += r["candle_acc_trade_price"]
+            time.sleep(0.15)
+        put("upbit_alt_share", s=sorted([[d, a[1] / (a[0] + a[1]) * 100] for d, a in agg.items() if a[0] + a[1] > 0]), top=[m[4:] for m in top[:8]])
+    except Exception as e: err("upbit_alt_share", e)
+    # e) 알트 펀딩비 − BTC 펀딩비 (ETH·SOL·XRP·DOGE·BNB 일평균) — 알트 레버리지 과열
+    try:
+        def fday(sym):
+            by = {}
+            for r in jget(f"https://fapi.binance.com/fapi/v1/fundingRate?symbol={sym}&limit=1000"):
+                by.setdefault(utc(r["fundingTime"] / 1000).strftime("%Y-%m-%d"), []).append(float(r["fundingRate"]) * 100)
+            return {d: sum(v) / len(v) for d, v in by.items()}
+        b = fday("BTCUSDT"); alts = [fday(s) for s in ("ETHUSDT", "SOLUSDT", "XRPUSDT", "DOGEUSDT", "BNBUSDT")]
+        s = []
+        for d in sorted(b):
+            vs = [a[d] for a in alts if d in a]
+            if len(vs) >= 3: s.append([d, sum(vs) / len(vs) - b[d]])
+        put("alt_funding", s=s)
+    except Exception as e: err("alt_funding", e)
+
 def judge():
     def S(k, st, txt, jv=None, jl=None):
         e = IND.setdefault(k, {}); e.update(status=st, judge=txt)
@@ -469,25 +532,41 @@ def judge():
 
     c = chg(s("stable"), 30)
     if c is not None: S("stable", "bull" if c > 1.5 else "bear" if c < -1 else "neu", f"스테이블 공급 30일 {c:+.1f}% — " + ("신규 발행=매수 대기자금 유입" if c > 1.5 else "소각=자금 이탈" if c < -1 else "정체"), jv=c, jl="30일 변화 %")
+    # ── 알트 순환 축: bull=알트로 자금 순환 중(알트 우호) · bear=BTC 집중/위험회피 · 과열은 문구로 경고
     x = v("altbreadth")
-    if x is not None: S("altbreadth", "bear" if x >= 75 else "bull" if x <= 25 else "neu", f"알트 50 중 {x:.0f}% 가 BTC 를 이김(30D) — " + ("알트시즌=사이클 후반 과열 특징" if x >= 75 else "BTC 시즌=사이클 초·중반" if x <= 25 else "혼재"))
-    x = v("btc_dom")
-    if x is not None: S("btc_dom", "neu", f"BTC 도미넌스 {x:.1f}% — 상승 중이면 자금이 BTC 로 집중(초기), 하락 전환은 알트 순환")
+    if x is not None: S("altbreadth", "bull" if x >= 75 else "bear" if x <= 25 else "neu", f"알트 50 중 {x:.0f}% 가 BTC 를 이김(30D) — " + ("알트시즌 진행 중 — 사이클 후반 과열 경계" if x >= 75 else "BTC 시즌=자금이 BTC 에만" if x <= 25 else "혼재"))
+    x = v("btc_dom"); c = None
+    if x is not None:
+        sd = s("btc_dom"); c = (x - at_back(sd, 30)) if at_back(sd, 30) is not None else None
+        S("btc_dom", ("bull" if c < -2 else "bear" if c > 2 else "neu") if c is not None else "neu", f"BTC 도미넌스 {x:.1f}%" + (f" (30일 {c:+.1f}p) — " + ("하락=알트로 순환" if c < -2 else "상승=BTC 집중" if c > 2 else "보합") if c is not None else " — 30일 누적 전(추세 판정 대기)"), jv=c, jl="30일 변화 %p")
+    c = chg(s("eth_btc"), 30)
+    if c is not None: S("eth_btc", "bull" if c > 8 else "bear" if c < -8 else "neu", f"ETH/BTC {v('eth_btc'):.4f} (30일 {c:+.1f}%) — " + ("ETH 가 BTC 를 이김=알트 순환 시작 신호" if c > 8 else "ETH 가 BTC 에 밀림=BTC 국면" if c < -8 else "보합"), jv=c, jl="30일 변화 %")
+    c = chg(s("alt_mcap_ratio"), 30)
+    if c is not None: S("alt_mcap_ratio", "bull" if c > 5 else "bear" if c < -5 else "neu", f"알트12/BTC 시총비 {v('alt_mcap_ratio'):.1f}% (30일 {c:+.1f}%) — " + ("알트로 시총 이동" if c > 5 else "BTC 로 시총 집중" if c < -5 else "보합"), jv=c, jl="30일 변화 %")
+    c = chg(s("stable_ratio"), 30)
+    if c is not None: S("stable_ratio", "bull" if c < -5 else "bear" if c > 5 else "neu", f"스테이블/(BTC+ETH) {v('stable_ratio'):.1f}% (30일 {c:+.1f}%) — " + ("대기자금이 코인으로 투입=위험선호" if c < -5 else "코인→스테이블 대피=위험회피" if c > 5 else "보합"), jv=c, jl="30일 변화 %")
+    x = v("eth_netflow")
+    if x is not None: S("eth_netflow", "bull" if x < -300 else "bear" if x > 300 else "neu", f"ETH 7일 순유입 {x:+,.0f}M$ — " + ("거래소 유출=보관(알트 대장 수급 우호)" if x < -300 else "거래소 유입=매도 대기" if x > 300 else "균형"))
+    r = rank(s("upbit_alt_share"), 200)
+    if r is not None: S("upbit_alt_share", "bull" if r >= 80 else "bear" if r <= 20 else "neu", f"업비트 알트 비중 {v('upbit_alt_share'):.0f}% (200일 백분위 {r:.0f}%) — " + ("국내 개미가 알트로 — 순환 진행, 90%↑면 과열" if r >= 80 else "알트 무관심=BTC 국면" if r <= 20 else "보통"), jv=r, jl="200일 백분위 %")
+    x = v("alt_funding")
+    if x is not None: S("alt_funding", "bear" if x > 0.02 else "bull" if x < -0.01 else "neu", f"알트−BTC 펀딩비 {x:+.4f}% — " + ("알트 롱 레버리지 과열=청산 위험" if x > 0.02 else "알트 숏 과밀=숏스퀴즈 여지" if x < -0.01 else "정상"))
 
     # 축 점수
     AX = {"short": ["fng", "kimp", "upbit_ratio", "gt_world", "gt_kr", "wiki_ko", "wiki_en", "funding", "ls_ratio", "taker", "oi"],
           "flow":  ["ex_netflow", "ex_supply", "cb_prem", "ibit_flow", "cot_am", "stable", "adr_act"],
-          "cycle": ["mvrv", "mvrv_z", "sopr", "nupl", "puell", "mayer", "w200", "altbreadth", "hashrate"],
-          "macro": ["netliq", "m2", "dff", "dxy", "us10y"]}
-    NM = {"short": "단기 과열·심리", "flow": "중기 수급(지갑·기관·대기자금)", "cycle": "사이클 밸류에이션", "macro": "매크로 유동성"}
+          "cycle": ["mvrv", "mvrv_z", "sopr", "nupl", "puell", "mayer", "w200", "hashrate"],
+          "macro": ["netliq", "m2", "dff", "dxy", "us10y"],
+          "alt":   ["eth_btc", "btc_dom", "alt_mcap_ratio", "stable_ratio", "altbreadth", "upbit_alt_share", "eth_netflow", "alt_funding"]}
+    NM = {"short": "단기 과열·심리", "flow": "중기 수급(지갑·기관·대기자금)", "cycle": "사이클 밸류에이션", "macro": "매크로 유동성", "alt": "알트 순환 (BTC↔알트)"}
     axes = {}
     for a, ks in AX.items():
         sc = [{"bull": 1, "neu": 0, "bear": -1}[IND[k]["status"]] for k in ks if IND.get(k, {}).get("status")]
         m = sum(sc) / len(sc) if sc else None
         axes[a] = {"name": NM[a], "score": None if m is None else round(m, 2), "n": len(sc), "keys": ks,
-                   "label": "—" if m is None else ("우호" if m >= 0.3 else "비우호" if m <= -0.3 else "중립"),
+                   "label": "—" if m is None else (("알트 순환 진행" if m >= 0.3 else "BTC 국면" if m <= -0.3 else "혼재") if a == "alt" else ("우호" if m >= 0.3 else "비우호" if m <= -0.3 else "중립")),
                    "bull": sc.count(1), "bear": sc.count(-1)}
-    ms = [a["score"] for a in axes.values() if a["score"] is not None]
+    ms = [a["score"] for k, a in axes.items() if a["score"] is not None and k != "alt"]   # 알트 축은 '순환 위치' 질문이라 시장 종합점수에서 제외
     tot = round(sum(ms) / len(ms), 2) if ms else None
     sh, fl, cy, ma = (axes[a]["score"] for a in ("short", "flow", "cycle", "macro"))
     if tot is None: txt = "데이터 부족"
@@ -500,6 +579,10 @@ def judge():
         head = ("상승 여지 우세" if tot >= 0.25 else "하락·조정 위험 우세" if tot <= -0.25 else "혼조")
         if fl is not None and sh is not None and fl >= 0.3 and sh <= -0.3: head = "추세 유효하나 단기 과열 — 눌림 대기"
         if fl is not None and sh is not None and fl <= -0.3 and sh >= 0.3: head = "공포 국면이나 수급 미확인 — 바닥 확인 전"
+        al = axes["alt"]["score"]
+        if al is not None:
+            ab = v("altbreadth") or 0
+            parts.append("알트 " + ("순환 진행(후반 과열 경계)" if al >= 0.3 and ab >= 75 else "순환 진행" if al >= 0.3 else "BTC 국면" if al <= -0.3 else "혼재"))
         txt = head + " · " + " / ".join(parts)
     return axes, {"score": tot, "text": txt}
 
@@ -538,6 +621,12 @@ META = {   # 화면 표기용 이름·단위·그룹·왜 선행인가 (JS 가 �
  "dxy":        ("달러지수 DXY", "", "매크로", "달러 약세 = BTC 강세의 역상관"),
  "us10y":      ("美 10년 국채금리", "%", "매크로", "할인율 — 상승은 성장·위험자산 밸류에이션 압박"),
  "stable":     ("스테이블코인 총공급", "B$", "대기자금", "USDT·USDC 신규 발행 = 거래소에 들어온 매수 대기 달러 — DefiLlama"),
+ "eth_btc":    ("ETH/BTC 비율", "", "알트", "알트시즌의 고전적 방아쇠 — ETH 가 BTC 를 이기기 시작하면 알트 전체로 번진다"),
+ "alt_mcap_ratio": ("주요 알트12 시총 / BTC 시총", "%", "알트", "시총이 BTC 에서 알트로 이동하는지 — 순환의 직접 측정 (Coin Metrics 구형 대형알트 바스켓)"),
+ "stable_ratio": ("스테이블 공급 / (BTC+ETH 시총)", "%", "알트", "대기자금 비중 — 떨어지면 돈이 코인으로 들어가는 중(위험선호), 오르면 대피"),
+ "eth_netflow": ("ETH 거래소 순유입 (7일 합)", "M$", "알트", "알트 대장의 거래소 유출입 — BTC 와 같은 논리"),
+ "upbit_alt_share": ("업비트 알트 거래대금 비중", "%", "알트", "한국 개미는 알트에 몰린다 — 국내 과열은 김프보다 이 지표가 빠르다"),
+ "alt_funding": ("알트 − BTC 펀딩비 격차", "%", "알트", "알트 무기한 선물 레버리지가 BTC 보다 얼마나 과열됐나"),
  "altbreadth": ("알트 강세 폭 (30D)", "%", "알트", "시총 50 중 BTC 를 이긴 비율 — 75%↑ 알트시즌=사이클 후반"),
  "btc_dom":    ("BTC 도미넌스", "%", "알트", "자금 순환 위치 — BTC 집중(초기) → 알트 확산(후기)"),
 }
@@ -554,7 +643,7 @@ def main():
     for name, fn in (("sentiment", lambda: c_sentiment(qv)), ("coinmetrics", c_coinmetrics),
                      ("cycle", lambda: c_cycle(d_px, wk)), ("institution", lambda: c_institution(d_px, hist)),
                      ("derivs", lambda: c_derivs(hist)), ("macro", c_macro), ("stable", c_stable),
-                     ("alt", lambda: c_alt(hist)), ("bitcoindata", lambda: c_bitcoindata(prev))):
+                     ("alt", lambda: c_alt(hist)), ("altcycle", lambda: c_altcycle(hist)), ("bitcoindata", lambda: c_bitcoindata(prev))):
         try:
             t = time.time(); fn(); log(f"  ✓ {name} {time.time() - t:.1f}s")
         except Exception as e: err(name, e)
@@ -572,7 +661,7 @@ def main():
     now = datetime.now(KST)
     OUT.write_text(json.dumps({"as_of": now.strftime("%Y-%m-%d %H:%M"), "marker": now.strftime("%Y-%m-%d"),
                                "ind": IND, "axes": axes, "overall": overall, "policy": policy,
-                               "groups": ["심리·한국", "지갑·거래소", "온체인 밸류", "기관", "파생", "매크로", "대기자금", "알트"],
+                               "groups": ["심리·한국", "지갑·거래소", "온체인 밸류", "기관", "파생", "매크로", "대기자금", "알트"],   # 알트 = 5번째 축(순환)
                                "errors": ERRORS}, ensure_ascii=False), encoding="utf-8")
     HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
     log(f"[cryptolead] ✅ {len([k for k in IND if not k.startswith('_')])}개 지표 · 종합 {overall} · 오류 {len(ERRORS)} → {OUT}")
