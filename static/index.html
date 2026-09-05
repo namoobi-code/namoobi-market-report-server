@@ -564,6 +564,7 @@
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
       <button class="tab"    data-pane="p_revd" style="background:#7c2d12;border-color:#7c2d12;color:#fff">📋 리비전 데일리<small style="color:#fed7aa">목표가·컨센 변동 일별</small></button>
+      <button class="tab"    data-pane="p_exp" style="background:#0c4a6e;border-color:#0c4a6e;color:#fff">📦 K-수출<small style="color:#bae6fd">잠정치 10일·품목별 HS</small></button>
       <!-- (2026-09-05) 코인 선행지표 탭 — cryptolead.js · scripts/fetch_cryptolead.py (매일 06:55) -->
       <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
@@ -745,6 +746,26 @@
   </div>
 
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
+  <!-- (2026-09-05) 📦 K-수출 페인 — customs+hs_invest 재사용 · exports.js (3.1.10 은 그대로 유지) -->
+  <div class="pane" id="p_exp" style="overflow:auto">
+    <h2>📦 K-수출 — 관세청 잠정치·품목별 HS <em id="ex_asof"></em> <button id="ex_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px;line-height:1.7">
+      ① <b>10일 단위 잠정치</b>(관세청 — 월 확정 전 가장 빠른 수출 실측)와 ② <b>투자 관점 품목별 월간 수출</b>(HS코드 · 3년 · 관련 종목 연결)을 한 페이지로.
+      수주 이벤트 메모(📌)는 계약 기준 — 실제 수출 통계는 선적 시점에 반영. daily 탭 3.1.10 과 같은 데이터(신규 수집 없음).</div>
+    <h3>① 관세청 10일 단위 잠정치 <span class="note">1~10일 / 1~20일 / 월전체 · 24개월 · 품목 칩 또는 표 행 클릭으로 전환</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="ex_chips" style="margin-bottom:8px"></div>
+      <div style="display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap">
+        <div style="flex:2;min-width:480px;height:260px"><canvas id="ex_cv1"></canvas></div>
+        <div style="flex:1;min-width:300px"><table class="mini" id="ex_cus_tbl" style="width:100%;font-size:12px;text-align:right"></table></div>
+      </div>
+    </div>
+    <h3>② 투자 관점 품목별 월간 수출 <span class="note">HS코드 · 3년 · 관련 종목(네이버) · 📌수주 이벤트 메모</span></h3>
+    <div class="box" style="padding:12px 14px">
+      <div id="ex_th_chips" style="margin-bottom:8px"></div>
+      <table class="mini" id="ex_hsi_tbl" style="width:100%;font-size:12px;text-align:center"></table>
+    </div>
+  </div>
   <!-- (2026-09-02) 📋 리비전 데일리 페인 — /api/kr_rev_daily · revd.js -->
   <div class="pane" id="p_revd" style="overflow:auto">
     <h2>📋 리비전 데일리 — 목표주가·이익 컨센 변동리스트
@@ -2137,7 +2158,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09051816"></script>
+<script src="/app.js?v=09051820"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -2145,6 +2166,7 @@
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
+<script src="/exports.js?v=09051700"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/cryptolead.js?v=09052010"></script><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09021150"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
