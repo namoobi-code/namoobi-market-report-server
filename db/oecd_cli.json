@@ -1,6 +1,6 @@
 {
  "marker": "2026-09-05|2026.06",
- "as_of": "2026-09-05",
+ "as_of": "2026-09-06",
  "data": {
   "unit": "지수(진폭조정, 기준 100)",
   "source": "OECD SDMX API (DSD_STES@DF_CLI, 진폭조정 AA)",

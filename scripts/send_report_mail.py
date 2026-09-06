@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""send_report_mail.py — 서버에서 Gmail SMTP 로 시황 보고서 docx 발송 (v3.72 — flock 직렬화).
+"""send_report_mail.py — 서버에서 Gmail SMTP 로 시황 보고서 docx 발송 (v3.96 — 주말 미발송 가드 · v3.72 flock 직렬화).
 
 인증: Gmail '앱 비밀번호' (2단계 인증 계정에서 발급) — keys/gmail_app_password.txt
   · 이 파일은 git 미포함(keys/ 는 .gitignore). PC SECURITY 폴더에서 scp 로 배포.
@@ -13,7 +13,12 @@
 사용: echo "$JSON" | python3 send_report_mail.py            # 발송
       python3 send_report_mail.py --check                    # 인증파일 존재만 검사(exit 0/3)
       echo "$JSON" | python3 send_report_mail.py --force     # 멱등 가드 무시하고 강제 발송
-종료코드: 0=발송 성공(중복 차단 포함) · 2=입력/첨부 오류 · 3=인증파일 없음 · 4=SMTP 실패
+종료코드: 0=발송 성공(중복 차단·주말 SKIP 포함) · 2=입력/첨부 오류 · 3=인증파일 없음 · 4=SMTP 실패
+출력: 주말 시 "SKIP (weekend — YYYY-MM-DD(토|일) …)" — SENT 아님·로그 미기록·exit 0
+
+[v3.96 주말 미발송 — 2026-09-06 사용자 지시]
+  첨부 파일명의 YYYYMMDD(보고서 날짜, 없으면 서버 현재 KST 날짜)가 토·일이면 SMTP 를 건너뛴다.
+  예약(catch-up 포함)·직접 실행 모두 적용, --force 만 우회. PC 래퍼(send_mail_server.py)와 2중 방어.
 출력: 성공 시 "SENT <메시지ID> to=1 bcc=N attach=<파일명> <크기>B" (주소 미노출)
       중복 시 "SENT <기존 메시지ID> (dedup — 기발송 재확인, 재발송 차단) ..."
 
@@ -139,6 +144,17 @@ def main():
         print("ERR 첨부 24MB 초과:", size); sys.exit(2)
 
     attach_name = os.path.basename(attach)
+    if "--force" not in sys.argv:
+        from datetime import timezone
+        _m = re.search(r"(\d{8})", attach_name)
+        try:
+            _d = datetime.strptime(_m.group(1), "%Y%m%d") if _m else datetime.now(timezone(timedelta(hours=9)))
+        except Exception:
+            _d = datetime.now(timezone(timedelta(hours=9)))
+        if _d.weekday() >= 5:
+            print(f"SKIP (weekend — {_d.strftime('%Y-%m-%d')} {'토' if _d.weekday()==5 else '일'} KST 미발송 규칙 v3.96, 주말 발송은 --force) "
+                  f"to=1 bcc={len(bcc)} attach={attach_name} {size}B")
+            sys.exit(0)
     _send_lock = _acquire_send_lock()  # v3.72 — 프로세스 종료까지 유지(락 안에서 dedup 확인·발송·로그)
     if "--force" not in sys.argv:
         dup = recent_sent(attach_name)

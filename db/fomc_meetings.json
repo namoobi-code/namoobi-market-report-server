@@ -1,6 +1,6 @@
 {
  "marker": "2026-10-27|19",
- "as_of": "2026-09-05",
+ "as_of": "2026-09-06",
  "data": [
   {
    "date": "2025-09-16~17",
@@ -30,7 +30,7 @@
   {
    "date": "2025-12-10",
    "stance": "인하",
-   "note": "25bp 인하 → 3.50~3.75%(2025년 3연속 인하 마무리). 9-2 가결(Miran 50bp 인하, Goolsbee·Schmid 동결 소수의견). SEP 실시 — 2026년 1회·2027년 1회 추가 인하 시사. (출처: federalreserve.gov FOMC statement·SEP 2025-12-10)"
+   "note": "25bp 인하 → 3.50~3.75%(2025년 3연속 인하 마무리). 9-2 가결(Miran 50bp 인하, Goolsbee·Schmid 동결 소수의견). SEP 실시 — 2026년 1회·2027년 1회 추가 인하 시사(종착점 3.125%). (출처: federalreserve.gov FOMC statement·SEP 2025-12-10)"
   },
   {
    "date": "2026-01-27~28",
@@ -80,7 +80,7 @@
   {
    "date": "2026-07-29",
    "stance": "동결",
-   "note": "3.50~3.75% 동결(5연속). SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-07-29, cnbc.com 2026-07-29 Fed meeting recap — Warsh, 인플레 억제 위해 주저하지 않겠다 발언)"
+   "note": "3.50~3.75% 동결(5회 연속). 9-3 가결 — Hammack·Kashkari·Logan 3인이 25bp 인상을 주장하며 반대(2016년 9월 이후 처음 3인 동일방향 소수의견). 물가는 공급충격 영향으로 2% 목표 대비 여전히 높다고 평가. SEP 미실시. (출처: federalreserve.gov FOMC statement 2026-07-29, cnbc.com 2026-07-29 Fed meeting recap — Warsh, 인플레 억제 위해 주저하지 않겠다 발언)"
   },
   {
    "date": "2026-09-15~16",
@@ -90,7 +90,7 @@
   {
    "date": "2026-09-16",
    "stance": "예정",
-   "note": "9/15~16 예정. SEP·점도표 갱신 예정. Kevin Warsh 의장 잭슨홀 매파 발언(8/28) 이후 CME FedWatch 25bp 인상 확률 약 60~66%(2026-08-31 기준) — 인상 가능성 부각. (출처: cnbc.com 2026-08-31 Jackson Hole 애널리스트 라운드업)"
+   "note": "9/15~16 예정. SEP·점도표 갱신 예정 정례회의(3·6·9·12월 분기 공개 주기). 8/28 잭슨홀 심포지엄에서 Warsh 의장이 '물가 기저추세 개선 확인 안 됨·해야 할 일이 남았다'는 매파적 연설을 하며 CME FedWatch 9월 인상 확률이 하루 만에 35.4%→57.5%로 급등, 2026-08-31 기준 약 60~66%. (출처: federalreserve.gov FOMC calendar 2026, cnbc.com 2026-08-28·08-31 Warsh Jackson Hole 보도)"
   },
   {
    "date": "2026-10-27~28",
