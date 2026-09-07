@@ -562,6 +562,7 @@
       <button class="tab"    data-pane="p_kcons" style="background:#9d174d;border-color:#9d174d;color:#fff">🛍️ K-소비재<small style="color:#fbcfe8">뷰티·푸드·패션 수출×주가</small></button>
       <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
+      <button class="tab"    data-pane="p_share2" style="background:#4c1d95;border-color:#4c1d95;color:#fff">🚗 점유율 추이(업무)<small style="color:#ddd6fe">AI 토큰·자동차 산업 대결</small></button>
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
       <button class="tab"    data-pane="p_revd" style="background:#7c2d12;border-color:#7c2d12;color:#fff">📋 리비전 데일리<small style="color:#fed7aa">목표가·컨센 변동 일별</small></button>
       <button class="tab"    data-pane="p_exp" style="background:#0c4a6e;border-color:#0c4a6e;color:#fff">📦 K-수출<small style="color:#bae6fd">잠정치 10일·품목별 HS</small></button>
@@ -672,6 +673,21 @@
     </div>
     <h3>선별 B2 점유 구도 <span class="note">해자워치 SHARES 정본 — 시계열화 대상 외 종목의 스냅샷, 보고서 Phase 3.6 이 뉴스로 점검</span></h3>
     <div class="box" style="padding:12px 14px"><div id="sh_b2"></div></div>
+  </div>
+
+  <!-- (2026-09-07) 점유율 추이(업무) 탭 — share.js 두 번째 페인(prefix sw) · 배틀 정의 scripts/share_work.py -->
+  <div class="pane" id="p_share2" style="overflow:auto">
+    <h2>🚗 점유율 추이(업무) <em id="sw_asof"></em> <button id="sw_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
+    <div class="note" style="margin:-4px 0 10px"><b>무엇을 보는 화면인가</b> — 업무 관점의 산업 대결. 🤖 AI 는 토큰 가격(입력·출력)·기업 LLM API 지출·코딩 워크로드/도구 점유(점유율 추이 탭과 같은 데이터),
+      🚗 자동차는 그룹별 판매량·영업이익, 현대차·기아 권역별 점유, 파워트레인 믹스, EV 배터리(글로벌·중국 제외), 차량용 반도체·MCU, 중국 智驾 칩(SDV·자율주행 SW 스택), 인포테인먼트 OS, 현대차 수익 구조.
+      <b>공표 실측만 적재</b> — 미공표 항목(현대차 중남미·아중동·아태 점유, 벤더별 MCU 점유, 차량 OS 연도별 장착률, 현대차 SDV·로보틱스 매출 등)은 추정으로 채우지 않고 각 카드 설명에 '미공개'로 명시했다.
+      (E)=기관 전망·목표. 리서치용·투자권유 아님.</div>
+    <div class="box" style="padding:12px 14px">
+      <div id="sw_chips" style="margin-bottom:10px"></div>
+      <details open style="margin-bottom:12px"><summary style="cursor:pointer;font-size:13px;font-weight:700;color:#334155">📋 요약 — 전 대결 한눈에</summary>
+        <div id="sw_dash" style="margin-top:7px"></div></details>
+      <div id="sw_grid" style="display:flex;flex-wrap:wrap;gap:10px"></div>
+    </div>
   </div>
 
   <div class="pane" id="p_debt" style="overflow:auto">
@@ -2174,7 +2190,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09051820"></script>
+<script src="/app.js?v=09071500"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -2187,7 +2203,7 @@
 <script src="/cryptolead.js?v=09052010"></script><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09051933"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
-<script src="/share.js?v=09052355"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
+<script src="/share.js?v=09071500"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}

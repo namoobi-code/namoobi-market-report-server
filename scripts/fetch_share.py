@@ -893,9 +893,15 @@ def main():
     ups = {}
     for u in llm.get("updates", []):
         ups.setdefault(u.get("id"), []).append(u)
+    # (2026-09-07) 점유율 추이(업무) 탭 — 자동차 12종은 share_work.py 에 분리 정의. 같은 스키마·같은 파이프라인.
+    #   업무 전용 배틀(work=True)은 기존 탭에서 숨기고, AI 5종(tok_in 등)은 양쪽에 보인다(데이터는 여기 한 곳).
+    from share_work import WORK_BATTLES, WORK_CAT, WORK_SHARED, WORK_SRC
+    work_ids = set(b[0] for b in WORK_BATTLES)
     battles = []
-    for bid, grade, name, unit, freq, why, players, seed, auto, src in BATTLES:
+    for bid, grade, name, unit, freq, why, players, seed, auto, src in list(BATTLES) + list(WORK_BATTLES):
         series = [{"d": d, "v": v, "note": n} for d, v, n in seed]
+        if bid in WORK_SRC and series:
+            series[-1]["src"] = WORK_SRC[bid]
         if auto == "hbm":
             # (2026-09-02) 시드(트렌드포스 참조점) 유지 + 자동(SA 추정) 병합 — 시드를 버리지 않는다
             series += [{"d": d, "v": v, "note": n} for d, v, n in auto_hbm()]
@@ -933,16 +939,20 @@ def main():
         last = series[-1]["d"] if series else None
         stale = None
         if last and auto is None:
-            days_old = (datetime.now(KST).date() - datetime.strptime(last[:10] if len(last) > 7 else last + "-28", "%Y-%m-%d").date()).days
+            # 시점 표기 3종: 'YYYY'(연간 → 그 해 12-31) · 'YYYY-MM'(→ 28일) · 'YYYY-MM-DD'
+            _ld = last[:10] if len(last) >= 10 else (last + "-12-31" if len(last) == 4 else last + "-28")
+            days_old = (datetime.now(KST).date() - datetime.strptime(_ld, "%Y-%m-%d").date()).days
             stale = days_old > FRESH.get(freq, 100)
         battles.append({"id": bid, "grade": grade, "name": name, "unit": unit, "freq": freq,
                         "why": why, "players": [{"k": k, "stock": st} for k, st in players],
-                        "series": series, "auto": auto, "src": src, "stale": stale})
+                        "series": series, "auto": auto, "src": src, "stale": stale,
+                        "work": bid in work_ids, "wcat": WORK_CAT.get(bid)})
         print(f"  {grade} {name}: {len(series)}점" + (" · 자동" if auto else (" · ⏳갱신 필요" if stale else "")), flush=True)
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "battles": battles,
         "llm_asof": llm.get("as_of"),
+        "work_ids": WORK_SHARED + [b[0] for b in WORK_BATTLES],
     }, ensure_ascii=False), encoding="utf-8")
     print(f"[share] ✅ {len(battles)}개 대결 → {OUT}", flush=True)
 

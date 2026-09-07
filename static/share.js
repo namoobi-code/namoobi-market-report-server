@@ -2,10 +2,12 @@
    데이터: /api/db/share (scripts/fetch_share.py · 매일 06:35) + /api/db/moat (B2 구도)
    목적: '점유율만 잘 추적하면 주가가 보이는 대결'(릴리vs노보 원형)을 경쟁사 동시 비교로 —
         배틀마다 전 플레이어를 한 차트에 겹쳐 추이·격차를 보여주고, 리더-2위 스프레드를 산출한다.
-   갱신: 자동(아마존·HBM=일일) / 나머지는 보고서 실행 Phase 3.7 이 stale 배틀만 웹서치 갱신. */
+   갱신: 자동(아마존·HBM=일일) / 나머지는 보고서 실행 Phase 3.7 이 stale 배틀만 웹서치 갱신.
+   (2026-09-07) 점유율 추이(업무) 탭 추가 — 같은 share.json 을 두 페인이 나눠 그린다(prefix 'sh'=기존, 'sw'=업무).
+     업무 탭 = work_ids(AI 5종 공유 + 자동차 12종 · scripts/share_work.py), 기존 탭은 work=true 배틀을 숨긴다. */
 (function(){
 'use strict';
-let D=null, M=null, GR='all', charts={};
+let D=null, M=null;
 const $=id=>document.getElementById(id);
 const COLS=['#be185d','#0ea5e9','#b45309','#7c3aed','#0f766e','#e11d48','#4f46e5','#ca8a04','#334155','#16a34a'];
 // (2026-09-04) 회사별 고정 색상 — 인덱스 순 배정이면 같은 회사가 카드마다 다른 색이 돼
@@ -26,7 +28,15 @@ const CO_COLOR={
   '1위 고객':'#be185d','2위 고객':'#0ea5e9','3위 고객':'#b45309','4위 고객':'#7c3aed',
   'OpenAI':'#0f766e','Anthropic':'#b45309','Google':'#4f46e5','DeepSeek':'#be185d','xAI':'#334155',
   '알테오젠(플랫폼 누적)':'#7c3aed','알테오젠':'#be185d','할로자임':'#0ea5e9',
-  '삼성바이오로직스':'#0ea5e9','한화에어로':'#166534','HD현대일렉':'#be185d','효성중공업':'#b45309'};
+  '삼성바이오로직스':'#0ea5e9','한화에어로':'#166534','HD현대일렉':'#be185d','효성중공업':'#b45309',
+  // (2026-09-07) 업무 탭 — 자동차
+  '도요타':'#be185d','폭스바겐':'#0ea5e9','스텔란티스':'#b45309','혼다':'#e11d48','닛산':'#7c3aed','메르세데스':'#334155','BMW':'#4f46e5',
+  'LG엔솔':'#0ea5e9','SK온':'#e11d48','파나소닉':'#4f46e5','CALB':'#ca8a04','고션':'#0f766e',
+  '인피니언':'#be185d','NXP':'#0ea5e9','ST마이크로':'#b45309','르네사스':'#7c3aed','TI':'#ca8a04',
+  '화웨이':'#e11d48','지평선':'#b45309','모빌아이':'#0ea5e9','퀄컴':'#7c3aed',
+  '미국':'#be185d','유럽':'#0ea5e9','인도':'#b45309','중국':'#e11d48','한국':'#0f766e',
+  '차량':'#0f766e','금융':'#b45309','기타':'#94a3b8',
+  'xEV':'#be185d','HEV':'#0ea5e9','ICE':'#94a3b8','QNX':'#334155','AGL':'#b45309','AAOS':'#16a34a','Generic Android':'#4f46e5'};
 function colorOf(name,i){
   const n=String(name||'');
   // 긴 키 우선 매칭 — 'SK하이닉스'가 '삼성'보다 먼저 걸리도록
@@ -52,13 +62,24 @@ function latestGap(b){
   return {lead,second,gap,dgap};
 }
 
+/* 페인 팩토리 — P='sh'(기존: 등급 칩, work 배틀 제외, B2 표) / P='sw'(업무: 카테고리 칩, work_ids 순서) */
+function makeView(P, isWork){
+let GR='all', charts={};
 function render(){
-  if(!D) return;
-  $('sh_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:35'+(D.llm_asof?` · 🧠 최근 보고서 갱신 ${D.llm_asof}`:'');
-  const bs=(D.battles||[]).filter(b=>GR==='all'||b.grade===GR);
-  $('sh_chips').innerHTML=[['all','전체'],['A','A급(고빈도)'],['B','B급(분기)'],['C','C급(캐파)']].map(g=>
+  if(!D||!$(P+'_asof')) return;
+  $(P+'_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:35'+(D.llm_asof?` · 🧠 최근 보고서 갱신 ${D.llm_asof}`:'');
+  let bs, chips;
+  if(isWork){
+    const byId={}; (D.battles||[]).forEach(b=>{byId[b.id]=b;});
+    bs=(D.work_ids||[]).map(id=>byId[id]).filter(b=>b&&(GR==='all'||b.wcat===GR));
+    chips=[['all','전체'],['AI','🤖 AI'],['자동차','🚗 자동차']];
+  }else{
+    bs=(D.battles||[]).filter(b=>!b.work).filter(b=>GR==='all'||b.grade===GR);
+    chips=[['all','전체'],['A','A급(고빈도)'],['B','B급(분기)'],['C','C급(캐파)']];
+  }
+  $(P+'_chips').innerHTML=chips.map(g=>
     `<button data-g="${g[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${GR===g[0]?'#334155':'#d6d9de'};background:${GR===g[0]?'#334155':'#fff'};color:${GR===g[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${g[1]}</button>`).join('');
-  $('sh_chips').querySelectorAll('button').forEach(x=>x.onclick=()=>{GR=x.dataset.g;render();});
+  $(P+'_chips').querySelectorAll('button').forEach(x=>x.onclick=()=>{GR=x.dataset.g;render();});
 
   // (2026-09-04) 요약 대시보드 — 배틀이 27개까지 늘어 카드만으론 한눈에 안 들어온다.
   //   리더·격차·방향을 한 표로 접고, '역전 진행'(격차 축소)을 맨 위로 올려 강조한다.
@@ -69,7 +90,7 @@ function render(){
     return (x.g.dgap??0)-(y.g.dgap??0);              // 그 안에서 축소 폭 큰 순
   });
   const nrev=sum.filter(x=>x.g.dgap!=null&&x.g.dgap<0).length;
-  const sd=$('sh_dash');
+  const sd=$(P+'_dash');
   if(sd) sd.innerHTML=`
     <div style="font-size:12.5px;margin-bottom:6px">전체 <b>${bs.length}</b>개 대결 ·
       <b style="color:#b91c1c">역전 방향 진행 ${nrev}</b>건 ·
@@ -90,7 +111,7 @@ function render(){
     </tbody></table>`;
 
   Object.values(charts).forEach(c=>{try{c.destroy();}catch(e){}}); charts={};
-  $('sh_grid').innerHTML=bs.map(b=>{
+  $(P+'_grid').innerHTML=bs.map(b=>{
     const g=GB[b.grade]||GB.B;
     const gap=latestGap(b);
     const ks=(b.players&&b.players.length)?b.players.map(p=>p.k)
@@ -112,14 +133,14 @@ function render(){
         ${b.auto?'<span style="background:#dcfce7;color:#166534;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">매일 자동</span>':(b.stale?'<span style="background:#fef3c7;color:#b45309;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">⏳ 다음 보고서 갱신</span>':'<span style="background:#f1f5f9;color:#475569;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">최신</span>')}</span></div>
       <div style="font-size:11px;color:#64748b;margin:3px 0 6px">${b.why}</div>
       ${gap?`<div style="font-size:11.5px;margin-bottom:4px">⚔️ <b>${gap.lead}</b> 리드 — 2위 ${gap.second}와 격차 <b>${gap.gap}${b.unit==='위'?'위':b.unit}</b>${gap.dgap!=null?` (직전 관측 대비 <b style="color:${gap.dgap>0?'#166534':gap.dgap<0?'#b91c1c':'#64748b'}">${gap.dgap>0?'확대 +':gap.dgap<0?'축소 ':''}${gap.dgap}</b>)`:''} ${gap.dgap!=null&&gap.dgap<0?'— <b style="color:#b91c1c">역전 방향 진행</b>':''}</div>`:''}
-      <div style="height:210px"><canvas id="sh_cv_${b.id}"></canvas></div>
+      <div style="height:210px"><canvas id="${P}_cv_${b.id}"></canvas></div>
       ${tbl}
       <div style="font-size:10.5px;color:#94a3b8;margin-top:5px">관련 종목: ${(b.players||[]).map(p=>p.stock?`${p.k}(${p.stock})`:p.k).join(' · ')||'—'} · 출처: ${b.src} · (E)=기관 추정치</div>
     </div>`;}).join('');
 
-  const sd2=$('sh_dash');
+  const sd2=$(P+'_dash');
   if(sd2) sd2.querySelectorAll('tr[data-go]').forEach(tr=>tr.onclick=()=>{
-    const el=$('sh_cv_'+tr.dataset.go);
+    const el=$(P+'_cv_'+tr.dataset.go);
     if(el){ const card=el.closest('div[style*="flex:1 1 480px"]')||el;
       card.scrollIntoView({behavior:'smooth',block:'center'});
       card.style.transition='box-shadow .3s'; card.style.boxShadow='0 0 0 3px #fbbf24';
@@ -135,7 +156,7 @@ function render(){
 
   // 차트 — 전 플레이어 동시 라인 + 값 높은 순 툴팁
   bs.forEach(b=>{
-    const el=$('sh_cv_'+b.id); if(!el||!b.series.length) return;
+    const el=$(P+'_cv_'+b.id); if(!el||!b.series.length) return;
     const ks=(b.players&&b.players.length)?b.players.map(p=>p.k)
             :[...new Set(b.series.flatMap(s=>Object.keys(s.v)))];
     charts[b.id]=new Chart(el,{type:'line',data:{labels:b.series.map(s=>s.d),
@@ -154,8 +175,8 @@ function render(){
                     :(LOGY.has(b.id)?b.unit+' (로그 눈금)':b.unit)),font:{size:10}}}}}});
   });
 
-  // B2 점유 구도 표 (moat.json SHARES — Phase 3.6 이 점검·갱신 제안)
-  if(M){
+  // B2 점유 구도 표 (moat.json SHARES — Phase 3.6 이 점검·갱신 제안) — 기존 탭만
+  if(M&&!isWork&&$('sh_b2')){
     const b2=(M.rows||[]).filter(r=>r.share);
     $('sh_b2').innerHTML=b2.length?`<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%">
       <thead><tr style="background:#f8fafc">${['종목','분야','점유 구도(경쟁사 대비)','판정'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px">${h}</th>`).join('')}</tr></thead>
@@ -167,19 +188,25 @@ function render(){
       :'<div class="note">데이터 없음</div>';
   }
 }
+return render;
+}
+const renderMain=makeView('sh',false), renderWork=makeView('sw',true);
 
-function load(force){
+function load(force, which){
+  const render=which==='sw'?renderWork:renderMain;
   if(D&&!force){ render(); return; }
-  $('sh_asof').textContent='불러오는 중…';
+  const a=$(which+'_asof'); if(a) a.textContent='불러오는 중…';
   Promise.all([
     fetch('/api/db/share',{cache:'no-cache'}).then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}),
     fetch('/api/db/moat',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null)
   ]).then(([s,m])=>{ D=s; M=m; render(); })
-  .catch(e=>{ $('sh_asof').textContent='로드 실패: '+e.message+' (서버 수집 전이면 06:35 이후 표시)'; });
+  .catch(e=>{ if(a) a.textContent='로드 실패: '+e.message+' (서버 수집 전이면 06:35 이후 표시)'; });
 }
 
-window.renderShare=function(){ load(false); };
+window.renderShare=function(){ load(false,'sh'); };
+window.renderShareWork=function(){ load(false,'sw'); };   // (2026-09-07) 점유율 추이(업무)
 document.addEventListener('DOMContentLoaded',function(){
-  const b=$('sh_reload'); if(b) b.onclick=()=>load(true);
+  const b=$('sh_reload'); if(b) b.onclick=()=>load(true,'sh');
+  const w=$('sw_reload'); if(w) w.onclick=()=>load(true,'sw');
 });
 })();
