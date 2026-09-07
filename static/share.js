@@ -21,8 +21,7 @@ const CO_COLOR={
   'AWS':'#b45309','Azure':'#0ea5e9','GCP':'#16a34a',
   '릴리':'#be185d','노보':'#0ea5e9','다케다':'#4f46e5','알케르메스':'#ca8a04',
   'CATL':'#be185d','LG엔솔':'#0ea5e9','삼성SDI':'#7c3aed','BYD':'#16a34a','EVE':'#b45309',
-  '테슬라':'#e11d48','현대차그룹':'#0f766e','GM':'#ca8a04','포드':'#4f46e5','지리':'#7c3aed',
-  '립모터':'#0ea5e9','창안':'#b45309','우링':'#334155','하이시움':'#334155','니오':'#16a34a','샤오펑':'#ca8a04',
+  '현대차그룹':'#0f766e','우링':'#334155','하이시움':'#334155','니오':'#16a34a','샤오펑':'#ca8a04',
   'HD현대일렉트릭':'#be185d','효성중공업':'#0ea5e9','센트러스':'#b45309','스페이스X':'#4f46e5','로켓랩':'#ca8a04',
   '삼성바이오':'#0ea5e9','론자':'#b45309','우시바이오':'#e11d48','베링거':'#7c3aed',
   '1위 고객':'#be185d','2위 고객':'#0ea5e9','3위 고객':'#b45309','4위 고객':'#7c3aed',
@@ -33,14 +32,21 @@ const CO_COLOR={
   '메타':'#0ea5e9','xAI':'#334155','Cursor':'#ca8a04','Copilot':'#16a34a','기타(잔여':'#94a3b8',
   '알테오젠(플랫폼 누적)':'#7c3aed','알테오젠':'#be185d','할로자임':'#0ea5e9',
   '삼성바이오로직스':'#0ea5e9','한화에어로':'#166534','HD현대일렉':'#be185d','효성중공업':'#b45309',
-  // (2026-09-07) 업무 탭 — 자동차
-  '도요타':'#be185d','폭스바겐':'#0ea5e9','스텔란티스':'#b45309','혼다':'#e11d48','닛산':'#7c3aed','메르세데스':'#334155','BMW':'#4f46e5',
+  // (2026-09-07) 업무 탭 — 자동차 회사 전역 고정색(권역 6카드·판매량·영업이익 공통). 같은 회사=같은 색, 한 카드 안에서 겹치지 않게 배정.
+  '도요타':'#be185d','폭스바겐':'#0ea5e9','VW':'#0ea5e9','현대':'#0f766e','GM':'#ca8a04','스텔란티스':'#b45309','BYD':'#16a34a',
+  '포드':'#4f46e5','혼다':'#f97316','닛산':'#1e40af','테슬라':'#111827','메르세데스':'#d946ef','벤츠':'#d946ef','BMW':'#2dd4bf',
+  '지리':'#a855f7','르노':'#eab308','볼보':'#64748b','SAIC':'#0891b2','체리':'#0891b2','치루이':'#0891b2','립모터':'#f472b6',
+  '창안':'#b45309','창청':'#84cc16','샤오미':'#facc15','스바루':'#65a30d','스즈키':'#16a34a','다이하쓰':'#ca8a04','마쓰다':'#0ea5e9','미쓰비시':'#7c3aed',
+  '기아':'#ca8a04','제네시스':'#7c3aed','KGM':'#0ea5e9','한국GM':'#b45309','르노코리아':'#65a30d','수입차합계':'#94a3b8',
+  '마루티':'#111827','타타':'#4f46e5','마힌드라':'#dc2626','스코다':'#0ea5e9','MG':'#0891b2',
   'LG엔솔':'#0ea5e9','SK온':'#e11d48','파나소닉':'#4f46e5','CALB':'#ca8a04','고션':'#0f766e',
   '인피니언':'#be185d','NXP':'#0ea5e9','ST마이크로':'#b45309','르네사스':'#7c3aed','TI':'#ca8a04',
   '화웨이':'#e11d48','지평선':'#b45309','모빌아이':'#0ea5e9','퀄컴':'#7c3aed',
   '미국':'#be185d','유럽':'#0ea5e9','인도':'#b45309','중국':'#e11d48','한국':'#0f766e',
-  '차량':'#0f766e','금융':'#b45309','기타':'#94a3b8','모듈·부품제조':'#0f766e','A/S부품':'#b45309','모듈조립':'#0f766e','RV':'#0f766e','승용':'#0ea5e9','소형상용':'#ca8a04','대형상용':'#7c3aed','기타(부품)':'#94a3b8','HCA':'#be185d','현대캐피탈':'#0ea5e9','현대카드':'#4f46e5','HCCA':'#94a3b8','현대로템':'#b45309','부품제조':'#4f46e5','전동화':'#be185d','A/S':'#b45309',
-  'xEV':'#be185d','HEV':'#0ea5e9','ICE':'#94a3b8','QNX':'#334155','AGL':'#b45309','AAOS':'#16a34a','Generic Android':'#4f46e5'};
+  '차량':'#0f766e','금융':'#b45309','기타':'#94a3b8','모듈·부품제조':'#0f766e','A/S부품':'#b45309','모듈조립':'#0f766e','부품제조':'#4f46e5','전동화':'#be185d','A/S':'#b45309',
+  'RV':'#0f766e','승용':'#0ea5e9','소형상용':'#ca8a04','대형상용':'#7c3aed','기타(부품)':'#94a3b8','HCA':'#be185d','현대캐피탈':'#0ea5e9','현대카드':'#4f46e5','HCCA':'#94a3b8','현대로템':'#b45309',
+  // (2026-09-07 사용자 지적) 파워트레인 3종이 같은 색으로 보이던 사고 — 'HEV' 짧은 키가 'PHEV'·'MHEV' 에도 걸렸다 → 전체 라벨을 키로
+  'xEV(BEV+PHEV+FCV)':'#be185d','HEV(MHEV 제외)':'#16a34a','ICE+MHEV(잔여)':'#64748b'};
 function colorOf(name,i){
   const n=String(name||'');
   // 긴 키 우선 매칭 — 'SK하이닉스'가 '삼성'보다 먼저 걸리도록
@@ -68,7 +74,7 @@ function latestGap(b){
 
 /* 페인 팩토리 — P='sh'(기존: 등급 칩, work 배틀 제외, B2 표) / P='sw'(업무: 카테고리 칩, work_ids 순서) */
 function makeView(P, isWork){
-let GR='all', charts={};
+let GR='all', REG='us', charts={};
 function render(){
   if(!D||!$(P+'_asof')) return;
   $(P+'_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:35'+(D.llm_asof?` · 🧠 최근 보고서 갱신 ${D.llm_asof}`:'');
@@ -76,7 +82,10 @@ function render(){
   if(isWork){
     const byId={}; (D.battles||[]).forEach(b=>{byId[b.id]=b;});
     bs=(D.work_ids||[]).map(id=>byId[id]).filter(b=>b&&(GR==='all'||b.wcat===GR));
-    chips=[['all','전체'],['AI','🤖 AI'],['자동차','🚗 자동차']];
+    chips=[['all','전체'],['AI','🤖 AI'],['자동차','🚗 자동차'],['권역별','🌍 권역별 자동차 점유']];
+    // (2026-09-07) 권역별 = 권역 하나를 골라 그 시장의 회사별 점유를 '큰 카드' 하나로 본다(전체 보기에선 권역 카드 숨김 — 6장이 너무 커서)
+    if(GR==='권역별') bs=bs.filter(b=>b.id==='reg_'+REG);
+    else bs=bs.filter(b=>b.wcat!=='권역별');
   }else{
     bs=(D.battles||[]).filter(b=>!b.work).filter(b=>GR==='all'||b.grade===GR);
     chips=[['all','전체'],['A','A급(고빈도)'],['B','B급(분기)'],['C','C급(캐파)']];
@@ -84,6 +93,13 @@ function render(){
   $(P+'_chips').innerHTML=chips.map(g=>
     `<button data-g="${g[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${GR===g[0]?'#334155':'#d6d9de'};background:${GR===g[0]?'#334155':'#fff'};color:${GR===g[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${g[1]}</button>`).join('');
   $(P+'_chips').querySelectorAll('button').forEach(x=>x.onclick=()=>{GR=x.dataset.g;render();});
+  if(isWork&&GR==='권역별'){
+    const regs=[['us','🇺🇸 미국'],['eu','🇪🇺 유럽'],['cn','🇨🇳 중국'],['in','🇮🇳 인도'],['kr','🇰🇷 한국'],['jp','🇯🇵 일본']];
+    $(P+'_chips').insertAdjacentHTML('beforeend','<div style="margin-top:8px;padding-top:8px;border-top:1px dashed #e2e8f0"><span class="note" style="margin-right:8px">권역 선택 →</span>'+
+      regs.map(r=>`<button data-r="${r[0]}" style="margin-right:6px;padding:4px 14px;border-radius:14px;border:1px solid ${REG===r[0]?'#4c1d95':'#d6d9de'};background:${REG===r[0]?'#4c1d95':'#fff'};color:${REG===r[0]?'#fff':'#333'};cursor:pointer;font-size:13px;font-weight:${REG===r[0]?700:400}">${r[1]}</button>`).join('')+'</div>');
+    $(P+'_chips').querySelectorAll('button[data-r]').forEach(x=>x.onclick=()=>{REG=x.dataset.r;render();});
+  }
+  const BIG=(isWork&&GR==='권역별');
 
   // (2026-09-04) 요약 대시보드 — 배틀이 27개까지 늘어 카드만으론 한눈에 안 들어온다.
   //   리더·격차·방향을 한 표로 접고, '역전 진행'(격차 축소)을 맨 위로 올려 강조한다.
@@ -95,7 +111,8 @@ function render(){
   });
   const nrev=sum.filter(x=>x.g.dgap!=null&&x.g.dgap<0).length;
   const sd=$(P+'_dash');
-  if(sd) sd.innerHTML=`
+  if(sd&&BIG) sd.innerHTML='<div class="note">권역별 보기에선 요약표 대신 아래 큰 카드 하나로 본다 — 표는 전 시점.</div>';
+  else if(sd) sd.innerHTML=`
     <div style="font-size:12.5px;margin-bottom:6px">전체 <b>${bs.length}</b>개 대결 ·
       <b style="color:#b91c1c">역전 방향 진행 ${nrev}</b>건 ·
       <span class="note">행을 누르면 해당 카드로 이동. 격차는 리더−2위, 음수 변화 = 추격 중</span></div>
@@ -121,7 +138,7 @@ function render(){
     const ks=(b.players&&b.players.length)?b.players.map(p=>p.k)
             :[...new Set(b.series.flatMap(s=>Object.keys(s.v)))];
     // 시점별 전원 비교 표 (최근 5시점, 최신이 위)
-    const recent=[...b.series].slice(-5).reverse();
+    const recent=[...b.series].slice(BIG?-40:-5).reverse();   // 큰 카드는 전 시점
     /* (2026-09-05 피드백) 비고를 표 컬럼에서 분리 — 값 컬럼이 좁아져 비고가 세로로 길게
        뭉개지던 문제. 표는 시점×값만, 비고는 표 아래 시점별 각주 목록으로. */
     const tbl=recent.length?`<table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%;margin-top:8px">
@@ -130,14 +147,14 @@ function render(){
         ${ks.map(k=>`<td style="border:1px solid #e2e8f0;padding:2px 6px;text-align:right;font-weight:${s.v[k]!=null?600:400}">${s.v[k]!=null?s.v[k]+(b.unit==='위'?'위':b.unit):'—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`
       +`<div style="font-size:10.5px;color:#94a3b8;line-height:1.6;margin-top:4px">${recent.filter(s=>s.note||s.src).map(s=>
          `<div><b style="color:#64748b">${s.d}</b> — ${s.note||''}${s.src?` <a href="${s.src}" target="_blank" rel="noopener" style="color:#94a3b8">[근거]</a>`:''}</div>`).join('')}</div>`:'';
-    return `<div style="flex:1 1 480px;max-width:640px;border:1px solid #e2e8f0;border-top:3px solid ${g[0]};border-radius:10px;background:#fff;padding:12px 14px">
+    return `<div style="flex:1 1 ${BIG?'100%':'480px'};max-width:${BIG?'none':'640px'};border:1px solid #e2e8f0;border-top:3px solid ${g[0]};border-radius:10px;background:#fff;padding:12px 14px">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:6px">
         <b style="font-size:13.5px">${b.name}</b>
         <span style="white-space:nowrap"><span title="${g[2]}" style="background:${g[1]};color:${g[0]};border-radius:9px;padding:1px 8px;font-size:11px;font-weight:700">${b.grade}급 · ${b.freq}</span>
         ${b.auto?'<span style="background:#dcfce7;color:#166534;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">매일 자동</span>':(b.stale?'<span style="background:#fef3c7;color:#b45309;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">⏳ 다음 보고서 갱신</span>':'<span style="background:#f1f5f9;color:#475569;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">최신</span>')}</span></div>
       <div style="font-size:11px;color:#64748b;margin:3px 0 6px">${b.why}</div>
       ${gap?`<div style="font-size:11.5px;margin-bottom:4px">⚔️ <b>${gap.lead}</b> 리드 — 2위 ${gap.second}와 격차 <b>${gap.gap}${b.unit==='위'?'위':b.unit}</b>${gap.dgap!=null?` (직전 관측 대비 <b style="color:${gap.dgap>0?'#166534':gap.dgap<0?'#b91c1c':'#64748b'}">${gap.dgap>0?'확대 +':gap.dgap<0?'축소 ':''}${gap.dgap}</b>)`:''} ${gap.dgap!=null&&gap.dgap<0?'— <b style="color:#b91c1c">역전 방향 진행</b>':''}</div>`:''}
-      <div style="height:210px"><canvas id="${P}_cv_${b.id}"></canvas></div>
+      <div style="height:${BIG?'460px':'210px'}"><canvas id="${P}_cv_${b.id}"></canvas></div>
       ${tbl}
       <div style="font-size:10.5px;color:#94a3b8;margin-top:5px">관련 종목: ${(b.players||[]).map(p=>p.stock?`${p.k}(${p.stock})`:p.k).join(' · ')||'—'} · 출처: ${b.src} · (E)=기관 추정치</div>
     </div>`;}).join('');
@@ -166,7 +183,7 @@ function render(){
     charts[b.id]=new Chart(el,{type:'line',data:{labels:b.series.map(s=>s.d),
       datasets:ks.map((k,i)=>({label:k,data:b.series.map(s=>s.v[k]??null),
         borderColor:colorOf(k,i),backgroundColor:colorOf(k,i),
-        pointRadius:3,borderWidth:1.8,spanGaps:true}))},
+        pointRadius:BIG?4:3,borderWidth:BIG?2.4:1.8,spanGaps:true}))},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
         plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},
           tooltip:{itemSort:(a,c)=>(c.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+c.raw+(b.unit==='위'?'위':b.unit)}}},
