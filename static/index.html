@@ -55,6 +55,7 @@
   .cbox canvas{height:100%!important;max-height:none!important}
   /* (2026-09-05) 코인 선행지표 카드 스파크 — 전역 canvas 200px 캡 해제(90px 컨테이너에 맞춤. 캡 때문에 판정 텍스트를 덮었다 — 실측) */
   #p_cl .clsp canvas{height:100px!important;max-height:100px!important}
+  [id^="sw_cv_reg_"]{height:100%!important;max-height:none!important} /* (2026-09-07) 점유율(업무) 권역별 큰 카드 — 전역 200px 캡 해제, 부모 div 높이(clamp 42vw)를 따른다 */
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
   #re_rt_big{height:680px!important;max-height:none!important} /* 부동산 지역비교 대형차트 — 동일 캡 해제 */
   /* (2026-08-16) 통합차트 — 지표를 여러 개 겹치면 세로가 좁아 선이 뭉친다. 캔버스 높이 캡 해제 */
@@ -2231,7 +2232,7 @@
 <script src="/cryptolead.js?v=09052010"></script><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09051933"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
-<script src="/share.js?v=09080100"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
+<script src="/share.js?v=09080120"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}
 .etfmd{font-size:9.5px;background:#e8f6ee;color:#1e8449;border-radius:4px;padding:0 4px;font-weight:700}
 #etf_tbl th{position:sticky;top:0;z-index:3;background:#eef2f7;box-shadow:inset 0 -1px 0 var(--line);cursor:pointer;white-space:nowrap;user-select:none}
