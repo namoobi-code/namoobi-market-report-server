@@ -57,7 +57,22 @@
   아직 과거가 없는 축 — 컨센 리비전·서프라이즈·수급·가이던스다. stock_panel 이
   6~12개월 쌓인 뒤 같은 하네스로 재검증할 것.
 
-사용:  python3 scripts/xs_backtest.py [--mk kr|us|both] [--nopit]
+2차 재검증 (2026-09-07 · 예약 실행) — **판정 유보**
+--------------------------------------------
+  panel 축적 1일(2026-09-04 · KR 2,533 / US 5,205행)뿐. 예약(2027-03-08)보다 6개월 이른
+  시점에 실행됐다. 워크포워드 최소 요건(학습 24 + 검증 12 = 36기간 ≈ 3년 월간관측,
+  현실적으로는 축적 6개월 = 관측 6기간에 불과)에 턱없이 못 미쳐 판정하지 않는다.
+  이번 회차에서 한 일: panel 테이블 조인(`--set panel|all`, 팩터 24종·부호 사전고정)과
+  팩터군별 워크포워드·판정 유보 게이트(MIN_VALID)·착시검사(ok3) 를 하네스에 넣어
+  다음 회차는 실행만 하면 되게 준비. 가격팩터 8종(`--set px`) 결과는 1차와 동일
+  (px 패널 2026-09-04 까지 정상 적재 확인). 크론(09:00/17:00) 정상.
+
+  ※ 주의 — 관측 간격 20거래일이라 panel 6개월 축적 = 관측 6기간이다. MIN_TRAIN 24 를
+  panel 에 그대로 요구하면 2년 넘게 기다려야 한다. 다음 회차에 표본이 부족하면
+  (a) 관측 간격을 5거래일로 줄이고 뉴이-웨스트 t 를 쓰거나 (b) 가격팩터 5년으로 사전
+  학습한 뒤 panel 축을 증분 학습하는 식의 완화를 **결과를 보기 전에** 정해서 적용할 것.
+
+사용:  python3 scripts/xs_backtest.py [--mk kr|us|both] [--nopit] [--set px|panel|all]
 """
 import json
 import sqlite3
@@ -113,7 +128,10 @@ def load_panel(mk, codes):
         cols = [k for k in cols if k in have]
         if not cols:
             return {}, []
-        rows = cx.execute(f"SELECT d, c, {','.join(cols)} FROM panel WHERE mk=?", (mk,)).fetchall()
+        # US 풀은 pbr→pb · fper→fpe 이름을 쓴다(실측 2026-09-07: US pbr/fper 0건, pb/fpe 는 있음)
+        alias = {"pbr": "COALESCE(pbr,pb)", "fper": "COALESCE(fper,fpe)"}
+        sel = ",".join(alias.get(k, k) if k in have else "NULL" for k in cols)
+        rows = cx.execute(f"SELECT d, c, {sel} FROM panel WHERE mk=?", (mk,)).fetchall()
     except sqlite3.OperationalError:
         return {}, []
     finally:
@@ -340,23 +358,33 @@ def walk_forward(snaps, idx):
         q_long.append(y[o[:k]].mean())          # 롱온리 상위20% 시장초과(실전에 더 가까움)
         q_spread.append(sp); q_hit += (sp > 0); n_used += 1
 
-    if not ic_wf:
-        print("  ⚠️ 워크포워드 표본 부족 — 판정 불가"); return
+    if len(ic_wf) < MIN_VALID:
+        return None
     ic_wf = np.array(ic_wf); q_spread = np.array(q_spread)
     ict = ic_wf.mean() / ic_wf.std(ddof=1) * np.sqrt(len(ic_wf)) if ic_wf.std(ddof=1) else np.nan
-    print(f"  워크포워드(학습 {MIN_TRAIN}기간↑ · 검증 {n_used}기간)")
+    return dict(ic=ic_wf, ict=ict, sp=q_spread, hit=q_hit / n_used, n=n_used,
+                qw=np.array(q_wins), qm=np.array(q_med), ql=np.array(q_long))
+
+
+def report_wf(r, keep):
+    ic_wf, ict, q_spread = r["ic"], r["ict"], r["sp"]
+    qw, qm, ql = r["qw"], r["qm"], r["ql"]
+    print(f"  워크포워드(학습 {MIN_TRAIN}기간↑ · 검증 {r['n']}기간)")
     print(f"    평균 IC        {ic_wf.mean():+.4f}   t값 {ict:+.2f}")
-    qw, qm, ql = np.array(q_wins), np.array(q_med), np.array(q_long)
     print(f"    상위20%-하위20% 4주 평균 {q_spread.mean()*100:+.2f}%  "
-          f"기간중앙 {np.median(q_spread)*100:+.2f}%  승률 {q_hit/n_used*100:.0f}%")
+          f"기간중앙 {np.median(q_spread)*100:+.2f}%  승률 {r['hit']*100:.0f}%")
     print(f"      └ ±30% 윈저화 {qw.mean()*100:+.2f}%  ·  종목중앙값 기준 {qm.mean()*100:+.2f}%"
           f"  ← 원값과 크게 벌어지면 소수 종목이 만든 착시")
     print(f"    롱온리 상위20% 시장초과 4주 {ql.mean()*100:+.2f}%  승률 "
           f"{(ql>0).mean()*100:.0f}%  (연환산 참고 {ql.mean()*13*100:+.1f}%p)")
     ok1 = ic_wf.mean() >= 0.02 and ict >= 2.0
-    ok2 = q_spread.mean() > 0 and q_hit / n_used > 0.5
+    ok2 = q_spread.mean() > 0 and r["hit"] > 0.5
+    # (2026-09-05 경험) 필수 조건 3: 윈저화·중앙값 스프레드가 원값의 절반 밑으로 무너지면
+    # 소수 종목 착시 → 통과로 치지 않는다
+    ok3 = q_spread.mean() > 0 and qw.mean() >= 0.5 * q_spread.mean() and qm.mean() >= 0.5 * q_spread.mean()
     print(f"  판정 → IC기준 {'통과' if ok1 else '미달'} · 스프레드기준 {'통과' if ok2 else '미달'}"
-          f"  ⇒ {'채택 검토' if (ok1 and ok2) else ('부분' if (ok1 or ok2) else '채택 안 함')}")
+          f" · 착시검사 {'통과' if ok3 else '미달'}"
+          f"  ⇒ {'채택 검토' if (ok1 and ok2 and ok3) else ('부분' if (ok1 or ok2) else '채택 안 함')}")
     if keep:
         print(f"  유의 팩터: {', '.join(keep)}")
 
@@ -368,5 +396,6 @@ if __name__ == "__main__":
         if v != "both":
             mks = [v]
     pit = "--nopit" not in sys.argv
+    fset = sys.argv[sys.argv.index("--set") + 1] if "--set" in sys.argv else "px"
     for m in mks:
-        run(m, pit=pit)
+        run(m, pit=pit, fset=fset)
