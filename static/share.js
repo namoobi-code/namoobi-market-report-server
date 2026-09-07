@@ -154,7 +154,7 @@ function render(){
         ${b.auto?'<span style="background:#dcfce7;color:#166534;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">매일 자동</span>':(b.stale?'<span style="background:#fef3c7;color:#b45309;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">⏳ 다음 보고서 갱신</span>':'<span style="background:#f1f5f9;color:#475569;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">최신</span>')}</span></div>
       <div style="font-size:11px;color:#64748b;margin:3px 0 6px">${b.why}</div>
       ${gap?`<div style="font-size:11.5px;margin-bottom:4px">⚔️ <b>${gap.lead}</b> 리드 — 2위 ${gap.second}와 격차 <b>${gap.gap}${b.unit==='위'?'위':b.unit}</b>${gap.dgap!=null?` (직전 관측 대비 <b style="color:${gap.dgap>0?'#166534':gap.dgap<0?'#b91c1c':'#64748b'}">${gap.dgap>0?'확대 +':gap.dgap<0?'축소 ':''}${gap.dgap}</b>)`:''} ${gap.dgap!=null&&gap.dgap<0?'— <b style="color:#b91c1c">역전 방향 진행</b>':''}</div>`:''}
-      <div style="height:${BIG?'460px':'210px'}"><canvas id="${P}_cv_${b.id}"></canvas></div>
+      <div style="height:${BIG?'clamp(560px, 72vh, 1100px)':'210px'}"><canvas id="${P}_cv_${b.id}"></canvas></div>
       ${tbl}
       <div style="font-size:10.5px;color:#94a3b8;margin-top:5px">관련 종목: ${(b.players||[]).map(p=>p.stock?`${p.k}(${p.stock})`:p.k).join(' · ')||'—'} · 출처: ${b.src} · (E)=기관 추정치</div>
     </div>`;}).join('');
@@ -185,12 +185,12 @@ function render(){
         borderColor:colorOf(k,i),backgroundColor:colorOf(k,i),
         pointRadius:BIG?4:3,borderWidth:BIG?2.4:1.8,spanGaps:true}))},
       options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-        plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},
+        plugins:{legend:{labels:{boxWidth:BIG?16:13,font:{size:BIG?13:10.5}}},
           tooltip:{itemSort:(a,c)=>(c.raw??-1e18)-(a.raw??-1e18),callbacks:{label:c=>c.dataset.label+' '+c.raw+(b.unit==='위'?'위':b.unit)}}},
-        scales:{x:{ticks:{maxTicksLimit:10,font:{size:9.5}}},
+        scales:{x:{ticks:{maxTicksLimit:10,font:{size:BIG?12:9.5}}},
           y:{type:(LOGY.has(b.id)?'logarithmic':'linear'),
              reverse:(b.unit==='위'),min:(b.unit==='단계'?0:undefined),max:(b.unit==='단계'?8:undefined),
-             ticks:{stepSize:(b.unit==='단계'?1:undefined),font:{size:10}},
+             ticks:{stepSize:(b.unit==='단계'?1:undefined),font:{size:BIG?12:10}},
              title:{display:true,text:b.unit==='위'?'랭크(낮을수록 상위)'
                     :(b.unit==='단계'?'개발 단계 (1 Ph1 → 8 다국가 승인)'
                     :(LOGY.has(b.id)?b.unit+' (로그 눈금)':b.unit)),font:{size:10}}}}}});
