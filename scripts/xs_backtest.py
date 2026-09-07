@@ -76,6 +76,62 @@ STEP = 20       # 관측 간격 — 지평과 같게 두어 표본 중첩 제거
 MIN_HIST = 260  # 팩터 계산에 필요한 최소 과거 길이(12개월 모멘텀)
 MIN_TRAIN = 24  # 최소 학습 기간 수
 LAM = 10.0      # 릿지 — 팩터 8개·표본 수만 개라 약한 정규화로 충분
+MIN_VALID = 12  # 워크포워드 검증 기간이 이보다 적으면 "판정 유보"(억지 판정 금지)
+
+# ── panel 테이블 팩터 (2026-09-07 추가) — 가격으로 소급 불가능했던 축.
+#    부호는 **사전에** 고정한다(데이터 보고 뒤집지 않는다): 값이 클수록 4주 초과수익에
+#    (+)일 것으로 가설하는 방향으로 맞춰 둔다. 밸류 배수는 낮을수록 싸므로 −, 공매도·
+#    대차잔고는 높을수록 하방 압력으로 −. 결측은 zs() 에서 그 시점 평균(0)으로 둔다.
+PANEL_FACTORS = {
+    # 리비전
+    "cr30": +1, "cr90": +1, "cr7": +1, "tprv": +1, "tprv90": +1, "eps_rev": +1,
+    # 서프라이즈
+    "spr": +1, "sspr": +1, "sprb": +1,
+    # 성장·전망
+    "opg": +1, "opg_f": +1, "gacc": +1, "epsg": +1, "qup": +1, "yup": +1,
+    # 밸류 (배수 낮을수록 +)
+    "per": -1, "pbr": -1, "psr": -1, "fper": -1, "upside": +1,
+    # 수급
+    "frgn": +1, "inst": +1, "sr": -1, "lbr": -1,
+}
+PANEL_GROUP = {
+    "리비전": ["cr30", "cr90", "cr7", "tprv", "tprv90", "eps_rev"],
+    "서프라이즈": ["spr", "sspr", "sprb"],
+    "성장전망": ["opg", "opg_f", "gacc", "epsg", "qup", "yup"],
+    "밸류": ["per", "pbr", "psr", "fper", "upside"],
+    "수급": ["frgn", "inst", "sr", "lbr"],
+}
+
+
+def load_panel(mk, codes):
+    """panel 테이블 → {d: ndarray(len(codes), len(PANEL_FACTORS))}. 조인 키 (d, mk, c).
+    밸류 배수는 0 이하(적자)를 결측 처리 — PER −5 가 '아주 싸다'로 읽히는 오류 방지."""
+    cx = sqlite3.connect(DB)
+    try:
+        cols = list(PANEL_FACTORS)
+        have = {r[1] for r in cx.execute("PRAGMA table_info(panel)")}
+        cols = [k for k in cols if k in have]
+        if not cols:
+            return {}, []
+        rows = cx.execute(f"SELECT d, c, {','.join(cols)} FROM panel WHERE mk=?", (mk,)).fetchall()
+    except sqlite3.OperationalError:
+        return {}, []
+    finally:
+        cx.close()
+    ci = {c: i for i, c in enumerate(codes)}
+    out = {}
+    for r in rows:
+        d, c = r[0], str(r[1])
+        if c not in ci:
+            continue
+        M = out.setdefault(d, np.full((len(codes), len(cols)), np.nan))
+        M[ci[c]] = [np.nan if v is None else float(v) for v in r[2:]]
+    for d, M in out.items():
+        for j, k in enumerate(cols):
+            if k in ("per", "pbr", "psr", "fper"):
+                M[np.where(M[:, j] <= 0)[0], j] = np.nan
+            M[:, j] *= PANEL_FACTORS[k]
+    return out, cols
 
 
 def load(mk):
@@ -149,7 +205,9 @@ def spearman(a, b):
     return float((ra * rb).sum() / dn) if dn else np.nan
 
 
-def run(mk, pit=True):
+def run(mk, pit=True, fset="px"):
+    """fset: px = 가격 파생 8종(1차와 동일) · panel = panel 팩터만 · all = 둘 다.
+    panel/all 은 관측 시점이 panel 스냅샷이 있는 날로 제한된다(가격은 5년, 패널은 축적분만)."""
     P, codes, dates = load(mk)
     if P is None:
         print(f"[{mk}] 데이터 없음"); return
@@ -158,13 +216,39 @@ def run(mk, pit=True):
     capT = caps_today(mk, codes)
     last = np.array([np.nan if np.all(np.isnan(P[i])) else P[i][~np.isnan(P[i])][-1]
                      for i in range(len(codes))])
-    ts = list(range(MIN_HIST, T - H, STEP))
+    panel, pcols = ({}, [])
+    if fset == "px":
+        ts = list(range(MIN_HIST, T - H, STEP))
+    else:
+        panel, pcols = load_panel(mk, codes)
+        di = {d: i for i, d in enumerate(dates)}
+        # panel 날짜 중 px 에도 있고(조인), 팩터 이력·정답지가 갖춰진 날만, STEP 간격으로 솎는다
+        cand = sorted(di[d] for d in panel if d in di and MIN_HIST <= di[d] < T - H)
+        ts, prev = [], -10**9
+        for t in cand:
+            if t - prev >= STEP:
+                ts.append(t); prev = t
+        pd_all = sorted(panel)
+        print(f"\n   panel 축적: {len(pd_all)}일 ({pd_all[0] if pd_all else '-'}~{pd_all[-1] if pd_all else '-'})"
+              f" · 정답지(+{H}거래일) 확보된 관측일 {len(cand)} → {STEP}거래일 간격 {len(ts)}기간"
+              f" · 팩터 {len(pcols)}종")
     print(f"\n══ {mk.upper()} · {len(codes)}종목 · {dates[0]}~{dates[-1]} · 관측 {len(ts)}기간 "
-          f"(지평 {H}거래일·간격 {STEP}) · 시점별 시총하한 {'ON' if pit else 'OFF(편향 재현)'}")
+          f"(지평 {H}거래일·간격 {STEP}) · 팩터셋 {fset} · 시점별 시총하한 {'ON' if pit else 'OFF(편향 재현)'}")
+    if len(ts) < MIN_TRAIN + MIN_VALID:
+        print(f"  ⏸ 판정 유보 — 관측 {len(ts)}기간 < 최소 {MIN_TRAIN}(학습)+{MIN_VALID}(검증)."
+              f" 표본이 모일 때까지 기다린다(억지 판정 금지).")
+        if fset != "px":
+            return
+    if not ts:
+        return
 
     FN, snaps = None, []
     for t in ts:
-        f = factors(P, t)
+        f = factors(P, t) if fset != "panel" else {}
+        if fset != "px":
+            M = panel[dates[t]]
+            for j, k in enumerate(pcols):
+                f[k] = M[:, j]
         if FN is None:
             FN = list(f)
         with np.errstate(invalid="ignore", divide="ignore"):
@@ -209,15 +293,38 @@ def run(mk, pit=True):
               f"  {'◀' if tv >= 2 else ''}")
 
     # ── 워크포워드 릿지 (전 팩터 결합)
+    res = walk_forward(snaps, list(range(len(FN))))
+    if res is None:
+        print("  ⚠️ 워크포워드 표본 부족 — 판정 불가"); return
+    report_wf(res, keep)
+    # ── 팩터군별 워크포워드 (panel/all) — 어떤 축이 실제로 기여하는지 기록용
+    if fset != "px":
+        print("  팩터군별 워크포워드(같은 하네스 · 해당 군만 학습)")
+        groups = dict(PANEL_GROUP)
+        if fset == "all":
+            groups = {"가격8종": [k for k in FN if k not in PANEL_FACTORS], **groups}
+        for g, ks in groups.items():
+            idx = [FN.index(k) for k in ks if k in FN]
+            if not idx:
+                continue
+            r = walk_forward(snaps, idx)
+            if r is None:
+                continue
+            print(f"    {g:6s} IC {r['ic'].mean():+.4f} t {r['ict']:+.2f} · 스프레드 {r['sp'].mean()*100:+.2f}%"
+                  f" 승률 {r['hit']*100:.0f}% · 윈저 {r['qw'].mean()*100:+.2f}% 중앙 {r['qm'].mean()*100:+.2f}%")
+
+
+def walk_forward(snaps, idx):
+    """확장창 워크포워드 릿지. idx = 사용할 팩터 열 인덱스. 검증 기간 < MIN_VALID 면 None."""
     ic_wf, q_spread, q_hit, n_used = [], [], 0, 0
     q_wins, q_med, q_long = [], [], []
     for i in range(MIN_TRAIN, len(snaps)):
-        Xtr = np.vstack([s[1] for s in snaps[:i]])
+        Xtr = np.vstack([s[1][:, idx] for s in snaps[:i]])
         ytr = np.concatenate([s[2] for s in snaps[:i]])
         A = Xtr.T @ Xtr + LAM * np.eye(Xtr.shape[1])
         beta = np.linalg.solve(A, Xtr.T @ ytr)
         d_, X, y, _ = snaps[i]
-        pred = X @ beta
+        pred = X[:, idx] @ beta
         ic = spearman(pred, y)
         if np.isfinite(ic):
             ic_wf.append(ic)
