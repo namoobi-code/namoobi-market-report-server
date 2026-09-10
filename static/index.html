@@ -567,6 +567,7 @@
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
       <button class="tab"    data-pane="p_revd" style="background:#7c2d12;border-color:#7c2d12;color:#fff">📋 리비전 데일리<small style="color:#fed7aa">목표가·컨센 변동 일별</small></button>
       <button class="tab"    data-pane="p_exp" style="background:#0c4a6e;border-color:#0c4a6e;color:#fff">📦 K-수출<small style="color:#bae6fd">잠정치 10일·품목별 HS</small></button>
+      <button class="tab"    data-pane="p_llm" style="background:#312e81;border-color:#312e81;color:#fff">🤖 AI 챗봇<small style="color:#c7d2fe">서버 로컬 LLM 실험</small></button>
       <!-- (2026-09-05) 코인 선행지표 탭 — cryptolead.js · scripts/fetch_cryptolead.py (매일 06:55) -->
       <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
@@ -792,6 +793,22 @@
 
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
   <!-- (2026-09-05) 📦 K-수출 페인 — customs+hs_invest 재사용 · exports.js (3.1.10 은 그대로 유지) -->
+  <!-- (2026-09-10) AI 챗봇 탭 — llm.js · 서버 Ollama(qwen3.5:4b) 프록시 /api/llm/chat (로그인 필요) -->
+  <div class="pane" id="p_llm" style="overflow:auto">
+    <h2>🤖 AI 챗봇 <em id="llm_stat"></em> <button id="llm_clear" class="scrrst" style="font-size:11px">🗑 대화 초기화</button></h2>
+    <div class="note" style="margin:-4px 0 10px"><b>실험용</b> — 서버(Oracle A1 · ARM 2코어 · GPU 없음)에 설치한 로컬 모델 <b>Qwen3.5 4B(Q4)</b>. Ollama 는 CPU 1.2코어·메모리 6GB 로 격리돼 기존 수집·화면에 영향 없음.
+      속도 약 3 토큰/초(첫 질문은 모델 로딩 20~30초 추가). 4B 급이라 사실·수치 오류가 잦음 — 챗봇·간단 작업(요약·분류·정형화) 실험 용도. 로그인 세션만 사용 가능(공개 서버 CPU 보호).</div>
+    <div class="box" style="padding:12px 14px;max-width:1000px">
+      <div id="llm_box" style="height:clamp(360px,55vh,760px);overflow:auto;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px"></div>
+      <div style="display:flex;gap:8px;margin-top:8px;align-items:flex-end">
+        <textarea id="llm_in" rows="2" placeholder="메시지 입력 (Enter 전송 · Shift+Enter 줄바꿈)" style="flex:1;font-size:13.5px;padding:8px 10px;border:1px solid #cbd5e1;border-radius:8px;resize:vertical"></textarea>
+        <button id="llm_send" style="padding:10px 18px;border-radius:8px;border:0;background:#4c1d95;color:#fff;font-weight:700;cursor:pointer">전송</button>
+        <button id="llm_stop" style="display:none;padding:10px 12px;border-radius:8px;border:1px solid #b91c1c;background:#fff;color:#b91c1c;cursor:pointer">■ 중단</button>
+      </div>
+      <div id="llm_meta" class="note" style="margin-top:6px"></div>
+    </div>
+  </div>
+
   <div class="pane" id="p_exp" style="overflow:auto">
     <h2>📦 K-수출 — 관세청 잠정치·품목별 HS <em id="ex_asof"></em> <button id="ex_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
     <div class="note" style="margin:-4px 0 10px;line-height:1.7">
@@ -2219,7 +2236,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09071500"></script>
+<script src="/app.js?v=09102130"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -2229,7 +2246,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09052010"></script><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09052010"></script><script src="/llm.js?v=09102130"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09051933"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=09080120"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

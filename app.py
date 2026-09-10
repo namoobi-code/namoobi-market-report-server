@@ -3006,6 +3006,54 @@ def apt_rank(ym0: str = "", ym1: str = "", region: str = "", kind: str = "apt",
 
 # ── 추세 스파크라인 (docx 표의 '추세(1Y)' 열과 동일한 PNG) ──
 #   리포트 실행 때 생성된 charts/spark_*.png 를 sync_server.py 가 올린다.
+# ── (2026-09-10) 🤖 AI 챗봇 — 서버 로컬 LLM(Ollama · qwen3.5:4b) 프록시 ──────────────────────
+#   실험용. Ollama 는 127.0.0.1:11434 에만 바인딩(외부 노출 없음)이고 systemd 로 CPU 1.2코어·메모리 6GB 로 격리돼
+#   기존 FastAPI·크론에 영향이 없다. 공개 서버라 로그인 세션만 허용(무단 사용 시 CPU 점유).
+#   스트리밍: Ollama /api/chat 의 NDJSON 을 그대로 흘려보낸다(클라이언트가 줄 단위 파싱).
+from fastapi.responses import StreamingResponse as _SR
+_OLLAMA = "http://127.0.0.1:11434"
+_LLM_MODEL = "qwen3.5:4b"
+_LLM_SYS = ("당신은 namoobi AI 터미널의 실험용 로컬 어시스턴트다. 한국어로 간결하게 답한다. "
+            "모르는 사실은 모른다고 말하고 수치를 지어내지 않는다.")
+
+
+@app.get("/api/llm/status")
+def llm_status():
+    try:
+        with urllib.request.urlopen(_OLLAMA + "/api/tags", timeout=3) as r:
+            tags = json.loads(r.read().decode())
+        models = [m.get("name") for m in tags.get("models", [])]
+        return {"ok": True, "model": _LLM_MODEL, "loaded": _LLM_MODEL in models, "models": models}
+    except Exception as ex:
+        return {"ok": False, "err": repr(ex)[:120]}
+
+
+@app.post("/api/llm/chat")
+async def llm_chat(request: Request):
+    if not _logged_in(request):
+        raise HTTPException(401, "로그인 후 이용 가능합니다(서버 CPU 보호)")
+    body = await request.json()
+    msgs = body.get("messages") or []
+    if not isinstance(msgs, list) or not msgs:
+        raise HTTPException(400, "messages 필요")
+    # 최근 12턴만 · 각 메시지 4000자 컷(4B 모델 컨텍스트 4k 보호)
+    msgs = [{"role": ("assistant" if m.get("role") == "assistant" else "user"),
+             "content": str(m.get("content", ""))[:4000]} for m in msgs][-12:]
+    payload = json.dumps({"model": _LLM_MODEL, "stream": True, "think": False,
+                          "messages": [{"role": "system", "content": _LLM_SYS}] + msgs,
+                          "options": {"num_ctx": 4096, "temperature": float(body.get("temperature", 0.6))}}).encode()
+
+    def gen():
+        req = urllib.request.Request(_OLLAMA + "/api/chat", data=payload, headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                for line in r:
+                    yield line
+        except Exception as ex:
+            yield json.dumps({"error": repr(ex)[:200]}).encode() + b"\n"
+    return _SR(gen(), media_type="application/x-ndjson")
+
+
 CHARTS = BASE / "data" / "charts"
 CHARTS.mkdir(parents=True, exist_ok=True)
 app.mount("/charts", StaticFiles(directory=CHARTS), name="charts")
