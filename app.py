@@ -3044,11 +3044,15 @@ async def llm_chat(request: Request):
                           "options": {"num_ctx": 4096, "temperature": float(body.get("temperature", 0.6))}}).encode()
 
     def gen():
+        # 클라이언트가 끊으면(탭 이동·창 닫기·■중단) Starlette 가 이 제너레이터를 close() → GeneratorExit →
+        # with 블록이 urllib 소켓을 닫고, Ollama 는 요청 연결이 끊기면 생성을 즉시 중단한다(2026-09-10 실측: 서버 CPU 즉시 복귀).
         req = urllib.request.Request(_OLLAMA + "/api/chat", data=payload, headers={"Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=600) as r:
                 for line in r:
                     yield line
+        except GeneratorExit:
+            raise
         except Exception as ex:
             yield json.dumps({"error": repr(ex)[:200]}).encode() + b"\n"
     return _SR(gen(), media_type="application/x-ndjson")
