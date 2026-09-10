@@ -3045,16 +3045,38 @@ async def llm_chat(request: Request):
 
     def gen():
         # 클라이언트가 끊으면(탭 이동·창 닫기·■중단) Starlette 가 이 제너레이터를 close() → GeneratorExit →
-        # with 블록이 urllib 소켓을 닫고, Ollama 는 요청 연결이 끊기면 생성을 즉시 중단한다(2026-09-10 실측: 서버 CPU 즉시 복귀).
+        # urllib 소켓을 닫고, Ollama 는 요청 연결이 끊기면 생성을 즉시 중단한다(2026-09-10 실측: 서버 CPU 즉시 복귀).
+        # (2026-09-10 사고) 첫 토큰까지 60초 넘게 무응답(모델 로딩+프롬프트 평가, CPU 1.2코어)이면 nginx 가 upstream timeout 으로
+        # 끊어 'network error' 가 났다 → 업스트림을 스레드로 읽고 10초마다 빈 줄(하트비트)을 흘려 연결을 살린다(클라이언트는 빈 줄 무시).
+        import threading, queue
+        q = queue.Queue()
         req = urllib.request.Request(_OLLAMA + "/api/chat", data=payload, headers={"Content-Type": "application/json"})
+        stop = threading.Event()
+
+        def reader():
+            try:
+                with urllib.request.urlopen(req, timeout=600) as r:
+                    for line in r:
+                        if stop.is_set():
+                            break
+                        q.put(line)
+            except Exception as ex:
+                q.put(json.dumps({"error": repr(ex)[:200]}).encode() + b"\n")
+            finally:
+                q.put(None)
+        threading.Thread(target=reader, daemon=True).start()
         try:
-            with urllib.request.urlopen(req, timeout=600) as r:
-                for line in r:
-                    yield line
-        except GeneratorExit:
-            raise
-        except Exception as ex:
-            yield json.dumps({"error": repr(ex)[:200]}).encode() + b"\n"
+            while True:
+                try:
+                    item = q.get(timeout=10)
+                except queue.Empty:
+                    yield b"\n"          # heartbeat
+                    continue
+                if item is None:
+                    break
+                yield item
+        finally:
+            stop.set()              # 클라이언트 이탈 → 리더 스레드가 다음 줄에서 빠져나오며 소켓 close → Ollama 중단
     return _SR(gen(), media_type="application/x-ndjson")
 
 
