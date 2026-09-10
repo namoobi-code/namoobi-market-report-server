@@ -807,6 +807,15 @@
       </div>
       <div id="llm_meta" class="note" style="margin-top:6px"></div>
     </div>
+
+    <!-- (2026-09-10) 노트북 로컬 LLM(RTX 5060 8GB) 상태 — /llm/api/features 를 같은 도메인에서 읽는다(역방향 SSH 터널). 노트북이 꺼져 있으면 502 → 안내 -->
+    <h2 style="margin-top:22px">💻 노트북 로컬 AI (RTX 5060 · 8GB) <em id="nb_stat"></em>
+      <a href="/llm/" target="_blank" class="scrrst" style="font-size:11px;text-decoration:none">↗ 노트북 AI 홈피 열기</a>
+      <button id="nb_reload" class="scrrst" style="font-size:11px">↻</button></h2>
+    <div class="note" style="margin:-4px 0 10px;line-height:1.7">서버(CPU 4B)와 별개로 <b>집 노트북 GPU</b> 에서 도는 모델들. 노트북이 켜져 있고 터널이 붙어 있을 때만 응답하며, 챗봇·앱만들기·이미지 생성 등은 위 링크의 노트북 홈피(접속키 필요)에서 쓴다.
+      ● 설치됨 = 디스크에 있음 · <span style="color:#b45309">● GPU 적재됨</span> = 지금 메모리에 있어 바로 응답 · ○ 미설치 · ◌ 예정</div>
+    <div id="nb_gpu" class="note" style="margin:-6px 0 8px"></div>
+    <div class="grid g3" id="nb_feat" style="max-width:1100px"></div>
   </div>
 
   <div class="pane" id="p_exp" style="overflow:auto">
@@ -2246,7 +2255,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09052010"></script><script src="/llm.js?v=09102220"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09052010"></script><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09051933"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=09080120"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

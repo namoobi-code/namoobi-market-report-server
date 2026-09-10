@@ -26,6 +26,31 @@ async function status(){
   }catch(e){ $('llm_stat').textContent='상태 확인 실패'; }
 }
 
+
+// (2026-09-10) 노트북 로컬 AI 상태 패널 — /llm/api/status + /llm/api/features (nginx → SSH 터널 → 노트북 :8800)
+async function nbStatus(){
+  const st=$('nb_stat'), box=$('nb_feat'), gpu=$('nb_gpu'); if(!st||!box) return;
+  st.innerHTML='<span style="color:#64748b">확인 중…</span>';
+  try{
+    const r=await fetch('/llm/api/features',{cache:'no-cache'});
+    if(!r.ok) throw new Error(r.status===502?'노트북 꺼짐 또는 터널 끊김(502)':'HTTP '+r.status);
+    const l=await r.json();
+    let g=null; try{ const s=await (await fetch('/llm/api/status',{cache:'no-cache'})).json(); g=s.gpu; 
+      gpu.innerHTML=g&&g.name?`GPU <b>${E(g.name)}</b> · VRAM ${(g.vram_used_mb/1024).toFixed(1)}/${(g.vram_total_mb/1024).toFixed(0)}GB · 사용률 ${g.util_pct}% · ${g.temp_c}°C · 가동 ${Math.floor(s.uptime_s/60)}분`:''; }catch(e){}
+    const on=l.filter(f=>f.installed).length, ld=l.filter(f=>f.loaded).length;
+    st.innerHTML=`<span style="color:#166534">● 연결됨 · 설치 ${on}/${l.length} · GPU 적재 ${ld}</span>`;
+    box.innerHTML=l.map(f=>{
+      const ins=f.install||{};
+      const mark=f.kind==='planned'?'<span style="color:#94a3b8">◌ 예정</span>':ins.running?'<span style="color:#b45309">⟳ 설치 중 '+(ins.pct!=null?ins.pct+'%':'')+'</span>':f.loaded?'<span style="color:#b45309">● GPU 적재됨</span>':f.installed?'<span style="color:#166534">● 설치됨</span>':'<span style="color:#94a3b8">○ 미설치</span>';
+      return `<div class="box" style="padding:10px 12px"><div style="display:flex;justify-content:space-between;align-items:center;font-weight:700">${E(f.title)}<span style="font-size:12px;font-weight:400">${mark}</span></div>
+        <div style="font-size:12px;color:#4c1d95;margin:2px 0 4px">${E(f.model)} · ${E(f.size)} · VRAM ${E(f.vram)}${f.cloud?' · <span style="color:#b45309">클라우드</span>':''}</div>
+        <div style="font-size:12.5px;color:#334155;line-height:1.55">${E(f.desc)}</div></div>`;}).join('');
+  }catch(e){
+    st.innerHTML=`<span style="color:#b91c1c">● ${E(e.message)}</span>`;
+    box.innerHTML='<div class="note">노트북에서 <b>namoobi-llm.bat</b> 런처의 ▶ 시작을 누르면 여기에 모델 목록과 상태가 나타납니다.</div>'; gpu.textContent='';
+  }
+}
+
 async function send(){
   if(BUSY) return;
   const ta=$('llm_in'); const q=ta.value.trim(); if(!q) return;
@@ -66,7 +91,7 @@ async function send(){
 }
 
 const HELLO='실험용 로컬 모델(qwen3.5 4B · CPU)입니다. 첫 질문은 모델 로딩으로 20~30초, 이후 약 3 토큰/초로 느리게 답합니다. 수치·사실은 검증 없이 믿지 마세요. 대화는 이 브라우저에 자동 저장됩니다.';
-window.renderLlm=function(){ status(); if(!$('llm_box').children.length){
+window.renderLlm=function(){ status(); nbStatus(); if(!$('llm_box').children.length){
   HIST=loadHist();
   $('llm_box').innerHTML=bubble('assistant',HELLO)+HIST.map(m=>bubble(m.role,m.content)).join('');
   if(HIST.length) $('llm_meta').textContent=`저장된 대화 ${HIST.length}개 복원`;
@@ -82,6 +107,8 @@ document.addEventListener('DOMContentLoaded',function(){
   const s=$('llm_send'); if(s) s.onclick=send;
   const st=$('llm_stop'); if(st) st.onclick=()=>{ if(ctrl) ctrl.abort(); };
   const c=$('llm_clear'); if(c) c.onclick=()=>{ if(ctrl) ctrl.abort(); HIST=[]; try{localStorage.removeItem(LS);}catch(e){} $('llm_box').innerHTML=''; $('llm_meta').textContent=''; window.renderLlm(); };
+  const nb=$('nb_reload'); if(nb) nb.onclick=nbStatus;
   const ta=$('llm_in'); if(ta) ta.addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); send(); } });
 });
 })();
+
