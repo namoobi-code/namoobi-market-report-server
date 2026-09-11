@@ -133,14 +133,20 @@ def fetch(did, s, e, tries=3):
 # 화면(PGJ164M01)이 쓰는 내부 엔드포인트다. 공식 Open API 가 아니라 인증키가 없고,
 # 법원이 화면을 바꾸면 깨질 수 있다 → 실패해도 조용히 넘어가고 이전 값을 유지한다.
 #
-# 지역 필터는 못 쓴다(실측 2026-08-22): adongSdCd·cortOfcCd 에 서울중앙/서울동부/부산/대구
-# 어느 값을 넣어도 전국과 동일한 숫자가 돌아온다. 서버가 세션에 담긴 조건을 보는 구조로 보인다.
-# → **전국 기준**으로만 수집한다. 지역별 물량은 등기정보광장(위)이 담당한다.
+# (2026-09-11 정정) 지역 필터는 **searchType='02'** 여야 먹는다 — '2' 로 보내면 조용히
+# 무시되고 전국이 돌아온다(8월의 "지역 불가" 판정은 이 오타 때문의 오진이었다).
+# 실측: 서울 2026-07 경매 239건·낙찰가율 95.9% — 경향신문(1~8월 1,614건·98.4%)과 정합.
 CA_BASE = "https://www.courtauction.go.kr"
 CA_STAT = CA_BASE + "/pgj/pgj164/selectRletCortDspslStats.on"
 CA_UA = "Mozilla/5.0 (namoobi market terminal)"
 # 화면이 돌려주는 용도 19종 중 대시보드에서 쓸 것만 고른다(소계·겸용은 중복이라 뺀다)
 CA_USG = ["아파트", "연립주택,다세대", "오피스텔", "단독주택", "다가구주택", "전체"]
+# 법원경매정보 selectAdong 의 시도 코드(실측 2026-09-11). ''=전국.
+# 12=전남광주통합특별시 — 대시보드 표기와 맞춘다. 29(구 광주)는 통합으로 비어 있어 뺀다.
+CA_SIDO = [("", "전국"), ("11", "서울"), ("12", "광주·전남"), ("26", "부산"), ("27", "대구"),
+           ("28", "인천"), ("30", "대전"), ("31", "울산"), ("36", "세종"), ("41", "경기"),
+           ("43", "충북"), ("44", "충남"), ("47", "경북"), ("48", "경남"), ("50", "제주"),
+           ("51", "강원"), ("52", "전북")]
 
 
 def num(v):
@@ -172,34 +178,41 @@ def _ca_opener():
 
 
 def court_stats(months):
-    """{용도: {ym: {...}}} — 월별 전국 매각통계."""
+    """{용도: {지역: {ym: {...}}}} — 월별 · 전국+16개 시도 매각통계."""
     op = _ca_opener()
     if not op:
         return {}
-    acc, miss = {}, 0
-    for ym in months:
-        body = json.dumps({"dma_search": {"searchType": "1", "cortOfcCd": "", "adongSdCd": "",
-                                          "adongSggCd": "", "startDate": ym, "endDate": ym}}).encode()
-        req = urllib.request.Request(CA_STAT, data=body, method="POST", headers={
-            "Content-Type": "application/json;charset=UTF-8", "User-Agent": CA_UA,
-            "Referer": CA_BASE + "/pgj/index.on", "SC-Pgmid": "PGJ164M01", "SC-Userid": "NONUSER"})
-        try:
-            d = json.loads(op.open(req, timeout=30).read())
-            rows = (d.get("data") or {}).get("rletCortDspslStats") or []
-        except Exception:
-            rows = []
-        if not rows:
-            miss += 1
-        for r in rows:
-            nm = str(r.get("lclDspslGdsLstUsgNm") or "").strip()
-            if nm not in CA_USG:
-                continue
-            acc.setdefault(nm, {})[ym] = {
-                "auctn": num(r.get("auctnNum")), "sold": num(r.get("dspslNum")),
-                "rate": num(r.get("dspslAmtRate")), "sold_rate": num(r.get("dspslRate")),
-                "appr": num(r.get("aeeEvlGrsAmt")), "amt": num(r.get("dspslGrsAmt"))}
-        time.sleep(0.35)
-    print(f"    용도 {len(acc)}종 · 빈 응답 {miss}/{len(months)}개월")
+    acc, miss, calls = {}, 0, 0
+    for sd, reg in CA_SIDO:
+        for ym in months:
+            body = json.dumps({"dma_search": {"searchType": "02" if sd else "01",
+                                              "cortOfcCd": "", "adongSdCd": sd,
+                                              "adongSggCd": "", "startDate": ym,
+                                              "endDate": ym}}).encode()
+            req = urllib.request.Request(CA_STAT, data=body, method="POST", headers={
+                "Content-Type": "application/json;charset=UTF-8", "User-Agent": CA_UA,
+                "Referer": CA_BASE + "/pgj/index.on", "SC-Pgmid": "PGJ164M01",
+                "SC-Userid": "NONUSER"})
+            try:
+                d = json.loads(op.open(req, timeout=30).read())
+                rows = (d.get("data") or {}).get("rletCortDspslStats") or []
+            except Exception:
+                rows = []
+            calls += 1
+            if not rows:
+                miss += 1
+            for r in rows:
+                nm = str(r.get("lclDspslGdsLstUsgNm") or "").strip()
+                if nm not in CA_USG:
+                    continue
+                acc.setdefault(nm, {}).setdefault(reg, {})[ym] = {
+                    "auctn": num(r.get("auctnNum")), "sold": num(r.get("dspslNum")),
+                    "rate": num(r.get("dspslAmtRate")), "sold_rate": num(r.get("dspslRate")),
+                    "appr": num(r.get("aeeEvlGrsAmt")), "amt": num(r.get("dspslGrsAmt"))}
+            time.sleep(0.3)
+        got = len((acc.get("아파트") or {}).get(reg, {}))
+        print(f"    {reg:<6} {got}개월", flush=True)
+    print(f"    용도 {len(acc)}종 · 호출 {calls} · 빈 응답 {miss}")
     return acc
 
 
@@ -242,7 +255,7 @@ def main():
     court = court_stats(month_range(Y0))
 
     ts = sorted({ym for k in acc for (_, ym) in acc[k]} |
-                {ym for u in court.values() for ym in u})
+                {ym for u in court.values() for regmp in u.values() for ym in regmp})
     regs = sorted({r for k in acc for (r, _) in acc[k]}, key=lambda x: (x != "전국", x))
     if not ts:
         raise SystemExit("✗ 수집 0건 — 인증키·API 제한 확인")
@@ -262,14 +275,15 @@ def main():
     USG_KEY = {"아파트": "apt", "연립주택,다세대": "rh", "오피스텔": "offi",
                "단독주택": "sh", "다가구주택": "mh", "전체": "all"}
     for nm, short in USG_KEY.items():
-        mp = court.get(nm) or {}
-        if not mp:
+        by_reg = court.get(nm) or {}
+        if not by_reg:
             continue
         for fld, suffix, lab in [("rate", "rate", "낙찰가율"), ("sold_rate", "sldrate", "매각률"),
                                  ("auctn", "auctn", "경매 진행건수"), ("sold", "sold", "매각건수")]:
-            out[f"bid_{short}_{suffix}"] = {"전국": [(mp.get(t) or {}).get(fld) for t in ts]}
+            out[f"bid_{short}_{suffix}"] = {
+                reg: [(mp.get(t) or {}).get(fld) for t in ts] for reg, mp in by_reg.items()}
             out["labels"][f"bid_{short}_{suffix}"] = f"{nm} {lab}"
-    out["court_src"] = "대법원 법원경매정보 매각통계 — 전국 기준(지역 필터 미지원)"
+    out["court_src"] = "대법원 법원경매정보 매각통계 · 전국+16개 시도 (searchType=02 소재지 기준)"
 
     # 개시 합계(임의+강제) — '경매 물량' 한 줄로 볼 때 쓰는 계열
     out["open_all"] = {r: [(None if (acc["open_v"].get((r, t)) is None and acc["open_f"].get((r, t)) is None)

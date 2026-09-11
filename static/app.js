@@ -4237,7 +4237,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   /* ── 3.3.2 리밸런싱 ── */
   const RB=(M.index_rebalance||{}).index_rebalance||M.index_rebalance||{};
   let rbh='';
-  [['sp500','S&P 500'],['nasdaq100','나스닥 100']].forEach(([k,l])=>{
+  [['sp500','S&P 500'],['sp100','S&P 100'],['nasdaq100','나스닥 100']].forEach(([k,l])=>{  // (2026-09-11) S&P 100 신설
     const r=RB[k]; if(!r)return;
     rbh+=`<div class="grp">${l}</div>`;
     let ch=[...(r.additions||[]).map(x=>({...x,act:'편입'})),...(r.deletions||[]).map(x=>({...x,act:'편출'}))];

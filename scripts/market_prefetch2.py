@@ -13,7 +13,7 @@
   factset_insight.json FactSet Insight RSS 최신 글(HubSpot JS 캐시 우회 — Chrome 대체)
   ism_pmi.json         ISM 제조/서비스 최신 공표치(구글뉴스 헤드라인 파싱, best-effort)
   ib_insights.json     IB 5사 하우스뷰 관련 최신 보도 풀(24시간 보존)
-  rebalance_news.json  S&P500·나스닥100 지수변경 헤드라인 모니터(마커 변동시에만 에이전트 발행)
+  rebalance_news.json  S&P500·S&P100·나스닥100 지수변경 헤드라인 모니터(마커 변동시에만 에이전트 발행)
 전부 비차단: 실패 항목은 기존 DB 유지·경고만.
 """
 import json, os, re, sys, html, urllib.request, urllib.parse
@@ -418,6 +418,7 @@ def ib():
 # ── 8) 리밸런싱 모니터 ──
 def rebalance():
     pool = (gnews("S&P 500 index changes constituents", 72, 8)
+            + gnews("S&P 100 index addition deletion", 72, 8) + gnews("S&P100 편입 편출", 72, 8)   # (2026-09-11) S&P 100 신설 — 나이키 편출(9/21) 누락 재발방지
             + gnews("나스닥100 편입 편출", 72, 8) + gnews("Nasdaq-100 index add removed", 72, 8))
     seen, ded = set(), []
     for it in pool:
