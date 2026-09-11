@@ -1,6 +1,6 @@
 {
  "marker": "2026-09",
- "as_of": "2026-09-08",
+ "as_of": "2026-09-11",
  "data": {
   "rows": [
    {
@@ -28,6 +28,6 @@
     "change": "변동없음"
    }
   ],
-  "comment": "2026-06-17 FOMC SEP(6월 점도표)가 현재 최신 공개본 — 9월 회의(9/15~16)는 SEP 발표 예정이나 아직 개최 전이라 갱신 전. 2026년말 중간값이 3월 3.4%→6월 3.8%로 40bp 매파적 상향된 것이 핵심 배경 — 8/28 잭슨홀에서 Kevin Warsh 신임 의장이 '기저 인플레 추세가 의미있게 개선됐다고 보기 어렵다'는 매파적 발언을 하며 9월 회의 인상 가능성이 부각됨. CME FedWatch 기준 9월 25bp 인상 확률 약 60~66%(2026-08-31 기준). (출처: federalreserve.gov fomcprojtabl20260617, fredblog.stlouisfed.org 2026-06 SEP 요약, cnbc.com 2026-08-28·08-31 Jackson Hole Warsh 발언 보도, 서버 DB /api/db/dot_plot)"
+  "comment": "2026-06-17 FOMC SEP(6월 점도표)가 현재 최신 공개본. 다음 SEP 는 2026-09-15~16 FOMC(9/16 종료)에서 발표 예정이나 2026-09-11 현재 아직 개최 전이라 갱신 없음 — 변동 없으므로 기존 rows 그대로 유지. 2026년말 중간값이 3월 3.4%→6월 3.8%로 40bp 매파적 상향된 것이 핵심 배경 — 8/28 잭슨홀에서 Kevin Warsh 신임 의장이 '기저 인플레 추세가 의미있게 개선됐다고 보기 어렵다'는 매파적 발언을 하며 9월 회의 인상 가능성이 부각됨. CME FedWatch 기준 9월 인상 확률 약 60~66%(2026-08-31 기준). (출처: federalreserve.gov fomcprojtabl20260617, fredblog.stlouisfed.org 2026-06 SEP 요약, cnbc.com 2026-08-28·08-31 Jackson Hole Warsh 발언 보도, 서버 DB db/dot_plot.json)"
  }
 }

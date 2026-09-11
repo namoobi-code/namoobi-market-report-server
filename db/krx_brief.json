@@ -1,6 +1,6 @@
 {
  "marker": "krx:2026091031|short:202609101S",
- "as_of": "2026-09-10",
+ "as_of": "2026-09-11",
  "data": {
   "krx": {
    "title": "KRX 증시 Brief(2026.9.10)",
@@ -8,7 +8,7 @@
    "att_seq": "2026091031",
    "pages": 1,
    "file_nm": "260910KRXBrief.pdf",
-   "reused": false
+   "reused": true
   },
   "short": {
    "title": "공매도 데일리 브리프('26.09.10)",
@@ -16,7 +16,7 @@
    "att_seq": "202609101S",
    "pages": 2,
    "file_nm": "260910..........��일리브리프.pdf",
-   "reused": false
+   "reused": true
   }
  }
 }

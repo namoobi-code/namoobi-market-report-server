@@ -745,6 +745,18 @@
     "DDR4 4Gb 256Mx16": 14.5,
     "DDR3 4Gb 256Mx16": 14.5
    }
+  ],
+  [
+   "2026-09-11",
+   {
+    "DDR5 8GB SO-DIMM": 130.0,
+    "DDR4 16GB SO-DIMM": 265.0,
+    "DDR4 8GB SO-DIMM": 139.0,
+    "DDR4 16Gb 2Gx8": 48.0,
+    "DDR4 8Gb 1Gx8": 24.0,
+    "DDR4 4Gb 256Mx16": 14.5,
+    "DDR3 4Gb 256Mx16": 14.5
+   }
   ]
  ]
 }
