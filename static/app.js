@@ -218,12 +218,17 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
      여기서 바로 드러난다. 값만 보고는 언제 것인지 알 수 없었다. */
   {const _ia=$('infl_asof'); if(_ia) _ia.textContent=b.inflation?.as_of?`데이터 기준 ${b.inflation.as_of}`:'';}
   $('infl').innerHTML=`<tr><th>지표</th><th style="text-align:right">최신값 YoY</th><th style="text-align:right">최신값 MoM</th>
-    <th>기준월</th><th>발표날짜</th><th>의미</th><th>시장영향</th><th>예상영향</th></tr>`+(b.inflation?.data||[]).map(r=>`<tr>
-    <td><b>${esc(r.name)}</b></td><td class="num up">${r.yoy!=null?(r.yoy>0?'+':'')+r.yoy+'%':'—'}</td>
-    <td class="num ${r.mom>0?'up':'dn'}">${r.mom!=null?(r.mom>0?'+':'')+r.mom+'%':'—'}</td>
+    <th>기준월</th><th>발표날짜</th><th>의미</th><th>시장영향</th><th>예상영향</th></tr>`+(b.inflation?.data||[]).map(r=>{
+    /* (2026-09-13 리포트=홈피 일치) DB 행이 보고서와 같은 보정본(nmr_reasons 되쓰기)이 되면서
+       BEI 의 mom 은 '수준지표(MoM 미해당)', yoy 는 '2.36% (수준)' 같은 문자열이 올 수 있다 — 숫자일 때만 부호·% 를 붙인다 */
+    const pv=v=>v==null||v===''?'—':(typeof v==='string'&&isNaN(+v))?esc(v):((+v>0?'+':'')+v+'%');
+    const cls=v=>(typeof v==='string'&&isNaN(+v))?'note':(+v>0?'up':+v<0?'dn':'note');
+    return `<tr>
+    <td><b>${esc(r.name)}</b></td><td class="num up">${pv(r.yoy)}</td>
+    <td class="num ${cls(r.mom)}">${pv(r.mom)}</td>
     <td class="note">${esc(r.asof)}</td><td class="note">${esc(r.release||'')}</td>
     <td class="note">${esc(r.meaning||'')}</td><td class="note">${esc(r.impact||'')}</td>
-    <td class="note">${esc(r.interp)}</td></tr>`).join('');
+    <td class="note">${esc(r.interp)}</td></tr>`;}).join('');
   const ic=S(b,'series_infl_CPI'),icc=S(b,'series_infl_Core_CPI'),ip=S(b,'series_infl_PCE'),
         ipc=S(b,'series_infl_Core_PCE'),ippi=S(b,'series_infl_PPI');
   mk($('c_infl'),L(ic),[{n:'CPI',d:V(ic),c:C.r},{n:'Core CPI',d:V(icc),c:C.o},{n:'PCE',d:V(ip),c:C.b},
@@ -3057,7 +3062,8 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       if(!regs.includes(_rhReg)) _rhReg=regs[0]||'전국';
       {const e=$('rh_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
       /* 지역 구분이 없는 거시 지표는 어느 지역을 골라도 '전국' 계열을 쓴다 */
-      const GLOB=['rate_kr','rate_us','csi'];
+      /* 지역 구분 없는 지표 — 어느 지역을 골라도 전국 값. (2026-09-13) 차주별 대출금리 5종 추가 */
+      const GLOB=['rate_kr','rate_us','csi','ln_mtg','ln_credit','ln_corp_l','ln_corp_s','ln_jeonse'];
       const pick=(k,r)=>(D[k]||{})[GLOB.includes(k)?'전국':r];
       const axOf=k=>_rhAxis[k]||(M[k]||{}).axis||'R';
       const MODES=[['val','값'],['idx','지수'],['yoy','전년비']];
@@ -3644,11 +3650,33 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
        $('re_csi_n').innerHTML=`최신 <b>${fm(a.t[a.t.length-1])} = ${lv??'—'}</b>${pv!=null?` (전월 ${pv>lv?'−':'+'}${Math.abs(lv-pv)}p)`:''} — `+
          (lv>=100?`<b class="up">100 위 = 상승 예상 우세</b> (심리 회복 국면)`:`<b class="dn">100 아래 = 하락 예상 우세</b>`)+
          ` · 심리 선행지표라 실제 가격지수보다 몇 달 먼저 도는 경향`;}
-      /* ② 주담대 금리 — 최근 5년 */
+      /* ② 주담대 금리 — 최근 5년 (먼저 그려두고, rehub 가 오면 아래에서 차주별 4선으로 덮어쓴다) */
       {const a=cut(S.mtg||{t:[],v:[]},60);
        line('re_mtg',[{...a,label:'주담대',color:'#d9534f'}]);
        const lv=a.v[a.v.length-1];
        $('re_mtg_n').innerHTML=`최신 <b>${fm(a.t[a.t.length-1])} = ${lv!=null?lv.toFixed(2)+'%':'—'}</b> — 전망CSI와 대체로 역방향(금리 하락 → 매수심리 회복)`;}
+      /* (2026-09-13) 차주별 대출금리 4선 — 한화투자증권 리서치 차트와 같은 구도.
+         주담대만 보면 '가계가 얼마에 빌리나' 뿐인데, 기업·신용을 나란히 놓으면 은행이
+         어느 차주의 위험을 더 크게 보는지가 스프레드로 드러난다. rehub.json(ECOS 121Y006). */
+      fetch('/api/db/rehub').then(r=>r.ok?r.json():null).then(h=>{
+        if(!h||!h.d||!h.d.ln_mtg) return;
+        const T=h.t, W=120;                           // 10년 — 2016~ 구간이 그림과 같다
+        const st=Math.max(0,T.length-W), t=T.slice(st);
+        const g=k=>((h.d[k]||{})['전국']||[]).slice(st);
+        const defs=[['ln_mtg','신규 주택담보대출','#d9534f'],['ln_corp_s','신규 중소기업대출','#2f6fed'],
+                    ['ln_corp_l','신규 대기업대출','#8a93a0'],['ln_credit','신규 일반신용대출','#2e8b7a'],
+                    ['ln_jeonse','신규 전세자금대출','#e08e3c']];
+        const arr=defs.map(([k,l,c])=>({t,v:g(k),label:l,color:c})).filter(a=>a.v.some(v=>v!=null));
+        if(!arr.length) return;
+        line('re_mtg',arr);
+        const last=k=>{const a=(h.d[k]||{})['전국']||[]; for(let i=a.length-1;i>=0;i--) if(a[i]!=null) return [T[i],a[i]]; return null;};
+        const m=last('ln_mtg'), cr=last('ln_credit'), cs=last('ln_corp_s');
+        $('re_mtg_n').innerHTML=`<b>${m?fm(m[0]):''}</b> 신규취급 — 주담대 <b>${m?m[1].toFixed(2):'—'}%</b>`
+          +(cs?` · 중소기업 <b>${cs[1].toFixed(2)}%</b>`:'')+(cr?` · 신용 <b>${cr[1].toFixed(2)}%</b>`:'')
+          +(m&&cr?` · 신용−주담대 스프레드 <b>${(cr[1]-m[1]).toFixed(2)}%p</b>`:'')
+          +` <span class="note">— 예금은행 신규취급액 가중평균(한국은행 ECOS 121Y006). 주담대는 담보가 있어 가장 낮고, `
+          +`신용대출과의 격차가 벌어지면 은행이 가계 신용위험을 더 크게 본다는 뜻. 전망CSI와는 대체로 역방향.</span>`;
+      }).catch(()=>{});
       /* ③ 매매지수 — 3선, 최근 5년 */
       {const n=60, s1=cut(S.sale||{t:[],v:[]},n), s2=cut(S.sale_apt||{t:[],v:[]},n), s3=cut(S.sale_apt_s||{t:[],v:[]},n);
        line('re_sale',[{...s1,label:'전국',color:'#666'},{...s2,label:'아파트',color:'#2f6fed'},{...s3,label:'서울APT',color:'#d9534f'}]);

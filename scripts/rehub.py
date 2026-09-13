@@ -100,8 +100,20 @@ META = {
                   "매각가 ÷ 감정가 · 100% 초과면 감정가보다 비싸게 팔린 것 · 시도별 · 2010~"),
     "bid_auctn": ("아파트 경매 진행건수",   "건",    "R", "M", "대법원 법원경매정보",
                   "그 달 경매가 진행된 아파트 물건 수 · 시도별 · 2010~"),
+    # (2026-09-13 추가) 차주별 대출금리 — 예금은행 신규취급액 기준(ECOS 121Y006).
+    #   기준금리가 '원인'이면 이쪽은 실제로 빌리는 사람이 내는 값이다. 주담대만 있던 걸
+    #   기업(대·중소)·신용까지 넓혀 한화투자증권 리서치 차트와 같은 구도로 본다.
+    "ln_mtg":    ("신규 주택담보대출 금리",  "%",  "L", "M", "한국은행 ECOS 121Y006",
+                  "예금은행 신규취급액 가중평균 · 전 지역 공통 · 2001.09~"),
+    "ln_credit": ("신규 일반신용대출 금리",  "%",  "L", "M", "한국은행 ECOS 121Y006",
+                  "가계 신용대출 · 주담대와의 격차가 벌어지면 가계 신용위험을 은행이 더 크게 본다는 뜻 · 2004.10~"),
+    "ln_corp_l": ("신규 대기업대출 금리",    "%",  "L", "M", "한국은행 ECOS 121Y006", "1996~"),
+    "ln_corp_s": ("신규 중소기업대출 금리",  "%",  "L", "M", "한국은행 ECOS 121Y006", "1996~"),
+    "ln_jeonse": ("신규 전세자금대출 금리",  "%",  "L", "M", "한국은행 ECOS 121Y006",
+                  "보증부 전세자금대출 · 2015~"),
 }
-GLOBAL_KEYS = ("rate_kr", "rate_us", "csi")   # 지역 구분 없는 지표 — bid 계열은 2026-09-11 지역별로 전환
+GLOBAL_KEYS = ("rate_kr", "rate_us", "csi",
+               "ln_mtg", "ln_credit", "ln_corp_l", "ln_corp_s", "ln_jeonse")   # 지역 구분 없는 지표
 
 
 def _key(*names):
@@ -496,10 +508,18 @@ def main():
     D["grdp_pc"] = kosis_annual(101, "DT_1C96", "T1", scale=0.1)
     print(f"    GRDP 총액 지역 {len(D['grdp'])} · 1인당 지역 {len(D['grdp_pc'])}")
 
-    print("[6/7] 금리 2종 (ECOS·FRED)")
+    print("[6/7] 금리 (ECOS·FRED)")
     D["rate_kr"] = {"전국": ecos_monthly("722Y001", "0101000")}
     D["rate_us"] = {"전국": fred_monthly("FEDFUNDS")}
-    print(f"    한국 {len(D['rate_kr']['전국'])}개월 · 미국 {len(D['rate_us']['전국'])}개월")
+    print(f"    기준금리 한국 {len(D['rate_kr']['전국'])}개월 · 미국 {len(D['rate_us']['전국'])}개월")
+    # 차주별 대출금리 — 121Y006 예금은행 대출금리(신규취급액). 항목코드는 StatisticItemList 실측(2026-09-13).
+    for key, item in [("ln_mtg", "BECBLA0302"), ("ln_credit", "BECBLA03051"),
+                      ("ln_corp_l", "BECBLA0201"), ("ln_corp_s", "BECBLA0202"),
+                      ("ln_jeonse", "BECBLA03041")]:
+        D[key] = {"전국": ecos_monthly("121Y006", item)}
+        time.sleep(0.3)
+    print("    차주별 대출금리 " + " · ".join(f"{META[k][0][3:7]} {len(D[k]['전국'])}개월"
+                                       for k in ("ln_mtg", "ln_credit", "ln_corp_l", "ln_corp_s", "ln_jeonse")))
 
     print("[7/7] 기존 수집분 합류 (csi·거래량·미분양)")
     re_ = load("realestate").get("series") or {}
