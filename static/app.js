@@ -213,6 +213,31 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
    const eu=$('ust_now');
    if(eu&&s10!=null) eu.innerHTML=`10년물 <b>${s10.toFixed(2)}%</b> · 2년물 <b>${s2!=null?s2.toFixed(2):'—'}%</b>`;}
 
+  /* ── (2026-09-13) 3.1.1 주요국 10년 국채금리 ── 서버 fetch_gbonds.py → db/gbonds.json(플랫 객체: countries·spreads·series).
+     보고서 gen_gbonds_chart.py 가 같은 API 를 회수하므로 표·차트 구성이 docx 3.1.1 과 동일하다. 변화 단위 = bp. */
+  try{ const G=b.gbonds; const W=$('gbonds_wrap');
+    if(G&&Array.isArray(G.countries)&&G.countries.length&&W){
+      W.style.display='';
+      $('gbonds_asof').textContent=`${G.as_of||''} · ${G.source||''} · 변화=bp`;
+      const bp=v=>v==null?'—':`<span class="${v>0?'up':v<0?'dn':'note'}">${v>0?'+':''}${v}</span>`;
+      $('gbonds').innerHTML=`<tr><th>국가</th><th style="text-align:right">10Y(%)</th><th>기준일</th><th style="text-align:right">1일</th><th style="text-align:right">1주</th><th style="text-align:right">1개월</th><th style="text-align:right">3개월</th><th style="text-align:right">6개월</th><th style="text-align:right">1년</th><th>주기</th></tr>`+
+        G.countries.map(c=>`<tr><td><b>${esc(c.name)}</b></td><td class="num"><b>${c.cur!=null?(+c.cur).toFixed(2):'—'}</b></td><td class="note">${esc(c.date||'')}</td>
+          <td class="num">${bp(c.d1)}</td><td class="num">${bp(c.w1)}</td><td class="num">${bp(c.m1)}</td><td class="num">${bp(c.m3)}</td><td class="num">${bp(c.m6)}</td><td class="num">${bp(c.y1)}</td>
+          <td class="note">${esc(c.freq==='daily'?'일별':c.freq==='monthly'?'월별(OECD)':c.freq||'')}</td></tr>`).join('');
+      const SR=G.series||{};
+      const draw=(el,ccs)=>{ const ds=[]; const dset=new Set();
+        ccs.forEach(cc=>(SR[cc]||[]).forEach(p=>dset.add(p[0])));
+        let days=[...dset].sort(); if(days.length>800) days=days.filter((_,i)=>i%Math.ceil(days.length/800)===0||i===days.length-1);
+        ccs.forEach((cc,i)=>{ const s=SR[cc]; if(!s||!s.length) return; const m=Object.fromEntries(s);
+          const nm=(G.countries.find(c=>c.cc===cc)||{}).name||cc;
+          ds.push({n:nm,d:days.map(d=>m[d]??null),c:PAL[i%PAL.length],w:cc==='KR'||cc==='DE'?2.4:1.4}); });
+        if(ds.length) mk(el,days.map(d=>d.slice(0,7)),ds,{legend:true,xt:8}); };
+      draw($('c_gb1'),['US','DE','GB','JP','KR','CN']);
+      draw($('c_gb2'),['DE','FR','IT','ES']);
+      const sp=G.spreads||{}; const se=$('gb_spread');
+      if(se) se.innerHTML=['IT-DE','FR-DE','ES-DE'].filter(k=>sp[k]!=null).map(k=>`${k.replace('-DE','')}−獨 <b>${sp[k]>0?'+':''}${sp[k]}bp</b>`).join(' · ');
+    } }catch(e){ console.warn('gbonds', e); }
+
   /* ── 3.1.2 물가 ── (2차 req5 2026-07-18) docx 표와 동일 컬럼: 지표·YoY·MoM·기준월·발표날짜·의미·시장영향·예상영향 */
   /* (2026-08-14) 표 옆에 데이터 기준일(as_of) 표시 — 화면이 옛 값을 들고 있으면
      여기서 바로 드러난다. 값만 보고는 언제 것인지 알 수 없었다. */

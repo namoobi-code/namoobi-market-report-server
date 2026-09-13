@@ -41,6 +41,8 @@
 52 6  * * * cd /home/ubuntu/namoobi && nice -n 5 python3 scripts/screener_pool.py >> /home/ubuntu/namoobi/pool.log 2>&1
 */10 * * * * cd /home/ubuntu/namoobi && python3 scripts/crypto_intel.py >> /home/ubuntu/namoobi/crypto_intel.log 2>&1
 40 7 * * * cd /home/ubuntu/namoobi && python3 scripts/emp_refresh.py >> /home/ubuntu/namoobi/emp.log 2>&1
+# (2026-09-13) 3.1.1 주요국 10년 국채금리 — stooq 일별(폴백 FRED 월별) → data/db/gbonds.json (홈피 패널 + 보고서 gen_gbonds_chart 공용)
+25 5,15 * * * cd /home/ubuntu/namoobi && python3 scripts/fetch_gbonds.py >> /home/ubuntu/namoobi/gbonds.log 2>&1
 20 7 * * * cd /home/ubuntu/namoobi && python3 scripts/ipo_watch.py >> /home/ubuntu/namoobi/ipo.log 2>&1
 10 7,16 * * * cd /home/ubuntu/namoobi && python3 scripts/research_watch.py >> /home/ubuntu/namoobi/research.log 2>&1
 50 5,15 * * * cd /home/ubuntu/namoobi && venv/bin/python scripts/report_prefetch.py >> /home/ubuntu/namoobi/prefetch.log 2>&1

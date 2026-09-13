@@ -1941,6 +1941,16 @@
     <div class="card"><div class="k">■ 장단기 금리차(수익률곡선) 10Y−2Y (%p) <span id="spread_now" style="font-weight:400"></span></div><canvas id="c_spread"></canvas></div>
   </div>
 
+  <!-- (2026-09-13) 주요국 10년 국채금리 — 서버 fetch_gbonds.py(stooq 일별·FRED 폴백) → db/gbonds.json. 보고서 3.1.1 과 동일 데이터 -->
+  <div id="gbonds_wrap" style="margin-top:12px;display:none">
+    <h3 style="margin-top:0">■ 주요국 10년 국채금리 <span class="note" id="gbonds_asof"></span></h3>
+    <div class="box"><table id="gbonds"></table></div>
+    <div class="grid g2" style="margin-top:8px">
+      <div class="card"><div class="k">① 미국·독일·영국·일본·한국·중국 10년물 (%) — 3년</div><canvas id="c_gb1"></canvas></div>
+      <div class="card"><div class="k">② 유로존 — 독일·프랑스·이탈리아·스페인 10년물 (%) <span id="gb_spread" style="font-weight:400"></span></div><canvas id="c_gb2"></canvas></div>
+    </div>
+  </div>
+
   <!-- (2차 req3) HY 현재값을 차트 위 텍스트로 통합 -->
   <div class="card" id="s333" style="margin-top:12px">
     <div class="k">■ 하이일드(HY) 스프레드 — ICE BofA US HY OAS 1년 추이 (%) <span id="hy_cur" style="font-weight:400"></span> <span class="note">🖥 서버 매일 2회 + 실행 시 실측</span></div>
@@ -2245,7 +2255,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09131730"></script>
+<script src="/app.js?v=09131900"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
