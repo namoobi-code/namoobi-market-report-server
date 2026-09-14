@@ -1,21 +1,21 @@
 {
- "marker": "krx:2026091111|short:202609114S",
- "as_of": "2026-09-12",
+ "marker": "krx:2026091421|short:202609141S",
+ "as_of": "2026-09-14",
  "data": {
   "krx": {
-   "title": "KRX 증시 Brief(2026.9.11)",
-   "date": "2026/09/11 16:02",
-   "att_seq": "2026091111",
+   "title": "KRX 증시 Brief(2026.9.14)",
+   "date": "2026/09/14 16:07",
+   "att_seq": "2026091421",
    "pages": 1,
-   "file_nm": "260911KRXBrief.pdf",
+   "file_nm": "260914KRXBrief.pdf",
    "reused": false
   },
   "short": {
-   "title": "공매도 데일리 브리프('26.09.11)",
-   "date": "2026/09/11 17:53",
-   "att_seq": "202609114S",
+   "title": "공매도 데일리 브리프('26.09.14)",
+   "date": "2026/09/14 16:06",
+   "att_seq": "202609141S",
    "pages": 2,
-   "file_nm": "260911..........��일리브리프.pdf",
+   "file_nm": "260914..........��일리브리프.pdf",
    "reused": false
   }
  }
