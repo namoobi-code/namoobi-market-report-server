@@ -8,7 +8,7 @@
 let D=null; const charts=[]; let SHOWHELP=true; try{ SHOWHELP=localStorage.getItem('cl_help')!=='0'; }catch(e){}
 const $=id=>document.getElementById(id);
 const ST={bull:['🟢','상승 우호','#16a34a','#dcfce7'],neu:['🟡','중립','#a16207','#fef9c3'],bear:['🔴','과열·역풍','#dc2626','#fee2e2']};
-const GCOL={'심리·한국':'#be185d','지갑·거래소':'#0f766e','온체인 밸류':'#7c3aed','기관':'#1d4ed8','파생':'#b45309','매크로':'#334155','대기자금':'#0e7490','알트':'#9333ea'};
+const GCOL={'정책':'#b91c1c','심리·한국':'#be185d','지갑·거래소':'#0f766e','온체인 밸류':'#7c3aed','기관':'#1d4ed8','파생':'#b45309','매크로':'#334155','대기자금':'#0e7490','알트':'#9333ea'};
 const nf=(n,d)=>n==null?'—':Number(n).toLocaleString(undefined,{maximumFractionDigits:d==null?2:d});
 function fmtV(k,e){
   const v=e.v; if(v==null) return '—';
@@ -57,7 +57,8 @@ function spark(cv,s,color,k){
 /* ── (2026-09-05 피드백 "어떤 지표인지, 의미와 해석방법이 어렵다") 쉬운 설명 + 눈금 게이지 ──
    HELP: what=한 줄로 뭔지(비유) · read=숫자로 읽는 법 · low/high=낮을 때/높을 때 뜻
    GAUGE: [min,max,lo,hi,dir] — 막대 위 현재값 위치. dir 'hot'=높을수록 과열(오른쪽 빨강), 'cool'=높을수록 좋음(오른쪽 초록), 'mid'=양끝 다 경계 */
-const NOCHART={   // 추세 차트가 없는 이유 (피드백 2026-09-05)
+const NOCHART={
+ treasury:'⏳ bitbo.io 는 당일 값만 공개 — 서버가 매일 기록해 추세를 만든다.',kr_share:'⏳ CoinGecko 24h 값 일간 누적 중.',poly_clarity:'⏳ 폴리마켓 확률 일간 누적 중 — 며칠 뒤부터 추세 표시.',   // 추세 차트가 없는 이유 (피드백 2026-09-05)
  halving:'📅 날짜 계산 지표 — 추세가 아니라 "사이클의 어디쯤인가"만 본다.',
  btc_dom:'⏳ 무료 API 가 과거치를 주지 않아 서버가 오늘부터 매일 쌓는다 — 며칠 뒤부터 추세가 그려진다.',
  ibit_flow:'⏳ iShares 페이지는 당일 발행주식수만 공개 — 서버가 매일 기록해 유입액을 계산한다. 1주일쯤 뒤부터 추세 표시.',
@@ -103,6 +104,10 @@ const HELP={
  eth_netflow:{what:'지난 7일 ETH 가 거래소로 들어온 돈 − 나간 돈(백만$). BTC 거래소 순유입과 같은 논리.',read:'−300M$ 미만 유출(좋음) · ±300 균형 · +300M$ 초과 유입(매도 대기).',low:'ETH 를 빼서 보관 → 알트 대장 수급 우호.',high:'ETH 를 팔려고 거래소로 → 알트 전체 하락 압력.'},
  upbit_alt_share:{what:'업비트에서 알트(거래대금 상위 30종) 거래대금이 전체(알트+BTC)의 몇 %인가. 한국 개미의 알트 쏠림.',read:'200일 중 백분위. 상위 20% 알트 순환 진행(90%↑ 과열) · 하위 20% 알트 무관심.',low:'개미가 알트를 안 본다 → BTC 국면.',high:'개미가 알트로 몰림 → 순환 진행. 극단이면 국내 주도 과열(김프보다 먼저 나타난다).'},
  alt_funding:{what:'ETH·SOL·XRP·DOGE·BNB 펀딩비 평균 − BTC 펀딩비. 알트 선물 롱이 BTC 보다 얼마나 과열됐나.',read:'+0.02% 이상 알트 롱 과열 · −0.01% 이하 알트 숏 과밀 · 사이는 정상.',low:'알트에 숏이 몰림 → 숏스퀴즈로 급등 여지.',high:'알트에 빚으로 롱이 몰림 → 조금만 떨어져도 연쇄 청산 → 알트 급락.'},
+ usdjpy:{what:'달러당 엔화 환율. 일본에서 싼 금리로 엔을 빌려 미국 주식·코인을 사는 "엔캐리" 자금이 많아, 엔이 급하게 강해지면(숫자 급락) 이 자금이 되감기며 위험자산이 동반 급락한다.',read:'30일 변화율. −5% 이하(엔 급강세) = 청산 위험 · +3% 이상(엔 약세) = 캐리 유입.',low:'2024-08-05 BOJ 인상 뒤 엔 급등 → BTC 하루 −17%. BOJ 회의 앞에서 특히 주시.',high:'엔이 싸지면 캐리 자금이 다시 위험자산으로.'},
+ treasury:{what:'스트래티지(옛 마이크로스트래티지) 같은 "비트코인 트레저리" 기업과 각국 정부(전략비축)가 들고 있는 BTC. 당장 시장에 나올 수 없는 물량.',read:'추세로 본다 — 계속 늘면 유통 공급이 줄어드는 것. 스트래티지 매도 전환은 큰 경고.',low:'보유량 감소 = 트레저리 기업의 매도(주가 압박 시 발생).',high:'매입 지속 = 장기 락업 물량 증가 = 공급 감소.'},
+ kr_share:{what:'국내 5대 거래소 24시간 거래대금 중 업비트 비중. 수수료 0원 경쟁(빗썸·코인원·코빗)과 금융권 지분 참여로 판이 흔들리는 중.',read:'판정 없음 — 구조 참고. 업비트 비중이 빠르게 떨어지면 수수료 경쟁이 심해진 것.',low:'후발 거래소가 점유율을 뺏는 중.',high:'업비트 독주.'},
+ poly_clarity:{what:'예측시장 폴리마켓에서 "클래리티법(시장구조법)이 성립할까"에 돈을 건 사람들이 매긴 확률. 연기금·국부펀드 등 기관 자금 유입의 제도적 전제.',read:'50% 이상 통과 기대 · 10% 미만 당해 통과 기대 낮음. 아래 표에 FOMC 결정·BTC 가격 마일스톤 확률도 함께.',low:'입법 지연 → SEC·CFTC 행정지침으로 공백을 메우는 흐름. 기관 유입 속도 둔화.',high:'통과 기대 → 기관 자금의 진입 장벽 제거.'},
  altbreadth:{what:'시총 상위 50개 알트코인 중 지난 30일 수익률이 비트코인을 이긴 비율.',read:'25% 이하 비트코인 시즌(사이클 초·중반) · 75% 이상 알트시즌(사이클 후반 과열).',low:'돈이 비트코인에만 몰림 = 사이클 초반 특징.',high:'잡코인까지 다 오름 = 사이클 후반, 고점 근처가 잦았다.'},
  btc_dom:{what:'전체 코인 시총 중 비트코인 비중.',read:'30일 변화(%p). −2p 이하 = 알트로 순환 · +2p 이상 = BTC 집중. (서버 누적 30일 뒤부터 판정)',low:'알트 순환 국면.',high:'비트코인 집중 국면.'},
 };
@@ -125,7 +130,8 @@ const GAUGE={
  eth_btc:[-25,25,-8,8,'cool',['BTC 우세','보합','ETH 우세'],1],alt_mcap_ratio:[-20,20,-5,5,'cool',['BTC 집중','보합','알트로 이동'],1],
  stable_ratio:[-30,30,-10,10,'hot',['코인 투입','보합','스테이블 대피'],1],eth_netflow:[-1500,1500,-300,300,'hot',['유출=보관','균형','유입=매도 대기']],
  upbit_alt_share:[0,100,20,80,'cool',['알트 무관심','보통','알트 쏠림'],1],alt_funding:[-0.04,0.06,-0.01,0.02,'hot',['알트 숏 과밀','정상','알트 롱 과열']],
- btc_dom:[-6,6,-2,2,'hot',['알트 순환','보합','BTC 집중'],1],halving:[0,1460,365,550,'hot',['상승 국면','과거 고점 구간','고점 이후·약세']],
+ btc_dom:[-6,6,-2,2,'hot',['알트 순환','보합','BTC 집중'],1],
+ usdjpy:[-12,12,-5,3,'cool',['엔 급강세=청산 위험','보합','엔 약세'],1],poly_clarity:[0,100,10,50,'cool',['통과 기대 낮음','불확실','통과 기대']],halving:[0,1460,365,550,'hot',['상승 국면','과거 고점 구간','고점 이후·약세']],
 };
 function gauge(k,v,E){
   const g=GAUGE[k]; if(!g||v==null) return '';
@@ -152,6 +158,8 @@ function card(k,e){
     :k==='ibit_flow'?` <span class="note">AUM $${nf(e.aum/1e9,1)}B · ${e.asof||''}</span>`
     :k==='halving'?` <span class="note">다음 ${e.next} (D-${e.next_days})</span>`
     :k==='w200'?` <span class="note">200W ≈ $${nf(e.w200,0)}</span>`
+    :k==='treasury'&&e.strategy?` <span class="note">Strategy ${nf(e.strategy,0)} BTC${e.cats&&e.cats.etf?' · ETF '+nf(e.cats.etf,0):''}</span>`
+    :k==='kr_share'&&e.shares?` <span class="note">${Object.entries(e.shares).sort((a,b)=>b[1]-a[1]).map(([k2,v2])=>k2+' '+v2.toFixed(1)+'%').join(' · ')}</span>`
     :k==='altbreadth'&&e.top?` <span class="note">BTC 30D ${(e.btc30>0?'+':'')+nf(e.btc30,1)}% · 상위 ${e.top.slice(0,3).map(t=>t[0]+' '+(t[1]>0?'+':'')+t[1]+'%').join(' · ')}</span>`:'';
   const cvid='cl_cv_'+k;
   return `<div class="box" style="padding:10px 12px;border-top:3px solid ${st[2]};display:flex;flex-direction:column;min-width:0">
@@ -165,6 +173,7 @@ function card(k,e){
     <div style="font-size:11.5px;color:#0f172a;margin-top:2px"><b>판정</b> ${e.judge||'—'}</div>
     <div class="note" style="margin-top:3px;color:#64748b"><b>왜 선행</b> ${e.why||''}</div>
     ${helpBox(k)}
+    ${k==='poly_clarity'&&e.markets?`<div style="margin-top:6px;font-size:11px"><table style="border-collapse:collapse;width:100%">${e.markets.map(m=>`<tr><td style="border-bottom:1px solid #f1f5f9;padding:2px 4px;color:#64748b;white-space:nowrap">${m.grp}</td><td style="border-bottom:1px solid #f1f5f9;padding:2px 4px">${m.q}</td><td style="border-bottom:1px solid #f1f5f9;padding:2px 4px;text-align:right;font-weight:700;color:${m.yes>=50?'#16a34a':'#b91c1c'}">${m.yes}%</td></tr>`).join('')}</table><div class="note">Polymarket · YES 확률 · 그룹별 거래량 상위 3 · 마감된 마켓은 자동 제외</div></div>`:''}
   </div>`;
 }
 function axisBox(a,isAlt){
@@ -187,6 +196,7 @@ function render(){
       <label style="font-size:11.5px;color:#475569;cursor:pointer;margin-left:auto"><input type="checkbox" id="cl_helpchk" ${SHOWHELP?'checked':''}> 쉬운 설명 보기</label>
       <div style="font-size:22px;font-weight:900;color:${oc}">${O.text||'—'}</div>
       <div class="note">종합 ${O.score==null?'—':(O.score>0?'+':'')+O.score.toFixed(2)} (−1 ~ +1 · 4축 평균)</div></div>
+    ${(D.events||[]).length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;align-items:center"><span class="note" style="font-weight:700">📅 다가오는 이벤트</span>${D.events.map(ev=>`<span style="font-size:11.5px;padding:2px 9px;border-radius:10px;background:${ev.dday<=3?'#fee2e2':ev.dday<=14?'#fef9c3':'#f1f5f9'};color:#0f172a"><b>D-${ev.dday}</b> ${ev.name} <span style="color:#64748b">${ev.date.slice(5)}</span></span>`).join('')}<span class="note">— 기사(한경BUSINESS 26.09.16) 학습: CPI·FOMC·BOJ 가 몰린 주간은 변동성 확대. BOJ 인상은 엔캐리 청산 경로</span></div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">${['short','flow','cycle','macro','alt'].filter(k=>A[k]).map(k=>axisBox(A[k],k==='alt')).join('')}</div>
     <div class="note" style="margin-top:8px">읽는 법: <b>단기</b>축이 🔴면 지금 사기엔 과열(눌림 대기), 🟢면 공포 국면(역발상). <b>수급</b>축은 지갑·기관·대기자금이 실제로 사고 있는지 — 상승이 <u>유지</u>될지를 가르는 축.
       <b>밸류</b>축은 사이클 상 위치(바닥권/고점권). <b>매크로</b>축은 달러 유동성 — BTC 는 유동성에 약 2~3개월 후행. 네 축이 모두 🟢인 시점은 드물고, 보통 "수급🟢 + 단기🔴" 같은 조합으로 나타난다.

@@ -450,6 +450,67 @@ def c_altcycle(hist):
         put("alt_funding", s=s)
     except Exception as e: err("alt_funding", e)
 
+# ── ⑪ 기사 학습분 (2026-09-20 한경BUSINESS 커버스토리 '비트코인 2.0') ─────────────────────────
+def c_article(hist):
+    # a) USD/JPY — 엔캐리 청산 리스크 (2024-08-05: BOJ 인상→엔 강세→BTC 하루 −17%)
+    try:
+        j = jget("https://query1.finance.yahoo.com/v8/finance/chart/JPY=X?range=1y&interval=1d")["chart"]["result"][0]
+        put("usdjpy", s=[[utc(ts).strftime("%Y-%m-%d"), c] for ts, c in zip(j["timestamp"], j["indicators"]["quote"][0]["close"]) if c])
+    except Exception as e: err("usdjpy", e)
+    # b) 기업·국가 BTC 보유 — bitbo.io/treasuries (Strategy 등 상장사·국가 카테고리 합계). 일간 누적 → 추세
+    try:
+        t = get("https://bitbo.io/treasuries/", t=40)
+        txt = re.sub(r"<[^>]+>", " ", t); txt = re.sub(r"\s+", " ", txt)
+        m = re.search(r"(?:Strategy|MicroStrategy)\D{0,60}?([\d,]{6,})", txt)
+        strat = float(m.group(1).replace(",", "")) if m else None
+        cats = {}
+        for nm, key in (("Public Companies", "public"), ("Private Companies", "private"), ("ETFs", "etf"), ("Countries", "gov")):
+            mm = re.search(nm + r"\D{0,40}?([\d,]{5,})", txt)
+            if mm: cats[key] = float(mm.group(1).replace(",", ""))
+        H = hist.setdefault("treasury", {})
+        if strat or cats: H[today()] = {"strategy": strat, **cats}
+        ks = sorted(H)
+        tot = [[d, (H[d].get("public") or 0) + (H[d].get("gov") or 0)] for d in ks if H[d].get("public")]
+        put("treasury", s=tot if tot else [[today(), strat or 0]], strategy=strat, cats=cats)
+    except Exception as e: err("treasury", e)
+    # c) 국내 거래소 점유율 — CoinGecko exchanges 24h 거래량(BTC 환산). 판정 없음(구조 참고)
+    try:
+        j = jget("https://api.coingecko.com/api/v3/exchanges?per_page=250&page=1", t=40)
+        kr = {x["id"]: x["trade_volume_24h_btc"] for x in j if x["id"] in ("upbit", "bithumb", "coinone", "korbit", "gopax")}
+        tot = sum(kr.values())
+        if tot:
+            H = hist.setdefault("krshare", {}); H[today()] = {k: round(v / tot * 100, 2) for k, v in kr.items()}
+            ks = sorted(H)
+            put("kr_share", s=[[d, H[d].get("upbit", 0)] for d in ks], shares=H[ks[-1]], tot_btc=round(tot))
+    except Exception as e: err("kr_share", e)
+    # d) 폴리마켓 정책 확률 — 클래리티법·시장구조법·FOMC. 검색어로 잡아 표결 뒤 마켓이 닫혀도 다음 마켓으로 자동 이동
+    try:
+        import urllib.parse as up
+        out = []
+        for q, label in (("Clarity Act", "클래리티법(시장구조법) 서명·통과"), ("Crypto Market Structure", "시장구조 입법 성립"), ("Fed decision", "FOMC 금리 결정"), ("Bitcoin reach", "BTC 가격 마일스톤")):
+            j = jget("https://gamma-api.polymarket.com/public-search?q=" + up.quote(q), t=30)
+            evs = j.get("events", []) if isinstance(j, dict) else j
+            for e in evs[:6]:
+                if e.get("closed"): continue
+                for mk in e.get("markets", [])[:4]:
+                    if mk.get("closed"): continue
+                    try: pr = json.loads(mk.get("outcomePrices") or "[]")
+                    except Exception: pr = []
+                    if len(pr) < 2: continue
+                    yes = float(pr[0])
+                    if yes in (0.0, 1.0) and q != "Fed decision": continue      # 결정 끝난 마켓
+                    out.append({"grp": label, "q": mk.get("question", "")[:90], "yes": round(yes * 100, 1), "vol": round(float(mk.get("volume") or 0)), "end": (mk.get("endDate") or "")[:10]})
+        # 그룹별 거래량 상위 3
+        keep = []
+        for label in dict.fromkeys(o["grp"] for o in out):
+            keep += sorted([o for o in out if o["grp"] == label], key=lambda o: -o["vol"])[:3]
+        H = hist.setdefault("poly", {})
+        cl = next((o["yes"] for o in keep if "signed into law" in o["q"].lower() or "clarity" in o["q"].lower()), None)
+        if cl is not None: H[today()] = cl
+        ks = sorted(H)
+        put("poly_clarity", s=[[d, H[d]] for d in ks], markets=keep)
+    except Exception as e: err("polymarket", e)
+
 def judge():
     def S(k, st, txt, jv=None, jl=None):
         e = IND.setdefault(k, {}); e.update(status=st, judge=txt)
@@ -552,11 +613,23 @@ def judge():
     x = v("alt_funding")
     if x is not None: S("alt_funding", "bear" if x > 0.02 else "bull" if x < -0.01 else "neu", f"알트−BTC 펀딩비 {x:+.4f}% — " + ("알트 롱 레버리지 과열=청산 위험" if x > 0.02 else "알트 숏 과밀=숏스퀴즈 여지" if x < -0.01 else "정상"))
 
+    c = chg(s("usdjpy"), 30)
+    if c is not None: S("usdjpy", "bear" if c < -5 else "bull" if c > 3 else "neu", f"USD/JPY {v('usdjpy'):.1f} (30일 {c:+.1f}%) — " + ("엔 급강세=엔캐리 청산 위험(2024.8 BTC −17% 경로)" if c < -5 else "엔 약세=캐리 자금 위험자산 유입" if c > 3 else "보합"), jv=c, jl="30일 변화 %")
+    x = v("poly_clarity")
+    if x is not None: S("poly_clarity", "bull" if x >= 50 else "bear" if x < 10 else "neu", f"클래리티법 성립 확률 {x:.0f}% — " + ("시장이 통과를 기대" if x >= 50 else "당해 통과 기대 낮음(지연 시 SEC·CFTC 행정지침으로 공백 메움)" if x < 10 else "불확실"))
+    e = g("treasury")
+    if e.get("strategy"): S("treasury", "neu", f"Strategy {e['strategy']:,.0f} BTC" + (f" · 상장사 {e['cats'].get('public',0):,.0f} · 국가 {e['cats'].get('gov',0):,.0f}" if e.get("cats") else "") + " — 매입 지속=장기 보유 물량 증가, 매도 전환은 큰 경고")
+    e = g("kr_share")
+    if e.get("shares"): S("kr_share", "neu", "국내 거래대금 점유율 " + " · ".join(f"{k} {vv:.1f}%" for k, vv in sorted(e["shares"].items(), key=lambda x: -x[1])) + " — 구조 참고(판정 없음)")
+    # 거래소 보유량 — 기사 "수년 만에 최저" 를 1년 백분위로 확인
+    r = rank(s("ex_supply"), 365)
+    if r is not None and IND.get("ex_supply", {}).get("judge"): IND["ex_supply"]["judge"] += f" · 1년 백분위 {r:.0f}%" + ("(1년 최저권=매도 가능 재고 최소)" if r <= 5 else "")
+
     # 축 점수
     AX = {"short": ["fng", "kimp", "upbit_ratio", "gt_world", "gt_kr", "wiki_ko", "wiki_en", "funding", "ls_ratio", "taker", "oi"],
           "flow":  ["ex_netflow", "ex_supply", "cb_prem", "ibit_flow", "cot_am", "stable", "adr_act"],
           "cycle": ["mvrv", "mvrv_z", "sopr", "nupl", "puell", "mayer", "w200", "hashrate"],
-          "macro": ["netliq", "m2", "dff", "dxy", "us10y"],
+          "macro": ["netliq", "m2", "dff", "dxy", "us10y", "usdjpy"],
           "alt":   ["eth_btc", "btc_dom", "alt_mcap_ratio", "stable_ratio", "altbreadth", "upbit_alt_share", "eth_netflow", "alt_funding"]}
     NM = {"short": "단기 과열·심리", "flow": "중기 수급(지갑·기관·대기자금)", "cycle": "사이클 밸류에이션", "macro": "매크로 유동성", "alt": "알트 순환 (BTC↔알트)"}
     axes = {}
@@ -620,6 +693,10 @@ META = {   # 화면 표기용 이름·단위·그룹·왜 선행인가 (JS 가 �
  "dff":        ("연방기금금리", "%", "매크로", "인하 사이클=위험자산 우호 (단, 경기침체형 인하는 예외)"),
  "dxy":        ("달러지수 DXY", "", "매크로", "달러 약세 = BTC 강세의 역상관"),
  "us10y":      ("美 10년 국채금리", "%", "매크로", "할인율 — 상승은 성장·위험자산 밸류에이션 압박"),
+ "usdjpy":     ("USD/JPY (엔캐리 리스크)", "", "매크로", "BOJ 인상→엔 강세→엔 빌려 산 위험자산 청산. 2024-08-05 BTC 하루 −17% 의 경로 (기사 학습 2026-09-20)"),
+ "treasury":   ("기업·국가 BTC 보유량", "BTC", "기관", "Strategy 등 트레저리 기업과 정부(전략비축)가 장기 보유하는 물량 — 시장에 나올 수 없는 공급 (bitbo.io 일간)"),
+ "kr_share":   ("국내 거래소 점유율 (업비트)", "%", "심리·한국", "수수료 0원 경쟁·금융권 지분 참여로 점유율이 흔들리는 중 — 구조 참고(CoinGecko 24h)"),
+ "poly_clarity": ("클래리티법 성립 확률 (폴리마켓)", "%", "정책", "예측시장이 매기는 시장구조법 통과 확률 — 기관 자금 유입의 제도적 전제"),
  "stable":     ("스테이블코인 총공급", "B$", "대기자금", "USDT·USDC 신규 발행 = 거래소에 들어온 매수 대기 달러 — DefiLlama"),
  "eth_btc":    ("ETH/BTC 비율", "", "알트", "알트시즌의 고전적 방아쇠 — ETH 가 BTC 를 이기기 시작하면 알트 전체로 번진다"),
  "alt_mcap_ratio": ("주요 알트12 시총 / BTC 시총", "%", "알트", "시총이 BTC 에서 알트로 이동하는지 — 순환의 직접 측정 (Coin Metrics 구형 대형알트 바스켓)"),
@@ -643,7 +720,7 @@ def main():
     for name, fn in (("sentiment", lambda: c_sentiment(qv)), ("coinmetrics", c_coinmetrics),
                      ("cycle", lambda: c_cycle(d_px, wk)), ("institution", lambda: c_institution(d_px, hist)),
                      ("derivs", lambda: c_derivs(hist)), ("macro", c_macro), ("stable", c_stable),
-                     ("alt", lambda: c_alt(hist)), ("altcycle", lambda: c_altcycle(hist)), ("bitcoindata", lambda: c_bitcoindata(prev))):
+                     ("alt", lambda: c_alt(hist)), ("altcycle", lambda: c_altcycle(hist)), ("article", lambda: c_article(hist)), ("bitcoindata", lambda: c_bitcoindata(prev))):
         try:
             t = time.time(); fn(); log(f"  ✓ {name} {time.time() - t:.1f}s")
         except Exception as e: err(name, e)
@@ -657,11 +734,18 @@ def main():
     for k, m in META.items():
         if k in IND: IND[k].update(name=m[0], unit=m[1], group=m[2], why=m[3])
     policy = jload(DB / "cryptolead_policy.json")
+    # (2026-09-20 기사) 이벤트 D-day — 2026 확정 일정. FOMC=연준 공표, CPI=BLS 공표, BOJ=일본은행 공표, 반감기=추정
+    EVENTS = [("FOMC", d) for d in ("2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09")] + \
+             [("美 CPI", d) for d in ("2026-01-13", "2026-02-11", "2026-03-11", "2026-04-10", "2026-05-12", "2026-06-10", "2026-07-14", "2026-08-12", "2026-09-11", "2026-10-14", "2026-11-12", "2026-12-10")] + \
+             [("BOJ", d) for d in ("2026-01-23", "2026-03-19", "2026-04-30", "2026-06-16", "2026-07-31", "2026-09-18", "2026-10-30", "2026-12-18")] + \
+             [("지니어스법 시행", "2027-01-18"), ("반감기(추정)", "2028-04-15")]
+    td = date.today()
+    upcoming = sorted([{"name": n, "date": d, "dday": (date.fromisoformat(d) - td).days} for n, d in EVENTS if date.fromisoformat(d) >= td], key=lambda x: x["dday"])[:6]
     DB.mkdir(parents=True, exist_ok=True)
     now = datetime.now(KST)
     OUT.write_text(json.dumps({"as_of": now.strftime("%Y-%m-%d %H:%M"), "marker": now.strftime("%Y-%m-%d"),
-                               "ind": IND, "axes": axes, "overall": overall, "policy": policy,
-                               "groups": ["심리·한국", "지갑·거래소", "온체인 밸류", "기관", "파생", "매크로", "대기자금", "알트"],   # 알트 = 5번째 축(순환)
+                               "ind": IND, "axes": axes, "overall": overall, "policy": policy, "events": upcoming,
+                               "groups": ["심리·한국", "지갑·거래소", "온체인 밸류", "기관", "파생", "매크로", "대기자금", "알트", "정책"],   # 알트 = 5번째 축(순환)
                                "errors": ERRORS}, ensure_ascii=False), encoding="utf-8")
     HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
     log(f"[cryptolead] ✅ {len([k for k in IND if not k.startswith('_')])}개 지표 · 종합 {overall} · 오류 {len(ERRORS)} → {OUT}")
