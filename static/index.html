@@ -560,6 +560,7 @@
       <button class="tab"    data-pane="p_hobby" style="background:#047857;border-color:#047857;color:#fff">🏃 취미(운동)<small style="color:#a7f3d0">대회 일정·신청</small></button>
       <button class="tab"    data-pane="p_kpop" style="background:#be123c;border-color:#be123c;color:#fff">🎤 K-POP<small style="color:#fecdd3">앨범·수출·팬덤 선행지표</small></button>
       <button class="tab"    data-pane="p_eg" style="background:#155e75;border-color:#155e75;color:#fff">📈 이익성장<small style="color:#a5f3fc">과거+미래+선행 매수판별</small></button>
+      <button class="tab"    data-pane="p_ct" style="background:#065f46;border-color:#065f46;color:#fff">🧬 셀트리온<small style="color:#a7f3d0">제품별 매출·점유율 추이</small></button>
       <button class="tab"    data-pane="p_kcons" style="background:#9d174d;border-color:#9d174d;color:#fff">🛍️ K-소비재<small style="color:#fbcfe8">뷰티·푸드·패션 수출×주가</small></button>
       <button class="tab"    data-pane="p_moat" style="background:#1e3a5f;border-color:#1e3a5f;color:#fff">🏰 해자워치<small style="color:#bfdbfe">독점기업 빠짐·저평가 신호</small></button>
       <button class="tab"    data-pane="p_share" style="background:#3730a3;border-color:#3730a3;color:#fff">📊 점유율 추이<small style="color:#c7d2fe">경쟁 대결 시계열 추적</small></button>
@@ -886,6 +887,26 @@
         <div class="box" style="padding:10px 10px"><div id="rv_op"><div class="note">불러오는 중…</div></div></div>
       </div>
     </div>
+  </div>
+  <!-- (2026-09-20) 🧬 셀트리온 페인 — data/db/celltrion.json(큐레이션 주간 갱신 + live 일일) · ct.js -->
+  <div class="pane" id="p_ct" style="overflow:auto">
+    <h2>🧬 셀트리온 (068270) — 제품별 매출 구조 · 점유율 추이</h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">회사는 <b>제품별 절대 매출을 공표하지 않는다</b>. 그래서 ① 공시·보도자료 ② IR 단편 공개 ③ 증권사 추정(<span style="color:#c47b1e">E</span>)을 출처와 함께 구분해 싣고,
+      추정으로 빈칸을 메우지 않는다. 핵심 지표는 회사가 유일하게 공표하는 <b>신제품 비중</b>(기존 3종 단가 하락 vs 고수익 신제품 성장)과 제품별 <b>지역 점유율</b>이다. 참고용이며 투자권유가 아님.</p>
+    <div id="ct_asof" class="note" style="margin-bottom:6px"></div>
+    <b style="font-size:13px">📌 라이브 — 시세·컨센·리비전·수급</b> <span class="note">(스크리너 풀·컨센 스냅샷 매일)</span>
+    <div id="ct_live" style="margin:6px 0 14px"></div>
+    <b style="font-size:13px">📊 분기·연간 실적 — 신제품 비중이 핵심</b>
+    <div style="height:240px;margin:6px 0"><canvas id="ct_cv1"></canvas></div>
+    <div id="ct_q" style="margin-bottom:14px"></div>
+    <b style="font-size:13px">💊 제품별 — 오리지널·시장 위치·매출(공개분)</b>
+    <div id="ct_p" style="margin:6px 0 14px"></div>
+    <b style="font-size:13px">📈 제품별 지역 점유율 추이</b> <span class="note">(회사 IR·보도 실측만 · 주간 누적)</span>
+    <div id="ct_sh_note"></div>
+    <div style="height:260px;margin:6px 0"><canvas id="ct_cv2"></canvas></div>
+    <div id="ct_sh" style="margin-bottom:14px"></div>
+    <b style="font-size:13px">👀 관전점</b><div id="ct_watch" style="margin-bottom:12px;font-size:12.5px"></div>
+    <b style="font-size:13px">🗒 갱신 이력</b><div id="ct_log" style="margin-top:4px"></div>
   </div>
   <!-- (2026-09-01) 📈 이익성장 모니터링 페인 — screener_pool + stlead 재사용 · eg.js -->
   <div class="pane" id="p_eg" style="overflow:auto">
@@ -2255,13 +2276,14 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09131900"></script>
+<script src="/app.js?v=09201200"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
-<script src="/eg.js?v=20260902c"></script><!-- (2026-09-01) 이익성장 모니터링 탭 -->
+<script src="/eg.js?v=20260902c"></script>
+<script src="/ct.js?v=20260920a"></script><!-- (2026-09-20) 셀트리온 탭 --><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
