@@ -548,6 +548,8 @@
       <button class="tab"    data-pane="p_estate" style="background:#b45309;border-color:#b45309;color:#fff">🏠 Real Estate<small style="color:#fde68a">가격지수·전망·금리</small></button>
       <button class="tab"    data-pane="p_re" style="background:#7c2d12;border-color:#7c2d12;color:#fff">🔮 RE 예측<small style="color:#fed7aa">r가중 합성·조절</small></button>
       <button class="tab"    data-pane="p_re3" style="background:#9a3412;border-color:#9a3412;color:#fff">🏘️ RE3<small style="color:#ffedd5">국면 신호등</small></button>
+      <!-- (2026-09-20) 부동산시황 — 기간별 아파트 매매가격지수 상승률 순위 (R-ONE 236지역) -->
+      <button class="tab"    data-pane="p_resh" style="background:#c2410c;border-color:#c2410c;color:#fff">📊 부동산시황<small style="color:#ffedd5">지역별 상승률 순위</small></button>
       <!-- (2026-09-04) 청약 탭 — 로그인 게이트 해제, 상시 노출 (청약홈 공공데이터) -->
       <button class="tab" id="tab_sub" data-pane="p_sub" style="background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
@@ -1452,6 +1454,41 @@
       <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="pf_bt"></div>
     </div>
   </div>
+  <!-- (2026-09-20) 📊 부동산시황 페인 — scripts/rerank.py (매일 07:50) · resh.js
+       한국부동산원 R-ONE (월) 매매가격지수_아파트 236지역 → 기간 골라 상승률 순위(기본 TOP10, 개수·기간·범위 조절) -->
+  <div class="pane" id="p_resh" style="overflow:auto">
+    <h2>📊 부동산시황 — 아파트 매매가격지수 상승률 순위 <em id="rs_asof" style="font-weight:400;font-size:12px;color:#8a93a0"></em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      한국부동산원 <b>(월) 매매가격지수_아파트</b>(2003.11~, 전국·시도·시군구 236지역)로 고른 기간의 상승률을 줄 세운다.
+      기본은 신문 그래픽과 같은 <b>2025.06 → 최신월</b>, <b>10곳</b>. 순위는 <b>시군구(말단)</b> 만 세워 성남시·분당구가
+      중복되지 않게 했고, '범위'에서 시도 단위로 바꿔 볼 수 있다. 최근 1~2개월은 잠정치.
+    </p>
+    <style>
+      .rs_seg button{font-size:12px;padding:3px 9px;border:1px solid #d7dbe0;background:#fff;border-radius:4px;cursor:pointer;margin:1px}
+      .rs_seg button.on{background:#c2410c;border-color:#c2410c;color:#fff}
+      .rs_ctl{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;font-size:12.5px;margin:6px 0 10px}
+      .rs_ctl select,.rs_ctl input{font-size:12.5px;padding:3px 6px;border:1px solid #d7dbe0;border-radius:4px}
+    </style>
+    <div class="rs_ctl">
+      <span>기간 <select id="rs_from"></select> → <select id="rs_to"></select>
+        <span class="rs_seg" id="rs_span" style="margin-left:4px">
+          <button data-m="3">3M</button><button data-m="6">6M</button><button data-m="12">1Y</button><button data-m="24">2Y</button><button data-m="36">3Y</button><button data-m="60">5Y</button><button data-m="120">10Y</button>
+        </span></span>
+      <span>개수 <input id="rs_n" type="number" min="1" max="236" style="width:58px"> <span class="rs_seg" id="rs_npre"><button data-n="5">5</button><button data-n="10">10</button><button data-n="20">20</button><button data-n="30">30</button><button data-n="50">50</button></span></span>
+      <span class="rs_seg" id="rs_order"><button data-v="desc">상승률 높은 순</button><button data-v="asc">하락률 높은 순</button></span>
+      <span class="rs_seg" id="rs_scope">범위 <button data-v="leaf">시군구</button><button data-v="sido">시도</button></span>
+    </div>
+    <div class="rs_seg" id="rs_sido" style="margin:-4px 0 10px;font-size:12px"></div>
+    <div id="rs_sum" class="note" style="margin:0 0 6px;font-size:12.5px">불러오는 중…</div>
+    <div style="display:grid;grid-template-columns:minmax(320px,5fr) minmax(360px,6fr);gap:14px;align-items:start">
+      <div style="position:relative;height:320px"><canvas id="rs_bar"></canvas></div>
+      <div id="rs_tbl" style="overflow:auto;max-height:640px"></div>
+    </div>
+    <h3 style="margin:16px 0 4px;font-size:14px">지수 추이 겹쳐보기</h3>
+    <div id="rs_line_n" class="note" style="margin:0 0 6px;font-size:12px">순위표나 막대에서 지역을 누르면 여기에 지수 추이가 겹쳐집니다(최대 8개).</div>
+    <div style="position:relative;height:340px"><canvas id="rs_line"></canvas></div>
+  </div>
+
   <!-- (2026-08-23) 🔮 RE 예측 페인 — scripts/repred.py (매일 08:10) · re.js
        r-가중 합성(릿지 미사용 — 사용자 지정) · 기사 통설 선행기간 vs 실측 시차 · 가중치/시나리오 조절 -->
   <div class="pane" id="p_re" style="overflow:auto">
@@ -2276,11 +2313,12 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09201200"></script>
+<script src="/app.js?v=09201300"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09050115d"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
+<script src="/resh.js?v=09201310"></script><!-- (2026-09-20) 부동산시황 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script>
 <script src="/ct.js?v=20260920a"></script><!-- (2026-09-20) 셀트리온 탭 --><!-- (2026-09-01) 이익성장 모니터링 탭 -->
