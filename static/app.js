@@ -4079,8 +4079,51 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
         const lv=dv.filter(v=>v!=null).slice(-1)[0], fv=dv.find(v=>v!=null);
         $('ve_ddr_n').innerHTML=`DDR5 16Gb 현물 <b>$${lv}</b> (수집 시작가 $${fv} 대비 ${fv?((lv/fv-1)*100).toFixed(1):'—'}%) — 반도체 실적의 최전선. KOSPI 조정에도 가격 강세 유지 여부가 기사 포인트`;
       }
+      try{ renderValMom(F); }catch(e){ console.warn('valmom',e); }
     });
   };
+  /* (2026-09-20) 국가별 선행PER(MSCI 월간 팩트시트) + 이익모멘텀(선행EPS 3개월 전 대비) — 블룸버그 표1·표3 무료 재현.
+     원본 20년 히스토리는 유료(I/B/E/S)라 없고, 2026-08월말부터 매월/매일 누적한다. */
+  function renderValMom(F){
+    fetch('/api/db/msci_val').then(r=>r.ok?r.json():null).catch(()=>null).then(V=>{
+      const box=$('ve_val'); if(!box) return;
+      const TD='border:1px solid #e2e8f0;padding:4px 8px;text-align:right;';
+      if(!V||!V.series){ box.innerHTML='<div class="note">msci_val 없음</div>'; }
+      else{
+        const ks=['KR','US','CN','IN'], nm=V.names||{};
+        const last=k=>(V.series[k]||[]).slice(-1)[0]||{};
+        const d=last('KR').d||'';
+        let h=`<table style="border-collapse:collapse;font-size:12.5px;background:#fff"><thead><tr><th style="${TD}text-align:left">국가</th><th style="${TD}">선행 PER</th><th style="${TD}">PER(후행)</th><th style="${TD}">P/B</th><th style="${TD}">배당%</th><th style="${TD}">누적</th></tr></thead><tbody>`;
+        ks.forEach(k=>{const r=last(k); const n=(V.series[k]||[]).length;
+          h+=`<tr><td style="${TD}text-align:left"><b>${nm[k]||k}</b></td><td style="${TD}"><b style="color:${k==='KR'?'#b91c1c':'#111'}">${r.pe_fwd??'—'}</b></td><td style="${TD}">${r.pe??'—'}</td><td style="${TD}">${r.pb??'—'}</td><td style="${TD}">${r.dy??'—'}</td><td style="${TD}color:#64748b">${n}개월</td></tr>`;});
+        const bn=Object.keys(V.bench||{});
+        bn.forEach(b=>{const r=(V.bench[b]||[]).slice(-1)[0]||{}; h+=`<tr style="color:#64748b"><td style="${TD}text-align:left">${b}</td><td style="${TD}">${r.pe_fwd??'—'}</td><td style="${TD}">${r.pe??'—'}</td><td style="${TD}">${r.pb??'—'}</td><td style="${TD}">${r.dy??'—'}</td><td style="${TD}"></td></tr>`;});
+        h+=`</tbody></table><div class="note" style="margin-top:4px">기준 ${d} · MSCI 공식 월간 팩트시트(USD) · 한국 선행 PER <b>${last('KR').pe_fwd}</b> vs 미국 ${last('US').pe_fwd}·중국 ${last('CN').pe_fwd}·인도 ${last('IN').pe_fwd} — 블룸버그 [표1] 끝점과 동일 소스 계열(I/B/E/S). 20년 히스토리는 유료라 없음 → 매월 누적(2026-08~), 2개월 이상 쌓이면 아래 추이선 자동</div>`;
+        box.innerHTML=h;
+        const multi=ks.some(k=>(V.series[k]||[]).length>=2);
+        const cv=$('ve_val_cv'); if(cv&&window.Chart){
+          if(multi){ const dates=[...new Set(ks.flatMap(k=>(V.series[k]||[]).map(x=>x.d)))].sort();
+            const cols={KR:'#b91c1c',US:'#2563eb',CN:'#16a34a',IN:'#d97706'};
+            new Chart(cv,{type:'line',data:{labels:dates,datasets:ks.map(k=>({label:nm[k]||k,data:dates.map(dd=>{const p=(V.series[k]||[]).find(x=>x.d===dd);return p?p.pe_fwd:null;}),borderColor:cols[k],backgroundColor:cols[k],spanGaps:true,tension:.15}))},
+              options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10.5}}}},scales:{y:{ticks:{font:{size:10}}}}}});
+          } else cv.parentElement.style.display='none';
+        }
+      }
+      /* 이익모멘텀 — 선행EPS(자체 프록시) 3개월(63거래일) 전 대비 % · 표본이 63일 미만이면 '시작일 대비'로 표기 */
+      const mb=$('ve_mom'); if(!mb||!F||!F.t) return;
+      const mom=(t,e,label)=>{ if(!t||!e||e.length<2) return null;
+        const i=e.length-1, j=Math.max(0,i-63); const full=i-j>=63;
+        return {label,cur:(e[i]/e[j]-1)*100,from:t[j],to:t[i],full,series:e.map((v,k)=>k>=63?(v/e[k-63]-1)*100:null)}; };
+      const K=mom(F.t,F.e,'한국(KOSPI200 프록시)'), U=F.us?mom(F.us.t,F.us.e,'미국(S&P 상위500 프록시)'):null;
+      const row=m=>m?`<tr><td style="${TD}text-align:left"><b>${m.label}</b></td><td style="${TD}"><b class="${m.cur>0?'up':'dn'}">${m.cur>0?'+':''}${m.cur.toFixed(1)}%</b></td><td style="${TD}color:#64748b">${m.from}→${m.to}${m.full?'':' <span style="color:#c47b1e">(63거래일 미만 — 시작일 대비)</span>'}</td></tr>`:'';
+      mb.innerHTML=`<table style="border-collapse:collapse;font-size:12.5px;background:#fff"><thead><tr><th style="${TD}text-align:left">시장</th><th style="${TD}">선행이익 3M Δ</th><th style="${TD}">구간</th></tr></thead><tbody>${row(K)}${row(U)}</tbody></table>
+        <div class="note" style="margin-top:4px">블룸버그 [표3] '이익전망 상향률(3개월 전 대비)' 재현 — 자체 집계(네이버·야후 컨센 선행PER 시총가중, 매일 누적). 한국 개시 2026-08-01 · 미국 2026-09-20 → 정식 3개월 비교는 각각 11월·12월부터. 한국 이익모멘텀이 +80%대에서 꺾이는 중(8월말 +45%)이 기사 포인트 — 우리 시계열은 그 꺾임 이후 구간부터 기록된다</div>`;
+      const mc=$('ve_mom_cv'); if(mc&&window.Chart&&K&&K.full){
+        new Chart(mc,{type:'line',data:{labels:F.t.map(x=>x.slice(2,4)+'.'+x.slice(4,6)+'.'+x.slice(6)),datasets:[{label:'한국',data:K.series,borderColor:'#b91c1c',spanGaps:true,pointRadius:0},...(U&&U.full?[{label:'미국',data:U.series,borderColor:'#2563eb',spanGaps:true,pointRadius:0}]:[])]},
+          options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{font:{size:10.5}}}},scales:{x:{ticks:{maxTicksLimit:8,font:{size:9.5}}},y:{ticks:{callback:v=>v+'%',font:{size:10}}}}}});
+      } else if(mc) mc.parentElement.style.display='none';
+    });
+  }
 })();
 
 

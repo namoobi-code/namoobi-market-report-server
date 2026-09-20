@@ -12,7 +12,8 @@ KOSPI: 당일 종가는 네이버, 과거 2년은 ECOS 802Y001(차트 배경·DD
 
 산출: data/db/fwd_eps.json
   {"asof","t":[YYYYMMDD],"e":[조원],"fper":[],"kospi":[],"n":[표본수],
-   "kospi_hist":{"t":[YYYYMMDD],"v":[]}}
+   "kospi_hist":{"t":[YYYYMMDD],"v":[]},
+   "us":{"t","e"(십억$),"fper","n"}}   ← (2026-09-20) 미국 동일 산식(시총상위 500·fpe)
 cron: 20 16 * * 1-5
 """
 import json, urllib.request
@@ -75,12 +76,30 @@ def main():
         except Exception as ex:
             print("  [warn] ECOS KOSPI 이력 실패:", ex)
 
+    # (2026-09-20) 미국 동일 산식 — 풀 US 시총상위 500 중 선행PER(fpe, 야후 컨센) 보유분.
+    #   목적: 블룸버그 '이익모멘텀(선행EPS 3개월 전 대비)' 차트를 한·미 나란히 자체 재현.
+    #   E_us 단위 십억$. KR 과 같은 파일에 두어 3.1.15 패널이 한 번에 읽는다.
+    us_blk = prev.get("us") or {"t": [], "e": [], "fper": [], "n": []}
+    try:
+        us = [r for r in pool.get("us") or [] if r.get("cap")]
+        us.sort(key=lambda r: -r["cap"])
+        uu = [r for r in us[:500] if r.get("fpe") and r["fpe"] > 0]
+        Eu = sum(r["cap"]/r["fpe"] for r in uu); Cu = sum(r["cap"] for r in uu)
+        if us_blk["t"] and us_blk["t"][-1] == today:
+            for k in ("t", "e", "fper", "n"): us_blk[k].pop()
+        us_blk["t"].append(today); us_blk["e"].append(round(Eu/1e9, 1))
+        us_blk["fper"].append(round(Cu/Eu, 2)); us_blk["n"].append(len(uu))
+        for k in ("t", "e", "fper", "n"): us_blk[k] = us_blk[k][-500:]
+        print(f"  [us] 선행이익 {us_blk['e'][-1]}십억$ · 선행PER {us_blk['fper'][-1]} · 표본 {len(uu)}")
+    except Exception as ex:
+        print("  [warn] US 선행이익 실패:", ex)
+
     DB.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "asof": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "src": "선행이익=스크리너 풀 종목별 선행PER(네이버 컨센서스) 시총가중 집계(KOSPI 시총상위 200 중 보유분) · KOSPI=네이버(당일)+ECOS 802Y001(이력)",
         "t": t[-500:], "e": e[-500:], "fper": fp[-500:], "kospi": ks[-500:], "n": nn[-500:],
-        "kospi_hist": hist}, ensure_ascii=False), encoding="utf-8")
+        "kospi_hist": hist, "us": us_blk}, ensure_ascii=False), encoding="utf-8")
     print(f"[fwd_eps] ✅ {today} 선행이익 {e_tril}조 · 선행PER {fper} · 표본 {len(uni)} · KOSPI {kospi} · 이력 {len(hist['t'])}일")
 
 if __name__ == "__main__":
