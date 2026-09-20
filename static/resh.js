@@ -133,6 +133,7 @@ function controls(){
 function draw(){ controls(); bar(); table(); lines(); }
 
 window.renderResh=async function(){
+  hsLoad();
   if(D){ setTimeout(()=>{[chBar,chLine].forEach(c=>c&&c.resize());},60); return; }
   try{
     const r=await fetch('/api/db/rerank'); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -144,4 +145,77 @@ window.renderResh=async function(){
     draw();
   }catch(e){ $('rs_sum').textContent='데이터를 불러오지 못했습니다 — 다음 수집(매일 07:50) 후 다시 열어 주세요. ('+e.message+')'; }
 };
+
+/* ───────── 월평균 착공 실적 (2026-09-20) — /api/db/hstart · scripts/hstart.py ─────────
+   한경BUSINESS(아기곰) 그래픽: 기준 10년(2012~21) 월평균 vs 연도별 월평균 + 감소율 + 입주 추정 시기.
+   실측: 전국 아파트 33,204 / 25,146 / 17,074 / 22,469 / 20,122 / 17,326 · 아파트외 12,763 / 7,024 / 3,448 / 2,817 / 2,601 / 2,443 (기사와 일치) */
+let H=null, hBar=null, hLine=null;
+let HS={type:'apt', reg:'전국', b0:2012, b1:2021, y0:2022};
+const HNM={apt:'아파트',non:'아파트외 주택',all_b:'전체 주택',ms:'다세대',det:'단독',row:'연립'};
+const LAG={apt:3,non:2,all_b:3,ms:2,det:1,row:2};        // 착공→입주 통상 소요(년) — 기사: 아파트 3년
+
+function hsYears(){ return [...new Set(H.t.map(m=>+m.slice(0,4)))]; }
+function hsAvg(arr, y0, y1){                                // y0~y1 연도의 월평균 (null 제외)
+  let s=0,n=0; H.t.forEach((m,i)=>{const y=+m.slice(0,4); const v=arr[i]; if(y>=y0&&y<=y1&&v!=null){s+=v;n++;}});
+  return n?{avg:s/n,n}:null;
+}
+function hsDraw(){
+  const arr=(H.series[HS.reg]||{})[HS.type]; if(!arr){ $('hs_sum').textContent='이 지역·유형 데이터가 없습니다.'; return; }
+  const base=hsAvg(arr,HS.b0,HS.b1); if(!base){ $('hs_sum').textContent='기준기간에 데이터가 없습니다.'; return; }
+  const lastY=+H.t[H.t.length-1].slice(0,4), lastM=+H.t[H.t.length-1].slice(4);
+  const ys=hsYears().filter(y=>y>=HS.y0&&y>HS.b1);
+  const rows=ys.map(y=>{const a=hsAvg(arr,y,y); return a?{y,avg:a.avg,n:a.n,chg:(a.avg/base.avg-1)*100,partial:y===lastY&&lastM<12}:null;}).filter(Boolean);
+  const labels=[`${HS.b0}~${String(HS.b1).slice(2)}년`].concat(rows.map(r=>r.y+'년'+(r.partial?`(1~${lastM}월)`:'')));
+  const labels2=[[labels[0],'기준']].concat(rows.map((r,i)=>[labels[i+1],`(입주 ${r.y+LAG[HS.type]}년)`]));   // 두 줄 라벨
+  const vals=[Math.round(base.avg)].concat(rows.map(r=>Math.round(r.avg)));
+  const sub=['기준'].concat(rows.map(r=>`입주 ${r.y+LAG[HS.type]}년`));
+  if(hBar) hBar.destroy();
+  hBar=new Chart($('hs_bar'),{type:'bar',data:{labels:labels2,datasets:[{data:vals,backgroundColor:vals.map((v,i)=>i?'#b5476c':'#7c2d12'),borderWidth:0,maxBarThickness:46}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const i=c.dataIndex; return i?` ${c.raw.toLocaleString()}호/월 · 기준 대비 ${rows[i-1].chg>=0?'+':''}${rows[i-1].chg.toFixed(0)}% · ${sub[i]}`:` ${c.raw.toLocaleString()}호/월 (${labels[0]} 월평균)`;}}}},
+      scales:{x:{ticks:{font:{size:10.5},maxRotation:0,autoSkip:false}},y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>v.toLocaleString()},grid:{color:'#eef1f4'}}}},
+    plugins:[{id:'hsLbl',afterDatasetsDraw(ch){const {ctx}=ch; const m=ch.getDatasetMeta(0); ctx.save(); ctx.textAlign='center'; ctx.font='bold 11px sans-serif';
+      m.data.forEach((b,i)=>{ctx.fillStyle='#fff'; if(b.height>16) ctx.fillText(vals[i].toLocaleString(),b.x,b.y+14);
+        if(i){const r=rows[i-1]; ctx.fillStyle=r.chg<0?'#e08e3c':'#2f6fed'; ctx.fillText(`${r.chg>=0?'+':''}${r.chg.toFixed(0)}%`,b.x,b.y-6);}
+        });
+      // 기준선
+      const y=ch.scales.y.getPixelForValue(vals[0]); ctx.strokeStyle='#7c2d12'; ctx.setLineDash([4,3]); ctx.beginPath(); ctx.moveTo(ch.chartArea.left,y); ctx.lineTo(ch.chartArea.right,y); ctx.stroke(); ctx.restore();}}]});
+  // 월별 + 12개월 이동평균 선
+  const i0=H.t.findIndex(m=>+m.slice(0,4)>=HS.y0-2); const L=H.t.slice(i0), V=arr.slice(i0);
+  const ma=V.map((_,i)=>{const w=arr.slice(i0+i-11,i0+i+1).filter(v=>v!=null); return w.length===12?w.reduce((a,b)=>a+b,0)/12:null;});
+  if(hLine) hLine.destroy();
+  hLine=new Chart($('hs_line'),{type:'line',data:{labels:L.map(fm),datasets:[
+      {label:'월별 착공',data:V,borderColor:'#c9cfd6',borderWidth:1,pointRadius:0,tension:.1},
+      {label:'12개월 이동평균',data:ma,borderColor:'#b5476c',borderWidth:2,pointRadius:0,tension:.15,spanGaps:true},
+      {label:`기준 월평균 ${Math.round(base.avg).toLocaleString()}`,data:V.map(()=>Math.round(base.avg)),borderColor:'#7c2d12',borderDash:[4,3],borderWidth:1.2,pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:12,font:{size:10.5}}},tooltip:{callbacks:{label:c=>` ${c.dataset.label} ${c.raw==null?'—':Math.round(c.raw).toLocaleString()}`}}},
+      scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>v.toLocaleString()}}}}});
+  const worst=rows.slice().sort((a,b)=>a.chg-b.chg)[0];
+  $('hs_sum').innerHTML=`<b>${E(HS.reg)} ${HNM[HS.type]}</b> · 기준 ${HS.b0}~${HS.b1}년 월평균 <b>${Math.round(base.avg).toLocaleString()}호</b>`
+    +(rows.length?` · 최근 ${rows.at(-1).y}년${rows.at(-1).partial?`(1~${lastM}월)`:''} <b style="color:${rows.at(-1).chg<0?'#c2410c':'#1d4ed8'}">${Math.round(rows.at(-1).avg).toLocaleString()}호 (${rows.at(-1).chg>=0?'+':''}${rows.at(-1).chg.toFixed(0)}%)</b>`
+      +(worst?` · 최저 ${worst.y}년 ${worst.chg.toFixed(0)}%`:''):'');
+  $('hs_tbl').innerHTML=`<table style="border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${['구분','월평균(호)','기준 대비','개월','입주 추정'].map(h=>`<th style="padding:4px 10px;text-align:left;border-bottom:1px solid #e5e8ec">${h}</th>`).join('')}</tr></thead><tbody>`
+    +`<tr><td style="padding:3px 10px"><b>${labels[0]} 평균</b></td><td style="padding:3px 10px">${Math.round(base.avg).toLocaleString()}</td><td style="padding:3px 10px">—</td><td style="padding:3px 10px">${base.n}</td><td style="padding:3px 10px">—</td></tr>`
+    +rows.map(r=>`<tr style="border-top:1px solid #f2f4f7"><td style="padding:3px 10px">${r.y}년${r.partial?` (1~${lastM}월)`:''}</td><td style="padding:3px 10px">${Math.round(r.avg).toLocaleString()}</td><td style="padding:3px 10px;color:${r.chg<0?'#c2410c':'#1d4ed8'}"><b>${r.chg>=0?'+':''}${r.chg.toFixed(1)}%</b></td><td style="padding:3px 10px">${r.n}</td><td style="padding:3px 10px;color:#8a93a0">${r.y+LAG[HS.type]}년</td></tr>`).join('')+'</tbody></table>';
+}
+function hsControls(){
+  const ys=hsYears();
+  const opt=(id,arr,cur,f)=>{const el=$(id); el.innerHTML=arr.map(v=>`<option value="${v}"${String(v)===String(cur)?' selected':''}>${f?f(v):v}</option>`).join('');};
+  opt('hs_reg',H.regions,HS.reg); opt('hs_b0',ys,HS.b0); opt('hs_b1',ys,HS.b1); opt('hs_y0',ys,HS.y0);
+  $('hs_reg').onchange=e=>{HS.reg=e.target.value;hsDraw();};
+  $('hs_b0').onchange=e=>{HS.b0=+e.target.value; if(HS.b1<HS.b0){HS.b1=HS.b0;$('hs_b1').value=HS.b1;} hsDraw();};
+  $('hs_b1').onchange=e=>{HS.b1=+e.target.value; if(HS.b0>HS.b1){HS.b0=HS.b1;$('hs_b0').value=HS.b0;} hsDraw();};
+  $('hs_y0').onchange=e=>{HS.y0=+e.target.value;hsDraw();};
+  $('hs_type').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===HS.type); b.onclick=()=>{HS.type=b.dataset.v; $('hs_type').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); hsDraw();};});
+}
+async function hsLoad(){
+  if(H){ setTimeout(()=>{[hBar,hLine].forEach(c=>c&&c.resize());},60); return; }
+  try{
+    const r=await fetch('/api/db/hstart'); if(!r.ok) throw new Error('HTTP '+r.status);
+    H=await r.json(); if(!H.t||!H.t.length) throw new Error('데이터 없음');
+    $('hs_asof').textContent=`${H.src} · 수집 ${H.asof} · ${fm(H.t[0])}~${fm(H.t.at(-1))}`;
+    hsControls(); hsDraw();
+  }catch(e){ $('hs_sum').textContent='착공 데이터를 불러오지 못했습니다 ('+e.message+')'; }
+}
 })();
