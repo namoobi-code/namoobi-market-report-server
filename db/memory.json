@@ -1,9 +1,9 @@
 {
- "marker": "2026-09-20",
- "as_of": "2026-09-20",
+ "marker": "2026-09-21",
+ "as_of": "2026-09-21",
  "data": {
-  "asof": "2026-09-20",
-  "fetched_at": "2026-09-20T08:37:20+09:00",
+  "asof": "2026-09-21",
+  "fetched_at": "2026-09-21T08:12:37+09:00",
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
@@ -6481,10 +6481,10 @@
     },
     "consensus_live": {
      "fwd_eps": 348994.0,
-     "fwd_per": 5.3,
+     "fwd_per": 5.32,
      "eps_ttm": 224313.0,
-     "per_ttm": 8.24,
-     "asof": "2026-09-20",
+     "per_ttm": 8.28,
+     "asof": "2026-09-21",
      "target": 3305652.0,
      "recomm": "4.00",
      "target_asof": "2026-09-17"
@@ -6601,10 +6601,10 @@
     },
     "consensus_live": {
      "fwd_eps": 47949.0,
-     "fwd_per": 5.42,
+     "fwd_per": 5.44,
      "eps_ttm": 22292.0,
-     "per_ttm": 11.66,
-     "asof": "2026-09-20",
+     "per_ttm": 11.71,
+     "asof": "2026-09-21",
      "target": 487045.0,
      "recomm": "4.00",
      "target_asof": "2026-09-17"
