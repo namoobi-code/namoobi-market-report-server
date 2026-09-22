@@ -79,6 +79,7 @@
 
   function render(){
     if(_st==='예정'){ renderPlan(); return; }
+    if(_st==='줍줍'){ renderRem(); return; }
     if(!_d){ init(); return; }
     const d=_d, root=$('sub_tbl'); if(!root) return;
     const rows=(d.items||[]).filter(i=>{
@@ -186,23 +187,25 @@
     el.querySelectorAll('button').forEach(b=>b.onclick=()=>fn(b.dataset.v));
   }
   function bars(){
-    const plan=(_st==='예정');
+    const plan=(_st==='예정'), rem=(_st==='줍줍');
     // 예정 모드에선 시도 칩도 예정 자료 기준으로(서울·경기만 조사 대상)
-    bar($('sub_reg'),['전체'].concat(plan?(_pd&&_pd.regions||[]):(_d.sido||[])),_reg,
+    bar($('sub_reg'),['전체'].concat(plan?(_pd&&_pd.regions||[]):rem?(_rd&&_rd.sido||[]):(_d&&_d.sido||[])),_reg,
         v=>{_reg=v;_sgg='전체';_n=60;bars();render();});
-    bar($('sub_st'),['모집중','발표대기','완료','전체','예정'],_st,v=>{
+    bar($('sub_st'),['모집중','발표대기','완료','전체','예정','줍줍'],_st,v=>{
       _st=v; _sgg='전체'; _n=60;
       if(v==='예정'&&!_pd){ initPlan(); return; }     // 첫 진입 시 로드 후 bars/render
+      if(v==='줍줍'&&!_rd){ initRem(); return; }      // (2026-09-22) 무순위·잔여세대
       bars(); render();});
-    // 유형(민영/국민) 대신 예정 모드에선 시기 구간 칩
+    // 유형(민영/국민) 대신 예정 모드에선 시기 구간 칩, 줍줍 모드에선 상태·종류 칩
     if(plan) bar($('sub_typ'),['전체'].concat(_pd&&_pd.bands||[]),_pband,v=>{_pband=v;_n=60;bars();render();});
+    else if(rem) bar($('sub_typ'),['모집중','완료','전체','무순위','재공급','규제지역','비규제'],_rf,v=>{_rf=v;_n=60;bars();render();});
     else bar($('sub_typ'),['전체','민영','국민'],_typ,v=>{_typ=v;_n=60;bars();render();});
     // 2단계: 시도를 고르면 그 안의 구(광역시)·시군(도) 칩 — 건수 많은 순
     const el=$('sub_sgg');
     if(_reg==='전체'){ el.innerHTML=''; el.style.display='none'; }
     else{
       const cnt={};
-      ((plan?_pd&&_pd.items:_d.items)||[]).forEach(i=>{ if(i.reg===_reg){ const g=i.sgg||'기타'; cnt[g]=(cnt[g]||0)+1; }});
+      ((plan?_pd&&_pd.items:rem?_rd&&_rd.items:_d&&_d.items)||[]).forEach(i=>{ if(i.reg===_reg){ const g=i.sgg||'기타'; cnt[g]=(cnt[g]||0)+1; }});
       const list=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a]);
       el.style.display='flex';
       el.innerHTML=['전체'].concat(list).map(v=>`<button data-v="${E(v)}" style="padding:3px 9px;font-size:11.5px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:${v===_sgg?'#0f766e':'#fff'};color:${v===_sgg?'#fff':'#333'}">${E(v)}${v!=='전체'?` <span style="opacity:.65">${cnt[v]}</span>`:''}</button>`).join('');
@@ -219,6 +222,96 @@
       const q=$('sub_q'); if(q) q.oninput=()=>{_q=q.value.trim().toLowerCase();_n=60;render();};
       bars(); render();
     }).catch(()=>{ $('sub_tbl').innerHTML='<div class="note">불러오기 실패 — 새로고침 해주세요.</div>'; });
+  }
+  /* ── (2026-09-22) 🎯 줍줍 — applyhome_rem.json (scripts/applyhome_rem.py · 매일 08:02)
+     청약홈 API 는 무순위/잔여세대를 별도 엔드포인트(getRemndrLttotPblancDetail)로 줘서
+     일반 공고 목록엔 안 잡혔다(철산자이 더 헤리티지·브리에르 사례). 무순위·불법행위 재공급을
+     따로 받아 분양가·예상시세·차익·자격(규칙)·접수일을 한 표로 보여준다. ── */
+  let _rd=null, _rf='모집중';
+  const rstat=i=>{
+    const bg=i.sp_bg&&i.sp_bg<i.rc_bg?i.sp_bg:(i.rc_bg||i.sp_bg||'');
+    if(bg&&bg>TODAY) return '접수예정';
+    if(i.rc_ed&&i.rc_ed>=TODAY) return '접수중';
+    if(i.prz&&i.prz>=TODAY) return '발표대기';
+    return '완료';
+  };
+  function renderRem(){
+    const root=$('sub_tbl'); if(!root) return;
+    if(!_rd){ root.innerHTML='<div class="note">무순위·잔여세대 자료를 불러오는 중…</div>'; return; }
+    const rows=(_rd.items||[]).filter(i=>{
+      if(_reg!=='전체'&&i.reg!==_reg) return false;
+      if(_sgg!=='전체'&&(i.sgg||'기타')!==_sgg) return false;
+      const s=rstat(i);
+      if(_rf==='모집중'&&s!=='접수예정'&&s!=='접수중'&&s!=='발표대기') return false;
+      if(_rf==='완료'&&s!=='완료') return false;
+      if(_rf==='무순위'&&i.secd!=='04') return false;
+      if(_rf==='재공급'&&i.secd!=='06') return false;
+      if(_rf==='규제지역'&&!i.regd) return false;
+      if(_rf==='비규제'&&i.regd) return false;
+      if(_q&&!((i.name||'')+(i.addr||'')).toLowerCase().includes(_q)) return false;
+      return true;
+    });
+    rows.sort((a,b)=>(_rf==='모집중')
+      ?String(a.rc_bg||a.de).localeCompare(String(b.rc_bg||b.de))
+      :String(b.rc_bg||b.de).localeCompare(String(a.rc_bg||a.de)));
+    const show=rows.slice(0,_n);
+    const F=v=>v==null?'—':(typeof v==='number'?v.toLocaleString():E(v));
+    const fr=v=>v==null?'—':(v>=100?Math.round(v).toLocaleString():v.toFixed(v>=10?1:2))+':1';
+    root.innerHTML=`<div class="note" style="margin-bottom:6px;line-height:1.6;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:7px 10px">
+        🎯 <b>줍줍(무순위·잔여세대)</b> — 청약통장·가점 없이 추첨. <b>규제지역(서울 전역+경기 12곳, 10·15 대책)</b>은 <b>해당 지역 거주 무주택세대구성원</b>만(거주 범위가 시·군인지 시·도인지는 공고마다 다름 — 헤리티지는 경기도, 브리에르는 광명시),
+        <b>비규제</b>는 성년이면 거주지·주택 소유 무관(2023.2.28~). <b>불법행위 재공급</b>은 최초 공고 자격 준용(해당 시·군 무주택). 당첨 시 규제지역 <b>재당첨 제한 10년</b>, 준공 단지는 계약 후 곧바로 <b>잔금 90%</b>(중도금 없음·LTV 50%·DSR).
+        '차수'가 붙은 단지(3차·8차)는 여러 번 돌려도 안 팔린 곳 — 예상차익이 음수인 게 많다. 자격·실거주 의무는 반드시 원문(🔗) 확인.</div>
+      <table><thead><tr>
+      <th>상태</th><th>단지명 <span class="note">(클릭=주택형 상세 · 🔗=청약홈 원문 · 📍=네이버지도)</span></th><th>지역</th><th>종류</th>
+      <th style="text-align:right">세대</th><th style="text-align:right">분양가(억)</th>
+      <th style="text-align:right" title="예상시세 − 최고분양가 (세대수 가중). 시세 우선순위: 단지 자체 매매 실측 > 분양권 전매 실측 > 같은 동·시군구 준공 10년 이내 신축 실거래 ㎡당가 × 전용. 옵션·층향 미반영">예상차익*</th>
+      <th title="규칙 기반 표시 — 확정은 공고 원문">자격(규칙)</th>
+      <th>접수</th><th>발표</th><th>계약</th><th style="text-align:right" title="접수건수 ÷ 공급세대 (형별 가중) — 접수 마감 후">경쟁률</th><th>입주</th></tr></thead><tbody>${
+      show.map(i=>{
+        const s=rstat(i);
+        let a=0,b=0;(i.ty||[]).forEach(t=>{if(t.rt!=null){const w=(t.gen||0)+(t.spc||0)||1;a+=t.rt*w;b+=w;}});
+        const rt=b?a/b:null;
+        const kind=i.secd==='06'?`<span style="color:#7c3aed;font-weight:700" title="불법전매·공급질서 교란 등으로 계약 취소된 세대를 사업주체가 재공급">재공급</span>`:'무순위';
+        const main=`<tr data-no="${E(i.no)}" style="cursor:pointer" title="${E(i.addr||'')}">
+          <td><b style="color:${SCOL[s]}">${s}</b></td>
+          <td><b>${E(i.name)}</b> <a href="${E(i.url||'#')}" target="_blank" rel="noopener" title="청약홈 공고 원문" onclick="event.stopPropagation()">🔗</a>${mapLink(i.addr,i.name)}</td>
+          <td>${E(i.reg)}${i.sgg?' '+E(i.sgg):''}${i.regd?'<span title="규제지역(투기과열·조정대상) — 해당 지역 거주 무주택만" style="color:#b91c1c;font-weight:700"> 규</span>':''}</td>
+          <td>${kind}</td><td class="num">${F(i.sup)}</td>
+          <td class="num">${i.pr?(i.pr[0]===i.pr[1]?i.pr[0]:i.pr[0]+'~'+i.pr[1]):'—'}</td>
+          <td class="num">${i.gain!=null?`<b style="color:${i.gain>=0?'#0f766e':'#b91c1c'}">${i.gain>0?'+':''}${i.gain}억</b>${i.gpct!=null?` <span class="note">(${i.gpct>0?'+':''}${i.gpct}%)</span>`:''}`:'—'}</td>
+          <td class="note" style="white-space:normal;max-width:260px;color:${i.regd||i.secd==='06'?'#b91c1c':'#0f766e'}">${E(i.elig||'')}</td>
+          <td><b>${F(i.rc_bg)}</b>${i.rc_ed&&i.rc_ed!==i.rc_bg?`<br><span class="note">~${E(i.rc_ed)}</span>`:''}</td>
+          <td>${F(i.prz)}</td><td>${F(i.ctr)}</td>
+          <td class="num">${rt!=null?fr(rt):'—'}</td>
+          <td>${i.mvn?String(i.mvn).slice(0,4)+'.'+String(i.mvn).slice(4):'—'}</td></tr>`;
+        if(!_open[i.no]) return main;
+        const det=`<tr><td colspan="13" style="background:#f8fafc;padding:8px 14px">
+          <div class="note" style="margin-bottom:5px">${E(i.addr||'')} · 시행 ${E(i.biz||'—')} · 접수 ${E(i.rc_bg||'')}~${E(i.rc_ed||'')} · 발표 ${E(i.prz||'—')} · 계약 ${E(i.ctr||'—')}
+            ${i.hmpg?` · <a href="${E(i.hmpg)}" target="_blank" rel="noopener">분양 홈페이지</a>`:''} · <a href="${E(i.url||'#')}" target="_blank" rel="noopener">청약홈 공고 원문 ↗</a></div>
+          <table style="font-size:11.5px"><thead><tr><th>주택형</th><th style="text-align:right">전용㎡</th><th style="text-align:right">세대</th>
+            <th style="text-align:right">최고분양가(억)</th><th style="text-align:right">예상시세*(억)</th><th style="text-align:right">차익*</th>
+            <th style="text-align:right">접수</th><th style="text-align:right">경쟁률</th></tr></thead><tbody>${
+          (i.ty||[]).map(t=>{const gv=(t.est!=null&&t.pr!=null)?+(t.est-t.pr).toFixed(2):null;
+            return `<tr><td>${E(t.t)}</td><td class="num">${F(t.ar)}</td><td class="num">${F((t.gen||0)+(t.spc||0))}</td>
+            <td class="num">${F(t.pr)}</td>
+            <td class="num">${t.est!=null?F(t.est)+(t.act?' <b style="color:#0f766e" title="이 단지 자체의 최근 12개월 매매 실거래 ㎡당가 기반">실측</b>':'')+(t.slv?' <b style="color:#7c3aed" title="이 단지 분양권 전매 실거래(최근 6개월) 가중평균">분양권</b>':'')+(t.cmp?` <span class="note" title="${t.dg?'같은 법정동':'같은 시군구'} 준공 10년 이내 신축 ${t.cmp}개 단지 실거래">신축${t.cmp}${t.dg?'·동':''}</span>`:'')+(t.estb?'<span title="신축 표본 부족 — 전 연식 사용">†</span>':''):'—'}</td>
+            <td class="num" style="font-weight:700;color:${gv>=0?'#0f766e':'#b91c1c'}">${gv!=null?(gv>0?'+':'')+gv+` <span class="note">(${Math.round(gv/t.pr*100)>0?'+':''}${Math.round(gv/t.pr*100)}%)</span>`:'—'}</td>
+            <td class="num">${F(t.req)}</td><td class="num">${t.rt!=null?fr(t.rt)+(t.short?' <span style="color:#b91c1c">미달</span>':''):'—'}</td></tr>`;}).join('')}</tbody></table>
+          <div class="note" style="margin-top:4px">💡 예상시세*는 단지 자체 매매 실측 → 분양권 전매 실측 → 같은 동·시군구 신축 실거래 순으로 잡는다. 최근 6~12개월에 그 단지 거래가 없으면 인근 신축 평균이라 실제와 차이가 날 수 있다(철산자이 더 헤리티지 59㎡는 2025.10·2026.02 전매 14억대가 있었으나 창 밖). 분양가는 최고가 기준(보수적).</div></td></tr>`;
+        return main+det;
+      }).join('')}</tbody></table>${
+      rows.length>_n?`<div style="text-align:center;margin:8px 0"><button id="sub_more" style="padding:5px 16px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff">더 보기 (${_n}/${rows.length}건)</button></div>`:''}`;
+    $('sub_cnt').textContent=`${rows.length}건`;
+    root.querySelectorAll('tr[data-no]').forEach(tr=>tr.addEventListener('click',()=>{
+      _open[tr.dataset.no]=!_open[tr.dataset.no]; render();}));
+    const mb=$('sub_more'); if(mb) mb.onclick=()=>{_n+=60; render();};
+  }
+  function initRem(){
+    $('sub_tbl').innerHTML='<div class="note">무순위·잔여세대 자료를 불러오는 중…</div>';
+    fetch('/api/db/applyhome_rem').then(r=>r.ok?r.json():null).then(d=>{
+      if(!d||!d.items){ $('sub_tbl').innerHTML='<div class="note">줍줍 자료 준비 중 — 다음 수집(매일 08:02)부터 표시됩니다.</div>'; return; }
+      _rd=d; bars(); render();
+    }).catch(()=>{ $('sub_tbl').innerHTML='<div class="note">줍줍 자료 불러오기 실패.</div>'; });
   }
   // 분양예정 자료는 '예정' 칩을 처음 누를 때만 받는다(평소엔 트래픽 0)
   function initPlan(){

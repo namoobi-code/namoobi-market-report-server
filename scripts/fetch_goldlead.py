@@ -221,7 +221,10 @@ def c_myth():
             X["real10"] = monthly(fred_series("DFII10", start="2003-01-01"))
             X["dff"] = monthly(fred_series("DFF", start=s6))
         except Exception as e: err("myth_fred", e)
-    try: X["dxy"] = monthly(yahoo("DX-Y.NYB", "max", "1mo"))
+    # 달러: 야후 DXY 월봉은 2019~ 뿐(1차 실측 n=79) → FRED 광의 달러지수 DTWEXBGS(2006~)로 대체
+    try:
+        if fred_series: X["dxy"] = monthly(fred_series("DTWEXBGS", start="2006-01-01"))
+        else: X["dxy"] = monthly(yahoo("DX-Y.NYB", "max", "1mo"))
     except Exception as e: err("myth_dxy", e)
     try: X["vix"] = monthly(yahoo("^VIX", "max", "1mo"))
     except Exception as e: err("myth_vix", e)
@@ -242,7 +245,17 @@ def c_myth():
         xs = X[k]; km = sorted(xs)
         dx = {km[i]: xs[km[i]] - xs[km[i - 12]] for i in range(12, len(km))}     # 지표 12M 변화(수준차)
         rows = []
-        for lag in (0, 3, 6, 12):
+        # 동행(같은 12개월 창) — 통설은 "같이 움직인다"는 주장이므로 이 행이 통설 검증의 정본.
+        # 아래 lag 행은 "지표가 먼저 움직이고 금이 따라오나"(예측력) — 다른 질문이다. 1차 실측에서
+        # 실질금리가 lag 행만으로 '부호 반대'(+0.49)로 나왔는데, 이는 급등 뒤 되돌림(평균회귀)이지
+        # 통설이 틀렸다는 뜻이 아니었다 → 두 질문을 분리해 표기한다.
+        a, b = [], []
+        for m in months:
+            i = months.index(m)
+            if i + 12 < len(months) and months[i + 12] in dx and fwd12(m) is not None:
+                a.append(dx[months[i + 12]]); b.append(fwd12(m))
+        r0 = corr(a, b); rows.append({"lag": "동행", "r": None if r0 is None else round(r0, 3), "n": len(a)})
+        for lag in (3, 6, 12):
             a, b = [], []
             for m in months:
                 i = months.index(m) - lag
@@ -252,10 +265,12 @@ def c_myth():
                     a.append(dx[mm]); b.append(fwd12(m))
             r = corr(a, b)
             rows.append({"lag": lag, "r": None if r is None else round(r, 3), "n": len(a)})
-        best = max([r for r in rows if r["r"] is not None], key=lambda r: abs(r["r"]), default=None)
-        verdict = "표본 부족" if not best else ("통설대로" if best["r"] * sign > 0.15 else "부호 반대" if best["r"] * sign < -0.15 else "유의미하지 않음")
-        out.append({"key": k, "myth": txt, "sign": sign, "lags": rows, "best": best, "verdict": verdict,
-                    "period": f"{months[0][:4]}~{months[-1][:4]}"})
+        co = rows[0]["r"]
+        verdict = "표본 부족" if co is None else ("통설대로" if co * sign > 0.15 else "부호 반대" if co * sign < -0.15 else "유의미하지 않음(|r|<0.15)")
+        lead = max([r for r in rows[1:] if r["r"] is not None], key=lambda r: abs(r["r"]), default=None)
+        km0 = sorted(dx)
+        out.append({"key": k, "myth": txt, "sign": sign, "lags": rows, "co": co, "lead": lead, "verdict": verdict,
+                    "period": f"{km0[0][:4]}~{km0[-1][:4]}"})
     IND["_myth"] = out
 
 # ── 판정 ───────────────────────────────────────────────────────────────────
