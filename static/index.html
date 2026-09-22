@@ -573,6 +573,7 @@
       <button class="tab"    data-pane="p_llm" style="background:#312e81;border-color:#312e81;color:#fff">🤖 AI 챗봇<small style="color:#c7d2fe">서버 로컬 LLM 실험</small></button>
       <!-- (2026-09-05) 코인 선행지표 탭 — cryptolead.js · scripts/fetch_cryptolead.py (매일 06:55) -->
       <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
+      <button class="tab"    data-pane="p_gl" style="background:#b45309;border-color:#b45309;color:#fff">🥇 금 선행<small style="color:#fde68a">실질금리·달러·통설검증 신호등</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -962,6 +963,17 @@
     </div>
   </div>
 
+  <!-- (2026-09-22) 🥇 금 선행지표 탭 — goldlead.js · 데이터 scripts/fetch_goldlead.py (매일 07:05) -->
+  <div class="pane" id="p_gl" style="overflow:auto">
+    <h2>🥇 금 선행지표 <em id="gl_asof"></em></h2>
+    <div class="note" style="margin:-4px 0 10px;line-height:1.7">금 가격의 "핵심 공식"(인플레↑·달러↓·전쟁↑·금리↓ → 금↑)이라는 통설을 <b>지표 5개로 환원해 매일 관측</b>하고, <b>20년 월간 데이터로 통설이 맞는지 실측</b>한다 —
+      <b>실질금리·달러</b>(10Y TIPS·BEI·DXY·기준금리·CPI) · <b>지정학·공포</b>(GPR 지수·VIX) · <b>포지셔닝·ETF·광산주</b>(CFTC 운용사 순롱·IAU 유입·GDX/GLD) · <b>한국·대중 심리</b>(KRX 금현물 프리미엄·구글 트렌드) · <b>상대가격</b>(금/은·금/유가).
+      전부 무료 공개 소스(FRED·CFTC·GPR·iShares·KRX·야후) 서버 자동 수집(LLM 토큰 0). 중앙은행 매수(WGC)는 무료 API 가 없어 제외. 리서치용이며 투자권유가 아님.</div>
+    <div class="box" style="padding:12px 14px;margin-bottom:10px" id="gl_overall"></div>
+    <h3>통설 vs 실측 <span class="note">인스타 카드 9공식 → 지표 6개 · 금 12개월 수익률과의 상관 (FRED·GPR·야후 월간)</span></h3>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px" id="gl_myth"></div>
+    <div id="gl_groups"></div>
+  </div>
   <!-- (2026-09-05) 🪙 코인 선행지표 탭 — cryptolead.js · 데이터 scripts/fetch_cryptolead.py (매일 06:55) -->
   <div class="pane" id="p_cl" style="overflow:auto">
     <h2>🪙 코인 선행지표 <em id="cl_asof"></em> <button id="cl_reload" class="scrrst" style="font-size:11px">↻ 새로고침</button></h2>
@@ -2356,7 +2368,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09201200"></script><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=09051933"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=09080120"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
