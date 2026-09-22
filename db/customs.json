@@ -1,6 +1,6 @@
 {
- "marker": "202609|d9821a7feb99",
- "as_of": "2026-09-12",
+ "marker": "202609|effcc8cc5fda",
+ "as_of": "2026-09-22",
  "data": {
   "months": [
    "2016-01",
@@ -395,7 +395,7 @@
      61728993,
      55208200,
      55219260,
-     null
+     71409349
     ],
     "pm": [
      36260420,
@@ -790,7 +790,7 @@
      25503658,
      22120084,
      26034569,
-     null
+     34128119
     ],
     "pm": [
      4590675,
@@ -7085,6 +7085,22 @@
     "computer": 634522,
     "precision": 341020,
     "appliance": 199166
+   },
+   {
+    "yyyymm": "202609",
+    "seq": 2,
+    "period": "01~20",
+    "total": 71409349,
+    "semiconductor": 34128119,
+    "steel": 2712227,
+    "car": 3734779,
+    "petroleum": 4012147,
+    "wireless": 1245445,
+    "ship": 2446453,
+    "autoparts": 1133439,
+    "computer": 2330034,
+    "precision": 640533,
+    "appliance": 377984
    }
   ],
   "latest": {
@@ -7105,12 +7121,27 @@
     "precision": 341020,
     "appliance": 199166
    },
-   "p20": null,
+   "p20": {
+    "yyyymm": "202609",
+    "seq": 2,
+    "period": "01~20",
+    "total": 71409349,
+    "semiconductor": 34128119,
+    "steel": 2712227,
+    "car": 3734779,
+    "petroleum": 4012147,
+    "wireless": 1245445,
+    "ship": 2446453,
+    "autoparts": 1133439,
+    "computer": 2330034,
+    "precision": 640533,
+    "appliance": 377984
+   },
    "pm": null
   },
   "unit": "천 달러",
   "source": "관세청 · data.go.kr(15157908)",
-  "marker": "202609|d9821a7feb99",
-  "as_of": "2026-09-12"
+  "marker": "202609|effcc8cc5fda",
+  "as_of": "2026-09-22"
  }
 }

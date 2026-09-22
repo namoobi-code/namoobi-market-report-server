@@ -1,12 +1,7 @@
 {
- "marker": "2026-12-09|21",
- "as_of": "2026-09-21",
+ "marker": "2026-12-09|20",
+ "as_of": "2026-09-22",
  "data": [
-  {
-   "date": "2025-09-16~17",
-   "stance": "인하",
-   "note": "25bp 인하 → 4.00~4.25%(2025년 첫 인하). 11-1 가결(Miran 50bp 인하 소수의견). SEP 실시. (출처: federalreserve.gov FOMC statement·SEP 2025-09-17)"
-  },
   {
    "date": "2025-09-17",
    "stance": "인하",
@@ -100,12 +95,12 @@
   {
    "date": "2026-10-28",
    "stance": "예정",
-   "note": "SEP 미발표 예정 정례회의(10/27~28). (출처: federalreserve.gov FOMC calendar 2026, 직접 확인 2026-09-18)"
+   "note": "SEP 미발표 예정 정례회의(10/27~28). (출처: federalreserve.gov FOMC calendar 2026)"
   },
   {
    "date": "2026-12-09",
    "stance": "예정",
-   "note": "SEP(점도표) 발표 예정 정례회의(12/8~9). (출처: federalreserve.gov monetarypolicy/fomccalendars.htm '2026 FOMC Meetings' 섹션, 직접 확인 2026-09-18)"
+   "note": "SEP(점도표) 발표 예정 정례회의(12/8~9). (출처: federalreserve.gov monetarypolicy/fomccalendars.htm '2026 FOMC Meetings' 섹션)"
   }
  ]
 }
