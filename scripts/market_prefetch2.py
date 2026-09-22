@@ -402,17 +402,38 @@ def ism():
 
 
 # ── 6·7) IB 인사이트 풀(24h) ──
-IBQ = {"ubs": "UBS CIO global markets", "goldman": "Goldman Sachs research forecast",
-       "jpmorgan": "JPMorgan strategist markets", "morgan_stanley": "Morgan Stanley outlook markets",
-       "blackrock": "BlackRock Investment Institute weekly"}
+# (2026-09-22 재발방지) 구 쿼리는 3~4어 조합 + lang=ko(한국어 구글뉴스) 기본이라 영문 IB 보도가 거의 안 잡혀
+#   풀이 상시 0~1건이었다(9/22 실측: 7일 창에서도 5사 합계 2건). → 회사별 2쿼리 × en+ko 병합, 제목 기준 중복 제거.
+IBQ = {"ubs": ["UBS CIO", "UBS Global Wealth Management"],
+       "goldman": ["Goldman Sachs strategist", "Goldman Sachs S&P 500 forecast"],
+       "jpmorgan": ["JPMorgan strategist", "JPMorgan Asset Management outlook"],
+       "morgan_stanley": ["Morgan Stanley Mike Wilson", "Morgan Stanley strategist"],
+       "blackrock": ["BlackRock Investment Institute", "BlackRock strategist"]}
+
+
+def _ib_pool(qs, hours, cap=6):
+    seen, out = set(), []
+    for q in qs:
+        for lang in ("en", "ko"):
+            for it in gnews(q, hours=hours, cap=cap, lang=lang):
+                key = (it.get("title") or "")[:60]
+                if key and key not in seen:
+                    seen.add(key); out.append(it)
+    out.sort(key=lambda x: x.get("date") or "", reverse=True)
+    return out[:cap]
 
 
 def ib():
-    out = {}
+    out, fallback = {}, {}
     for k, q in IBQ.items():
-        out[k] = gnews(q, hours=24, cap=6)   # (사용자 규칙) 24시간 이내 보도만 보유
-    save("ib_insights", {"pool": out, "keep_hours": 24,
-                         "desc": "IB 5사 하우스뷰 관련 최신 보도(24h) — GlobalSecuritiesAgent 1차 소스"})
+        out[k] = _ib_pool(q, hours=24)       # (사용자 규칙) 24시간 이내 보도만 보유
+        # (2026-09-22 재발방지) 월·화 05:45 실행은 24h 창이 주말에 걸려 5사 전부 0건 → 에이전트가 웹서치로
+        #   전량 재조사(9/22 실측). 24h 가 비면 72h 후보를 별도 키(pool_72h)로 동봉 — 정본 pool 은 24h 유지,
+        #   에이전트는 pool 이 빈 회사만 pool_72h 를 '후보'로 읽어 신선도(D-1/D-3) 판정은 자체 수행한다.
+        if not out[k]:
+            fallback[k] = _ib_pool(q, hours=72)
+    save("ib_insights", {"pool": out, "keep_hours": 24, "pool_72h": fallback,
+                         "desc": "IB 5사 하우스뷰 관련 최신 보도(24h) — GlobalSecuritiesAgent 1차 소스. pool 이 빈 회사는 pool_72h(72h 후보) 참조"})
 
 
 # ── 8) 리밸런싱 모니터 ──

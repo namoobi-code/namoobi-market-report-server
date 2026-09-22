@@ -94,7 +94,12 @@ def call(cat, api, bas_dd, tries=3, use_cache=True):
     if use_cache and cp.exists():
         try:
             with gzip.open(cp, "rt", encoding="utf-8") as fh:
-                return json.load(fh)
+                _cached = json.load(fh)
+            # (2026-09-22 재발방지) 빈 캐시([])는 '아직 미공표/일시 오류' 시점의 오염분 — 적중으로 치지 않고 재조회.
+            #   실측: 05:50 크론이 미공표 시각에 받은 []를 영구 캐시해 9/18·9/21·9/22 코스피 종가가 전부 빈 값
+            #   → krx_market_snapshot 이 6일간 "최근 영업일 데이터 없음"(3.1 국내 KRX 공식값 전부 웹서치 폴백).
+            if _cached:
+                return _cached
         except Exception:
             pass
     url = f"{BASE}/{cat}/{api}?basDd={bas_dd}"
@@ -109,7 +114,7 @@ def call(cat, api, bas_dd, tries=3, use_cache=True):
             if t == tries - 1:
                 return []
             time.sleep(1.2)
-    if use_cache:
+    if use_cache and rows:      # 빈 응답은 캐시하지 않는다(휴장일도 매 호출 재조회 — 비용 미미)
         try:
             with gzip.open(cp, "wt", encoding="utf-8") as fh:
                 json.dump(rows, fh, ensure_ascii=False)
