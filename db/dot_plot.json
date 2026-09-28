@@ -1,33 +1,33 @@
 {
  "marker": "2026-09",
- "as_of": "2026-09-25",
+ "as_of": "2026-09-28",
  "data": {
   "rows": [
    {
     "year": "2026",
     "mar": 3.8,
     "jun": 4.1,
-    "change": 0.3
+    "change": "+0.3%p 상향"
    },
    {
     "year": "2027",
     "mar": 3.6,
     "jun": 4.1,
-    "change": 0.5
+    "change": "+0.5%p 상향"
    },
    {
-    "year": "2028말",
+    "year": "2028",
     "mar": 3.4,
     "jun": 3.9,
-    "change": 0.5
+    "change": "+0.5%p 상향"
    },
    {
     "year": "장기중립",
     "mar": 3.1,
     "jun": 3.2,
-    "change": 0.1
+    "change": "+0.1%p 상향"
    }
   ],
-  "comment": "'mar'/'jun'은 컬럼 관행상 명칭이며 실제 3월/6월이 아님 — 'mar'=직전 SEP(2026-06-17 FOMC 발표) 중간값(median), 'jun'=최신 SEP(2026-09-16 FOMC 발표) 중간값. 9월 SEP는 8/28 잭슨홀에서 Warsh 의장의 매파적 발언 이후 발표되었고, 9/16 FOMC에서 25bp 인상(3.75~4.00%)이 단행되며 점도표도 큰 폭 상향(2026년말 3.8%→4.1%, 2027년말 3.6%→4.1%, 2028년말 3.4%→3.9%, 장기중립 3.1%→3.2%). 출처: federalreserve.gov SEP 원문 fomcprojtabl20260916.pdf(2026-09-16 발표), fomcprojtabl20260617.pdf(2026-06-17 발표)."
+  "comment": "컬럼명(mar/jun)은 레거시 표기이며 실제로는 '직전 SEP'(mar) vs '최신 SEP'(jun) 중간값 비교. mar=2026-06-17 SEP(직전, Warsh 신임의장 첫 회의), jun=2026-09-16 SEP(최신, 9월 FOMC 25bp 인상과 동시 발표) — 두 차례 모두 매파적 상향. 출처: federalreserve.gov FOMC statement·SEP 2026-06-17, 2026-09-16"
  }
 }
