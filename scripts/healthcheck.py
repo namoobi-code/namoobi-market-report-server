@@ -162,14 +162,25 @@ def main():
             pxlag = (dt.date.today() - dt.date.fromisoformat(px_last)).days
             pan = {"days": nd, "last": last, "lag_d": lag, "rows_last": nrec,
                    "days_in_10d": d7, "px_syms": px_n, "px_last": px_last, "px_lag_d": pxlag}
-            # 주말·휴일을 감안해 4일까지는 정상으로 본다(연휴가 3일까지 붙는다)
-            if lag > 4:
-                out["alerts"].append(f"[패널] 팩터 스냅샷 최신 {last} — {lag}일 밀림(크론 09:00/17:00 확인)")
+            # (2026-09-28 오탐 수정) 추석 연휴(9/24~28) 에 '5일 밀림' 경보 — 시세 자체가 없는데 달력으로 재서 오탐.
+            #   기준을 바꾼다: 패널이 **풀(price_date)보다 뒤처졌는가**. 풀이 새 시세를 갖는데 패널이 못 따라오면 경보,
+            #   풀도 같은 날짜면 휴장일 뿐이다. 풀 자체가 7일 넘게 안 움직이면 그건 풀 크론 문제로 따로 경보.
+            try:
+                pdate = json.load(open(os.path.join(DB, "screener_pool.json"))).get("price_date")
+            except Exception:
+                pdate = None
+            pan["pool_price_date"] = pdate
+            if pdate and last < pdate:
+                out["alerts"].append(f"[패널] 팩터 스냅샷 {last} < 풀 시세일 {pdate} — 적재 크론(09:00/17:00) 미실행 의심")
+            elif not pdate and lag > 4:
+                out["alerts"].append(f"[패널] 팩터 스냅샷 최신 {last} — {lag}일 밀림(풀 price_date 미확인)")
+            if pdate and (dt.date.today() - dt.date.fromisoformat(pdate)).days > 7:
+                out["alerts"].append(f"[패널] 풀 시세일 {pdate} 이 7일 넘게 정지 — screener_pool 크론 확인(휴장 5일 초과)")
             if nrec < 5000:
                 out["alerts"].append(f"[패널] 최신일 {last} 적재 {nrec}행 — 평시 7,700행 대비 결손")
             if nd >= 3 and d7 < 3:
                 out["alerts"].append(f"[패널] 최근 10일 중 {d7}일치만 적재 — 누락 발생(재검증 표본 손실)")
-            if pxlag > 5:
+            if pxlag > 7:      # (2026-09-28) 연휴 감안 7일
                 out["alerts"].append(f"[패널] 종가 패널 최신 {px_last} — {pxlag}일 밀림(크론 17:10 확인)")
         out["checks"]["stock_panel"] = pan
     except Exception as e:
