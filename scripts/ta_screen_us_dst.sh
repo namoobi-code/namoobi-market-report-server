@@ -1,9 +1,9 @@
 #!/bin/sh
 # ta_screen 미국장 마감 후 회차 — 서머타임 인식 래퍼 (2026-09-30)
 # cron 은 DST 를 모른다. 미국장 마감 = EDT 05:00 / EST 06:00 KST.
-#   edt      : 05:40 cron — 서머타임(EDT)일 때만 실행 (마감+40분)
-#   est      : 06:50 cron — 표준시(EST)일 때만 실행 (마감+50분)
-#   edt-retry: 06:20 cron — EDT 이고 오늘자 완료 flag 가 없을 때만 재시도
+#   edt      : 05:10 cron — 서머타임(EDT)일 때만 실행 (마감+10분)
+#   est      : 06:10 cron — 표준시(EST)일 때만 실행 (마감+10분)
+#   edt-retry: 05:16 cron — EDT 이고 오늘자 완료 flag 가 없을 때만 재시도
 cd /home/ubuntu/namoobi || exit 1
 Z=$(TZ=America/New_York date +%Z)
 TODAY=$(date +%y%m%d)
