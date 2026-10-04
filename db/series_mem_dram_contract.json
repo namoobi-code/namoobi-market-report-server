@@ -1,6 +1,6 @@
 {
- "marker": "2026-09-28",
- "as_of": "2026-09-28",
+ "marker": "2026-10-01",
+ "as_of": "2026-10-01",
  "data": [
   [
    "2026-07-11",
@@ -960,6 +960,54 @@
     "DDR4 8Gb 1Gx8": 24.0,
     "DDR4 4Gb 256Mx16": 14.5,
     "DDR3 4Gb 256Mx16": 14.5
+   }
+  ],
+  [
+   "2026-09-29",
+   {
+    "DDR5 8GB SO-DIMM": 130.0,
+    "DDR4 16GB SO-DIMM": 265.0,
+    "DDR4 8GB SO-DIMM": 139.0,
+    "DDR4 16Gb 2Gx8": 48.0,
+    "DDR4 8Gb 1Gx8": 24.0,
+    "DDR4 4Gb 256Mx16": 14.5,
+    "DDR3 4Gb 256Mx16": 14.5
+   }
+  ],
+  [
+   "2026-09-30",
+   {
+    "DDR5 8GB SO-DIMM": 130.0,
+    "DDR4 16GB SO-DIMM": 265.0,
+    "DDR4 8GB SO-DIMM": 139.0,
+    "DDR4 16Gb 2Gx8": 48.0,
+    "DDR4 8Gb 1Gx8": 24.0,
+    "DDR4 4Gb 256Mx16": 14.5,
+    "DDR3 4Gb 256Mx16": 14.5
+   }
+  ],
+  [
+   "2026-10-01",
+   {
+    "DDR5 8GB SO-DIMM": 133.0,
+    "DDR4 16GB SO-DIMM": 270.0,
+    "DDR4 8GB SO-DIMM": 142.0,
+    "DDR4 16Gb 2Gx8": 50.0,
+    "DDR4 8Gb 1Gx8": 25.0,
+    "DDR4 4Gb 256Mx16": 15.2,
+    "DDR3 4Gb 256Mx16": 15.2
+   }
+  ],
+  [
+   "2026-10-02",
+   {
+    "DDR5 8GB SO-DIMM": 133.0,
+    "DDR4 16GB SO-DIMM": 270.0,
+    "DDR4 8GB SO-DIMM": 142.0,
+    "DDR4 16Gb 2Gx8": 50.0,
+    "DDR4 8Gb 1Gx8": 25.0,
+    "DDR4 4Gb 256Mx16": 15.2,
+    "DDR3 4Gb 256Mx16": 15.2
    }
   ]
  ]
