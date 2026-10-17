@@ -146,6 +146,12 @@ def etfs():
             row = {"sym": sym, "name": nm, "grp": grp, "mk": mk, "cur": cur, "d": s[-1][0],
                    "w1": ret(7), "m1": ret(30), "m3": ret(91), "m6": ret(182), "y1": ret(365),
                    "spark": [v for _, v in s[::max(1, len(s) // 60)]]}
+            # (2026-10-17 사용자 요청 "채권에 유리한지") 기술 상태 — 200일선比·RSI14·52주 고점比
+            cl = [v for _, v in s]
+            row["vs200"] = round((cur / (sum(cl[-200:]) / min(200, len(cl))) - 1) * 100, 1)
+            dd = [cl[i] - cl[i - 1] for i in range(len(cl) - 14, len(cl))]; up = sum(x for x in dd if x > 0); dn = -sum(x for x in dd if x < 0)
+            row["rsi"] = round(100 - 100 / (1 + up / dn), 0) if dn else 100.0
+            row["hi52"] = round((cur / max(cl) - 1) * 100, 1)
             # (2026-10-17 정정) 풀(다음금융) r1y 는 수정주가 기준 = 분배 포함 총수익(실측 KODEX KOFR: 풀 +2.71% = 분배율 2.64%,
             #   야후 원가격 +0.06%). 처음엔 야후가 틀린 줄 알고 가격 열을 풀로 덮었는데 그러면 분배를 두 번 더하게 된다.
             #   → 가격 열은 야후(원가격), 총수익 1년은 풀 r1y 로 분리한다. 두 소스의 기준일 차이로 ±1%p 어긋날 수 있음.
@@ -214,6 +220,52 @@ def parking():
                      "divy": r.get("divy")})
     return rows
 
+def judge_etfs(rows, chk, aux, n_ok, sr):
+    """만기(듀레이션)별 '지금 유리한가' — 기사 프레임(고점 확인 전 단기채, 확인 후 장기채)을 ETF 행에 대입.
+       bucket: park(파킹) / short(1~3년) / mid(7~10년) / long(20년+·초장기) / credit(회사채·HY·종합) / tips(물가연동)
+       점수 0~4 → 🟢 유리(3↑) 🟡 보통(2) 🔴 불리(≤1). 근거는 why 에 열거."""
+    us10 = next((c for c in chk if c["key"] == "us10"), {}); kr10 = next((c for c in chk if c["key"] == "kr10"), {})
+    hy = aux.get("hy") or {}; hy_widen = hy.get("cur") is not None and hy.get("m3") is not None and hy["cur"] > hy["m3"] + 0.2
+    curve = (aux.get("curve") or {}).get("cur")
+    def bucket(g):
+        if "파킹" in g or "초단기" in g: return "park"
+        if "1년" in g or "단기" in g or "3년" in g: return "short"
+        if "중기" in g or "7-10" in g or "10년" in g: return "mid"
+        if "물가" in g: return "tips"
+        if "회사채" in g or "하이일드" in g or "종합" in g: return "credit"
+        return "long"
+    for r in rows:
+        if not r.get("cur"): continue
+        b = bucket(r["grp"]); sc = 0; why = []
+        if b == "park":
+            sc = 3; why.append("듀레이션 0 — 금리 변동 무관")
+            if n_ok < 3: sc += 1; why.append(f"고점 미확인({n_ok}/4) = 대기자금 둘 곳")
+            else: why.append("고점 통과 신호 — 장기채로 옮길 때")
+        elif b == "short":
+            sc = 2; why.append("금리 민감도 낮음")
+            if n_ok < 3: sc += 1; why.append("고점 확인 전 — 기사 '단기채 50%' 구간")
+            if r.get("vs200") is not None and r["vs200"] <= 0: sc += 1; why.append("200일선 아래")
+        elif b in ("mid", "long"):
+            if n_ok >= 3: sc += 2; why.append(f"고점 통과 신호 {n_ok}/4 — 장기채 비중 확대 구간")
+            elif n_ok == 2: sc += 1; why.append("혼조(2/4) — 분할 소량")
+            else: why.append(f"고점 미확인({n_ok}/4) — 금리 더 오르면 손실 확대")
+            if r.get("vs200") is not None and r["vs200"] <= -3: sc += 1; why.append("200일선 아래(눌림)")
+            if r.get("rsi") is not None and r["rsi"] < 40: sc += 1; why.append(f"RSI {r['rsi']:.0f} 과매도")
+            if b == "long" and curve is not None and curve < 0.3: why.append("장단기차 축소 — 장기채 추가 상승여력 제한")
+            if r.get("dy") and r["dy"] >= 4.5: sc = min(4, sc + 1); why.append(f"분배율 {r['dy']}% — 캐리 확보")
+            if b == "long" and n_ok < 3: sc = min(sc, 2); why.append("고점 확신 전 장기채는 '소량'까지(기사) — 유리 판정 보류")
+        elif b == "credit":
+            sc = 2
+            if hy_widen: sc -= 1; why.append(f"HY 가산금리 확대 중({hy.get('m3')}→{hy.get('cur')}%p) — 상환능력 불신")
+            else: why.append("신용스프레드 안정")
+            if n_ok >= 3: sc += 1; why.append("금리 고점 통과 신호")
+            if r.get("dy") and r["dy"] >= 5: sc += 1; why.append(f"분배율 {r['dy']}%")
+        elif b == "tips":
+            sc = 2; why.append("기대인플레 상승 시 유리 — 유가·CPI 재가속 국면의 보험")
+            if not next((c["ok"] for c in chk if c["key"] == "wti"), True): sc += 1; why.append("유가 $75↑ — 인플레 재점화 위험")
+        r["score"] = max(0, min(4, sc)); r["lamp"] = "유리" if r["score"] >= 3 else "보통" if r["score"] == 2 else "불리"; r["why"] = " · ".join(why)
+    return rows
+
 def main():
     log("[bonds] 시작")
     chk, aux, n_ok, phase = checklist()
@@ -230,6 +282,7 @@ def main():
              "n_ok": n_ok, "phase": phase,
              "note": "메리츠 윤여삼(한경MONEY 2026.10): 고점 확신 전 단기채 50%로 유동성 확보, 최종금리 3.25~3.5% 확신 시 장기채 50%로 점진 전환. 회사채는 신용등급만 믿지 말고 신용스프레드·부채비율(200%)·이자보상배율(2배)을 함께. 초장기채·레버리지 ETF 몰빵 금지, 분할 매수·만기 분산."}
     sr = short_rates(); pk = parking()
+    rows = judge_etfs(rows, chk, aux, n_ok, sr)
     OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "checklist": chk, "aux": aux, "short": sr, "parking": pk,
                                "policy": pr, "countries": countries, "series": series, "etfs": rows, "alloc": alloc},
                               ensure_ascii=False), encoding="utf-8")

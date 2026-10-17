@@ -49,6 +49,9 @@ from rtms import REGIONS  # noqa: E402
 
 ARGS = sys.argv[1:]
 LIMIT = int(ARGS[ARGS.index("--limit") + 1]) if "--limit" in ARGS else 0
+# (2026-10-17) 단계 분리 — VWorld 는 해외 IP(오라클 도쿄)를 차단해서(502·연결끊김 실측) geo·poi 단계는 로컬에서 돌리고
+#   캐시(locscore_cache.json)만 서버로 올린다. K-apt 는 서버에서 돌아간다.  --stage kapt|geo|poi|score (없으면 전부)
+STAGE = ARGS[ARGS.index("--stage") + 1] if "--stage" in ARGS else "all"
 
 # 대상 시군구: 서울 전체 + 성남 3구 + 용인 수지
 SGG = {c: n for c, n in REGIONS.items() if c.startswith("11") or c in ("41131", "41133", "41135", "41465")}
@@ -231,13 +234,45 @@ def collect_pois():
     for q in MAJOR_PARKS:
         for i in vsearch(q, "126.70,37.25,127.30,37.75", 1):
             t = i.get("title", "")
-            if q in t and (i.get("category", "").startswith("공원") or "하천" in i.get("category", "") or "공원" in t or q in ("탄천", "양재천", "안양천", "중랑천", "불광천", "홍제천", "성내천", "우이천", "도림천", "정릉천", "청계천", "운중천", "분당천", "고기리")):
+            cat = i.get("category", "")
+            if q in t and (cat.startswith("공원") or "하천" in cat or "습지" in t or t == q) and not any(b in t for b in BAD_PK):
                 majors.append({"nm": t, "x": round(float(i["point"]["x"]), 5), "y": round(float(i["point"]["y"]), 5)})
     print(f"[poi] 역 {len(stations)}(환승 {sum(1 for s in stations if s['lines']>=2)}) · 학원 {len(hk)} · 종합병원 {len(hp)} · 근린공원 {len(pk)} · 대규모공원 지점 {len(majors)}")
     pt = lambda i: [round(float(i["point"]["x"]), 5), round(float(i["point"]["y"]), 5)]
     return {"asof": date.today().isoformat(), "st": stations, "hk": [pt(i) for i in hk.values()],
             "hp": [{"nm": i["title"], "x": pt(i)[0], "y": pt(i)[1]} for i in hp.values()],
             "pk": [pt(i) for i in pk.values()], "mj": majors}
+
+
+# (2026-10-17) 환승역 — VWorld 레코드 중복수는 노선수가 아니다(지축역·신이문역도 2건 실측). 수도권 환승역 이름 목록으로 판정.
+TRANSFER = set("""서울 시청 종로3가 동대문 동묘앞 신설동 동대문역사문화공원 을지로3가 을지로4가 충정로 합정 홍대입구 디지털미디어시티 공덕
+왕십리 신당 청구 약수 교대 사당 이수 총신대입구 고속터미널 강남 선릉 선정릉 강남구청 종합운동장 잠실 석촌 천호 군자 건대입구
+노원 창동 도봉산 석계 태릉입구 상봉 망우 중랑 광운대 신내 회기 청량리 신도림 대림 가산디지털단지 온수 영등포구청 당산 여의도
+노량진 동작 신길 까치산 김포공항 마곡나루 불광 연신내 충무로 삼각지 이촌 옥수 효창공원앞 보문 성신여대입구 삼성 수서 도곡 양재
+신사 논현 신논현 가락시장 오금 올림픽공원 복정 모란 이매 정자 미금 구성 기흥 판교 금정 용산 대곡 구리 별내 암사역사공원 인덕원""".split())
+BAD_ST = ("출입구", "출구", "입구", "환승", "주차", "정류", "엘리베이터")
+
+
+def norm_stations(raw):
+    """출입구 레코드 제거 → 역명(…역)별 1개 · 300m 안 같은 이름은 합침 · lines = 환승목록이면 2, 아니면 1"""
+    out = []
+    for s in raw:
+        nm = s["nm"].strip()
+        if any(b in nm for b in BAD_ST) or not nm.endswith("역"):
+            continue
+        base = re.sub(r"\(.*?\)", "", nm[:-1]).strip()
+        hit = next((o for o in out if o["nm"] == nm and hav(s["x"], s["y"], o["x"], o["y"]) < 0.3), None)
+        if hit:
+            continue
+        out.append({"nm": nm, "x": s["x"], "y": s["y"], "lines": 2 if base in TRANSFER else 1})
+    return out
+
+
+BAD_PK = ("입구", "주차", "화장실", "학교", "센터", "현장", "관리소", "회관", "유치원", "어린이집", "교회", "아파트", "빌라")
+
+
+def norm_majors(raw):
+    return [m for m in raw if not any(b in m["nm"] for b in BAD_PK)]
 
 
 def hav(x1, y1, x2, y2):
@@ -305,8 +340,9 @@ def score_size(hh):
 
 def main():
     C = load_cache()
+    st = lambda *names: STAGE == "all" or STAGE in names
     # 1) 단지
-    if "--refresh-kapt" in ARGS or not C["kapt"]:
+    if st("kapt") and ("--refresh-kapt" in ARGS or not C.get("codes")):
         codes = {}
         for sgg, nm in SGG.items():
             lst = kapt_list(sgg)
@@ -316,7 +352,7 @@ def main():
         C["codes"] = {k: list(v) for k, v in codes.items()}
         save_cache(C)
     codes = C.get("codes") or {}
-    todo = [c for c in codes if c not in C["kapt"]]
+    todo = [c for c in codes if c not in C["kapt"]] if st("kapt") else []
     if LIMIT:
         todo = todo[:LIMIT]
     print(f"[kapt] 단지 {len(codes)} · 상세 미수집 {len(todo)}")
@@ -328,7 +364,9 @@ def main():
             save_cache(C)
     save_cache(C)
     # 2) 좌표
-    todo = [c for c, v in C["kapt"].items() if v and c not in C["geo"]]
+    todo = [c for c, v in C["kapt"].items() if v and c not in C["geo"]] if st("geo") else []
+    if LIMIT:
+        todo = todo[:LIMIT]
     print(f"[geo] 미지오코딩 {len(todo)}")
     for n, c in enumerate(todo, 1):
         v = C["kapt"][c]
@@ -340,10 +378,16 @@ def main():
             save_cache(C)
     save_cache(C)
     # 3) POI
-    if "--refresh-poi" in ARGS or not C["poi"]:
+    if st("poi") and ("--refresh-poi" in ARGS or not C["poi"]):
         C["poi"] = collect_pois()
         save_cache(C)
+    if not st("score"):
+        return
     P = C["poi"]
+    if not P:
+        print("[loc] poi 캐시 없음 — --stage poi 먼저"); return
+    P = dict(P, st=norm_stations(P["st"]), mj=norm_majors(P["mj"]))
+    print(f"[poi] 정규화 후 역 {len(P['st'])}(환승 {sum(1 for s in P['st'] if s['lines']>=2)}) · 대규모공원 지점 {len(P['mj'])}")
     # 4) 점수
     PR = load_prices()
     apts = []
