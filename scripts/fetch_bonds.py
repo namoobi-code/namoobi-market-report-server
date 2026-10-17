@@ -28,11 +28,15 @@ def jload(p, default=None):
     except Exception: return default if default is not None else {}
 def log(m): print(m, flush=True)
 
-ETFS_KR = [("148070.KS", "KOSEF 국고채10년", "국내 장기"), ("114260.KS", "KODEX 국고채3년", "국내 단기"),
+# (2026-10-17 사용자 지적 "왜 초단기 ETF 는 없나") 기사의 '현금성 10%' = 파킹형(KOFR·CD금리). 야후 가격이 누적형 금리를 제대로 반영하는
+# 종목만 채택(실측: TIGER CD금리 1y +2.78%·TIGER KOFR +2.02% 정상 / KODEX KOFR·CD 는 +0.0x% 로 야후 데이터 결함 → 제외).
+# 미국 SGOV·BIL 은 월 분배형이라 가격이 평평 — 수익은 분배금(연 4%대). 화면 주석으로 안내.
+ETFS_KR = [("357870.KS", "TIGER CD금리투자KIS", "초단기·파킹(CD 91일)"), ("449170.KS", "TIGER KOFR금리액티브", "초단기·파킹(KOFR)"),
+           ("148070.KS", "KOSEF 국고채10년", "국내 장기"), ("114260.KS", "KODEX 국고채3년", "국내 단기"),
            ("439870.KS", "KODEX 국고채30년액티브", "국내 초장기"), ("385560.KS", "RISE KIS국고채30년Enhanced", "국내 초장기"),
            ("273130.KS", "KODEX 종합채권(AA-이상)액티브", "국내 회사채 혼합"), ("305080.KS", "TIGER 미국채10년선물", "미국 장기(KR상장)"),
            ("453850.KS", "ACE 미국30년국채액티브(H)", "미국 초장기(KR상장·환헤지)"), ("304660.KS", "KODEX 미국채울트라30년선물(H)", "미국 초장기(KR상장·환헤지)")]
-ETFS_US = [("SHY", "iShares 1-3Y Treasury", "미국 단기"), ("IEF", "iShares 7-10Y Treasury", "미국 중기"),
+ETFS_US = [("SGOV", "iShares 0-3M T-Bill", "초단기·파킹(월분배)"), ("BIL", "SPDR 1-3M T-Bill", "초단기·파킹(월분배)"), ("SHY", "iShares 1-3Y Treasury", "미국 단기"), ("IEF", "iShares 7-10Y Treasury", "미국 중기"),
            ("TLT", "iShares 20+Y Treasury", "미국 장기"), ("EDV", "Vanguard Ext. Duration", "미국 초장기"),
            ("TIP", "iShares TIPS", "물가연동"), ("LQD", "iShares IG Corp", "우량 회사채"),
            ("HYG", "iShares High Yield", "하이일드"), ("BND", "Vanguard Total Bond", "종합")]
