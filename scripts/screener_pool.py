@@ -390,12 +390,20 @@ def _enrich_us(us):
         for att in range(3):
             try:
                 j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
-                         f"?modules=financialData,assetProfile,earningsTrend,earningsHistory,summaryDetail,defaultKeyStatistics&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                         f"?modules=financialData,assetProfile,earningsTrend,earningsHistory,summaryDetail,defaultKeyStatistics,incomeStatementHistory&crumb={_up.quote(crumb)}",opener=op,timeout=12)
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
                 fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{}); sd=fd.get("summaryDetail",{})
                 ks=fd.get("defaultKeyStatistics",{})   # (2026-07-24) US 수급 프록시 — 공매도잔량·커버일수·기관보유
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
-                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),
+                # (2026-10-17) 재무건전성 2종 — ICR(영업이익/이자비용)·OCF/영업이익 (한경MONEY 김학균 4대 지표)
+                #   operatingCashflow 는 financialData, interestExpense·operatingIncome 은 incomeStatementHistory[0](최근 연간).
+                #   Yahoo 는 interestExpense 를 음수로 주는 종목이 있어 abs. 이자비용 0/미공시면 ICR None(무차입은 '—' 로 정직하게).
+                _ish=((fd.get("incomeStatementHistory") or {}).get("incomeStatementHistory") or [{}])[0]
+                _ie=v(_ish.get("interestExpense")); _oi=v(_ish.get("operatingIncome")); _ocf=v(fdd.get("operatingCashflow"))
+                _ie=abs(_ie) if _ie else None
+                _icr=(round(_oi/_ie,1) if (_ie and _oi is not None) else None)
+                _ocfop=(round(_ocf/_oi,2) if (_ocf is not None and _oi and _oi>0) else None)
+                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),"icr":_icr,"ocfop":_ocfop,
                         "sr_f":v(ks.get("shortPercentOfFloat")),"scov":v(ks.get("shortRatio")),
                         "inst":v(ks.get("heldPercentInstitutions")),
                         "opm":v(fdd.get("operatingMargins")),"psr":v(sd.get("priceToSalesTrailing12Months")),
@@ -420,7 +428,7 @@ def _enrich_us(us):
     ok=sum(1 for c in by if "sector" in by[c])
     print(f"[pool] US quoteSummary 커버리지 {ok}/{len(by)} (갭필 후)")
     # 이월(carry-forward): 그래도 실패한 종목은 직전 풀의 컨센서스·재무값 재사용(하루새 거의 불변)
-    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev","opm","psr",
+    CF=("sector","payout","de","cr","roe","revg","epsg","fcf","tp","tphi","tplo","rec","nan","op3neg","oploss","eps_rev","opm","psr","icr","ocfop",
         "cr30","cr7","cr90","pr30","pr7","pr90","cup","cdn","eq1","rq1","nan1","spr","sprb","sprn","spra")
     cf=0
     for c in by:
@@ -772,6 +780,16 @@ def build():
                     _r["qtoby"]=_v.get("qtoby"); _r["qtobq"]=_v.get("qtobq"); _r["opmch"]=_v.get("opmch")
         print(f"[pool] growth_accel 병합 KR {len(_ga.get('kr') or {})} · US {len(_ga.get('us') or {})}")
     except Exception as e: print("[pool] growth_accel 병합 skip:", repr(e)[:80])
+    # (2026-10-17) 재무건전성 2종 병합 — fin_quality.py(주 1회, DART 전체재무제표) 산출 icr·ocfop 를 KR 풀에 붙인다.
+    try:
+        _fq=json.load(open(os.path.join(T.BASE,"data","db","fin_quality.json"),encoding="utf-8")).get("rows",{})
+        _nq=0
+        for r in kr:
+            q=_fq.get(r["c"])
+            if q and not q.get("none"):
+                r["icr"]=q.get("icr"); r["ocfop"]=q.get("ocfop"); r["fq_yr"]=q.get("yr"); _nq+=1
+        print(f"[pool] fin_quality 병합 {_nq}종 (ICR·OCF/영업이익)")
+    except Exception as e: print("[pool] fin_quality skip:", repr(e)[:80])
     # (2026-09-02) KR 발표일 영구 이력 — edl(잠정공시 접수일)은 earnings_live 45일 유지라
     # 풀에서도 45일 뒤 소멸한다. 다음 예정일 추정(직전 발표일+91일)은 발표 91일 후에야
     # 필요한데 그땐 edl이 이미 사라져 있어 **추정이 항상 불가**(실측: 향후7일 추정 0건).

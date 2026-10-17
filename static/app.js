@@ -1352,7 +1352,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
      '<b>미국 전용 후보</b>: expense ratio · AUM($) · 자산군/테마 · 옵션 유동성 · 레버리지 배수',
    ].map(x=>'· '+x).join('<br>');}
   // 탭 전환
-  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_kpop','p_kcons','p_moat','p_share','p_share2','p_debt','p_sub','p_pf','p_re','p_re3','p_resh','p_eg','p_ct','p_revd','p_cl','p_gl','p_exp','p_llm'];  // p_llm: (2026-09-10) AI 챗봇 탭 (llm.js)  // p_exp: (2026-09-05) K-수출 탭 (exports.js) // p_cl: (2026-09-05) 코인 선행지표 탭 (cryptolead.js) // p_revd: (2026-09-02) 리비전 데일리 탭 (revd.js)  // p_eg: (2026-09-01) 이익성장 탭 (eg.js)  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) · p_re: (2026-08-23) RE 예측 탭 (re.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
+  const panes=['p_welcome','p_daily','p_db','p_ai','p_ta','p_auto','p_fire','p_screener','p_vis','p_cal','p_etf','p_estate','p_global','p_trends','p_hobby','p_kpop','p_kcons','p_moat','p_share','p_share2','p_debt','p_sub','p_pf','p_re','p_re3','p_resh','p_eg','p_ct','p_revd','p_cl','p_gl','p_bd','p_exp','p_llm'];  // p_llm: (2026-09-10) AI 챗봇 탭 (llm.js)  // p_exp: (2026-09-05) K-수출 탭 (exports.js) // p_cl: (2026-09-05) 코인 선행지표 탭 (cryptolead.js) // p_revd: (2026-09-02) 리비전 데일리 탭 (revd.js)  // p_eg: (2026-09-01) 이익성장 탭 (eg.js)  // p_sub: 청약 탭 (sub.js) · p_pf: (2026-08-23) Portfolio 탭 (pf.js) · p_re: (2026-08-23) RE 예측 탭 (re.js) — 여기 안 넣으면 탭 눌러도 빈 화면(실측)
   {const hb=document.getElementById('go_home');          // 제목 클릭 → 홈(인사 화면)
    if(hb) hb.addEventListener('click',()=>{
      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('on'));
@@ -4762,6 +4762,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       opLoss:{label:'영업적자',exclGE:1,maxOnly:1,fmt:v=>v.toFixed(0)+'년이상 제외',presets:[['전체',null,null],['1년이상 제외',null,1],['2년이상 제외',null,2],['3년이상 제외',null,3]],def:[null,3]},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
+      /* (2026-10-17) 재무건전성 2종 — 한경MONEY 김학균 '저금리 40년 끝났다' 4대 지표 중 빠져 있던 둘.
+         icr = 영업이익/이자비용(좀비기업 선별, 1 미만=이자도 못 갚음) · ocfop = 영업현금흐름/영업이익(이익의 질, 1 근처가 정상·장기 0.5 미만이면 채권·재고 적체 의심).
+         KR=DART 전체재무제표(주1회 fin_quality.py) · US=야후 incomeStatementHistory. 금융업 면제(이자비용이 영업비용). 무차입은 ICR 산출 불가 → 값 없음(필수 아님). */
+      icr:{label:'이자보상배율',fmt:v=>v.toFixed(1)+'배',min:1,fin:1,presets:[['전체',null],['1배 ↑ (좀비 제외)',1],['3배 ↑',3],['10배 ↑',10]],def:[null,null]},
+      ocfop:{label:'영업현금/영업이익',fmt:v=>v.toFixed(2),min:1,fin:1,presets:[['전체',null],['0.5 ↑',0.5],['0.8 ↑',0.8],['1.0 ↑',1.0]],def:[null,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
       /* (2026-08-09 재편) 리비전 계열을 2쌍으로 통일 — ③영업익추정 30/90일 · ④목표주가 30/90일.
@@ -4867,6 +4872,11 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       opLoss:{label:'영업적자',exclGE:1,maxOnly:1,fmt:v=>v.toFixed(0)+'년이상 제외',presets:[['전체',null,null],['1년이상 제외',null,1],['2년이상 제외',null,2],['3년이상 제외',null,3]],def:[null,3]},
       de:{label:'부채비율',fmt:v=>v.toFixed(0)+'%',fin:1,presets:[['전체',null,null],['100% ↓',null,100],['200% ↓',null,200],['300% ↓',null,300]],def:[null,300]},
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
+      /* (2026-10-17) 재무건전성 2종 — 한경MONEY 김학균 '저금리 40년 끝났다' 4대 지표 중 빠져 있던 둘.
+         icr = 영업이익/이자비용(좀비기업 선별, 1 미만=이자도 못 갚음) · ocfop = 영업현금흐름/영업이익(이익의 질, 1 근처가 정상·장기 0.5 미만이면 채권·재고 적체 의심).
+         KR=DART 전체재무제표(주1회 fin_quality.py) · US=야후 incomeStatementHistory. 금융업 면제(이자비용이 영업비용). 무차입은 ICR 산출 불가 → 값 없음(필수 아님). */
+      icr:{label:'이자보상배율',fmt:v=>v.toFixed(1)+'배',min:1,fin:1,presets:[['전체',null],['1배 ↑ (좀비 제외)',1],['3배 ↑',3],['10배 ↑',10]],def:[null,null]},
+      ocfop:{label:'영업현금/영업이익',fmt:v=>v.toFixed(2),min:1,fin:1,presets:[['전체',null],['0.5 ↑',0.5],['0.8 ↑',0.8],['1.0 ↑',1.0]],def:[null,null]},
       /* (2026-08-10) 사용자 지정 명칭 — '목표주가 상승여력' */
       upside:{label:'목표주가 상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       rec:{label:'투자의견',fmt:v=>'매수강도 '+v.toFixed(0),min:1,reqData:1,presets:[['전체',null],['매수 이상',65],['강력매수',85]],def:[null,null]},
@@ -4986,7 +4996,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     }
   };
   /* 나열 순서 = 표시 컬럼 순서와 동일. 컬럼이 없는 필터(증권 구분)는 맨 뒤에 배치 */
-  const KEYS=['mk','krx','wics2','wics','usind','sector','px','chg','cap','tv','de','cr','opLoss','age',
+  const KEYS=['mk','krx','wics2','wics','usind','sector','px','chg','cap','tv','de','cr','icr','ocfop','opLoss','age',
               /* (2026-07-21) 이동평균은 기간 오름차순으로 — 20일 → 50일 → 200일 */
               'v20','v50','v200','align','rsi','adx','volx','turn','macd','bb',
               /* (2026-07-21) 수익률 1Y 제거 — 미국은 mom(수익률 12-1M)이 52주 변화율로 산출돼
@@ -5360,7 +5370,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     usind:{l:'세부업종',n:0,m:'us'},
     px:{l:'가격',n:1,m:'both'}, chg:{l:'등락',n:1,m:'both'},
     cap:{l:'시가총액',n:1,m:'both'}, tv:{l:'거래대금',n:1,m:'both'},
-    de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'},
+    de:{l:'부채비율',n:1,m:'both'}, cr:{l:'유동비율',n:1,m:'both'}, icr:{l:'이자보상',n:1,m:'both'}, ocfop:{l:'영업현금/영익',n:1,m:'both'},
     oploss:{l:'영업적자',n:1,m:'both'},
     age:{l:'상장기간',n:1,m:'both'}, v200:{l:'200일선',n:1,m:'both'},
     v20:{l:'20일선',n:1,m:'both'}, v50:{l:'50일선',n:1,m:'both'}, align:{l:'이평배열',n:0,m:'both'},
@@ -5484,6 +5494,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'adx': return r.adx??null;
       case 'rsi': return r.rsi; case 'volx': return r.volx; case 'bb': return r.bb;
       case 'de': return r.de; case 'cr': return r.cr;
+      case 'icr': return r.icr; case 'ocfop': return r.ocfop;   // (2026-10-17) 재무건전성
       case 'oploss': return r.oploss!=null?r.oploss:(r.op3neg?3:null);
       case 'frgn': return r.frgn;
       case 'frgn4w': return r.frgn4w;                              // 외인 지분율 4주 변화(%p)
@@ -5599,6 +5610,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'per': case 'pbr': return v.toFixed(1)+'배';
       case 'divy': return v.toFixed(2)+'%';
       case 'de': return v.toFixed(0)+'%';
+      case 'icr': return (v<1?'<span style="color:#dc2626;font-weight:700">':'')+v.toFixed(1)+'배'+(v<1?'</span>':'');
+      case 'ocfop': return (v<0.5?'<span style="color:#b45309">':'')+v.toFixed(2)+(v<0.5?'</span>':'');
       case 'cr': return v.toFixed(1);
       case 'roe': case 'frgn': return v.toFixed(1)+'%';
       case 'frgn4w': return `<span class="${v>0?'up':(v<0?'dn':'note')}">${v>0?'+':''}${v.toFixed(2)}%p</span>`;
@@ -8863,6 +8876,25 @@ await _canvasFlow(c);
     set('cap',{min:3e11,max:null});    // 시총 3,000억 ↑
     set('tv',{min:1e9,max:null});      // 거래대금 10억 ↑
     sort={k:'divy',d:-1};              // 배당률 높은 순
+    apply(); };}
+  /* (2026-10-17) 🏦 퀄리티 배당 (김학균 체크리스트 · KR/US 공통) — 한경MONEY 2026-10 "저금리 40년 끝났다, 업종보다 기업의 질".
+     배당주 점검 5기준 그대로: ① 5년↑ 배당 지속·증가(KR=DPS 연속증가 2년↑(DART 5개년 한계) · US=배당성장 5년↑)
+     ② 배당성향 70% 이하 ③ 배당수익률 3% 이상 ④ 잉여현금흐름 → 영업현금/영업이익 0.5↑(이익의 질) ⑤ 부채비율 200%↓
+     + 좀비 제외: 이자보상배율 1배↑ · 영업적자 제외 · 시총 하한. 배당률 높은 순. 배당선취(KR 단기 선취)·배당귀족(US 20년)과 달리 '질' 중심 중도안. */
+  {const b=$('scr_kqd'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    const d=DEF[mkt];
+    for(const k in d){ const f=d[k]; if(!f||f.fixed!==undefined) continue;
+      F[k]= f.tgl? {on:false} : f.cat? {v:null} : {min:null,max:null}; }
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    if(mkt==='kr') set('dinc',{min:2,max:null}); else set('dgy',{min:5,max:null});
+    set('payout',{min:null,max:70});
+    set('divy',{min:3,max:12});        // 12% 초과는 함정 배제(배당선취와 동일)
+    set('ocfop',{min:0.5,max:null});   // 영업현금흐름이 영업이익의 절반 이상 — '이익은 흑자, 현금은 적자' 배제
+    set('icr',{min:1,max:null});       // 좀비 제외
+    set('de',{min:null,max:200});
+    set('opLoss',{min:null,max:1});
+    set('cap',{min:(mkt==='kr'?3e11:2e9),max:null});
+    sort={k:'divy',d:-1};
     apply(); };}
   /* (2026-08-06) US 배당 3종 프리셋 — div_hist_us(야후 30y 배당 이벤트) 기반.
      공통 사상: '사놓고 잊는' 배당 — 성장연수(감액 이력 없음)·성향 상한(증가 여력)·폭락 이력(MDD)·대형주. */

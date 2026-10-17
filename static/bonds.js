@@ -1,0 +1,96 @@
+/* bonds.js — 📜 채권 탭 (2026-10-17 신설)
+   데이터: /api/db/bonds (scripts/fetch_bonds.py 매일 07:40 · 기존 DB 재사용 + 채권 ETF 야후)
+   구성: ① 금리 고점 통과 4신호 체크리스트(+장단기차·HY·美韓 스프레드) ② 배분 가이드(기사 프레임에 현재 위치)
+         ③ 기준금리·10년물 현황 + 1년 추이 ④ 채권 ETF 추세표(KR 8·US 8). 한경MONEY 2026.10 메리츠 윤여삼 인터뷰 기반. 투자권유 아님. */
+(function(){
+'use strict';
+const $=id=>document.getElementById(id);
+const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const nf=(n,d)=>n==null?'—':Number(n).toLocaleString(undefined,{maximumFractionDigits:d==null?2:d});
+const pf=(v,d=1)=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
+const TD='border:1px solid #e2e8f0;padding:4px 8px;', TH='border:1px solid #e2e8f0;padding:5px 8px;font-size:11.5px;background:#f8fafc;';
+let D=null, _init=false; const charts=[];
+
+function spark(cv,s,color,th){
+  if(!s||s.length<2||!window.Chart) return;
+  const labels=s.map(x=>x[0]), data=s.map(x=>x[1]);
+  const ds=[{data,borderColor:color,backgroundColor:color+'22',fill:true,pointRadius:0,borderWidth:1.3,tension:.15}];
+  (th||[]).forEach(t=>ds.push({data:data.map(()=>t),borderColor:'#94a3b8',borderDash:[3,3],borderWidth:.8,pointRadius:0,fill:false}));
+  charts.push(new Chart(cv,{type:'line',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},
+    scales:{x:{ticks:{maxTicksLimit:4,font:{size:9},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(2,7):''},grid:{display:false}},y:{ticks:{font:{size:9},maxTicksLimit:4},grid:{color:'#f1f5f9'}}}}}));
+}
+function miniSpark(cv,vals,color){
+  if(!vals||vals.length<2||!window.Chart) return;
+  charts.push(new Chart(cv,{type:'line',data:{labels:vals.map((_,i)=>i),datasets:[{data:vals,borderColor:color,pointRadius:0,borderWidth:1.2,tension:.2}]},
+    options:{responsive:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}}}}));
+}
+const TH_LINE={wti:[75],us10:[4.5],jobs:[0],kr10:[]};
+function checklist(){
+  const C=D.checklist||[], A=D.aux||{}, al=D.alloc||{};
+  const n=al.n_ok||0; const col=n>=4?'#16a34a':n>=3?'#65a30d':n>=2?'#ca8a04':'#dc2626';
+  let h=`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <div style="font-size:22px;font-weight:900;color:${col}">${n}/4 충족 — ${E(al.phase||'')}</div>
+      <div class="note">메리츠 윤여삼 '금리 고점 통과 신호 4가지'(한경MONEY 2026.10) · 서버 매일 자동 판정 · 기준 ${E(D.as_of||'')}</div></div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px">`;
+  C.forEach(c=>{ h+=`<div class="box" style="padding:10px 12px;border-top:3px solid ${c.ok?'#16a34a':'#dc2626'}">
+      <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:12.5px">${E(c.name)}</b><span style="font-size:11px;padding:1px 7px;border-radius:9px;background:${c.ok?'#dcfce7':'#fee2e2'};color:${c.ok?'#16a34a':'#dc2626'};font-weight:700">${c.ok?'✓ 충족':'✗ 미충족'}</span></div>
+      <div style="font-size:19px;font-weight:800;margin:2px 0">${E(c.value)} <span class="note" style="font-weight:400;font-size:11px">${E(c.detail||'')}</span></div>
+      <div style="position:relative;height:90px;margin:4px 0"><canvas id="bd_cv_${c.key}"></canvas></div>
+      <div class="note" style="font-size:11px"><b>왜</b> ${E(c.why)}</div></div>`;});
+  h+=`</div>`;
+  const cv=A.curve||{}, hy=A.hy||{};
+  h+=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    ${cv.cur!=null?`<div style="flex:1;min-width:200px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">보조 · 美 장단기차 10Y−2Y</div><div style="font-size:17px;font-weight:800">${cv.cur.toFixed(2)}%p <span class="note" style="font-weight:400">3M전 ${cv.m3==null?'—':cv.m3.toFixed(2)}</span></div><div class="note" style="font-size:11px">축소(플래트닝)=경기 모멘텀 정점·긴축 체감 신호, 역전이면 경고(기사). 커브가 다시 가팔라지는 건 고점 통과 후 전형</div></div>`:''}
+    ${hy.cur!=null?`<div style="flex:1;min-width:200px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">보조 · 美 HY 가산금리</div><div style="font-size:17px;font-weight:800">${hy.cur.toFixed(2)}%p <span class="note" style="font-weight:400">3M전 ${hy.m3==null?'—':hy.m3.toFixed(2)}</span></div><div class="note" style="font-size:11px">회사채 신용스프레드의 미국판 — 벌어지면 상환능력 불신, 좁아지면 신뢰. 회사채는 등급 아닌 스프레드로 보라(기사)</div></div>`:''}
+    ${A.us_kr!=null?`<div style="flex:1;min-width:200px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">보조 · 美−韓 10년 스프레드</div><div style="font-size:17px;font-weight:800">${A.us_kr.toFixed(0)}bp</div><div class="note" style="font-size:11px">국내 10년은 美 10년을 따라간다 — 스프레드가 넓을수록 국내 금리의 추가 상승 압력은 제한적</div></div>`:''}
+  </div>`;
+  return h;
+}
+function alloc(){
+  const al=D.alloc||{}; const n=al.n_ok||0;
+  const pie=(o,title,on)=>{const cols={'현금성':'#94a3b8','단기채':'#0ea5e9','장기채':'#7c3aed','우량 회사채':'#f59e0b'};
+    return `<div style="flex:1;min-width:220px;border:2px solid ${on?'#7c3aed':'#e2e8f0'};border-radius:8px;padding:10px 12px;background:#fff${on?';box-shadow:0 0 0 3px #ede9fe':''}"><div style="font-weight:700;font-size:12.5px">${title}${on?' <span style="font-size:10.5px;color:#7c3aed">◀ 현재 위치</span>':''}</div>
+      <div style="display:flex;height:16px;border-radius:8px;overflow:hidden;margin:6px 0">${Object.entries(o).map(([k,v])=>`<div title="${k} ${v}%" style="width:${v}%;background:${cols[k]}"></div>`).join('')}</div>
+      <div style="font-size:11.5px">${Object.entries(o).map(([k,v])=>`<span style="color:${cols[k]};font-weight:700">■</span> ${k} ${v}%`).join(' · ')}</div></div>`;};
+  return `<div style="display:flex;gap:10px;flex-wrap:wrap">${pie(al.base||{},'고점 확신 전 — 단기채로 대기',n<3)}<div style="align-self:center;font-size:22px;color:#94a3b8">→</div>${pie(al.after||{},'최종금리 확신 후 — 장기채 50%',n>=3)}</div>
+    <div class="note" style="margin-top:6px;line-height:1.6">${E(al.note||'')} — 체크리스트 3개 이상 충족이면 오른쪽으로 <b>단계적</b> 이동(한 번에 몰지 말 것). 위험·안전자산 큰 틀(60/40)은 별개이며 이 배분은 채권 몫 안의 구성. 참고용·투자권유 아님.</div>`;
+}
+function rates(){
+  const P=D.policy||[], C=D.countries||[];
+  let h=`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${P.map(r=>`<div style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;background:#fff;min-width:110px"><div class="note" style="font-size:10.5px">${E(r.country)} 기준금리</div><div style="font-size:15px;font-weight:800">${E(r.rate)}</div><div class="note" style="font-size:10px">${E(r.asof||'')}</div></div>`).join('')}</div>`;
+  h+=`<table style="border-collapse:collapse;font-size:12px;background:#fff"><thead><tr>${['국가 10년물','현재','1일','1주','1개월','3개월','6개월','1년','기준일'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
+    C.map(c=>{const bp=v=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${v.toFixed(0)}bp</span>`;
+      return `<tr><td style="${TD}"><b>${E(c.name)}</b></td><td style="${TD}text-align:right;font-weight:700">${c.cur==null?'—':c.cur.toFixed(2)+'%'}</td>${['d1','w1','m1','m3','m6','y1'].map(k=>`<td style="${TD}text-align:right">${bp(c[k])}</td>`).join('')}<td style="${TD}color:#64748b;font-size:11px">${E(c.date||'')}</td></tr>`;}).join('')}</tbody></table>
+    <div class="note" style="margin-top:3px">변화는 bp(0.01%p). 소스 FRED·Bundesbank·CNBC·ECOS</div>`;
+  return h;
+}
+function ratesChart(){
+  const S=D.series||{}; const cv=$('bd_cv_rates'); if(!cv||!window.Chart) return;
+  const cols={US:'#2563eb',KR:'#dc2626',DE:'#64748b',JP:'#16a34a'}, nm={US:'미국',KR:'한국',DE:'독일',JP:'일본'};
+  const dates=[...new Set(Object.values(S).flat().map(x=>x[0]))].sort();
+  charts.push(new Chart(cv,{type:'line',data:{labels:dates,datasets:Object.entries(S).map(([k,s])=>{const m=new Map(s);return {label:nm[k]||k,data:dates.map(d=>m.get(d)??null),borderColor:cols[k],pointRadius:0,borderWidth:1.4,spanGaps:true,tension:.1};})},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10.5}}}},
+      scales:{x:{ticks:{maxTicksLimit:8,font:{size:9.5},maxRotation:0,callback:(v,i)=>dates[i]?dates[i].slice(2,7):''}},y:{ticks:{callback:v=>v+'%',font:{size:10}}}}}}));
+}
+function etfTbl(mk){
+  const R=(D.etfs||[]).filter(r=>r.mk===mk);
+  return `<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%"><thead><tr>${['ETF','구분','현재가','1주','1개월','3개월','6개월','1년','1년 추세'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
+    R.map(r=>`<tr><td style="${TD}"><b>${E(r.name)}</b><span class="note" style="font-size:10px"> ${E(r.sym)}</span></td><td style="${TD}font-size:11px;color:#475569">${E(r.grp)}</td><td style="${TD}text-align:right">${r.cur==null?'—':(mk==='kr'?nf(r.cur,0):'$'+nf(r.cur,2))}</td>${['w1','m1','m3','m6','y1'].map(k=>`<td style="${TD}text-align:right">${pf(r[k])}</td>`).join('')}<td style="${TD}"><canvas id="bd_sp_${r.sym.replace('.','_')}" width="90" height="26"></canvas></td></tr>`).join('')}</tbody></table>`;
+}
+function render(){
+  charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
+  $('bd_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 07:40 자동';
+  $('bd_chk').innerHTML=checklist();
+  (D.checklist||[]).forEach(c=>{const cv=$('bd_cv_'+c.key); if(cv) spark(cv,c.s,c.ok?'#16a34a':'#dc2626',TH_LINE[c.key]);});
+  $('bd_alloc').innerHTML=alloc();
+  $('bd_rates').innerHTML=rates(); ratesChart();
+  $('bd_etf_kr').innerHTML=etfTbl('kr'); $('bd_etf_us').innerHTML=etfTbl('us');
+  (D.etfs||[]).forEach(r=>{const cv=$('bd_sp_'+r.sym.replace('.','_')); if(cv&&r.spark) miniSpark(cv,r.spark,(r.y1||0)>=0?'#dc2626':'#2563eb');});
+}
+function init(){ if(_init) return; _init=true;
+  fetch('/api/db/bonds',{cache:'no-cache'}).then(r=>{if(!r.ok) throw new Error('HTTP '+r.status); return r.json();})
+    .then(d=>{D=d; try{render();}catch(err){$('bd_chk').innerHTML=`<div style="color:#b91c1c;font-weight:700">렌더 오류: ${E(err&&err.message||err)}</div>`; throw err;}})
+    .catch(e=>{$('bd_chk').innerHTML=`<div class="note">bonds 로딩 실패: ${E(e.message||e)}</div>`;});
+}
+const tb=document.querySelector('.tab[data-pane="p_bd"]'); if(tb) tb.addEventListener('click',init);
+})();

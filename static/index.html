@@ -575,6 +575,7 @@
       <!-- (2026-09-05) 코인 선행지표 탭 — cryptolead.js · scripts/fetch_cryptolead.py (매일 06:55) -->
       <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
       <button class="tab"    data-pane="p_gl" style="background:#b45309;border-color:#b45309;color:#fff">🥇 금 선행<small style="color:#fde68a">실질금리·달러·통설검증 신호등</small></button>
+      <button class="tab"    data-pane="p_bd" style="background:#1e40af;border-color:#1e40af;color:#fff">📜 채권<small style="color:#bfdbfe">금리 고점 체크리스트·ETF</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -970,6 +971,23 @@
     </div>
   </div>
 
+  <!-- (2026-10-17) 📜 채권 탭 — bonds.js · 데이터 scripts/fetch_bonds.py (매일 07:40, 기존 DB 재사용) -->
+  <div class="pane" id="p_bd" style="overflow:auto">
+    <h2>📜 채권 — 금리 고점은 언제 확인되나 <em id="bd_asof"></em></h2>
+    <div class="note" style="margin:-4px 0 10px;line-height:1.7">한경MONEY 2026.10 메리츠 윤여삼 채권애널리스트 인터뷰 프레임: <b>"고점을 단번에 맞히려 하지 말고 단기채로 유동성을 확보한 뒤, 고점 통과 신호가 확인되면 장기채 비중을 단계적으로 확대"</b>.
+      그 '신호 4가지'(유가 $75 하회 · 美 고용·소비 질서 있는 둔화 · 美 10년 4.5% 안팎 완만 하락 · 국내 장기금리 신고점 미경신)를 서버가 매일 자동 판정하고, 기준금리·10년물·채권 ETF 추세를 한 화면에 둔다. 전부 기존 수집 DB 재사용(신규 토큰 0). 투자권유 아님.</div>
+    <h3>① 금리 고점 통과 체크리스트</h3>
+    <div class="box" style="padding:12px 14px;margin-bottom:10px" id="bd_chk"></div>
+    <h3>② 채권 배분 가이드 <span class="note">기사 프레임 — 체크리스트 충족 수로 현재 위치 표시</span></h3>
+    <div class="box" style="padding:12px 14px;margin-bottom:10px" id="bd_alloc"></div>
+    <h3>③ 기준금리 · 국가별 10년물</h3>
+    <div class="box" style="padding:12px 14px;margin-bottom:6px" id="bd_rates"></div>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px"><b style="font-size:12.5px">10년물 1년 추이 — 미국·한국·독일·일본</b><div style="height:230px;margin-top:4px"><canvas id="bd_cv_rates"></canvas></div></div>
+    <h3>④ 채권 ETF 추세 <span class="note">국내 상장 8종 · 미국 8종 — 단기/장기/초장기/회사채/물가연동</span></h3>
+    <div class="box" style="padding:10px 12px;margin-bottom:8px" id="bd_etf_kr"></div>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px" id="bd_etf_us"></div>
+    <div class="note" style="line-height:1.6">읽는 법: 금리가 오르면 기존 채권 가격은 떨어지지만 새로 사는 투자자는 높은 이자를 만기까지 고정한다(기사 박스). 만기가 길수록 금리 변화에 가격이 크게 움직여(듀레이션) 초장기 ETF가 1년 −20~30%인 이유. 고점 통과 후엔 같은 이유로 가장 크게 오른다 — 그래서 '언제'가 전부이고 체크리스트가 그 질문에 답한다.</div>
+  </div>
   <!-- (2026-09-22) 🥇 금 선행지표 탭 — goldlead.js · 데이터 scripts/fetch_goldlead.py (매일 07:05) -->
   <div class="pane" id="p_gl" style="overflow:auto">
     <h2>🥇 금 선행지표 <em id="gl_asof"></em></h2>
@@ -1905,6 +1923,7 @@
             <button class="scrrst" id="scr_surge_ern" title="어닝서지 — 개장서지 조건 + 어닝일 D+1~D+7. 실적 발표 직후 거래량 실린 급등(서프라이즈 추격, PEAD 드리프트)">📈 어닝서지</button>
             <button class="scrrst" id="scr_opg" title="이익성장 상위 — '영업이익 성장률 상위 매수'가 매출·순이익 성장보다 고수익이었다는 백테스트(2016~26 · KR +645% · US +466%)를 실전형으로 보정한 프리셋. 이익성장 +30%↑ · 영업이익률 5%↑ · 성장가속 0%p↑(일회성 반등 배제) + [US] PEG 0.3↑(저기저 반등주 배제 — +1000% 급은 전부 PEG 0.1 미만, 시장이 그 성장률을 안 믿는다는 뜻) · 컨센 리비전 30일↑ · 직전 서프라이즈↑ · [KR] 영업적자 이력 제외 · 목표가 리비전 90일↑ · 영업익 서프라이즈↑. 정렬은 성장률순 — 소수만 남아도 전 조건 유지. 분기 리밸런싱 전제 — 실적 시즌 종료 후 다시 돌리세요">📈 이익성장</button>
             <button class="scrrst" id="scr_divp" title="배당선취 (한국 전용) — 8~9월 연말 배당 선취 전략. 배당 4~12%(12% 초과=배당 함정 배제) · 배당성향 20~60%(매년 지킬 체력) · 영업이익성장 0%↑ · 영업적자 제외 · ROE 5%↑ · 부채 150%↓ · 변동성 2.5%↓ · 시총 3,000억↑. 배당률 높은 순">🎁 배당선취</button>
+            <button class="scrrst" id="scr_kqd" title="퀄리티 배당 (한국·미국 공통) — 한경MONEY 김학균 체크리스트: 배당 5년↑ 지속·증가(KR DPS 연속증가 2년↑ · US 배당성장 5년↑) · 배당성향 70%↓ · 배당수익률 3%↑ · 영업현금/영업이익 0.5↑(이익의 질) · 부채비율 200%↓ · 이자보상배율 1배↑(좀비 제외) · 영업적자 제외. 배당률 높은 순">🏦 퀄리티배당</button>
             <button class="scrrst" id="scr_darist" title="배당귀족 (미국 전용) — 배당 20년↑ 연속 증가(귀족급, 감액 이력 없음) · 배당 1.5~8% · 배당성향 70%↓(증가 여력) · 시총 $10B↑ · 5년 최대낙폭 -40% 이내 · 저변동. 야후 30년 배당 이력 실측 기반 — 성장연수 긴 순">🏛️ 배당귀족</button>
             <button class="scrrst" id="scr_dgrow" title="배당성장 (미국 전용) — 배당 10년↑ 연속 증가(Achievers) + 이익성장 + · 배당 1.5~8% · 성향 70%↓ · 시총 $2B↑. 배당과 성장의 균형 — 배당률 높은 순">📈 배당성장</button>
             <button class="scrrst" id="scr_dcal" title="월현금흐름 (미국 전용) — 매월 배당 수령 설계. 고배당 3~12% · 최소 1년↑ 증가(감액 배제) · 성향 80%↓ · 시총 $2B↑ 후보군을 깔아줌 → '배당주기' 칩에서 월배당 또는 분기 그룹(1·4·7·10 / 2·5·8·11 / 3·6·9·12) 선택 · 그룹별 1종목씩 3종목이면 매월 배당">📅 월현금흐름</button>
@@ -2363,7 +2382,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=09201300"></script>
+<script src="/app.js?v=10172000"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -2375,7 +2394,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10171500"></script><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
