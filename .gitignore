@@ -8,3 +8,6 @@ charts/
 data/db/apt.sqlite*
 data/db/rtms_etc.sqlite*
 testfile_del_check
+
+# (2026-10-17) 로컬 실행용 키 사본 — 절대 커밋 금지
+keys/

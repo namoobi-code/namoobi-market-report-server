@@ -181,7 +181,54 @@ def main():
     etfs_us = []
     for sym, nm, grp in ETF_US:
         etfs_us.append(enrich(sym, {"c": sym, "n": nm, "grp": grp}, y10.get("US"))); time.sleep(0.15)
-    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us,
+    # (2026-10-17 한경MONEY 2026.10 '커버드콜이 다시 주목받는 이유' SC제일은행 김종국) 커버드콜 국면 판정
+    #   기사 실측(1990~, BXM vs S&P500 총수익): 지수 하락 +6 / 0~10% 상승 +2 / 10~20% −5 / 20%↑ −8 (%p 상대성과)
+    #   → "완만한 상승·횡보 예상이면 커버드콜 유리, 강한 상승 예상이면 불리(OTM·부분매도만), 급락 우려면 커버드콜만으론 한계"
+    #   우리 Portfolio 탭(stlead) 의 S&P500·나스닥100·코스피200 3/6/12개월 릿지 예측으로 국면을 자동 판정한다.
+    cc = {"table": [["지수 하락", 6], ["0~10% 상승", 2], ["10~20% 상승", -5], ["20% 이상 상승", -8]], "regime": {}}
+    try:
+        st = jload(DB / "stlead.json").get("targets") or {}
+        for k, lab in (("spx", "S&P500"), ("ndx", "나스닥100"), ("ks200", "코스피200")):
+            pr = (st.get(k) or {}).get("pred") or {}
+            g12 = (pr.get("12") or {}).get("g"); g6 = (pr.get("6") or {}).get("g"); g3 = (pr.get("3") or {}).get("g")
+            if g12 is None: continue
+            e = g12 * 100
+            if e < 0: ph, verdict = "하락 예상", "커버드콜만으론 하락 방어 한계 — 별도 헤지(채권·현금) 병행"
+            elif e < 10: ph, verdict = "완만 상승·횡보 예상", "커버드콜 유리 — 등가격(ATM) 전통형 OK, 프리미엄이 수익의 주축"
+            elif e < 20: ph, verdict = "상승 예상", "커버드콜 불리 — 쓰려면 OTM·부분매도(타겟/위클리)형으로 상승 참여율 확보"
+            else: ph, verdict = "강한 상승 예상", "커버드콜 크게 불리(−8%p 급) — 지수 직접 투자 우선"
+            cc["regime"][k] = {"label": lab, "g3": round((g3 or 0) * 100, 1), "g6": round((g6 or 0) * 100, 1), "g12": round(e, 1), "phase": ph, "verdict": verdict,
+                               "gb": [round(x * 100, 1) for x in ((pr.get("12") or {}).get("gb") or [])]}
+    except Exception as e: log(f"  ⚠ cc regime: {e}")
+    # 커버드콜 ETF 전략 유형 태그 + 기초지수 대비 1년 상대성과
+    def strat(n):
+        n = n.upper()
+        if "OTM" in n: return "OTM(외가격) — 상승 참여↑"
+        if "타겟" in n or "TARGET" in n: return "부분매도(타겟 분배) — 상승 참여 일부"
+        if n.startswith("JEPI") or n.startswith("JEPQ") or "PREMIUM" in n: return "ELN 부분매도 — 상승 참여 일부"
+        if "커버드콜" in n or "COVERED" in n or n.startswith("QYLD") or n.startswith("XYLD"): return "ATM 100% — 상승 포기·프리미엄 최대"
+        return None
+    bench = {}
+    for sym in ("SPY", "QQQ", "069500.KS", "133690.KS"):     # S&P500 · 나스닥100 · KODEX200 · TIGER 미국나스닥100
+        try:
+            j = T.jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{_up.quote(sym)}?range=1y&interval=1d&events=div", opener=op, timeout=20)
+            res = j["chart"]["result"][0]; cl = [c for c in res["indicators"]["quote"][0]["close"] if c]; dv = (res.get("events") or {}).get("dividends") or {}
+            bench[sym] = round((cl[-1] / cl[0] - 1) * 100 + sum(x["amount"] for x in dv.values()) / cl[-1] * 100, 2)
+        except Exception: pass
+    for e in etfs + etfs_us:
+        tg = strat(e.get("n") or ""); e["strat"] = tg
+        if tg:
+            n = (e.get("n") or "").upper(); c = e.get("c") or ""
+            # 기초지수를 아는 것만 비교 — 국채·반도체·금융 커버드콜은 지수 벤치가 다르므로 비교 생략(1차 실측 SPY 오매핑 수정)
+            if c in ("JEPQ", "QYLD"): b = "QQQ"
+            elif c in ("JEPI", "XYLD"): b = "SPY"
+            elif "미국" in n and ("나스닥" in n or "테크100" in n): b = "QQQ"
+            elif "미국" in n and ("S&P" in n or "배당" in n or "AI" in n): b = "SPY"
+            elif "200" in n and "미국" not in n: b = "069500.KS"
+            else: b = None
+            if b and b in bench and e.get("tr1y") is not None: e["bench"] = b; e["rel1y"] = round(e["tr1y"] - bench[b], 2)
+    cc["bench"] = bench
+    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us, "cc": cc,
                                "kr": [r for r in rows if r["mk"] == "kr"][:80], "us": [r for r in rows if r["mk"] == "us"][:80],
                                "n": {"kr": sum(1 for r in rows if r["mk"] == "kr"), "us": sum(1 for r in rows if r["mk"] == "us")},
                                "etfs": etfs, "ref": {"kospi_mfg_ni": {"2025": 169, "2026E": 751, "2027E": 973}, "kospi_mfg_fcf": {"2025": 99, "2026E": 522, "2027E": 778},
