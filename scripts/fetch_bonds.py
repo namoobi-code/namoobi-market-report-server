@@ -145,12 +145,29 @@ def etfs():
             row = {"sym": sym, "name": nm, "grp": grp, "mk": mk, "cur": cur, "d": s[-1][0],
                    "w1": ret(7), "m1": ret(30), "m3": ret(91), "m6": ret(182), "y1": ret(365),
                    "spark": [v for _, v in s[::max(1, len(s) // 60)]]}
+            # (2026-10-17 정정) 풀(다음금융) r1y 는 수정주가 기준 = 분배 포함 총수익(실측 KODEX KOFR: 풀 +2.71% = 분배율 2.64%,
+            #   야후 원가격 +0.06%). 처음엔 야후가 틀린 줄 알고 가격 열을 풀로 덮었는데 그러면 분배를 두 번 더하게 된다.
+            #   → 가격 열은 야후(원가격), 총수익 1년은 풀 r1y 로 분리한다. 두 소스의 기준일 차이로 ±1%p 어긋날 수 있음.
             pr = pool.get(sym.split(".")[0]) if mk == "kr" else None
             if pr and pr.get("px"):
-                row.update(cur=pr["px"], src="pool", **{k: (round(pr[k] * 100, 2) if pr.get(k) is not None else None) for k in ("r1m", "r3m", "r6m", "r1y")})
-                row["m1"], row["m3"], row["m6"], row["y1"] = row.pop("r1m"), row.pop("r3m"), row.pop("r6m"), row.pop("r1y")
+                row["cur"] = pr["px"]
+                if pr.get("r1y") is not None: row["tr1y_pool"] = round(pr["r1y"] * 100, 2)
             rows.append(row)
         time.sleep(0.5)
+    # (2026-10-17 사용자 요청 "분배금 몇 % 주는지도") TTM 분배율 — 야후 chart events=div 로 최근 1년 실제 분배금 합 ÷ 현재가.
+    #   KR·US 공통(실측: KODEX KOFR 12건 2.64% = 풀 divy 일치 · 국고채3년 0건=누적형 · TLT 4.86% · HYG 6.12%).
+    #   총수익 1년 ≈ 가격수익 + 분배율 — 미국처럼 월분배형은 이 합이 진짜 수익.
+    for r in rows:
+        try:
+            j = T.jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{_up.quote(r['sym'])}?range=1y&interval=1d&events=div", opener=op, timeout=20)
+            res = j["chart"]["result"][0]; dv = (res.get("events") or {}).get("dividends") or {}
+            tot = sum(x["amount"] for x in dv.values()); px = res["meta"].get("regularMarketPrice") or r.get("cur")
+            r["dy"] = round(tot / px * 100, 2) if px else None; r["dyn"] = len(dv)
+            if r.get("tr1y_pool") is not None: r["tr1y"] = r.pop("tr1y_pool"); r["tr_src"] = "다음 수정주가"
+            elif r.get("y1") is not None and r["dy"] is not None: r["tr1y"] = round(r["y1"] + r["dy"], 2); r["tr_src"] = "가격+분배"
+            time.sleep(0.2)
+        except Exception as e:
+            log(f"  ⚠ div {r['sym']}: {repr(e)[:50]}")
     return rows
 
 def main():
