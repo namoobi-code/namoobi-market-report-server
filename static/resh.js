@@ -254,6 +254,7 @@ function ipDraw(){
   $('ip_sum').innerHTML=`<b>${E(IP.reg)}</b> ${IP.kind?E(IP.kind)+' ':''}· 단지 <b>${R.length}</b>곳 · <b>${tot.toLocaleString()}</b>세대 (${P.base}) · `
     +Object.keys(byY).sort().map(y=>`${y}년 <b>${byY[y].toLocaleString()}</b>`).join(' · ')
     +(und?` · 입주월 미정 ${und.toLocaleString()}`:'')+` · 월평균 <b>${Math.round(tot/ms.length).toLocaleString()}</b>세대`;
+  ihDraw();
   const rows=R.slice().sort((a,b)=>a.ym.localeCompare(b.ym)||b.n-a.n);
   $('ip_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${['입주월','단지','지역','유형','세대'].map(h=>`<th style="padding:4px 8px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap">${h}</th>`).join('')}</tr></thead><tbody>${
     rows.map(i=>`<tr style="border-bottom:1px solid #f2f4f7" title="${E(i.addr||'')}"><td style="padding:3px 8px;white-space:nowrap">${E(i.ym.replace('-','.'))}</td>
@@ -278,7 +279,60 @@ async function ipLoad(){
     const r=await fetch('/api/db/ipju'); if(!r.ok) throw new Error('HTTP '+r.status);
     P=await r.json(); if(!P.items) throw new Error('데이터 없음');
     $('ip_asof').textContent=`${P.src} · 수집 ${P.asof} · 기준 ${P.base}`;
-    ipControls(); ipDraw();
+    if(!H){ await hsLoad(); }   // 준공 추이는 hstart.json(H.done) 사용
+    ipControls(); ihControls(); ipDraw();
   }catch(e){ $('ip_sum').textContent='입주예정 데이터를 불러오지 못했습니다 ('+e.message+')'; }
+}
+
+/* ───────── 과거 준공(입주) vs 예정 (2026-10-17) — H.done(KOSIS 준공실적) + P(입주예정) ─────────
+   왜: "지금 입주가 많은지 적은지"는 숫자 하나로는 모른다. 2011~ 반기별 준공을 회색, 향후 2년 예정을
+   청록으로 잇고, 기준기간(기본 2012~2021) 반기 평균을 점선으로 긋는다. 시군구(성남 등)를 고르면
+   준공 통계가 시도 단위뿐이라 해당 시도(경기)로 대체하고 그 사실을 적는다.
+   정의 차이: 준공=모든 공동주택(아파트+연립·다세대, 세대수 무관) · 예정=30세대 이상 공동주택(임대 포함). */
+let hBar2=null; let IH={b0:2012,b1:2021,type:'multi'};
+function ihControls(){
+  if(!H) return;
+  const ys=hsYears();
+  const opt=(id,cur)=>{const el=$(id); el.innerHTML=ys.map(v=>`<option value="${v}"${v===cur?' selected':''}>${v}</option>`).join('');};
+  opt('ih_b0',IH.b0); opt('ih_b1',IH.b1);
+  $('ih_b0').onchange=e=>{IH.b0=+e.target.value; if(IH.b1<IH.b0){IH.b1=IH.b0;$('ih_b1').value=IH.b1;} ihDraw();};
+  $('ih_b1').onchange=e=>{IH.b1=+e.target.value; if(IH.b0>IH.b1){IH.b0=IH.b1;$('ih_b0').value=IH.b0;} ihDraw();};
+  $('ih_type').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===IH.type); b.onclick=()=>{IH.type=b.dataset.v; $('ih_type').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); ihDraw();};});
+}
+function ihDraw(){
+  const ctx=$('ih_bar'); if(!ctx||!P) return;
+  if(!H||!H.done){ $('ih_sum').textContent='준공 실적(hstart.json)에 done 이 아직 없습니다 — 다음 수집(07:55) 후 표시됩니다.'; return; }
+  // 지역 매핑: 입주예정 지역 → 준공 통계 지역(시도)
+  const t0=IP.reg.split(' ')[0]; const hreg=IP.reg==='전국'?'전국':t0; const fb=IP.reg!==hreg;
+  const arr=(H.done[hreg]||{})[IH.type]; if(!arr){ $('ih_sum').textContent=`${hreg} 준공 자료 없음`; return; }
+  const hk=m=>m.slice(0,4)+(+m.slice(4,6)<=6?'H1':'H2');
+  const past={}; H.t.forEach((m,i)=>{ if(arr[i]!=null){ past[hk(m)]=(past[hk(m)]||0)+arr[i]; } });
+  const lastM=H.t[H.t.length-1]; const lastHk=hk(lastM); const lastFull=(+lastM.slice(4,6))%6===0;  // 마지막 반기가 꽉 찼나
+  // 예정(선택 지역 그대로) 반기 합
+  const fut={}; ipRows().forEach(i=>{ if(P.months.includes(i.ym)) { const k=i.ym.slice(0,4)+(+i.ym.slice(5)<=6?'H1':'H2'); fut[k]=(fut[k]||0)+i.n; } });
+  // 기준 평균(반기)
+  const bk=Object.keys(past).filter(k=>+k.slice(0,4)>=IH.b0&&+k.slice(0,4)<=IH.b1);
+  const base=bk.length?bk.reduce((a,k)=>a+past[k],0)/bk.length:null;
+  const keys=[...new Set(Object.keys(past).concat(Object.keys(fut)))].sort();
+  const pv=keys.map(k=>past[k]!=null&&!(k===lastHk&&!lastFull&&fut[k])?past[k]:null);
+  const fv=keys.map(k=>fut[k]!=null?fut[k]:null);
+  // 겹치는 반기(예정 기준시점 반기)는 예정 쪽으로 — 준공 집계가 아직 미완이라
+  if(hBar2) hBar2.destroy();
+  hBar2=new Chart(ctx,{type:'bar',data:{labels:keys.map(k=>k.replace('H1',' 상').replace('H2',' 하')),datasets:[
+      {label:'준공(실적)',data:pv,backgroundColor:'#9aa5b1',borderWidth:0,stack:'s'},
+      {label:'입주예정(추정)',data:fv,backgroundColor:'#0e9aa7',borderWidth:0,stack:'s'},
+      {type:'line',label:`기준 ${IH.b0}~${IH.b1} 반기평균 ${base?Math.round(base).toLocaleString():'—'}`,data:keys.map(()=>base),borderColor:'#7c2d12',borderDash:[5,3],borderWidth:1.5,pointRadius:0}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:12,font:{size:10.5}}},tooltip:{callbacks:{label:c=>c.raw==null?null:` ${c.dataset.label} ${Math.round(c.raw).toLocaleString()}세대`+(base&&c.dataset.type!=='line'?` (평균 대비 ${Math.round(c.raw/base*100)}%)`:'')}}},
+      scales:{x:{ticks:{font:{size:10},maxRotation:60,autoSkip:true,maxTicksLimit:34}},y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>v.toLocaleString()},grid:{color:'#eef1f4'}}}}});
+  // 요약: 최근 준공 반기, 예정 반기들 평균 대비
+  const fk=Object.keys(fut).sort(); const favg=fk.length?fk.reduce((a,k)=>a+fut[k],0)/fk.length:null;
+  const recent=Object.keys(past).filter(k=>k<lastHk||lastFull).sort().slice(-2);
+  $('ih_ttl').textContent=`${hreg}${fb?` (${IP.reg}의 과거 준공은 시도 단위만 있어 ${hreg}로 표시)`:''} · ${IH.type==='apt'?'아파트':'공동주택'} · 준공 ${H.t[0].slice(0,4)}~${lastM.slice(0,4)}.${lastM.slice(4)} · 예정 ${P.base}`;
+  const pct=v=>base?`<b style="color:${v/base<0.8?'#c2410c':v/base>1.2?'#1d4ed8':'#333'}">${Math.round(v/base*100)}%</b>`:'—';
+  $('ih_sum').innerHTML=`기준기간 반기평균 <b>${base?Math.round(base).toLocaleString():'—'}</b>세대 · 최근 준공 `
+    +recent.map(k=>`${k.replace('H1','상').replace('H2','하')} ${Math.round(past[k]).toLocaleString()} (${pct(past[k])})`).join(' · ')
+    +(favg?` · 향후 예정 반기평균 <b>${Math.round(favg).toLocaleString()}</b> (${pct(favg)})`:'')
+    +(fb?` · <span style="color:#b45309">예정은 ${E(IP.reg)}, 준공·평균은 ${hreg} 전체 — 비율이 아니라 추세로 읽을 것</span>`:'');
 }
 })();

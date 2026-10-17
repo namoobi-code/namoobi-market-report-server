@@ -57,6 +57,7 @@
   #p_cl .clsp canvas{height:100px!important;max-height:100px!important}
     /* (2026-10-17) 채권 탭 — 전역 canvas{height:200px!important} 를 섹션별로 덮는다(화면 실측: 미니스파크가 200px 로 늘어나 세로 막대처럼 보임) */
     #p_bd .bdsp canvas{height:26px!important;max-height:26px!important;width:90px!important}
+    #p_dv canvas{height:26px!important;max-height:26px!important;width:90px!important}
     #p_bd .bdc canvas{height:90px!important;max-height:90px!important}
     #p_bd .bdr canvas{height:230px!important;max-height:230px!important}
   [id^="sw_cv_reg_"]{height:100%!important;max-height:none!important}
@@ -988,8 +989,8 @@
     <div class="box" style="padding:10px 12px;margin-bottom:10px;overflow-x:auto;flex:0 0 auto" id="dv_us"></div>
     <h3>📅 월배당 달력 조합 <span class="note">미국 분기배당 지급월 그룹 — 한 종목씩 섞으면 매월 수령</span></h3>
     <div style="margin-bottom:10px" id="dv_cal"></div>
-    <h3>🧺 고배당·커버드콜 ETF (국내 상장)</h3>
-    <div class="box" style="padding:10px 12px;margin-bottom:10px" id="dv_etf"></div>
+    <h3>🧺 배당 ETF — 국내 · 미국 <span class="note">분배율·총수익·지금 유리·1년 추세</span></h3>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px;overflow-x:auto;flex:0 0 auto" id="dv_etf"></div>
   </div>
   <!-- (2026-10-17) 📜 채권 탭 — bonds.js · 데이터 scripts/fetch_bonds.py (매일 07:40, 기존 DB 재사용) -->
   <div class="pane" id="p_bd" style="overflow:auto">
@@ -1581,6 +1582,14 @@
       <div style="position:relative;height:280px"><canvas id="ip_bar"></canvas></div>
       <div id="ip_tbl" style="overflow:auto;max-height:420px"></div>
     </div>
+    <!-- (2026-10-17) 과거 준공(=입주) 반기 추이 + 평균선 + 예정 — "지금 입주가 평년보다 많은가" -->
+    <h4 style="margin:14px 0 2px;font-size:13px">과거 준공(입주) 추이 vs 입주예정 — 반기별 <em id="ih_ttl" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h4>
+    <div id="ih_sum" class="note" style="margin:0 0 6px;font-size:12.5px"></div>
+    <div class="rs_ctl" style="margin:0 0 6px">
+      <span>기준기간 <select id="ih_b0"></select> ~ <select id="ih_b1"></select></span>
+      <span class="rs_seg" id="ih_type"><button data-v="multi">공동주택(아파트+연립·다세대)</button><button data-v="apt">아파트만</button></span>
+    </div>
+    <div style="position:relative;height:300px"><canvas id="ih_bar"></canvas></div>
   </div>
 
   <!-- (2026-08-23) 🔮 RE 예측 페인 — scripts/repred.py (매일 08:10) · re.js
@@ -2425,14 +2434,14 @@
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/resh.js?v=10172030"></script><!-- (2026-09-20) 부동산시황 탭 -->
+<script src="/resh.js?v=10172100"></script><!-- (2026-09-20) 부동산시황 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script>
 <script src="/ct.js?v=20260920a"></script><!-- (2026-09-20) 셀트리온 탭 --><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10172000"></script><script src="/div.js?v=10172200"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10172000"></script><script src="/div.js?v=10172300"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

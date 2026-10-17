@@ -19,7 +19,8 @@
 산출: data/db/hstart.json
   {asof, src, note, t:[YYYYMM], regions:[...], series:{region:{key:[값|null]}}}
   key: all_b(계·동수) all_h(계·가구수) apt(아파트) non(아파트외=all_b-apt) det(단독) mh_b(다가구 동수) mh_h(다가구 가구수)
-       ms(다세대) row(연립)
+       ms(다세대) row(연립) multi(공동주택=apt+ms+row)
+  done: 준공실적(DT_MLTM_5373) 같은 키 — 2026-10-17 추가
 
 사용: hstart.py [--full]      cron: 55 7 * * *
 """
@@ -35,6 +36,9 @@ FULL = "--full" in sys.argv
 NOW  = datetime.now()
 API  = "https://kosis.kr/openapi/Param/statisticsParameterData.do"
 TBL  = "DT_MLTM_5387"
+# (2026-10-17) 준공실적도 같은 구조(DT_MLTM_5373 · 분류코드 접두어만 969→973)로 함께 받는다 — '과거 입주량' 대용.
+#   준공 ≈ 입주. 입주예정(부동산원·부동산114 추정)과 이어 붙여 "지금 입주가 평년보다 많은지"를 본다.
+TBLS = {"start": ("DT_MLTM_5387", "13102766969D."), "done": ("DT_MLTM_5373", "13102766973D.")}
 KEYMAP = {("계(다가구동수기준)", "계(다가구동수기준)"): "all_b", ("계(다가구가구수기준)", "계(다가구가구수기준)"): "all_h",
           ("단독", "단독"): "det", ("다가구", "동수"): "mh_b", ("다가구", "가구수"): "mh_h",
           ("다세대", "다세대"): "ms", ("연립", "연립"): "row", ("아파트", "아파트"): "apt"}
@@ -58,17 +62,18 @@ def _key():
 KEY = _key()
 
 
-C4 = "13102766969D."
-GROUPS = [C4 + "0001+" + C4 + "0002+" + C4 + "0008",                       # 계(동수)·계(가구수)·아파트
-          C4 + "0003+" + C4 + "0004+" + C4 + "0005+" + C4 + "0006+" + C4 + "0007"]   # 단독·다가구동·다가구가구·다세대·연립
+def groups(c4):
+    return [c4 + "0001+" + c4 + "0002+" + c4 + "0008",                       # 계(동수)·계(가구수)·아파트
+            c4 + "0003+" + c4 + "0004+" + c4 + "0005+" + c4 + "0006+" + c4 + "0007"]   # 단독·다가구동·다가구가구·다세대·연립
 
 
-def fetch_year(y):
+def fetch_year(y, kind="start"):
     """1년 × 유형 그룹 2 × 반기 2 = 4회 — objL4=ALL 이면 40,000셀 초과(실측)."""
+    tbl, c4 = TBLS[kind]
     out = []
-    for g in GROUPS:
+    for g in groups(c4):
         for a, b in (("01", "06"), ("07", "12")):     # 반기 — 1년 단위는 그룹에 따라 간헐적으로 err 31 (실측)
-            out += _fetch(f"{API}?method=getList&apiKey={KEY}&orgId=116&tblId={TBL}&objL1=ALL&objL2=ALL&objL3=ALL"
+            out += _fetch(f"{API}?method=getList&apiKey={KEY}&orgId=116&tblId={tbl}&objL1=ALL&objL2=ALL&objL3=ALL"
                           f"&objL4={g}&itmId=ALL&prdSe=M&startPrdDe={y}{a}&endPrdDe={y}{b}&format=json&jsonVD=Y", y)
             time.sleep(0.3)
     return out
@@ -94,22 +99,23 @@ def _fetch(u, y):
 def main():
     y0 = 2011 if FULL else NOW.year - 2
     print(f"hstart: {y0}~{NOW.year} {'(전체)' if FULL else '(최근 2년 갱신)'}")
-    data = {}                                   # {region: {key: {ym: v}}}
-    for y in range(y0, NOW.year + 1):
-        rows = fetch_year(y)
-        n = 0
-        for r in rows:
-            k = KEYMAP.get((r.get("C3_NM"), r.get("C4_NM")))
-            if not k:
-                continue
-            reg = REG_NM.get(r["C1_NM"], r["C1_NM"])
-            try:
-                data.setdefault(reg, {}).setdefault(k, {})[r["PRD_DE"]] = int(float(r["DT"]))
-                n += 1
-            except Exception:
-                pass
-        print(f"  {y}: {len(rows)}행 → {n}셀")
-        time.sleep(0.3)
+    data, done = {}, {}                         # {region: {key: {ym: v}}} — 착공 / 준공
+    for kind, dst in (("start", data), ("done", done)):
+        for y in range(y0, NOW.year + 1):
+            rows = fetch_year(y, kind)
+            n = 0
+            for r in rows:
+                k = KEYMAP.get((r.get("C3_NM"), r.get("C4_NM")))
+                if not k:
+                    continue
+                reg = REG_NM.get(r["C1_NM"], r["C1_NM"])
+                try:
+                    dst.setdefault(reg, {}).setdefault(k, {})[r["PRD_DE"]] = int(float(r["DT"]))
+                    n += 1
+                except Exception:
+                    pass
+            print(f"  {'착공' if kind == 'start' else '준공'} {y}: {len(rows)}행 → {n}셀")
+            time.sleep(0.3)
     if not data:
         raise SystemExit("✗ 수집 0")
 
@@ -120,18 +126,25 @@ def main():
         except Exception:
             old = {}
     ot = old.get("t") or []
-    merged = {}
-    for reg, ks in (old.get("series") or {}).items():
-        for k, arr in ks.items():
-            merged.setdefault(reg, {})[k] = {ot[i]: arr[i] for i in range(min(len(ot), len(arr))) if arr[i] is not None}
-    for reg, ks in data.items():
-        for k, mp in ks.items():
-            merged.setdefault(reg, {}).setdefault(k, {}).update(mp)
-    for reg, ks in merged.items():             # 아파트외 = 계(동수) − 아파트
-        if "all_b" in ks and "apt" in ks:
-            ks["non"] = {m: ks["all_b"][m] - ks["apt"][m] for m in ks["all_b"] if m in ks["apt"]}
 
-    ts = sorted({m for ks in merged.values() for mp in ks.values() for m in mp})
+    def merge(prev, new):
+        m = {}
+        for reg, ks in (prev or {}).items():
+            for k, arr in ks.items():
+                m.setdefault(reg, {})[k] = {ot[i]: arr[i] for i in range(min(len(ot), len(arr))) if arr[i] is not None}
+        for reg, ks in new.items():
+            for k, mp in ks.items():
+                m.setdefault(reg, {}).setdefault(k, {}).update(mp)
+        for reg, ks in m.items():               # 아파트외 = 계(동수) − 아파트 · 공동주택 = 아파트+다세대+연립
+            if "all_b" in ks and "apt" in ks:
+                ks["non"] = {t: ks["all_b"][t] - ks["apt"][t] for t in ks["all_b"] if t in ks["apt"]}
+            if "apt" in ks and "ms" in ks and "row" in ks:
+                ks["multi"] = {t: ks["apt"][t] + ks["ms"].get(t, 0) + ks["row"].get(t, 0) for t in ks["apt"]}
+        return m
+    merged = merge(old.get("series"), data)
+    mdone = merge(old.get("done"), done)
+
+    ts = sorted({m for src in (merged, mdone) for ks in src.values() for mp in ks.values() for m in mp})
     regs = [REG_NM.get(r, r) for r in REG_ORDER if REG_NM.get(r, r) in merged] + \
            sorted(r for r in merged if r not in {REG_NM.get(x, x) for x in REG_ORDER})
     out = {
@@ -141,6 +154,8 @@ def main():
         "t": ts,
         "regions": regs,
         "series": {reg: {k: [merged[reg][k].get(t) for t in ts] for k in merged[reg]} for reg in regs},
+        # (2026-10-17) 준공실적 — 같은 키 체계(+multi=아파트+다세대+연립 '공동주택'). 입주예정과 이어 붙이는 과거 축.
+        "done": {reg: {k: [mdone[reg][k].get(t) for t in ts] for k in mdone[reg]} for reg in regs if reg in mdone},
     }
     DB.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(out, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

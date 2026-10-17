@@ -148,7 +148,40 @@ def main():
         if any(k in n for k in ("배당", "커버드콜", "인컴")) and r.get("divy"):
             etfs.append({"c": r["c"], "n": n, "px": r.get("px"), "divy": r.get("divy"), "r1y": pct((r.get("r1y") or 0) * 100, 1) if r.get("r1y") is not None else None, "fee": r.get("fee"), "cap": r.get("cap")})
     etfs.sort(key=lambda x: -(x["cap"] or 0)); etfs = etfs[:25]
-    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10,
+    # (2026-10-17 사용자 요청) 미국 배당 ETF + 전 ETF 1년 추세·지금 유리 신호
+    ETF_US = [("SCHD", "Schwab US Dividend Equity", "배당성장·퀄리티"), ("VYM", "Vanguard High Dividend Yield", "고배당 광범위"), ("DGRO", "iShares Core Dividend Growth", "배당성장"),
+              ("VIG", "Vanguard Dividend Appreciation", "10년↑ 연속증가"), ("NOBL", "S&P 500 Dividend Aristocrats", "25년↑ 귀족주"), ("HDV", "iShares Core High Dividend", "고배당 퀄리티"),
+              ("DVY", "iShares Select Dividend", "고배당"), ("SPYD", "SPDR S&P 500 High Dividend", "S&P 고배당 80"), ("JEPI", "JPMorgan Equity Premium Income", "커버드콜·월배당"),
+              ("JEPQ", "JPMorgan Nasdaq Equity Premium", "나스닥 커버드콜·월배당"), ("QYLD", "Global X Nasdaq 100 Covered Call", "커버드콜·월배당"), ("XYLD", "Global X S&P 500 Covered Call", "커버드콜·월배당"),
+              ("O", "Realty Income (리츠)", "월배당 리츠"), ("VNQ", "Vanguard Real Estate", "리츠 광범위")]
+    def enrich(sym, row, bench):
+        """야후 1y 일봉 + 배당이벤트 → 가격수익·분배율(TTM)·200일선比·RSI·스파크·지금유리"""
+        try:
+            j = T.jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{_up.quote(sym)}?range=1y&interval=1d&events=div", opener=op, timeout=20)
+            res = j["chart"]["result"][0]; cl = [c for c in res["indicators"]["quote"][0]["close"] if c]
+            if len(cl) < 60: return row
+            px = cl[-1]; dv = (res.get("events") or {}).get("dividends") or {}; tot = sum(x["amount"] for x in dv.values())
+            row["px_y"] = px; row["dy"] = round(tot / px * 100, 2); row["dyn"] = len(dv)
+            row["y1p"] = round((px / cl[0] - 1) * 100, 2); row["tr1y"] = round(row["y1p"] + row["dy"], 2)
+            ma200 = sum(cl[-200:]) / min(200, len(cl)); row["vs200"] = round((px / ma200 - 1) * 100, 1)
+            d = [cl[i] - cl[i - 1] for i in range(len(cl) - 14, len(cl))]; up = sum(x for x in d if x > 0); dn = -sum(x for x in d if x < 0)
+            row["rsi"] = round(100 - 100 / (1 + up / dn), 0) if dn else 100.0
+            row["hi52"] = round((px / max(cl) - 1) * 100, 1)
+            row["spark"] = [round(v, 2) for v in cl[::max(1, len(cl) // 60)]]
+            t = 0; w = []
+            if row["vs200"] <= 0: t += 1; w.append("200일선 아래")
+            if row["rsi"] < 50: t += 1; w.append(f"RSI {row['rsi']:.0f}")
+            if bench and row["dy"] >= bench: t += 1; w.append(f"분배율≥국채 {bench:.1f}%")
+            if row["hi52"] <= -10: t += 1; w.append("고점比 −10%↓")
+            row["timing"] = t; row["timing_why"] = " · ".join(w) or "눌림 신호 없음"
+        except Exception as e: log(f"  ⚠ etf {sym}: {repr(e)[:50]}")
+        return row
+    for e in etfs:
+        enrich(e["c"] + ".KS", e, y10.get("KR")); time.sleep(0.15)
+    etfs_us = []
+    for sym, nm, grp in ETF_US:
+        etfs_us.append(enrich(sym, {"c": sym, "n": nm, "grp": grp}, y10.get("US"))); time.sleep(0.15)
+    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us,
                                "kr": [r for r in rows if r["mk"] == "kr"][:80], "us": [r for r in rows if r["mk"] == "us"][:80],
                                "n": {"kr": sum(1 for r in rows if r["mk"] == "kr"), "us": sum(1 for r in rows if r["mk"] == "us")},
                                "etfs": etfs, "ref": {"kospi_mfg_ni": {"2025": 169, "2026E": 751, "2027E": 973}, "kospi_mfg_fcf": {"2025": 99, "2026E": 522, "2027E": 778},
