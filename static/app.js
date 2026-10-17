@@ -4764,7 +4764,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       /* (2026-10-17) 재무건전성 2종 — 한경MONEY 김학균 '저금리 40년 끝났다' 4대 지표 중 빠져 있던 둘.
          icr = 영업이익/이자비용(좀비기업 선별, 1 미만=이자도 못 갚음) · ocfop = 영업현금흐름/영업이익(이익의 질, 1 근처가 정상·장기 0.5 미만이면 채권·재고 적체 의심).
-         KR=DART 전체재무제표(주1회 fin_quality.py) · US=야후 incomeStatementHistory. 금융업 면제(이자비용이 영업비용). 무차입은 ICR 산출 불가 → 값 없음(필수 아님). */
+         KR=DART 전체재무제표(주1회 fin_quality.py) · US=야후 incomeStatementHistory. 금융업 면제(이자비용이 영업비용). 무차입은 ICR 산출 불가 → 값 없음(필수 아님).
+         2025 사업보고서 실측: KR 2,446종 중 영업손실 848 · 흑자인데 ICR<1 160종(좀비 후보) · OCF/영업이익 중앙값 1.24.
+         ⚠ 금융 자회사를 연결하는 제조사(현대차 ICR 1.6·OCF/영익 -0.52 — 현대캐피탈 리스채권 증가가 영업현금 유출로 잡힘)는 왜곡 — 그룹 금융 보유사는 별도 판단. */
       icr:{label:'이자보상배율',fmt:v=>v.toFixed(1)+'배',min:1,fin:1,presets:[['전체',null],['1배 ↑ (좀비 제외)',1],['3배 ↑',3],['10배 ↑',10]],def:[null,null]},
       ocfop:{label:'영업현금/영업이익',fmt:v=>v.toFixed(2),min:1,fin:1,presets:[['전체',null],['0.5 ↑',0.5],['0.8 ↑',0.8],['1.0 ↑',1.0]],def:[null,null]},
       upside:{label:'상승여력',fmt:v=>v.toFixed(0)+'%',min:1,reqData:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
@@ -4874,7 +4876,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cr:{label:'유동비율',fmt:v=>v.toFixed(1),min:1,fin:1,presets:[['전체',null],['0.8 ↑',0.8],['1.0 ↑',1.0],['1.5 ↑',1.5]],def:[0.8,null]},
       /* (2026-10-17) 재무건전성 2종 — 한경MONEY 김학균 '저금리 40년 끝났다' 4대 지표 중 빠져 있던 둘.
          icr = 영업이익/이자비용(좀비기업 선별, 1 미만=이자도 못 갚음) · ocfop = 영업현금흐름/영업이익(이익의 질, 1 근처가 정상·장기 0.5 미만이면 채권·재고 적체 의심).
-         KR=DART 전체재무제표(주1회 fin_quality.py) · US=야후 incomeStatementHistory. 금융업 면제(이자비용이 영업비용). 무차입은 ICR 산출 불가 → 값 없음(필수 아님). */
+         KR=DART 전체재무제표(주1회 fin_quality.py) · US=야후 incomeStatementHistory. 금융업 면제(이자비용이 영업비용). 무차입은 ICR 산출 불가 → 값 없음(필수 아님).
+         2025 사업보고서 실측: KR 2,446종 중 영업손실 848 · 흑자인데 ICR<1 160종(좀비 후보) · OCF/영업이익 중앙값 1.24.
+         ⚠ 금융 자회사를 연결하는 제조사(현대차 ICR 1.6·OCF/영익 -0.52 — 현대캐피탈 리스채권 증가가 영업현금 유출로 잡힘)는 왜곡 — 그룹 금융 보유사는 별도 판단. */
       icr:{label:'이자보상배율',fmt:v=>v.toFixed(1)+'배',min:1,fin:1,presets:[['전체',null],['1배 ↑ (좀비 제외)',1],['3배 ↑',3],['10배 ↑',10]],def:[null,null]},
       ocfop:{label:'영업현금/영업이익',fmt:v=>v.toFixed(2),min:1,fin:1,presets:[['전체',null],['0.5 ↑',0.5],['0.8 ↑',0.8],['1.0 ↑',1.0]],def:[null,null]},
       /* (2026-08-10) 사용자 지정 명칭 — '목표주가 상승여력' */

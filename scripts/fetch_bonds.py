@@ -27,6 +27,7 @@ def jload(p, default=None):
     try: return json.loads(Path(p).read_text(encoding="utf-8"))
     except Exception: return default if default is not None else {}
 def log(m): print(m, flush=True)
+def pct(v, d=1): return None if v is None else round(v, d)
 
 # (2026-10-17 사용자 지적 "왜 초단기 ETF 는 없나") 기사의 '현금성 10%' = 파킹형(KOFR·CD금리). 야후 가격이 누적형 금리를 제대로 반영하는
 # 종목만 채택(실측: TIGER CD금리 1y +2.78%·TIGER KOFR +2.02% 정상 / KODEX KOFR·CD 는 +0.0x% 로 야후 데이터 결함 → 제외).
@@ -170,6 +171,49 @@ def etfs():
             log(f"  ⚠ div {r['sym']}: {repr(e)[:50]}")
     return rows
 
+# ── (2026-10-17 한경MONEY 2026.10 '일할 복리로 쌓이는 안전자산' 반영) 파킹형 ETF 4유형 16종 + 초단기 기준금리 ──
+PARK = [  # 유형, 코드, 이름, 기초지표, 신용위험, 환노출
+    ("CD금리형", "459580", "KODEX CD금리액티브(합성)", "CD 91일", "시중은행 신용위험 일부", False), ("CD금리형", "357870", "TIGER CD금리투자KIS(합성)", "CD 91일", "시중은행 신용위험 일부", False),
+    ("CD금리형", "481050", "KODEX CD1년금리플러스액티브(합성)", "CD 1년", "시중은행 신용위험 일부", False), ("CD금리형", "477080", "RISE CD금리액티브(합성)", "CD 91일", "시중은행 신용위험 일부", False),
+    ("KOFR형", "423160", "KODEX KOFR금리액티브(합성)", "KOFR(국채담보 RP 1일)", "무위험", False), ("KOFR형", "449170", "TIGER KOFR금리액티브(합성)", "KOFR", "무위험", False),
+    ("KOFR형", "479520", "RISE KOFR금리액티브(합성)", "KOFR", "무위험", False), ("KOFR형", "453010", "PLUS KOFR금리", "KOFR", "무위험", False),
+    ("머니마켓·초단기", "488770", "KODEX 머니마켓액티브", "단기채·CP·전단채", "편입자산 일부", False), ("머니마켓·초단기", "0043B0", "TIGER 머니마켓액티브", "단기채·CP", "편입자산 일부", False),
+    ("머니마켓·초단기", "455890", "RISE 머니마켓액티브", "단기채·CP", "편입자산 일부", False), ("머니마켓·초단기", "469830", "SOL 초단기채권액티브", "초단기채", "편입자산 일부", False),
+    ("SOFR·달러MMF", "0048J0", "KODEX 미국머니마켓액티브", "SOFR·美 단기국채", "무위험(美 국채담보)", True), ("SOFR·달러MMF", "456610", "TIGER 미국달러SOFR금리액티브(합성)", "SOFR", "무위험", True),
+    ("SOFR·달러MMF", "455030", "KODEX 미국달러SOFR금리액티브(합성)", "SOFR", "무위험", True), ("SOFR·달러MMF", "456880", "ACE 미국달러SOFR금리(합성)", "SOFR", "무위험", True)]
+
+def short_rates():
+    """초단기 기준금리 — CD 91일·KOFR(ECOS 817Y002 일별) · SOFR(FRED). 하루 이자 = 연 ÷ 365 (기사 '일할 계산')."""
+    out = {}
+    try:
+        import urllib.request
+        K = (BASE / "keys" / "ecos.txt").read_text().strip()
+        s0 = (date.today() - timedelta(days=400)).strftime("%Y%m%d"); s1 = date.today().strftime("%Y%m%d")
+        for key, code, nm in (("cd91", "010502000", "CD 91일"), ("kofr", "010901000", "KOFR"), ("call", "010101000", "콜금리 1일")):
+            j = json.loads(urllib.request.urlopen(f"https://ecos.bok.or.kr/api/StatisticSearch/{K}/json/kr/1/400/817Y002/D/{s0}/{s1}/{code}", timeout=25).read())
+            rows = (j.get("StatisticSearch") or {}).get("row") or []
+            ser = [[f"{r['TIME'][:4]}-{r['TIME'][4:6]}-{r['TIME'][6:]}", float(r["DATA_VALUE"])] for r in rows if r.get("DATA_VALUE")]
+            if ser: out[key] = {"name": nm, "cur": ser[-1][1], "d": ser[-1][0], "m3": last_n(ser, 90), "s": ser[-260:]}
+    except Exception as e: log(f"  ⚠ ecos short: {repr(e)[:60]}")
+    try:
+        from nmr_fred import fred_series
+        ser = fred_series("SOFR", start=(date.today() - timedelta(days=400)).isoformat())
+        if ser: out["sofr"] = {"name": "SOFR(美)", "cur": ser[-1][1], "d": ser[-1][0], "m3": last_n(ser, 90), "s": ser[-260:]}
+    except Exception as e: log(f"  ⚠ sofr: {repr(e)[:60]}")
+    for v in out.values(): v["daily"] = round(v["cur"] / 365, 5)     # 하루 이자(%)
+    return out
+
+def parking():
+    pool = {str(r.get("c")): r for r in (jload(DB / "etf_pool.json").get("kr") or [])}
+    rows = []
+    for typ, c, nm, base, credit, fx in PARK:
+        r = pool.get(c) or {}
+        rows.append({"type": typ, "c": c, "name": nm, "base": base, "credit": credit, "fx": fx, "px": r.get("px"), "cap": r.get("cap"), "fee": r.get("fee"),
+                     "m1": pct((r.get("r1m") or 0) * 100, 2) if r.get("r1m") is not None else None, "m3": pct((r.get("r3m") or 0) * 100, 2) if r.get("r3m") is not None else None,
+                     "m6": pct((r.get("r6m") or 0) * 100, 2) if r.get("r6m") is not None else None, "y1": pct((r.get("r1y") or 0) * 100, 2) if r.get("r1y") is not None else None,
+                     "divy": r.get("divy")})
+    return rows
+
 def main():
     log("[bonds] 시작")
     chk, aux, n_ok, phase = checklist()
@@ -185,7 +229,8 @@ def main():
              "after": {"현금성": 10, "단기채": 20, "장기채": 50, "우량 회사채": 20},
              "n_ok": n_ok, "phase": phase,
              "note": "메리츠 윤여삼(한경MONEY 2026.10): 고점 확신 전 단기채 50%로 유동성 확보, 최종금리 3.25~3.5% 확신 시 장기채 50%로 점진 전환. 회사채는 신용등급만 믿지 말고 신용스프레드·부채비율(200%)·이자보상배율(2배)을 함께. 초장기채·레버리지 ETF 몰빵 금지, 분할 매수·만기 분산."}
-    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "checklist": chk, "aux": aux,
+    sr = short_rates(); pk = parking()
+    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "checklist": chk, "aux": aux, "short": sr, "parking": pk,
                                "policy": pr, "countries": countries, "series": series, "etfs": rows, "alloc": alloc},
                               ensure_ascii=False), encoding="utf-8")
     log(f"[bonds] ✅ 체크리스트 {n_ok}/4 · {phase} · ETF {sum(1 for r in rows if r.get('cur'))}/{len(rows)} → {OUT}")

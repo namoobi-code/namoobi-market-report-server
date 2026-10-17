@@ -81,6 +81,18 @@ function etfTbl(mk){
   return `<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%"><thead><tr>${['ETF','구분','현재가','1주','1개월','3개월','6개월','1년(가격)','분배율<br><span class="note" style="font-weight:400">최근 1년 실지급</span>','총수익 1년≈<br><span class="note" style="font-weight:400">KR=다음 수정주가 · US=가격+분배</span>','1년 추세'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
     R.map(r=>`<tr><td style="${TD}"><b>${E(r.name)}</b><span class="note" style="font-size:10px"> ${E(r.sym)}</span></td><td style="${TD}font-size:11px;color:#475569">${E(r.grp)}</td><td style="${TD}text-align:right">${r.cur==null?'—':(mk==='kr'?nf(r.cur,0):'$'+nf(r.cur,2))}</td>${['w1','m1','m3','m6','y1'].map(k=>`<td style="${TD}text-align:right">${pf(r[k])}</td>`).join('')}<td style="${TD}text-align:right;color:#0f766e;font-weight:700">${r.dy==null?'—':r.dy.toFixed(2)+'%'}<span class="note" style="font-weight:400;font-size:10px"> ${r.dyn?r.dyn+'회':(r.dy===0?'누적형':'')}</span></td><td style="${TD}text-align:right;font-weight:700">${r.tr1y==null?'—':pf(r.tr1y)}</td><td style="${TD}width:100px"><div class="bdsp" style="width:90px;height:26px;overflow:hidden"><canvas id="bd_sp_${r.sym.replace('.','_')}" width="90" height="26" style="display:block;width:90px;height:26px"></canvas></div></td></tr>`).join('')}</tbody></table>`;
 }
+function parkingSec(){
+  const S=D.short||{}, P=D.parking||[];
+  const card=(k,extra)=>{const v=S[k]; if(!v) return ''; const d=v.cur-(v.m3??v.cur);
+    return `<div style="flex:1;min-width:170px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">${E(v.name)} <span style="font-size:10px">${E(v.d)}</span></div><div style="font-size:18px;font-weight:800">${v.cur.toFixed(2)}% <span class="note" style="font-weight:400;font-size:11px">3M ${d>0?'+':''}${d.toFixed(2)}%p</span></div><div class="note" style="font-size:10.5px">하루 ${v.daily.toFixed(4)}% · 100만원당 ${Math.round(1e6*v.daily/100)}원/일 ${extra||''}</div></div>`;};
+  let h=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${card('cd91','← CD금리형 기준')}${card('kofr','← KOFR형 기준')}${card('call')}${card('sofr','← 달러MMF 기준(환노출)')}</div>
+    <div class="note" style="margin-bottom:8px;line-height:1.6">기사(삼성증권 임은혜): 파킹형은 듀레이션 ≈ 0 이라 금리 변동에 가격이 안 흔들리고, 이자가 <b>일할 계산으로 매일 기준가에 누적(복리)</b>된다 — 위 '하루 이자'가 그 숫자. CD금리형은 시중은행 신용위험 일부, KOFR형은 국채담보 RP 라 사실상 무위험, 머니마켓형은 단기채·CP 액티브로 알파 추구, <b>달러 SOFR형은 원·달러 환율에 그대로 노출</b>(1년 수익률이 음수인 이유 = 환율). 결제 T+1~2, 2025 소득세법 개정으로 연 1회↑ 분배 의무(월분배형 多).</div>`;
+  const TYPES=['CD금리형','KOFR형','머니마켓·초단기','SOFR·달러MMF'];
+  h+=`<table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%"><thead><tr>${['유형','ETF','기초지표','신용위험','환노출','AUM','보수','1개월','3개월','6개월','1년(총수익)'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
+    TYPES.map(t=>P.filter(r=>r.type===t).map((r,i)=>`<tr style="${t==='SOFR·달러MMF'?'background:#fffbeb':''}"><td style="${TD}white-space:nowrap">${i===0?'<b>'+E(t)+'</b>':''}</td><td style="${TD}white-space:nowrap"><b>${E(r.name)}</b><span class="note" style="font-size:10px"> ${E(r.c)}</span></td><td style="${TD}font-size:11px">${E(r.base)}</td><td style="${TD}font-size:11px;color:#475569">${E(r.credit)}</td><td style="${TD}text-align:center">${r.fx?'<b style="color:#b45309">원·달러</b>':'없음'}</td><td style="${TD}text-align:right">${r.cap?(r.cap/1e12).toFixed(1)+'조':'—'}</td><td style="${TD}text-align:right">${r.fee==null?'—':r.fee+'%'}</td>${['m1','m3','m6','y1'].map(k=>`<td style="${TD}text-align:right">${pf(r[k],2)}</td>`).join('')}</tr>`).join('')).join('')}</tbody></table>
+    <div class="note" style="margin-top:4px">수익률=다음금융 수정주가(분배 포함 총수익). 기사 표(체크 9/14)의 운용규모 상위 16종 — AUM·보수는 ETF 풀 당일값. 머니마켓형 1년 3.1~3.3% > CD형 2.8~3.0% > KOFR형 2.6~2.7%: 신용위험을 조금 더 지는 순서대로 수익이 높다(기사 논리 그대로).</div>`;
+  return h;
+}
 function render(){
   charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
   $('bd_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 07:40 자동';
@@ -88,6 +100,7 @@ function render(){
   (D.checklist||[]).forEach(c=>{const cv=$('bd_cv_'+c.key); if(cv) spark(cv,c.s,c.ok?'#16a34a':'#dc2626',TH_LINE[c.key]);});
   $('bd_alloc').innerHTML=alloc();
   $('bd_rates').innerHTML=rates(); ratesChart();
+  if($('bd_park')) $('bd_park').innerHTML=parkingSec();
   $('bd_etf_kr').innerHTML=etfTbl('kr'); $('bd_etf_us').innerHTML=etfTbl('us');
   (D.etfs||[]).forEach(r=>{const cv=$('bd_sp_'+r.sym.replace('.','_')); if(cv&&r.spark) miniSpark(cv,r.spark,(r.y1||0)>=0?'#dc2626':'#2563eb');});
 }
