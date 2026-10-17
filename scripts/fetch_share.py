@@ -58,6 +58,7 @@ FRESH = {"주간": 10, "월간": 40, "분기": 100, "반기": 200, "연간": 400
 #     ② **NAND 는 병목이 아니다** — 기사의 'NAND 리드타임 16주'에도 키옥시아 −41.9%·WDC −39.5%·샌디스크 −18.3%.
 #        넣지 않는 게 답이라는 게 데이터의 결론이라 스토리지 축은 **의도적으로 제외**한다.
 #   축 순서 = 실제 제조 흐름: 설계→제조→메모리→기판→검사→전송→조립→전력
+BNECK_STATUS = None   # auto_bottleneck 이 채우는 "최신 3개월 축별 방향"(단일 진실원천)
 BNECK = [("연산 (엔비디아)", "NVDA"), ("파운드리 (TSMC)", "TSM"), ("메모리 (마이크론)", "MU"),
          ("기판 (이비덴)", "4062.T"), ("검사 (어드밴테스트)", "6857.T"), ("광통신 (코히런트)", "COHR"),
          ("조립 (위스트론)", "3231.TW"), ("전력 (버티브)", "VRT")]
@@ -944,6 +945,19 @@ def auto_bottleneck(win=12, tail=0):
         return []
     months = sorted(set().union(*[set(v) for v in px.values()]))
     out = []
+    global BNECK_STATUS
+    # 최신 시점의 3개월 부호로 축별 방향을 확정해 둔다 — UI 가 12개월 값으로 방향을 재추정하면
+    #   기저효과 때문에 또 오판한다(이비덴: 주가 +44.9% 인데 12M 은 하락). 단일 진실원천을 여기 둔다.
+    if len(months) > 3:
+        _m, _b3 = months[-1], months[-4]
+        _st = []
+        for lab in px:
+            a3, b3 = px[lab].get(_b3), px[lab].get(_m)
+            if a3 and b3:
+                _st.append({"k": lab, "v": round((b3 / a3 - 1) * 100, 1),
+                            "dir": "up" if b3 >= a3 else "down"})
+        _st.sort(key=lambda x: -x["v"])
+        if _st: BNECK_STATUS = {"asof": _m, "items": _st}
     for i, m in enumerate(months):
         if i < win:
             continue
@@ -959,7 +973,26 @@ def auto_bottleneck(win=12, tail=0):
         if len(v) < 2:
             continue
         top = max(v, key=v.get)
-        out.append((m, v, "%d개월 수익률 · 선두 %s(%+.0f%%)" % (win, top.split(" (")[0], v[top])))
+        # (2026-10-17) 축별 '지금 오르나 꺾였나'를 같은 줄에 붙인다.
+        #   판정은 **3개월 수익률 부호**로만 한다 — 12개월은 기저효과 때문에 방향 판정에 못 쓴다
+        #   (이비덴: 주가 +44.9% 인데 12M 은 +582%→+167% 로 하락. 12M 하락을 '꺾임'으로 읽으면 오판).
+        up, dn = [], []
+        if i >= 3:
+            b3 = months[i - 3]
+            for lab in px:
+                a, b = px[lab].get(b3), px[lab].get(m)
+                if a and b:
+                    (up if b >= a else dn).append((lab.split(" (")[0], (b / a - 1) * 100))
+        up.sort(key=lambda x: -x[1]); dn.sort(key=lambda x: x[1])
+        st = ""
+        if up or dn:
+            st = " · 3개월 기준 ▲오름 %d / ▼꺾임 %d" % (len(up), len(dn))
+            if dn:
+                st += " — ▼ " + "·".join("%s%+.0f%%" % t for t in dn)
+            if up:
+                st += " / ▲ " + "·".join("%s%+.0f%%" % t for t in up[:3])
+        out.append((m, v, "%d개월 수익률 · 선두 %s(%+.0f%%)%s"
+                    % (win, top.split(" (")[0], v[top], st)))
     return out[-tail:] if tail else out
 
 
@@ -1025,7 +1058,8 @@ def main():
         battles.append({"id": bid, "grade": grade, "name": name, "unit": unit, "freq": freq,
                         "why": why, "players": [{"k": k, "stock": st} for k, st in players],
                         "series": series, "auto": auto, "src": src, "stale": stale,
-                        "work": bid in work_ids, "wcat": WORK_CAT.get(bid)})
+                        "work": bid in work_ids, "wcat": WORK_CAT.get(bid),
+                        **({"status": BNECK_STATUS} if (bid in ("bneck", "bneck3") and BNECK_STATUS) else {})})
         print(f"  {grade} {name}: {len(series)}점" + (" · 자동" if auto else (" · ⏳갱신 필요" if stale else "")), flush=True)
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),

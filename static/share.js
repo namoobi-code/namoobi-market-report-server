@@ -157,6 +157,10 @@ function render(){
         ${b.auto?'<span style="background:#dcfce7;color:#166534;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">매일 자동</span>':(b.stale?'<span style="background:#fef3c7;color:#b45309;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">⏳ 다음 보고서 갱신</span>':'<span style="background:#f1f5f9;color:#475569;border-radius:9px;padding:1px 8px;font-size:11px;margin-left:3px">최신</span>')}</span></div>
       <div style="font-size:11px;color:#64748b;margin:3px 0 6px">${b.why}</div>
       ${gap?`<div style="font-size:11.5px;margin-bottom:4px">⚔️ <b>${gap.lead}</b> 리드 — 2위 ${gap.second}와 격차 <b>${gap.gap}${b.unit==='위'?'위':b.unit}</b>${gap.dgap!=null?` (직전 관측 대비 <b style="color:${gap.dgap>0?'#166534':gap.dgap<0?'#b91c1c':'#64748b'}">${gap.dgap>0?'확대 +':gap.dgap<0?'축소 ':''}${gap.dgap}</b>)`:''} ${gap.dgap!=null&&gap.dgap<0?'— <b style="color:#b91c1c">역전 방향 진행</b>':''}</div>`:''}
+      ${b.status&&b.status.items?`<div style="font-size:11.5px;margin:2px 0 6px;line-height:1.9">
+        <span style="color:#64748b">지금 상태(${b.status.asof} · 3개월 기준)</span>&nbsp;
+        ${b.status.items.map(it=>{const u=it.dir==='up';return `<span style="background:${u?'#dcfce7':'#fee2e2'};color:${u?'#166534':'#b91c1c'};border-radius:9px;padding:1px 8px;margin-right:4px;white-space:nowrap;font-weight:600">${u?'▲':'▼'} ${it.k.split(' (')[0]} ${it.v>0?'+':''}${it.v}%</span>`}).join('')}
+        <span style="color:#94a3b8">— 방향은 3개월 부호로만 판정한다(12개월은 기저효과로 방향 판정 불가)</span></div>`:''}
       <div style="height:${BIG?'clamp(360px, 21vw, 700px)':'210px'}"><canvas id="${P}_cv_${b.id}"></canvas></div>
       ${tbl}
       <div style="font-size:10.5px;color:#94a3b8;margin-top:5px">관련 종목: ${(b.players||[]).map(p=>p.stock?`${p.k}(${p.stock})`:p.k).join(' · ')||'—'} · 출처: ${b.src} · (E)=기관 추정치</div>
