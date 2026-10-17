@@ -150,6 +150,12 @@ META = {
                  "경매로 나온 물량 — 침체가 길수록 쌓인다 · 전 지역 공통"),
     "bid_all_rate": ("전체 낙찰가율", "%", "경매", "M", "대법원 경매정보",
                  "주택 외 포함 전체 용도 낙찰가율 · 전 지역 공통"),
+    # (2026-10-17 추가) 고준석 인터뷰(한경머니 2026.10) 후속 — 새로 들어온 자료 2종을 예측 후보로.
+    "fwd_sup":  ("향후 12개월 입주물량", "호", "공급", "M", "국토교통부 준공실적 + 부동산원·부동산114 입주예정",
+                 "t 시점에서 앞으로 12개월 공동주택 입주(과거=실제 준공, 미래=입주예정 추정) · 시도별 · "
+                 "준공은 전체 공동주택, 예정은 30세대 이상이라 2026H2 이후는 다소 작게 잡힌다"),
+    "breadth":  ("상승 확산비율", "%", "가격", "M", "한국부동산원 R-ONE 매매가격지수",
+                 "그 시도 안 시군구 중 최근 3개월 아파트 매매가격지수가 오른 곳의 비율 · 상승이 넓게 퍼지면 100 가까이 · 2003.11~"),
 }
 GLOBAL_KEYS = {"cli", "m2", "gdp", "fx", "rate_kr", "rate_us", "mtg_bal", "mtg_rate",
                "kospi", "hppci", "jeonse", "csi",
@@ -365,7 +371,7 @@ def from_re(re_, key):
 # 지표를 그대로 쓸지(수준), 전년비로 바꿀지 — 단위가 다른 계열을 같은 회귀에 넣기 위한 구분.
 #   금리·심리지수처럼 이미 '수준 자체가 의미'인 것은 그대로,
 #   통화량·대출잔액처럼 계속 커지는 것은 전년비로 바꿔야 추세에 회귀가 끌려가지 않는다.
-TRANS = {"rate_kr": "lvl", "rate_us": "lvl", "mtg_rate": "lvl", "csi": "lvl",
+TRANS = {"rate_kr": "lvl", "rate_us": "lvl", "mtg_rate": "lvl", "csi": "lvl", "breadth": "lvl",
          "supply": "lvl", "cli": "lvl", "khai": "lvl", "khoi": "lvl",
          "jr": "lvl", "supply_j": "lvl", "gap_am": "lvl",
          "bid_apt_rate": "lvl", "bid_apt_sldrate": "lvl", "bid_all_rate": "lvl"}
@@ -455,7 +461,9 @@ def corr(a, b):
 #   변수를 늘리면 과적합이 걱정이지만, ① 릿지 정규화 ② 지평별 시차 재탐색
 #   ③ 워크포워드 백테스트(그 시점 자료만) 로 걸러본 결과 늘리는 쪽이 실제로 나았다.
 #   → 수집한 지표를 **전부** 쓴다. 지역 차이는 값·시차·회귀계수에서만 나온다.
-FIXED_KEYS = list(META)
+# (2026-10-17) 신규 후보는 백테스트 판정(repred.py --judge) 전까지 relead 모델에서 제외 — 계열·메타는 내보내 판정에 쓴다.
+CANDIDATE = {"fwd_sup", "breadth"}
+FIXED_KEYS = [k for k in META if k not in CANDIDATE]
 
 
 def best_lag_ge(x, y, h, maxlag=MAXLAG):
@@ -844,6 +852,63 @@ def main():
         if mp:
             D["gap_am"][r] = mp
     print(f"    기준계열 {TARGET_LABEL} 지역 {len(tgt)} · 파생 seoul_p {len(D['seoul_p'])}·gap_am {len(D['gap_am'])}")
+    # 파생 ③ (2026-10-17): 향후 12개월 입주물량 — hstart.done.multi(준공, 2011~) 뒤에 ipju.sido(입주예정, 반기 추정)를 이어 붙여
+    #   t+1..t+12 합. 공급 지표 중 유일하게 '앞을 보는' 계열이라 시차≥h 규칙 아래서도 먼 지평에 발언권이 생길 수 있다.
+    D["fwd_sup"] = {}
+    hs, ip = load("hstart"), load("ipju")
+    if hs.get("done") and ip.get("sido"):
+        T = hs["t"]
+        for reg in SIDO:
+            mp = {}
+            arr = (hs["done"].get(reg) or {}).get("multi")
+            if arr:
+                mp.update({T[i]: arr[i] for i in range(min(len(T), len(arr))) if arr[i] is not None})
+            fut = ip["sido"].get(reg) or {}
+            f0 = min((m for m in fut if m[:4].isdigit() and not m.endswith("-00")), default=None)
+            for m, v in fut.items():
+                if m[:4].isdigit() and not m.endswith("-00"):
+                    ym = m.replace("-", "")
+                    if f0 and m >= f0:
+                        mp[ym] = v                     # 예정 구간은 예정치로 (준공 집계가 미완인 겹침 달 포함)
+            ms = sorted(mp)
+            idx = {m: i for i, m in enumerate(ms)}
+            out = {}
+            for m in ms:
+                i = idx[m]
+                if i + 12 < len(ms):
+                    win = ms[i + 1:i + 13]
+                    # 달이 연속인지(빈 달 없이 12개) 확인
+                    if all(int(win[j][:4]) * 12 + int(win[j][4:]) == int(m[:4]) * 12 + int(m[4:]) + j + 1 for j in range(12)):
+                        out[m] = sum(mp[w] for w in win)
+            if out:
+                D["fwd_sup"][reg] = out
+        print(f"    파생 fwd_sup(향후 12개월 입주) 지역 {len(D['fwd_sup'])} · 서울 최신 {max(D['fwd_sup'].get('서울', {}) or {'-': 0})}")
+    # 파생 ④ (2026-10-17): 상승 확산비율 — rerank.json 말단 시군구(depth≥2)의 3개월 지수 변화 > 0 비율(%). 시도별, 전국은 전체.
+    D["breadth"] = {}
+    rr = load("rerank")
+    if rr.get("idx"):
+        T = rr["t"]
+        leaf = {fn: r for fn, r in rr["regions"].items() if r.get("leaf") and r.get("depth", 0) >= 2}
+        groups = {"전국": list(leaf)}
+        for fn, r in leaf.items():
+            groups.setdefault(r["sido"], []).append(fn)
+        for reg in SIDO:
+            fns = groups.get(reg) or []
+            if len(fns) < 5:
+                fns = groups["전국"]            # 시군구가 적은 시도(세종 등)는 전국 확산으로 대체
+            out = {}
+            for i in range(3, len(T)):
+                up = tot = 0
+                for fn in fns:
+                    a = rr["idx"][fn]
+                    if a[i] is not None and a[i - 3] is not None and a[i - 3]:
+                        tot += 1
+                        up += a[i] > a[i - 3]
+                if tot >= 5:
+                    out[T[i]] = round(100 * up / tot, 1)
+            if out:
+                D["breadth"][reg] = out
+        print(f"    파생 breadth(상승 확산비율) 지역 {len(D['breadth'])} · 서울 최신 {sorted(D['breadth'].get('서울', {}).items())[-1] if D['breadth'].get('서울') else '-'}")
 
     # ── 월 축 통일 (기준계열이 있는 구간만)
     ts = sorted({t for mp in tgt.values() for t in mp})

@@ -9,6 +9,7 @@
   ② 금리 현황 — 기준금리(policy_rates)·10년물 10개국(gbonds)·1년 추이
   ③ 채권 ETF 추세표 — KR 상장 8종 + US 8종 (야후 1년 일봉, 기간수익률·스파크)
   ④ 배분 가이드 — 기사 프레임(현금10/단기50/장기20/우량회사채20 → 고점 확인 후 장기채 50)에 체크리스트 충족 수를 대입
+  ⑤ (2026-10-17 매경ECONOMY '5% 금리 시대') 긴축 성격 패널 regime() — 실질/기대인플레 분해 · 명목성장률−10Y · 인상 사이클 종료(FF선물·마지막 인상 경과)
 
 판정 기준은 기사 수치 그대로. 투자권유 아님 — 기사 프레임의 '현재 위치' 표시용.
 cron: 40 7 * * *   (gbonds·employment·global_market 갱신 뒤)
@@ -266,9 +267,113 @@ def judge_etfs(rows, chk, aux, n_ok, sr):
         r["score"] = max(0, min(4, sc)); r["lamp"] = "유리" if r["score"] >= 3 else "보통" if r["score"] == 2 else "불리"; r["why"] = " · ".join(why)
     return rows
 
+def regime():
+    """(2026-10-17) 매경ECONOMY 2026.10.7 커버스토리 '5% 금리 시대' 3가지를 기계 판정:
+       ① 긴축 성격 — 메리츠 이진우 "금리 절대 수준보다 끌어올리는 요인이 성장(실질금리)인지 비용(기대인플레)인지".
+          美 10Y 변화(3M·6M)를 실질금리(DFII10) + 기대인플레(T10YIE) 로 분해 → 실질 주도=성장형(2015~18 S&P +25%) / BEI 주도=인플레형(2022 S&P −18%).
+       ② 명목성장률 − 10Y — 메리츠 1962~ 실측 "명목성장률 > 10Y 금리였던 시기엔 S&P 장기평균 상회". FRED GDP(SAAR)·ECOS 200Y109 명목GDP YoY vs 10년물.
+       ③ 인상 사이클 종료 — 현대차증권 "마지막 인상 후 글로벌 채권 6M +4.6%·12M +6.6%(이전 6M +0.7%)". 마지막 인상일(FRED DFEDTARU·ECOS 722Y001) 경과,
+          FF선물(ZQ 12월·내년 6월물, 야후 .CBT) 이 반영한 추가 인상 폭, 9월 SEP 중간값·전문가 8인 컨센(정적 큐레이션)."""
+    from nmr_fred import fred_series
+    s2 = (date.today() - timedelta(days=400)).isoformat()
+    R = {}
+    try:
+        real = fred_series("DFII10", start=s2); bei = fred_series("T10YIE", start=s2); us10 = fred_series("DGS10", start=s2)
+        def dec(n):
+            out = {}
+            for k, s in (("us10", us10), ("real", real), ("bei", bei)):
+                p = last_n(s, n); out[k] = round(s[-1][1] - p, 2) if (s and p is not None) else None
+            tot = out["us10"]
+            if tot is None or out["real"] is None or out["bei"] is None: out["kind"] = None; return out
+            if abs(tot) < 0.15: out["kind"] = "보합"; out["label"] = "금리 횡보 — 성격 판정 유보"
+            elif tot < 0: out["kind"] = "하락"; out["label"] = "금리 하락 국면" + ("(실질 주도 — 성장 둔화 우려)" if out["real"] < out["bei"] else "(기대인플레 하락 — 물가 안정)")
+            else:
+                sh = min(1.0, max(0.0, out["real"] / tot))   # BEI 가 반대로 움직이면 100% 로 캡
+                out["real_share"] = round(sh * 100)
+                if sh >= 0.6: out["kind"] = "성장형"; out["label"] = f"성장형 긴축 — 실질금리가 상승분의 {sh*100:.0f}% (주식에 우호, 2015~18 유형)"
+                elif sh <= 0.4: out["kind"] = "인플레형"; out["label"] = f"인플레형 긴축 — 기대인플레가 상승분의 {(1-sh)*100:.0f}% (주식·채권 동반 약세, 2022 유형)"
+                else: out["kind"] = "혼합"; out["label"] = f"혼합 — 실질 {sh*100:.0f}% · 기대인플레 {(1-sh)*100:.0f}%"
+            return out
+        R["decomp"] = {"m3": dec(90), "m6": dec(180), "cur": {"us10": us10[-1][1] if us10 else None, "real": real[-1][1] if real else None, "bei": bei[-1][1] if bei else None, "d": us10[-1][0] if us10 else None},
+                       "s": {"us10": us10[-260:], "real": real[-260:], "bei": bei[-260:]}}
+    except Exception as e: log(f"  ⚠ regime decomp: {repr(e)[:80]}")
+    # ② 명목성장률 − 10Y
+    g = {}
+    try:
+        gdp = fred_series("GDP", start="2022-01-01")
+        if len(gdp) >= 5:
+            yoy = (gdp[-1][1] / gdp[-5][1] - 1) * 100; cur10 = (R.get("decomp") or {}).get("cur", {}).get("us10")
+            g["US"] = {"gdp_yoy": round(yoy, 1), "q": gdp[-1][0][:7], "y10": cur10, "gap": round(yoy - cur10, 1) if cur10 is not None else None}
+    except Exception as e: log(f"  ⚠ regime gdp us: {repr(e)[:60]}")
+    try:
+        import urllib.request
+        K = (BASE / "keys" / "ecos.txt").read_text().strip()
+        j = json.loads(urllib.request.urlopen(f"https://ecos.bok.or.kr/api/StatisticSearch/{K}/json/kr/1/100/200Y109/Q/2022Q1/{date.today().year}Q4/10601", timeout=25).read())
+        rows = [(r["TIME"], float(r["DATA_VALUE"])) for r in ((j.get("StatisticSearch") or {}).get("row") or []) if r.get("DATA_VALUE")]
+        kr10 = ((jload(DB / "gbonds.json").get("series") or {}).get("KR") or [])
+        if len(rows) >= 8 and kr10:
+            # 원계열(계절 미조정)이라 단일 분기 YoY 는 들쭉날쭉(1차 실측 2026Q2 +26%) → 최근 4분기 합 / 전년 4분기 합
+            yoy = (sum(v for _, v in rows[-4:]) / sum(v for _, v in rows[-8:-4]) - 1) * 100
+            g["KR"] = {"gdp_yoy": round(yoy, 1), "q": rows[-1][0] + " 4Q합", "y10": kr10[-1][1], "gap": round(yoy - kr10[-1][1], 1)}
+    except Exception as e: log(f"  ⚠ regime gdp kr: {repr(e)[:60]}")
+    R["growth_gap"] = g
+    # ③ 인상 사이클 종료
+    cyc = {}
+    try:
+        tu = fred_series("DFEDTARU", start="2022-01-01"); dff = fred_series("DFF", start=s2)
+        last_hike = next((tu[i][0] for i in range(len(tu) - 1, 0, -1) if tu[i][1] > tu[i - 1][1]), None)
+        last_cut = next((tu[i][0] for i in range(len(tu) - 1, 0, -1) if tu[i][1] < tu[i - 1][1]), None)
+        us = {"upper": tu[-1][1] if tu else None, "dff": dff[-1][1] if dff else None, "last_hike": last_hike, "last_cut": last_cut,
+              "days": (date.today() - datetime.strptime(last_hike, "%Y-%m-%d").date()).days if last_hike else None}
+        # FF 선물: 다음 12월물·그 다음 6월물 (야후 ZQ<월코드><yy>.CBT, 가격=100−기간평균 FFR)
+        import ta_screen as T
+        op, _ = T.yahoo_opener(); y = date.today().year; yy = y if date.today().month <= 10 else y + 1
+        fut = []
+        for code, yr, nm in (("Z", yy, f"{yy}.12"), ("M", yy + 1, f"{yy+1}.6")):
+            try:
+                jj = T.jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{_up.quote(f'ZQ{code}{str(yr)[2:]}.CBT')}?range=5d&interval=1d", opener=op, timeout=15)
+                px = [v for v in jj["chart"]["result"][0]["indicators"]["quote"][0]["close"] if v]
+                if px:
+                    imp = round(100 - px[-1], 3); fut.append({"m": nm, "implied": imp, "vs_dff": round((imp - us["dff"]) * 100) if us["dff"] is not None else None})
+            except Exception as e: log(f"  ⚠ ZQ{code}{yr}: {repr(e)[:50]}")
+        us["futures"] = fut
+        us["sep"] = {"src": "FOMC 2026.9 SEP 중간값(매경 2026.10.7)", "2026E": 4.1, "2027E": 4.1, "prev_2026E": 3.8, "prev_2027E": 3.6}
+        cyc["US"] = us
+    except Exception as e: log(f"  ⚠ regime cycle us: {repr(e)[:60]}")
+    try:
+        import urllib.request
+        K = (BASE / "keys" / "ecos.txt").read_text().strip()
+        j = json.loads(urllib.request.urlopen(f"https://ecos.bok.or.kr/api/StatisticSearch/{K}/json/kr/1/200/722Y001/M/202001/{date.today().strftime('%Y%m')}/0101000", timeout=25).read())
+        rows = [(r["TIME"], float(r["DATA_VALUE"])) for r in ((j.get("StatisticSearch") or {}).get("row") or []) if r.get("DATA_VALUE")]
+        lh = next((rows[i][0] for i in range(len(rows) - 1, 0, -1) if rows[i][1] > rows[i - 1][1]), None)
+        lc = next((rows[i][0] for i in range(len(rows) - 1, 0, -1) if rows[i][1] < rows[i - 1][1]), None)
+        f = lambda t: f"{t[:4]}-{t[4:]}" if t else None
+        cyc["KR"] = {"rate": rows[-1][1] if rows else None, "last_hike": f(lh), "last_cut": f(lc),
+                     "days": (date.today() - datetime.strptime(lh, "%Y%m").date()).days if lh else None}
+    except Exception as e: log(f"  ⚠ regime cycle kr: {repr(e)[:60]}")
+    # 전문가 컨센 — 매경이코노미 채권 전문가 8인 설문(2026.10.7) 정적 큐레이션
+    cyc["consensus"] = {"src": "매경ECONOMY 2026.10.7 채권 전문가 8인", "us_2026": "4.25% (8/8 연내 1회 더)", "us_2027_6": "4.25% 5명 · 4.5% 3명", "kr_2026": "3.25% (8/8 연내 1회 더)",
+                        "kr_2027_6": "3.5% 7명", "first_cut": "美 2027 4Q~2028 · 韓 2028 2Q (AI 설비투자 피크아웃이 전환점)"}
+    # 판정: 시장이 추가 인상을 얼마나 반영하는가
+    fut = (cyc.get("US") or {}).get("futures") or []
+    near = fut[0]["vs_dff"] if fut and fut[0].get("vs_dff") is not None else None
+    if near is None: cyc["verdict"] = None
+    elif near >= 20: cyc["verdict"] = {"st": "진행 중", "ok": False, "txt": f"선물이 {fut[0]['m']}까지 +{near}bp(≈{near/25:.1f}회) 추가 인상을 반영 — 사이클 미종료, 장기채 '소량' 유지"}
+    elif near >= 8: cyc["verdict"] = {"st": "막바지", "ok": False, "txt": f"선물 반영 +{near}bp — 한 차례 미만. 종료 임박이나 확인 전(기사: 마지막 인상 전 6M 채권 +0.7%)"}
+    else: cyc["verdict"] = {"st": "종료 신호", "ok": True, "txt": f"선물이 추가 인상을 거의 반영 안 함({near:+d}bp) — 마지막 인상 후 6M +4.6%·12M +6.6% 구간 진입 가능성"}
+    R["cycle"] = cyc
+    R["ref"] = {"hike_eras": "1990년 이후 美 금리 인상기 6차례 S&P500 누적 평균 +7.4% (1994 +4.3 · 1997 +1.5 · 1999 +3.5 · 2004 +11.3 · 2015 +22.7 · 2022 +1.3, 블룸버그·현대차증권)",
+                "types": "성장형(2015.12~18) S&P +25%·종합채권 +5% / 인플레형(2022) S&P −18%·종합채권 −13% (신한투자증권)",
+                "after_hike": "글로벌 채권 마지막 인상 후 6M +4.6%·12M +6.6% vs 인상 전 6M +0.7%·12M +0.4% (현대차증권)",
+                "alt": "과거 美 인상기 글로벌 인프라 +8.2%·원자재 +9.2% (2004~, 연환산) / 韓 리츠·인프라 −12% (현대차증권)"}
+    return R
+
 def main():
     log("[bonds] 시작")
     chk, aux, n_ok, phase = checklist()
+    reg = {}
+    try: reg = regime()
+    except Exception as e: log(f"  ⚠ regime: {repr(e)[:80]}")
     pr = jload(DB / "policy_rates.json").get("rows") or []
     gb = jload(DB / "gbonds.json")
     countries = gb.get("countries") or []
@@ -284,7 +389,7 @@ def main():
     sr = short_rates(); pk = parking()
     rows = judge_etfs(rows, chk, aux, n_ok, sr)
     OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "checklist": chk, "aux": aux, "short": sr, "parking": pk,
-                               "policy": pr, "countries": countries, "series": series, "etfs": rows, "alloc": alloc},
+                               "policy": pr, "countries": countries, "series": series, "etfs": rows, "alloc": alloc, "regime": reg},
                               ensure_ascii=False), encoding="utf-8")
     log(f"[bonds] ✅ 체크리스트 {n_ok}/4 · {phase} · ETF {sum(1 for r in rows if r.get('cur'))}/{len(rows)} → {OUT}")
 

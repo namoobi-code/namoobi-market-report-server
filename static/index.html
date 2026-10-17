@@ -60,6 +60,7 @@
     #p_dv canvas{height:26px!important;max-height:26px!important;width:90px!important}
     #p_bd .bdc canvas{height:90px!important;max-height:90px!important}
     #p_bd .bdr canvas{height:230px!important;max-height:230px!important}
+    #p_bd .bdm canvas{height:150px!important;max-height:150px!important}
   [id^="sw_cv_reg_"]{height:100%!important;max-height:none!important}
   #kc_cn_cv{height:240px!important;max-height:none!important} /* (2026-10-17) 대중국 수출 차트 — 전역 200px 캡 해제 */ /* (2026-09-07) 점유율(업무) 권역별 큰 카드 — 전역 200px 캡 해제, 부모 div 높이(clamp 42vw)를 따른다 */
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
@@ -556,6 +557,8 @@
       <button class="tab"    data-pane="p_re3" style="background:#9a3412;border-color:#9a3412;color:#fff">🏘️ RE3<small style="color:#ffedd5">국면 신호등</small></button>
       <!-- (2026-09-20) 부동산시황 — 기간별 아파트 매매가격지수 상승률 순위 (R-ONE 236지역) -->
       <button class="tab"    data-pane="p_resh" style="background:#c2410c;border-color:#c2410c;color:#fff">📊 부동산시황<small style="color:#ffedd5">지역별 상승률 순위</small></button>
+      <!-- (2026-10-17) 입지점수 — 고준석 입지 5요소를 서울·성남·수지 K-apt 단지에 점수화 (locscore.py · loc.js) -->
+      <button class="tab"    data-pane="p_loc" style="background:#4d7c0f;border-color:#4d7c0f;color:#fff">📍 입지점수<small style="color:#ecfccb">학원·병원·공원·환승·규모</small></button>
       <!-- (2026-09-04) 청약 탭 — 로그인 게이트 해제, 상시 노출 (청약홈 공공데이터) -->
       <button class="tab" id="tab_sub" data-pane="p_sub" style="background:#0f766e;border-color:#0f766e;color:#fff">🏗️ 청약<small style="color:#99f6e4">분양·추첨제·경쟁률</small></button>
       <button class="tab"    data-pane="p_trends" style="background:#be185d;border-color:#be185d;color:#fff">📈 Trends<small style="color:#fbcfe8">구글·유튜브·네이버</small></button>
@@ -999,6 +1002,8 @@
     <h2>📜 채권 — 금리 고점은 언제 확인되나 <em id="bd_asof"></em></h2>
     <div class="note" style="margin:-4px 0 10px;line-height:1.7">한경MONEY 2026.10 메리츠 윤여삼 채권애널리스트 인터뷰 프레임: <b>"고점을 단번에 맞히려 하지 말고 단기채로 유동성을 확보한 뒤, 고점 통과 신호가 확인되면 장기채 비중을 단계적으로 확대"</b>.
       그 '신호 4가지'(유가 $75 하회 · 美 고용·소비 질서 있는 둔화 · 美 10년 4.5% 안팎 완만 하락 · 국내 장기금리 신고점 미경신)를 서버가 매일 자동 판정하고, 기준금리·10년물·채권 ETF 추세를 한 화면에 둔다. 전부 기존 수집 DB 재사용(신규 토큰 0). 투자권유 아님.</div>
+    <h3>⓪ 지금 긴축은 어떤 종류인가 <span class="note">매경ECONOMY 2026.10.7 '5% 금리 시대' — 성장형 vs 인플레형 · 명목성장률−10Y · 인상 사이클 종료 (FRED DFII10·T10YIE·GDP·DFEDTARU, ECOS 명목GDP·기준금리, FF선물)</span></h3>
+    <div class="box" style="padding:12px 14px;margin-bottom:10px" id="bd_regime"></div>
     <h3>① 금리 고점 통과 체크리스트</h3>
     <div class="box" style="padding:12px 14px;margin-bottom:10px" id="bd_chk"></div>
     <h3>② 채권 배분 가이드 <span class="note">기사 프레임 — 체크리스트 충족 수로 현재 위치 표시</span></h3>
@@ -1516,6 +1521,41 @@
       <h3 style="margin:4px 0">백테스트 성적 (지평별)</h3><div id="pf_bt"></div>
     </div>
   </div>
+  <!-- (2026-10-17) 📍 입지점수 페인 — scripts/locscore.py(월 1회) · loc.js -->
+  <div class="pane" id="p_loc" style="overflow:auto">
+    <h2>📍 입지점수 — 서울·성남·수지 아파트 입지 5요소 <em id="lc_asof" style="font-weight:400;font-size:12px;color:#8a93a0"></em></h2>
+    <p class="note" style="margin:2px 0 8px;line-height:1.7">
+      고준석(연세대 상남경영원) 입지 체크리스트 — <b>걸어서 다닐 학원가 · 종합병원 · 대규모 공원 · 지하철 2개 노선 환승 · 1,500~2,500가구</b> — 를
+      K-apt 등록 단지(의무관리, 대체로 150세대+) 하나하나에 공공데이터로 매긴다. 좌표는 VWorld 지오코더, 주변 시설은 VWorld 장소검색(국토부 POI), 세대수·준공은 K-apt,
+      가격은 국토부 실거래(최근 12개월 ㎡당가 → 84㎡ 환산). 가중치는 아래 슬라이더로 바로 바꿀 수 있다. <b>점수는 규칙 기반 참고치</b> — 학군(학교 배정)·조망·브랜드·재건축 가능성은 안 들어 있다.
+    </p>
+    <div class="rs_ctl" style="gap:8px 18px">
+      <span>가중치
+        <span class="rs_seg" id="lc_wpre">
+          <button data-w='{"edu":20,"hosp":20,"park":20,"tr":20,"size":20}'>균등</button>
+          <button data-w='{"edu":35,"hosp":10,"park":15,"tr":30,"size":10}'>학군·교통</button>
+          <button data-w='{"edu":10,"hosp":30,"park":30,"tr":15,"size":15}'>병원·공원(시니어)</button>
+          <button data-w='{"edu":15,"hosp":10,"park":15,"tr":35,"size":25}'>출퇴근·대단지</button>
+        </span></span>
+      <span style="color:#7c3aed">교육 <input type="range" id="lc_w_edu" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_edu"></b></span>
+      <span style="color:#0e9aa7">편의 <input type="range" id="lc_w_hosp" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_hosp"></b></span>
+      <span style="color:#27ae60">자연 <input type="range" id="lc_w_park" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_park"></b></span>
+      <span style="color:#2f6fed">교통 <input type="range" id="lc_w_tr" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_tr"></b></span>
+      <span style="color:#e08e3c">규모 <input type="range" id="lc_w_size" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_size"></b></span>
+    </div>
+    <div class="rs_ctl">
+      <input type="text" id="lc_q" placeholder="🔎 단지명·동 검색" style="width:200px">
+      <span>최소 세대수 <select id="lc_minhh"><option value="0">전체</option><option value="300">300+</option><option value="500">500+</option><option value="1000">1,000+</option><option value="1500">1,500+</option></select></span>
+    </div>
+    <div class="rs_seg" id="lc_reg" style="margin:-2px 0 8px;font-size:12px"></div>
+    <div id="lc_sum" class="note" style="margin:0 0 6px;font-size:12.5px">불러오는 중…</div>
+    <div style="display:grid;grid-template-columns:minmax(320px,2fr) minmax(500px,5fr);gap:14px;align-items:start">
+      <div><div class="note" style="font-size:11.5px;margin-bottom:3px">총점 vs 84㎡ 환산가 — 오른쪽 아래가 '점수 대비 싼' 단지 · 점 클릭=표에서 찾기 (주황=성남·수지)</div>
+        <div style="position:relative;height:420px"><canvas id="lc_sc"></canvas></div></div>
+      <div id="lc_tbl" style="overflow:auto;max-height:760px"></div>
+    </div>
+  </div>
+
   <!-- (2026-09-20) 📊 부동산시황 페인 — scripts/rerank.py (매일 07:50) · resh.js
        한국부동산원 R-ONE (월) 매매가격지수_아파트 236지역 → 기간 골라 상승률 순위(기본 TOP10, 개수·기간·범위 조절) -->
   <div class="pane" id="p_resh" style="overflow:auto">
@@ -2433,19 +2473,20 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=10172010"></script>
+<script src="/app.js?v=10172200"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/resh.js?v=10172100"></script><!-- (2026-09-20) 부동산시황 탭 -->
+<script src="/resh.js?v=10172100"></script>
+<script src="/loc.js?v=10172200"></script><!-- (2026-10-17) 입지점수 탭 --><!-- (2026-09-20) 부동산시황 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script>
 <script src="/ct.js?v=20260920a"></script><!-- (2026-09-20) 셀트리온 탭 --><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10172600"></script><script src="/div.js?v=10172500"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10172900"></script><script src="/div.js?v=10172500"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

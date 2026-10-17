@@ -95,9 +95,54 @@ function parkingSec(){
     <div class="note" style="margin-top:4px">수익률=다음금융 수정주가(분배 포함 총수익). 기사 표(체크 9/14)의 운용규모 상위 16종 — AUM·보수는 ETF 풀 당일값. 머니마켓형 1년 3.1~3.3% > CD형 2.8~3.0% > KOFR형 2.6~2.7%: 신용위험을 조금 더 지는 순서대로 수익이 높다(기사 논리 그대로).</div>`;
   return h;
 }
+function regimeSec(){
+  /* (2026-10-17) 매경ECONOMY '5% 금리 시대' — 긴축 성격(실질 vs 기대인플레)·명목성장률−10Y·인상 사이클 종료 */
+  const R=D.regime||{}; if(!R.decomp&&!R.cycle) return '<div class="note">regime 데이터 없음</div>';
+  const dc=R.decomp||{}, cur=dc.cur||{}, m3=dc.m3||{}, m6=dc.m6||{}; const G=R.growth_gap||{}, C=R.cycle||{}, ref=R.ref||{};
+  const kcol=k=>k==='성장형'?'#16a34a':k==='인플레형'?'#dc2626':k==='혼합'?'#ca8a04':'#64748b';
+  const bar=(o)=>{ if(o.us10==null||o.kind==null||o.us10<=0.15&&o.us10>=-0.15) return ''; const tot=Math.abs(o.real)+Math.abs(o.bei)||1; const rw=Math.abs(o.real)/tot*100;
+    return `<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;margin:4px 0;max-width:360px"><div title="실질금리 ${o.real>0?'+':''}${o.real}%p" style="width:${rw}%;background:#16a34a"></div><div title="기대인플레 ${o.bei>0?'+':''}${o.bei}%p" style="width:${100-rw}%;background:#dc2626"></div></div>
+      <div class="note" style="font-size:10.5px"><span style="color:#16a34a;font-weight:700">■</span> 실질금리 ${o.real>0?'+':''}${o.real}%p · <span style="color:#dc2626;font-weight:700">■</span> 기대인플레 ${o.bei>0?'+':''}${o.bei}%p = 10Y ${o.us10>0?'+':''}${o.us10}%p</div>`;};
+  const win=(o,t)=>`<div style="flex:1;min-width:240px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff;border-top:3px solid ${kcol(o.kind)}"><div class="note">${t}</div><div style="font-size:15px;font-weight:800;color:${kcol(o.kind)}">${E(o.kind||'—')}</div><div style="font-size:11.5px;line-height:1.4">${E(o.label||'')}</div>${bar(o)}</div>`;
+  let h=`<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch">
+    <div style="flex:1.2;min-width:280px"><div style="font-weight:700;font-size:12.5px;margin-bottom:4px">① 지금 긴축은 <u>성장형</u>인가 <u>인플레형</u>인가 <span class="note" style="font-weight:400">美10Y 변화 = 실질금리(TIPS) + 기대인플레(BEI)</span></div>
+      <div class="note" style="margin-bottom:6px">현재 10Y <b>${cur.us10==null?'—':cur.us10.toFixed(2)}%</b> = 실질 ${cur.real==null?'—':cur.real.toFixed(2)} + 기대인플레 ${cur.bei==null?'—':cur.bei.toFixed(2)} (${E(cur.d||'')})</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${win(m3,'최근 3개월')}${win(m6,'최근 6개월')}</div>
+      <div class="note" style="font-size:11px;margin-top:6px;line-height:1.5"><b>왜</b> 메리츠 이진우: "금리의 절대 수준보다 끌어올리는 요인이 성장인지 비용 상승인지 구분" — ${E(ref.types||'')}. 실질 주도면 증시는 적응하고, 기대인플레 주도면 주식·채권이 동시에 무너진다(할인율 충격).</div>
+      <div class="bdm" style="position:relative;height:150px;overflow:hidden;margin-top:6px"><canvas id="bd_cv_regime" style="display:block;width:100%;height:150px"></canvas></div></div>
+    <div style="flex:1;min-width:260px"><div style="font-weight:700;font-size:12.5px;margin-bottom:4px">② 경제가 금리를 감당하나 <span class="note" style="font-weight:400">명목성장률 − 10년물</span></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${['US','KR'].map(k=>{const g=G[k]; if(!g) return ''; const ok=g.gap!=null&&g.gap>0; return `<div style="flex:1;min-width:120px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff;border-top:3px solid ${ok?'#16a34a':'#dc2626'}"><div class="note">${k==='US'?'미국':'한국'} <span style="font-size:10px">${E(g.q)}</span></div><div style="font-size:20px;font-weight:800;color:${ok?'#16a34a':'#dc2626'}">${g.gap>0?'+':''}${nf(g.gap,1)}%p</div><div class="note" style="font-size:10.5px">명목GDP YoY ${nf(g.gdp_yoy,1)}% − 10Y ${nf(g.y10,2)}%</div><div style="font-size:11px;font-weight:700;color:${ok?'#16a34a':'#dc2626'}">${ok?'감당 — 주식 우호 구간':'금리 > 성장 — 이자가 성장을 잠식'}</div></div>`;}).join('')}</div>
+      <div class="note" style="font-size:11px;margin-top:6px;line-height:1.5"><b>왜</b> 메리츠 1962년 이후 실측: 명목성장률이 美10Y보다 높았던 시기엔 S&P500 수익률이 장기평균을 웃돌았다(예외 1977·78·2005·2022). 기사의 "5% 고금리 지속 여부는 경제가 이자비용을 감당할 만큼 성장하느냐에 달렸다"를 숫자 하나로. 명목GDP 는 분기(한국은 반도체 호황으로 명목 급증 — 물가 아닌 수출 효과).</div>
+      ${ref.hike_eras?`<div class="note" style="font-size:10.5px;margin-top:4px">${E(ref.hike_eras)}</div>`:''}</div></div>`;
+  // ③ 인상 사이클
+  const U=C.US||{}, K=C.KR||{}, V=C.verdict, cs=C.consensus||{}; const fut=U.futures||[];
+  h+=`<div style="margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:10px"><div style="font-weight:700;font-size:12.5px;margin-bottom:4px">③ 인상 사이클은 끝났나 <span class="note" style="font-weight:400">마지막 인상 경과 · FF선물 반영 · 점도표 · 전문가 8인</span>
+      ${V?`<span style="margin-left:8px;font-size:11.5px;padding:2px 9px;border-radius:9px;background:${V.ok?'#dcfce7':'#fee2e2'};color:${V.ok?'#16a34a':'#dc2626'};font-weight:700">${E(V.st)}</span>`:''}</div>
+    ${V?`<div style="font-size:12px;margin-bottom:6px">${E(V.txt)}</div>`:''}
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="flex:1;min-width:230px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">🇺🇸 연준 — 상단 ${U.upper==null?'—':U.upper.toFixed(2)}% · 실효 ${U.dff==null?'—':U.dff.toFixed(2)}%</div>
+        <div style="font-size:12px;margin-top:3px">마지막 인상 <b>${E(U.last_hike||'—')}</b>${U.days!=null?` <span class="note">(${U.days}일 전)</span>`:''} · 마지막 인하 ${E(U.last_cut||'—')}</div>
+        <div style="font-size:12px;margin-top:3px">FF선물 반영: ${fut.length?fut.map(f=>`${E(f.m)}월 <b>${f.implied.toFixed(2)}%</b> (${f.vs_dff>0?'+':''}${f.vs_dff}bp)`).join(' · '):'—'}</div>
+        <div style="font-size:11.5px;margin-top:3px" class="note">점도표(9월 SEP): 2026말 ${U.sep?.['2026E']}% (6월 ${U.sep?.prev_2026E}) · 2027말 ${U.sep?.['2027E']}% (6월 ${U.sep?.prev_2027E}) — 연준 스스로 '더 높게 더 오래'로 수정</div></div>
+      <div style="flex:1;min-width:230px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">🇰🇷 한국은행 — 기준금리 ${K.rate==null?'—':K.rate.toFixed(2)}%</div>
+        <div style="font-size:12px;margin-top:3px">마지막 인상 <b>${E(K.last_hike||'—')}</b>${K.days!=null?` <span class="note">(약 ${K.days}일 전)</span>`:''} · 마지막 인하 ${E(K.last_cut||'—')}</div>
+        <div style="font-size:11.5px;margin-top:3px" class="note">전문가 8인(${E(cs.src||'')}): 연말 美 ${E(cs.us_2026||'')} · 韓 ${E(cs.kr_2026||'')} / 2027.6 美 ${E(cs.us_2027_6||'')} · 韓 ${E(cs.kr_2027_6||'')} / 첫 인하 ${E(cs.first_cut||'')}</div></div>
+    </div>
+    <div class="note" style="font-size:11px;margin-top:6px;line-height:1.5"><b>왜</b> ${E(ref.after_hike||'')} — 채권은 "마지막 인상"이 확인된 뒤에 산 쪽이 압도적으로 유리했다. 선물이 추가 인상을 반영하는 동안은 위 체크리스트와 무관하게 장기채 '소량'. 판정 규칙: 다음 12월물 반영 ≥ +20bp 진행 중 · 8~20bp 막바지 · <8bp 종료 신호. ${E(ref.alt||'')}</div></div>`;
+  return h;
+}
+function regimeChart(){
+  const S=((D.regime||{}).decomp||{}).s||{}; const cv=$('bd_cv_regime'); if(!cv||!window.Chart||!S.us10) return;
+  const cols={us10:'#1e293b',real:'#16a34a',bei:'#dc2626'}, nm={us10:'美10Y',real:'실질(TIPS)',bei:'기대인플레(BEI)'};
+  const dates=[...new Set(Object.values(S).flat().map(x=>x[0]))].sort();
+  charts.push(new Chart(cv,{type:'line',data:{labels:dates,datasets:Object.entries(S).map(([k,s])=>{const m=new Map(s);return {label:nm[k],data:dates.map(d=>m.get(d)??null),borderColor:cols[k],pointRadius:0,borderWidth:k==='us10'?1.6:1.2,spanGaps:true,tension:.1};})},
+    options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},
+      scales:{x:{ticks:{maxTicksLimit:6,font:{size:9},maxRotation:0,callback:(v,i)=>dates[i]?dates[i].slice(2,7):''}},y:{ticks:{callback:v=>v+'%',font:{size:9.5},maxTicksLimit:5}}}}}));
+}
 function render(){
   charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
   $('bd_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 07:40 자동';
+  if($('bd_regime')){ $('bd_regime').innerHTML=regimeSec(); regimeChart(); }
   $('bd_chk').innerHTML=checklist();
   (D.checklist||[]).forEach(c=>{const cv=$('bd_cv_'+c.key); if(cv) spark(cv,c.s,c.ok?'#16a34a':'#dc2626',TH_LINE[c.key]);});
   $('bd_alloc').innerHTML=alloc();

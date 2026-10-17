@@ -517,9 +517,12 @@ def main():
                 if sum(1 for v in f if v is not None) >= 36:
                     feat[k] = f
             ks_all = list(feat)
-            sets = {"기본": set(k for k in ks_all if k not in ("subs", "cons")),
-                    "+청약": set(k for k in ks_all if k != "cons"),
-                    "+수주": set(k for k in ks_all if k != "subs"),
+            # (2026-10-17) 신규 후보 fwd_sup(향후 12개월 입주)·breadth(상승 확산비율) 편입 판정 — 현행(둘 다 제외) 대비
+            NEW2 = ("fwd_sup", "breadth")
+            cur = set(k for k in ks_all if k not in NEW2)
+            sets = {"현행": cur,
+                    "+입주12M": cur | ({"fwd_sup"} & set(ks_all)),
+                    "+확산": cur | ({"breadth"} & set(ks_all)),
                     "+둘다": set(ks_all)}
             bt = backtest_multi(feat, prices, ks_all, sets)
             line = " | ".join(f"{nm} {v['mape']}%/{v['hit']}%" for nm, v in bt.items())
