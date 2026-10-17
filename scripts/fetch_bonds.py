@@ -123,7 +123,9 @@ def etfs():
             if not s: rows.append({"sym": sym, "name": nm, "grp": grp, "mk": mk}); continue
             cur = s[-1][1]
             def ret(n):
-                p = last_n(s, n); return round((cur / p - 1) * 100, 2) if p else None
+                p = last_n(s, n)
+                if p is None and n >= 365 and len(s) > 200: p = s[0][1]   # range=1y 가 365일에 며칠 못 미쳐 1년 수익률이 비던 결함(SGOV·BIL 실측)
+                return round((cur / p - 1) * 100, 2) if p else None
             rows.append({"sym": sym, "name": nm, "grp": grp, "mk": mk, "cur": cur, "d": s[-1][0],
                          "w1": ret(7), "m1": ret(30), "m3": ret(91), "m6": ret(182), "y1": ret(365),
                          "spark": [v for _, v in s[::max(1, len(s) // 60)]]})
