@@ -52,13 +52,16 @@ def pull(corp, year, fs):
         v = num(x.get("thstrm_amount"))
         if v is None:
             continue
+        # (2026-10-17 실측) 손익계산서를 단일 포괄손익계산서로 내는 회사(SK하이닉스 등 전체의 ~90%)는 sj_div 가 'CIS' —
+        #   'IS' 만 보면 영업이익이 안 잡혀 2,078종 중 1,907종이 '데이터 없음'으로 캐시됐다. IS·CIS 둘 다 받는다.
+        sjn = "IS" if sj in ("IS", "CIS") else sj
         for k, (div, ids) in IDS.items():
-            if sj == div and aid in ids and k not in got:
+            if sjn == div and aid in ids and k not in got:
                 got[k] = v
         # 계정ID 가 표준이 아닌 회사 — 계정명으로 보조 매칭(이자의 지급 등)
         if "ie_cf" not in got and sj == "CF" and nm.replace(" ", "") in ("이자의지급", "이자지급", "이자지급액"):
             got["ie_cf"] = v
-        if "ie_is" not in got and sj == "IS" and nm.replace(" ", "") in ("이자비용",):
+        if "ie_is" not in got and sjn == "IS" and nm.replace(" ", "") in ("이자비용",):
             got["ie_is"] = v
     return got or None
 
@@ -80,12 +83,14 @@ def main():
         if ck in cache:
             rows[c] = cache[ck]
             continue
-        rec = None
+        rec = None; failed = False
         for fs in ("CFS", "OFS"):
             try:
                 got = pull(corp, year, fs); n_call += 1
             except Exception as e:
-                got = None; time.sleep(1)
+                # (2026-10-17 실측) 2,800콜 넘자 DART 가 응답을 지연시켜(SYN 후 무응답 → 30s 타임아웃) 건당 1분씩 걸렸다.
+                #   타임아웃을 '데이터 없음'으로 캐시하면 그 종목은 영영 비므로 — 실패는 캐시하지 않고 다음 주 재시도. 속도도 늦춘다.
+                got = None; failed = True; time.sleep(3)
             if got and "op" in got:
                 ie, src = None, None
                 for k in ("ie_is", "ie_cf", "fc"):
@@ -96,8 +101,9 @@ def main():
                        "icr": (round(op / ie, 1) if (ie and op is not None) else None),
                        "ocfop": (round(ocf / op, 2) if (ocf is not None and op and op > 0) else None)}
                 break
-            time.sleep(0.15)
-        cache[ck] = rec if rec else {"yr": year, "none": True}
+            time.sleep(0.4)
+        if rec or not failed:
+            cache[ck] = rec if rec else {"yr": year, "none": True}   # 실패(타임아웃)는 캐시하지 않는다
         if rec:
             rows[c] = rec; n_new += 1
         if n_call and n_call % 200 == 0:
