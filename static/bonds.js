@@ -20,9 +20,13 @@ function spark(cv,s,color,th){
     scales:{x:{ticks:{maxTicksLimit:4,font:{size:9},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(2,7):''},grid:{display:false}},y:{ticks:{font:{size:9},maxTicksLimit:4},grid:{color:'#f1f5f9'}}}}}));
 }
 function miniSpark(cv,vals,color){
-  if(!vals||vals.length<2||!window.Chart) return;
-  charts.push(new Chart(cv,{type:'line',data:{labels:vals.map((_,i)=>i),datasets:[{data:vals,borderColor:color,pointRadius:0,borderWidth:1.2,tension:.2}]},
-    options:{responsive:false,animation:false,plugins:{legend:{display:false},tooltip:{enabled:false}},scales:{x:{display:false},y:{display:false}}}}));
+  /* Chart.js 는 responsive:false 미니캔버스에서 그림이 깨졌다(2026-10-17 화면 실측: 점 하나만 보임) → 순수 2D 로 직접 그린다 */
+  if(!vals||vals.length<2) return;
+  const W=90,H=26,dpr=window.devicePixelRatio||1; cv.width=W*dpr; cv.height=H*dpr; cv.style.width=W+'px'; cv.style.height=H+'px';
+  const x=cv.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,W,H);
+  const mn=Math.min(...vals), mx=Math.max(...vals), rg=(mx-mn)||1;
+  x.beginPath(); vals.forEach((v,i)=>{const px=i/(vals.length-1)*(W-2)+1, py=H-2-(v-mn)/rg*(H-4); i?x.lineTo(px,py):x.moveTo(px,py);});
+  x.strokeStyle=color; x.lineWidth=1.3; x.stroke();
 }
 const TH_LINE={wti:[75],us10:[4.5],jobs:[0],kr10:[]};
 function checklist(){
@@ -35,7 +39,7 @@ function checklist(){
   C.forEach(c=>{ h+=`<div class="box" style="padding:10px 12px;border-top:3px solid ${c.ok?'#16a34a':'#dc2626'}">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b style="font-size:12.5px">${E(c.name)}</b><span style="font-size:11px;padding:1px 7px;border-radius:9px;background:${c.ok?'#dcfce7':'#fee2e2'};color:${c.ok?'#16a34a':'#dc2626'};font-weight:700">${c.ok?'✓ 충족':'✗ 미충족'}</span></div>
       <div style="font-size:19px;font-weight:800;margin:2px 0">${E(c.value)} <span class="note" style="font-weight:400;font-size:11px">${E(c.detail||'')}</span></div>
-      <div style="position:relative;height:90px;margin:4px 0"><canvas id="bd_cv_${c.key}"></canvas></div>
+      <div class="bdc" style="position:relative;height:90px;overflow:hidden;margin:4px 0"><canvas id="bd_cv_${c.key}" style="display:block;width:100%;height:90px"></canvas></div>
       <div class="note" style="font-size:11px"><b>왜</b> ${E(c.why)}</div></div>`;});
   h+=`</div>`;
   const cv=A.curve||{}, hy=A.hy||{};
@@ -75,7 +79,7 @@ function ratesChart(){
 function etfTbl(mk){
   const R=(D.etfs||[]).filter(r=>r.mk===mk);
   return `<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%"><thead><tr>${['ETF','구분','현재가','1주','1개월','3개월','6개월','1년','1년 추세'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
-    R.map(r=>`<tr><td style="${TD}"><b>${E(r.name)}</b><span class="note" style="font-size:10px"> ${E(r.sym)}</span></td><td style="${TD}font-size:11px;color:#475569">${E(r.grp)}</td><td style="${TD}text-align:right">${r.cur==null?'—':(mk==='kr'?nf(r.cur,0):'$'+nf(r.cur,2))}</td>${['w1','m1','m3','m6','y1'].map(k=>`<td style="${TD}text-align:right">${pf(r[k])}</td>`).join('')}<td style="${TD}"><canvas id="bd_sp_${r.sym.replace('.','_')}" width="90" height="26"></canvas></td></tr>`).join('')}</tbody></table>`;
+    R.map(r=>`<tr><td style="${TD}"><b>${E(r.name)}</b><span class="note" style="font-size:10px"> ${E(r.sym)}</span></td><td style="${TD}font-size:11px;color:#475569">${E(r.grp)}</td><td style="${TD}text-align:right">${r.cur==null?'—':(mk==='kr'?nf(r.cur,0):'$'+nf(r.cur,2))}</td>${['w1','m1','m3','m6','y1'].map(k=>`<td style="${TD}text-align:right">${pf(r[k])}</td>`).join('')}<td style="${TD}width:100px"><div class="bdsp" style="width:90px;height:26px;overflow:hidden"><canvas id="bd_sp_${r.sym.replace('.','_')}" width="90" height="26" style="display:block;width:90px;height:26px"></canvas></div></td></tr>`).join('')}</tbody></table>`;
 }
 function render(){
   charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;

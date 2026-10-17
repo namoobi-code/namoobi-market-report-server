@@ -55,6 +55,10 @@
   .cbox canvas{height:100%!important;max-height:none!important}
   /* (2026-09-05) 코인 선행지표 카드 스파크 — 전역 canvas 200px 캡 해제(90px 컨테이너에 맞춤. 캡 때문에 판정 텍스트를 덮었다 — 실측) */
   #p_cl .clsp canvas{height:100px!important;max-height:100px!important}
+    /* (2026-10-17) 채권 탭 — 전역 canvas{height:200px!important} 를 섹션별로 덮는다(화면 실측: 미니스파크가 200px 로 늘어나 세로 막대처럼 보임) */
+    #p_bd .bdsp canvas{height:26px!important;max-height:26px!important;width:90px!important}
+    #p_bd .bdc canvas{height:90px!important;max-height:90px!important}
+    #p_bd .bdr canvas{height:230px!important;max-height:230px!important}
   [id^="sw_cv_reg_"]{height:100%!important;max-height:none!important}
   #kc_cn_cv{height:240px!important;max-height:none!important} /* (2026-10-17) 대중국 수출 차트 — 전역 200px 캡 해제 */ /* (2026-09-07) 점유율(업무) 권역별 큰 카드 — 전역 200px 캡 해제, 부모 div 높이(clamp 42vw)를 따른다 */
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
@@ -982,7 +986,7 @@
     <div class="box" style="padding:12px 14px;margin-bottom:10px" id="bd_alloc"></div>
     <h3>③ 기준금리 · 국가별 10년물</h3>
     <div class="box" style="padding:12px 14px;margin-bottom:6px" id="bd_rates"></div>
-    <div class="box" style="padding:10px 12px;margin-bottom:10px"><b style="font-size:12.5px">10년물 1년 추이 — 미국·한국·독일·일본</b><div style="height:230px;margin-top:4px"><canvas id="bd_cv_rates"></canvas></div></div>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px"><b style="font-size:12.5px">10년물 1년 추이 — 미국·한국·독일·일본</b><div class="bdr" style="position:relative;height:230px;overflow:hidden;margin-top:4px"><canvas id="bd_cv_rates" style="display:block;width:100%;height:230px"></canvas></div></div>
     <h3>④ 채권 ETF 추세 <span class="note">국내 상장 8종 · 미국 8종 — 단기/장기/초장기/회사채/물가연동</span></h3>
     <div class="box" style="padding:10px 12px;margin-bottom:8px" id="bd_etf_kr"></div>
     <div class="box" style="padding:10px 12px;margin-bottom:10px" id="bd_etf_us"></div>
@@ -2394,7 +2398,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10171500"></script><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10171800"></script><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
