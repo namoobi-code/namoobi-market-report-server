@@ -133,7 +133,7 @@ function controls(){
 function draw(){ controls(); bar(); table(); lines(); }
 
 window.renderResh=async function(){
-  hsLoad();
+  hsLoad(); ipLoad();
   if(D){ setTimeout(()=>{[chBar,chLine].forEach(c=>c&&c.resize());},60); return; }
   try{
     const r=await fetch('/api/db/rerank'); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -217,5 +217,68 @@ async function hsLoad(){
     $('hs_asof').textContent=`${H.src} · 수집 ${H.asof} · ${fm(H.t[0])}~${fm(H.t.at(-1))}`;
     hsControls(); hsDraw();
   }catch(e){ $('hs_sum').textContent='착공 데이터를 불러오지 못했습니다 ('+e.message+')'; }
+}
+
+/* ───────── 입주예정 물량 (2026-10-17) — /api/db/ipju · scripts/ipju.py ─────────
+   부동산원·부동산114 반기 추정(단지 703건, 2026.07~2028.06). 지역을 고르면 월/반기 막대 + 단지 표.
+   서울 2026H2 18,994 · 2027 22,428 · 2028H1 8,246 — 기사(아파트만) 1.8만/1.5만보다 크다(임대·도시형 포함). */
+let P=null, pBar=null;
+let IP={reg:'서울', kind:'', grp:'m'};
+function ipRows(){
+  if(!P) return [];
+  return (P.items||[]).filter(i=>{
+    if(IP.kind&&i.kind!==IP.kind) return false;
+    if(IP.reg==='전국') return true;
+    const t=IP.reg.split(' ');
+    if(t.length===1) return i.reg===t[0];
+    if(t.length===2) return i.reg===t[0]&&i.sgg===t[1];
+    return i.reg===t[0]&&i.sgg===t[1]&&i.sgg2===t[2];
+  });
+}
+function ipDraw(){
+  const R=ipRows(), ms=P.months;
+  const key=m=>IP.grp==='m'?m:(m.slice(0,4)+(+m.slice(5)<=6?' 상반기':' 하반기'));
+  const labels=[...new Set(ms.map(key))]; const agg={}; let und=0;
+  R.forEach(i=>{ if(ms.includes(i.ym)) agg[key(i.ym)]=(agg[key(i.ym)]||0)+i.n; else und+=i.n; });
+  const vals=labels.map(l=>agg[l]||0);
+  if(pBar) pBar.destroy();
+  pBar=new Chart($('ip_bar'),{type:'bar',data:{labels:labels.map(l=>IP.grp==='m'?l.replace('-','.'):l),
+    datasets:[{data:vals,backgroundColor:'#0e9aa7',borderWidth:0,maxBarThickness:40}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},
+      tooltip:{callbacks:{label:c=>` ${c.raw.toLocaleString()}세대`}}},
+      scales:{x:{ticks:{font:{size:10},maxRotation:IP.grp==='m'?60:0}},y:{beginAtZero:true,ticks:{font:{size:10},callback:v=>v.toLocaleString()},grid:{color:'#eef1f4'}}}},
+    plugins:[{id:'ipLbl',afterDatasetsDraw(ch){if(IP.grp!=='h')return;const {ctx}=ch;ctx.save();ctx.textAlign='center';ctx.font='bold 11px sans-serif';ctx.fillStyle='#333';
+      ch.getDatasetMeta(0).data.forEach((b,i)=>{if(vals[i])ctx.fillText(vals[i].toLocaleString(),b.x,b.y-5);});ctx.restore();}}]});
+  const byY={}; R.forEach(i=>{const y=i.ym.slice(0,4); byY[y]=(byY[y]||0)+i.n;});
+  const tot=R.reduce((a,i)=>a+i.n,0);
+  $('ip_sum').innerHTML=`<b>${E(IP.reg)}</b> ${IP.kind?E(IP.kind)+' ':''}· 단지 <b>${R.length}</b>곳 · <b>${tot.toLocaleString()}</b>세대 (${P.base}) · `
+    +Object.keys(byY).sort().map(y=>`${y}년 <b>${byY[y].toLocaleString()}</b>`).join(' · ')
+    +(und?` · 입주월 미정 ${und.toLocaleString()}`:'')+` · 월평균 <b>${Math.round(tot/ms.length).toLocaleString()}</b>세대`;
+  const rows=R.slice().sort((a,b)=>a.ym.localeCompare(b.ym)||b.n-a.n);
+  $('ip_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${['입주월','단지','지역','유형','세대'].map(h=>`<th style="padding:4px 8px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap">${h}</th>`).join('')}</tr></thead><tbody>${
+    rows.map(i=>`<tr style="border-bottom:1px solid #f2f4f7" title="${E(i.addr||'')}"><td style="padding:3px 8px;white-space:nowrap">${E(i.ym.replace('-','.'))}</td>
+      <td style="padding:3px 8px"><b>${E(i.name)}</b> <a href="https://map.naver.com/p/search/${encodeURIComponent((i.addr||'').replace(/\s*\d+-\d+$/,'').replace(/-0$/,''))}" target="_blank" rel="noopener" title="네이버지도">📍</a><br><span class="note" style="font-size:11px">${E(i.addr||'')}</span></td>
+      <td style="padding:3px 8px;white-space:nowrap">${E(i.reg)} ${E(i.sgg||'')}${i.sgg2?' '+E(i.sgg2):''}</td>
+      <td style="padding:3px 8px;color:${i.kind==='임대'?'#8a93a0':'#0f766e'}">${E(i.kind||'')}</td>
+      <td style="padding:3px 8px;text-align:right;font-weight:700">${i.n.toLocaleString()}</td></tr>`).join('')}</tbody></table>`;
+}
+function ipControls(){
+  const regs=['전국'].concat(Object.keys(P.sido).filter(k=>k!=='전국').sort(),
+    Object.keys(P.sgg).sort((a,b)=>a.localeCompare(b,'ko')));
+  $('ip_reg').innerHTML=regs.map(r=>`<option value="${E(r)}"${r===IP.reg?' selected':''}>${E(r)}</option>`).join('');
+  $('ip_reg').onchange=e=>{IP.reg=e.target.value; ipDraw(); syncQ();};
+  const syncQ=()=>$('ip_quick').querySelectorAll('button').forEach(b=>b.classList.toggle('on',b.dataset.v===IP.reg));
+  $('ip_quick').querySelectorAll('button').forEach(b=>b.onclick=()=>{IP.reg=b.dataset.v;$('ip_reg').value=IP.reg;syncQ();ipDraw();}); syncQ();
+  const seg=(id,cur,set)=>$(id).querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===cur);b.onclick=()=>{set(b.dataset.v);seg(id,b.dataset.v,set);ipDraw();};});
+  seg('ip_kind',IP.kind,v=>IP.kind=v); seg('ip_grp',IP.grp,v=>IP.grp=v);
+}
+async function ipLoad(){
+  if(P){ setTimeout(()=>pBar&&pBar.resize(),60); return; }
+  try{
+    const r=await fetch('/api/db/ipju'); if(!r.ok) throw new Error('HTTP '+r.status);
+    P=await r.json(); if(!P.items) throw new Error('데이터 없음');
+    $('ip_asof').textContent=`${P.src} · 수집 ${P.asof} · 기준 ${P.base}`;
+    ipControls(); ipDraw();
+  }catch(e){ $('ip_sum').textContent='입주예정 데이터를 불러오지 못했습니다 ('+e.message+')'; }
 }
 })();

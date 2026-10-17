@@ -580,6 +580,7 @@
       <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
       <button class="tab"    data-pane="p_gl" style="background:#b45309;border-color:#b45309;color:#fff">🥇 금 선행<small style="color:#fde68a">실질금리·달러·통설검증 신호등</small></button>
       <button class="tab"    data-pane="p_bd" style="background:#1e40af;border-color:#1e40af;color:#fff">📜 채권<small style="color:#bfdbfe">금리 고점 체크리스트·ETF</small></button>
+      <button class="tab"    data-pane="p_dv" style="background:#9a3412;border-color:#9a3412;color:#fff">💰 배당<small style="color:#fed7aa">KR·US 배당주 지도 · 타이밍</small></button>
       <button class="tab" id="tab_vis" data-pane="p_vis" style="display:none">방문자<small>접속 통계 · 관리자</small></button>
     </div>
     <div class="hdr-r"><button class="hbtn" id="side_tgl" title="보고서 아카이브 · APK · DB 인벤토리">📚 자료</button>
@@ -975,6 +976,21 @@
     </div>
   </div>
 
+  <!-- (2026-10-17) 💰 배당 탭 — div.js · 데이터 scripts/fetch_dividend.py (매일 08:10) -->
+  <div class="pane" id="p_dv" style="overflow:auto">
+    <h2>💰 배당주 지도 — 한국 · 미국 <em id="dv_asof"></em></h2>
+    <div class="note" style="margin:-4px 0 10px;line-height:1.7">한경MONEY 2026.10 '배당 여력 4배로… 이번 가을 배당주 지도' 프레임: <b>배당수익률만 보고 고르면 낭패 — 배당을 계속 지급할 이익과 현금이 있는지, 배당성향·이력은 어떤지, 배당락 이후 주가는 어떤지</b>를 함께 봐야 한다.
+      그 체크리스트 4가지를 종목별로 자동 판정하고, 예상 배당률·배당 주기·다음 배당락일·배당락 폭·연속증가 연수·3년 배당성장률·분리과세 적격(KR)·5년 최대낙폭(US)을 한 줄에 둔다. 스크리너 풀 + DART 배당공시(KR 5개년) + 야후 배당 이벤트(실제 배당락일) 기반. 투자권유 아님.</div>
+    <div class="box" style="padding:12px 14px;margin-bottom:10px" id="dv_env"></div>
+    <h3>🇰🇷 한국 배당주 <span class="note" id="dv_counts"></span></h3>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px;overflow-x:auto" id="dv_kr"></div>
+    <h3>🇺🇸 미국 배당주</h3>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px;overflow-x:auto" id="dv_us"></div>
+    <h3>📅 월배당 달력 조합 <span class="note">미국 분기배당 지급월 그룹 — 한 종목씩 섞으면 매월 수령</span></h3>
+    <div style="margin-bottom:10px" id="dv_cal"></div>
+    <h3>🧺 고배당·커버드콜 ETF (국내 상장)</h3>
+    <div class="box" style="padding:10px 12px;margin-bottom:10px" id="dv_etf"></div>
+  </div>
   <!-- (2026-10-17) 📜 채권 탭 — bonds.js · 데이터 scripts/fetch_bonds.py (매일 07:40, 기존 DB 재사용) -->
   <div class="pane" id="p_bd" style="overflow:auto">
     <h2>📜 채권 — 금리 고점은 언제 확인되나 <em id="bd_asof"></em></h2>
@@ -1547,6 +1563,24 @@
       <div style="position:relative;height:300px"><canvas id="hs_line"></canvas></div>
     </div>
     <div id="hs_tbl" style="overflow:auto;margin-top:8px"></div>
+
+    <!-- (2026-10-17) 입주예정 물량 — scripts/ipju.py (주 1회 월 08:05, data.go.kr 15111714 부동산원·부동산114 반기 추정) -->
+    <h3 style="margin:22px 0 4px;font-size:14px">입주예정 물량 — 향후 2년, 단지별 <em id="ip_asof" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h3>
+    <p class="note" style="margin:0 0 6px;line-height:1.6;font-size:12px">
+      위 착공이 3년 뒤 입주로 이어지는지 단지 단위로 본다. 한국부동산원·부동산114 공동 추정(30세대 이상 공동주택, 임대·도시형 포함)이라
+      '아파트만' 센 언론 수치보다 크다(서울 2027년: 여기 2.2만 vs 기사 1.8만). 반기마다 갱신, 기준시점 이후 일정 변경은 미반영.
+    </p>
+    <div class="rs_ctl">
+      <span>지역 <select id="ip_reg"></select></span>
+      <span class="rs_seg" id="ip_quick"><button data-v="서울">서울</button><button data-v="경기 성남시">성남</button><button data-v="경기 성남시 분당구">분당</button><button data-v="경기 용인시 수지구">수지</button><button data-v="경기">경기</button><button data-v="전국">전국</button></span>
+      <span class="rs_seg" id="ip_kind"><button data-v="">전체</button><button data-v="분양">분양</button><button data-v="임대">임대</button></span>
+      <span class="rs_seg" id="ip_grp"><button data-v="m">월별</button><button data-v="h">반기별</button></span>
+    </div>
+    <div id="ip_sum" class="note" style="margin:0 0 6px;font-size:12.5px"></div>
+    <div style="display:grid;grid-template-columns:minmax(360px,5fr) minmax(360px,6fr);gap:14px;align-items:start">
+      <div style="position:relative;height:280px"><canvas id="ip_bar"></canvas></div>
+      <div id="ip_tbl" style="overflow:auto;max-height:420px"></div>
+    </div>
   </div>
 
   <!-- (2026-08-23) 🔮 RE 예측 페인 — scripts/repred.py (매일 08:10) · re.js
@@ -2391,14 +2425,14 @@
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/resh.js?v=09201410"></script><!-- (2026-09-20) 부동산시황 탭 -->
+<script src="/resh.js?v=10172030"></script><!-- (2026-09-20) 부동산시황 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script>
 <script src="/ct.js?v=20260920a"></script><!-- (2026-09-20) 셀트리온 탭 --><!-- (2026-09-01) 이익성장 모니터링 탭 -->
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10172000"></script><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><script src="/bonds.js?v=10172000"></script><script src="/div.js?v=10172100"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
