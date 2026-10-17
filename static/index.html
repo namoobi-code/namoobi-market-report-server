@@ -55,7 +55,8 @@
   .cbox canvas{height:100%!important;max-height:none!important}
   /* (2026-09-05) 코인 선행지표 카드 스파크 — 전역 canvas 200px 캡 해제(90px 컨테이너에 맞춤. 캡 때문에 판정 텍스트를 덮었다 — 실측) */
   #p_cl .clsp canvas{height:100px!important;max-height:100px!important}
-  [id^="sw_cv_reg_"]{height:100%!important;max-height:none!important} /* (2026-09-07) 점유율(업무) 권역별 큰 카드 — 전역 200px 캡 해제, 부모 div 높이(clamp 42vw)를 따른다 */
+  [id^="sw_cv_reg_"]{height:100%!important;max-height:none!important}
+  #kc_cn_cv{height:240px!important;max-height:none!important} /* (2026-10-17) 대중국 수출 차트 — 전역 200px 캡 해제 */ /* (2026-09-07) 점유율(업무) 권역별 큰 카드 — 전역 200px 캡 해제, 부모 div 높이(clamp 42vw)를 따른다 */
   #gm_cv{height:600px!important;max-height:none!important}   /* 글로벌시황 상세차트 — 전역 200px 캡 해제 */
   #re_rt_big{height:680px!important;max-height:none!important} /* 부동산 지역비교 대형차트 — 동일 캡 해제 */
   /* (2026-08-16) 통합차트 — 지표를 여러 개 겹치면 세로가 좁아 선이 뭉친다. 캔버스 높이 캡 해제 */
@@ -951,6 +952,12 @@
     </div>
 
     <!-- (2026-09-05) K푸드 전용 — 라면 글로벌 위상 카드 (이코노미스트 커버스토리 'K라면 열풍, 진짜일까' 반영 · kcons.js 정적 렌더) -->
+    <!-- (2026-10-17) 대중국 수출 선행 — 이코노미스트 'K브랜드, 다시 중국으로' -->
+    <h3 id="kc_cn_h3">🇨🇳 대중국 수출 선행 <span class="note">통관 → 현지판매 → 분기공시 순이라 통관이 실적을 2~4개월 선행 · 테마 품목별 대중국 월 수출 · YoY 전환 플래그 · 중국 비중</span></h3>
+    <div class="box" id="kc_cn_box" style="padding:12px 14px">
+      <div style="height:240px"><canvas id="kc_cn_cv"></canvas></div>
+      <div id="kc_cn" style="margin-top:10px"></div>
+    </div>
     <h3 id="kc_rm_h3">라면 글로벌 위상 <span class="note">K푸드 전용 · '수출 사상 최대 vs 점유 한 자릿수' 갭 — 분기 갱신(이코노미스트 2026-09 커버스토리)</span></h3>
     <div class="box" id="kc_rm_box" style="padding:12px 14px"><div id="kc_rm"></div></div>
 
@@ -2369,7 +2376,7 @@
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
 <script src="/cryptolead.js?v=09201200"></script><script src="/goldlead.js?v=09221200"></script><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
-<script src="/kcons.js?v=09051933"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
+<script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=09040500"></script>
 <script src="/share.js?v=09080120"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}

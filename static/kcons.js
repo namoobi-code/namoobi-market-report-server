@@ -6,7 +6,7 @@
              국내 관심도는 기존 Trends 탭(구글·유튜브·네이버쇼핑)을 보조지표로 쓴다. */
 (function(){
 'use strict';
-let D=null, TH='K뷰티', MODE='idx', ch1=null, ch2=null;   // MODE: idx(지수)|abs(절대값) — 화장품이 축을 지배해 소품목 급등이 안 보이는 문제(2026-08-29 피드백)
+let D=null, CN=null, TH='K뷰티', MODE='idx', ch1=null, ch2=null, chCn=null;   // MODE: idx(지수)|abs(절대값) — 화장품이 축을 지배해 소품목 급등이 안 보이는 문제(2026-08-29 피드백)
 
 // 품목 → 관련 종목 매핑 (연동 논리 — 직결 상장사가 없으면 정직하게 표기)
 const ITEM_MAP={
@@ -107,6 +107,7 @@ function render(){
   //     아마존·세포라는 K뷰티 전용 데이터 — K푸드·K패션 선택 시 섹션 숨김(사용자 피드백)
   const showRet=(TH==='K뷰티');
   ['kc_ret_h3','kc_ret_box'].forEach(id=>{const el=$(id); if(el) el.style.display=showRet?'':'none';});
+  renderCn();
   /* (2026-09-05) K푸드 전용 — 라면 글로벌 위상 카드. 이코노미스트 커버스토리 실측 전재:
      '수출 사상 최대(+28%)인데 글로벌 점유는 한 자릿수'라는 갭이 투자 논점. 분기 갱신. */
   const showRm=(TH==='K푸드');
@@ -189,13 +190,65 @@ function render(){
   }
 }
 
+/* ── (2026-10-17) 🇨🇳 대중국 수출 선행 — 이코노미스트 'K브랜드, 다시 중국으로' 커버 반영 ──
+   중국 매출은 통관(월) → 현지 판매 → 분기 공시 순으로 드러나므로 통관이 실적을 2~4개월 선행한다.
+   표: 품목별 최신월 대중국 수출·YoY·3개월 YoY·중국 비중(전세계 대비)·연속 YoY+ 개월 → '전환' 플래그.
+   한계: 품목별이지 회사별이 아니다 — 비중 큰 중소형주일수록 신호가 선명(설명에 명시). */
+function renderCn(){
+  const box=$('kc_cn'); if(!box) return;
+  if(!CN||!CN.items){ box.innerHTML='<div class="note">대중국 수출 데이터 수집 전(매일 08:50)</div>'; return; }
+  const ms=CN.months, n=ms.length-1;
+  const rows=CN.items.filter(x=>x.th===TH);
+  ['kc_cn_h3','kc_cn_box'].forEach(id=>{const el=$(id); if(el) el.style.display=rows.length?'':'none';});
+  if(!rows.length) return;
+  const sum=(a,i,j)=>{const s=a.slice(i,j+1); return s.some(v=>v==null)?null:s.reduce((x,y)=>x+y,0);};
+  const stat=rows.map(x=>{
+    const e=x.exp, y1=yoy(e,n);
+    const s3=sum(e,n-2,n), p3=sum(e,n-14,n-12), y3=(s3!=null&&p3)?(s3/p3-1)*100:null;
+    let run=0; for(let i=n;i>=12;i--){ const v=yoy(e,i); if(v!=null&&v>0) run++; else break; }
+    let neg=0; for(let i=n;i>=12;i--){ const v=yoy(e,i); if(v!=null&&v<=0) neg++; else break; }
+    const sh=(x.tot&&x.tot[n])?e[n]/x.tot[n]*100:null;
+    const sh12=(x.tot&&x.tot[n-12]&&e[n-12]!=null)?e[n-12]/x.tot[n-12]*100:null;
+    // 전환 판정: 직전 3개월+ YoY 연속 플러스이고 그 앞이 마이너스였으면 '🔼 전환', 연속 6개월+면 '📈 추세'
+    let flag='';
+    if(run>=6) flag='📈 추세(+'+run+'개월)';
+    else if(run>=3){ const before=yoy(e,n-run); flag=(before!=null&&before<=0)?'🔼 전환(+'+run+'개월)':'▲ +'+run+'개월'; }
+    else if(neg>=6) flag='📉 침체('+neg+'개월)';
+    return {x,y1,y3,run,sh,sh12,flag};
+  });
+  // 차트: 테마 품목 대중국 수출 지수(3년 전=100) + 최상위 품목 중국 비중
+  if(chCn){try{chCn.destroy();}catch(e){}}
+  const cv=$('kc_cn_cv');
+  if(cv) chCn=new Chart(cv,{type:'line',data:{labels:ms,datasets:rows.map((x,i)=>{
+      const b=x.exp.find(v=>v)||1;
+      return {label:x.nm+' (대중국)',data:x.exp.map(v=>v==null?null:+(v/b*100).toFixed(1)),borderColor:ITEM_COLORS[i%ITEM_COLORS.length],backgroundColor:'transparent',pointRadius:0,borderWidth:1.6,spanGaps:true};})},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:13,font:{size:10.5}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+c.raw}}},
+      scales:{x:{ticks:{maxTicksLimit:13,font:{size:10},maxRotation:0}},y:{ticks:{font:{size:10}},title:{display:true,text:'대중국 월 수출 지수 (첫 달=100)',font:{size:10}}}}}});
+  box.innerHTML=`<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%">
+    <thead><tr style="background:#f8fafc">${['품목','HS','최신월 대중국','YoY','3M YoY','중국 비중','비중 1년전','판정','관련 종목'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px">${h}</th>`).join('')}</tr></thead>
+    <tbody>${stat.map(({x,y1,y3,sh,sh12,flag})=>`<tr style="${/전환|추세/.test(flag)?'background:#fff7ed':''}">
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:700;white-space:nowrap">${x.nm}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#64748b">${x.hs}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;font-weight:700">$${(x.exp[n]/1000).toFixed(1)}M</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(y1)}">${pf(y1)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(y3)};font-weight:700">${pf(y3)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${sh==null?'—':sh.toFixed(1)+'%'}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:#64748b">${sh12==null?'—':sh12.toFixed(1)+'%'}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;white-space:nowrap;font-weight:${flag?700:400}">${flag||'—'}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#334155;font-size:11.5px">${x.note||''}</td></tr>`).join('')}</tbody></table>
+    <div class="note" style="margin-top:6px">기준 ${ms[n]} · 관세청 품목별+국가별(수출 천$) · 매일 08:50 수집, 월 확정치는 익월 15일경 반영 · 중국 비중 = 대중국 ÷ 전세계(K-수출 탭 동일 산식, 의류·가방·신발은 전세계 미수집) ·
+      <b>판정</b>: 🔼 전환 = YoY 3개월 이상 연속 플러스로 돌아섬(그 앞은 마이너스) · 📈 추세 = 6개월 이상 · 📉 침체 = 6개월 이상 마이너스.
+      ⚠ 품목 합계라 회사별이 아님 — 해당 품목 매출 비중이 큰 종목일수록 신호가 선명. 전환 품목은 관련 종목의 다음 분기 중국 매출(DART 지역별·종속법인 요약재무)로 확인.</div>`;
+}
+
 function load(force){
   if(D&&!force){ render(); return; }
   $('kc_asof').textContent='불러오는 중…';
-  fetch('/api/db/kcons',{cache:'no-cache'}).then(r=>{
-    if(!r.ok) throw new Error('HTTP '+r.status);
-    return r.json();
-  }).then(j=>{ D=j; render(); })
+  Promise.all([
+    fetch('/api/db/kcons',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }),
+    fetch('/api/db/cn_export',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null)   // (2026-10-17) 대중국 수출 선행
+  ]).then(([j,c])=>{ D=j; CN=c; render(); })
   .catch(e=>{ $('kc_asof').textContent='로드 실패: '+e.message+' (서버 수집 전이면 다음 06:25 이후 표시)'; });
 }
 
