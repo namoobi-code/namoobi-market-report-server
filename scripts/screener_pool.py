@@ -296,19 +296,40 @@ def _enrich_us(us):
     op,crumb=T.yahoo_opener()
     import urllib.parse as _up
     _p2=int(time.time()); _p1=_p2-5*365*24*3600
-    def _op3neg_us(sym):
-        """fundamentals-timeseries annualOperatingIncome → 연속 영업적자 연수(0=아님)."""
+    _TS_CACHE={}
+    def _ts_fin(sym):
+        """(2026-10-17) fundamentals-timeseries 한 번에 3종 — 영업이익(연속적자용)·이자비용·영업현금흐름.
+        quoteSummary incomeStatementHistory 는 2026-10 실측 전부 None(사실상 폐기)이라 이 엔드포인트가 유일.
+        {type: [(asOfDate, raw)...]} 연도 오름차순."""
+        if sym in _TS_CACHE: return _TS_CACHE[sym]
+        out={}
         try:
             t=T.jget(f"https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/{sym}"
-                     f"?symbol={sym}&type=annualOperatingIncome&period1={_p1}&period2={_p2}&crumb={_up.quote(crumb)}",opener=op,timeout=12)
-            res=(t.get("timeseries",{}) or {}).get("result",[]) or []
-            for r0 in res:
-                arr=r0.get("annualOperatingIncome") or []
-                vals=[(x.get("reportedValue",{}) or {}).get("raw") for x in arr if x]
-                vals=[x for x in vals if x is not None]
-                if vals: return _neg_streak(vals)
+                     f"?symbol={sym}&type=annualOperatingIncome,annualInterestExpense,annualOperatingCashFlow"
+                     f"&period1={_p1}&period2={_p2}&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+            for r0 in ((t.get("timeseries",{}) or {}).get("result",[]) or []):
+                for k in ("annualOperatingIncome","annualInterestExpense","annualOperatingCashFlow"):
+                    if k in r0:
+                        out[k]=[(x.get("asOfDate"),(x.get("reportedValue") or {}).get("raw")) for x in (r0[k] or []) if x and (x.get("reportedValue") or {}).get("raw") is not None]
         except Exception: pass
-        return None
+        _TS_CACHE[sym]=out
+        return out
+    def _op3neg_us(sym):
+        """annualOperatingIncome → 연속 영업적자 연수(0=아님)."""
+        vals=[v for _,v in (_ts_fin(sym).get("annualOperatingIncome") or [])]
+        return _neg_streak(vals) if vals else None
+    def _finq_us(sym):
+        """(2026-10-17) ICR·OCF/영업이익 — 같은 결산연도(asOfDate)끼리만 짝지운다.
+        애플은 이자비용을 2023 이후 따로 공시하지 않아 최신 영업이익(2025)과 연도가 안 맞으면 ICR None(정직하게 비움)."""
+        d=_ts_fin(sym)
+        oi=d.get("annualOperatingIncome") or []; ie=d.get("annualInterestExpense") or []; cf=d.get("annualOperatingCashFlow") or []
+        if not oi: return {}
+        yd,ov=oi[-1]; out={}
+        iev=next((v for a,v in ie if a==yd),None)
+        if iev and abs(iev)>0 and ov is not None: out["icr"]=round(ov/abs(iev),1)
+        cfv=next((v for a,v in cf if a==yd),None)
+        if cfv is not None and ov and ov>0: out["ocfop"]=round(cfv/ov,2)
+        return out
     def _eps_rev(fd):
         """EPS 추정치 리비전: FY1(0y)·FY2(+1y) 컨센 EPS의 90일 변화율 평균."""
         et=(fd.get("earningsTrend") or {}).get("trend",[]) or []
@@ -390,20 +411,15 @@ def _enrich_us(us):
         for att in range(3):
             try:
                 j=T.jget(f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{r['c']}"
-                         f"?modules=financialData,assetProfile,earningsTrend,earningsHistory,summaryDetail,defaultKeyStatistics,incomeStatementHistory&crumb={_up.quote(crumb)}",opener=op,timeout=12)
+                         f"?modules=financialData,assetProfile,earningsTrend,earningsHistory,summaryDetail,defaultKeyStatistics&crumb={_up.quote(crumb)}",opener=op,timeout=12)
                 fd=(j["quoteSummary"]["result"] or [{}])[0]
                 fdd=fd.get("financialData",{}); ap=fd.get("assetProfile",{}); sd=fd.get("summaryDetail",{})
                 ks=fd.get("defaultKeyStatistics",{})   # (2026-07-24) US 수급 프록시 — 공매도잔량·커버일수·기관보유
                 def v(x): return (x or {}).get("raw") if isinstance(x,dict) else x
                 # (2026-10-17) 재무건전성 2종 — ICR(영업이익/이자비용)·OCF/영업이익 (한경MONEY 김학균 4대 지표)
-                #   operatingCashflow 는 financialData, interestExpense·operatingIncome 은 incomeStatementHistory[0](최근 연간).
-                #   Yahoo 는 interestExpense 를 음수로 주는 종목이 있어 abs. 이자비용 0/미공시면 ICR None(무차입은 '—' 로 정직하게).
-                _ish=((fd.get("incomeStatementHistory") or {}).get("incomeStatementHistory") or [{}])[0]
-                _ie=v(_ish.get("interestExpense")); _oi=v(_ish.get("operatingIncome")); _ocf=v(fdd.get("operatingCashflow"))
-                _ie=abs(_ie) if _ie else None
-                _icr=(round(_oi/_ie,1) if (_ie and _oi is not None) else None)
-                _ocfop=(round(_ocf/_oi,2) if (_ocf is not None and _oi and _oi>0) else None)
-                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),"icr":_icr,"ocfop":_ocfop,
+                #   (수정) quoteSummary incomeStatementHistory 는 전부 None → fundamentals-timeseries(_finq_us)로 교체. 호출 수 증가 없음(_op3neg_us 와 캐시 공유).
+                _fq=_finq_us(r["c"])
+                return {**r,"sector":ap.get("sector"),"payout":v(sd.get("payoutRatio")),"icr":_fq.get("icr"),"ocfop":_fq.get("ocfop"),
                         "sr_f":v(ks.get("shortPercentOfFloat")),"scov":v(ks.get("shortRatio")),
                         "inst":v(ks.get("heldPercentInstitutions")),
                         "opm":v(fdd.get("operatingMargins")),"psr":v(sd.get("priceToSalesTrailing12Months")),
