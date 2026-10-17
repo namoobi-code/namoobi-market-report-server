@@ -31,11 +31,13 @@ def log(m): print(m, flush=True)
 # (2026-10-17 사용자 지적 "왜 초단기 ETF 는 없나") 기사의 '현금성 10%' = 파킹형(KOFR·CD금리). 야후 가격이 누적형 금리를 제대로 반영하는
 # 종목만 채택(실측: TIGER CD금리 1y +2.78%·TIGER KOFR +2.02% 정상 / KODEX KOFR·CD 는 +0.0x% 로 야후 데이터 결함 → 제외).
 # 미국 SGOV·BIL 은 월 분배형이라 가격이 평평 — 수익은 분배금(연 4%대). 화면 주석으로 안내.
-ETFS_KR = [("357870.KS", "TIGER CD금리투자KIS", "초단기·파킹(CD 91일)"), ("449170.KS", "TIGER KOFR금리액티브", "초단기·파킹(KOFR)"),
-           ("148070.KS", "KOSEF 국고채10년", "국내 장기"), ("114260.KS", "KODEX 국고채3년", "국내 단기"),
-           ("439870.KS", "KODEX 국고채30년액티브", "국내 초장기"), ("385560.KS", "RISE KIS국고채30년Enhanced", "국내 초장기"),
-           ("273130.KS", "KODEX 종합채권(AA-이상)액티브", "국내 회사채 혼합"), ("305080.KS", "TIGER 미국채10년선물", "미국 장기(KR상장)"),
-           ("453850.KS", "ACE 미국30년국채액티브(H)", "미국 초장기(KR상장·환헤지)"), ("304660.KS", "KODEX 미국채울트라30년선물(H)", "미국 초장기(KR상장·환헤지)")]
+ETFS_KR = [  # (2026-10-17 사용자 지적 "국고채 1년은 왜 뺐냐") 만기 사다리 순 — 파킹 → 1년 이내 → 3년 → 10년 → 30년 → 회사채 → 미국채(KR상장)
+           ("423160.KS", "KODEX KOFR금리액티브", "초단기·파킹(KOFR 하루)"), ("357870.KS", "TIGER CD금리투자KIS", "초단기·파킹(CD 91일)"),
+           ("153130.KS", "KODEX 단기채권", "단기 1년 이내(국공채·은행채)"), ("157450.KS", "TIGER 단기통안채", "단기 1년 이내(통안채)"),
+           ("114260.KS", "KODEX 국고채3년", "국고채 3년"), ("471230.KS", "KODEX 국고채10년액티브", "국고채 10년"),
+           ("439870.KS", "KODEX 국고채30년액티브", "국고채 30년"), ("385560.KS", "RISE KIS국고채30년Enhanced", "국고채 30년(강화)"),
+           ("273130.KS", "KODEX 종합채권(AA-이상)액티브", "우량 회사채 혼합"), ("305080.KS", "TIGER 미국채10년선물", "미국 10년(KR상장)"),
+           ("453850.KS", "ACE 미국30년국채액티브(H)", "미국 30년(KR상장·환헤지)"), ("304660.KS", "KODEX 미국채울트라30년선물(H)", "미국 초장기(KR상장·환헤지)")]
 ETFS_US = [("SGOV", "iShares 0-3M T-Bill", "초단기·파킹(월분배)"), ("BIL", "SPDR 1-3M T-Bill", "초단기·파킹(월분배)"), ("SHY", "iShares 1-3Y Treasury", "미국 단기"), ("IEF", "iShares 7-10Y Treasury", "미국 중기"),
            ("TLT", "iShares 20+Y Treasury", "미국 장기"), ("EDV", "Vanguard Ext. Duration", "미국 초장기"),
            ("TIP", "iShares TIPS", "물가연동"), ("LQD", "iShares IG Corp", "우량 회사채"),
@@ -107,6 +109,13 @@ def etfs():
     import ta_screen as T
     op, _ = T.yahoo_opener()
     rows = []
+    # 국내 ETF 수익률은 야후가 금리형(KOFR·CD·단기채) 가격 누적을 못 잡는다(실측 KODEX KOFR 1y +0.06% vs 실제 +2.71%).
+    # → 우리 ETF 풀(etf_pool.json · 다음금융)을 정본으로 쓰고 야후는 스파크(추세선)만.
+    pool = {}
+    try:
+        for r in (jload(DB / "etf_pool.json").get("kr") or []):
+            pool[str(r.get("c"))] = r
+    except Exception: pass
     for lst, mk in ((ETFS_KR, "kr"), (ETFS_US, "us")):
         syms = [s for s, _, _ in lst]
         u = "https://query1.finance.yahoo.com/v7/finance/spark?symbols=%s&range=1y&interval=1d" % _up.quote(",".join(syms))
@@ -120,15 +129,27 @@ def etfs():
             if s: got[r0.get("symbol")] = s
         for sym, nm, grp in lst:
             s = got.get(sym)
-            if not s: rows.append({"sym": sym, "name": nm, "grp": grp, "mk": mk}); continue
+            if not s:
+                pr = pool.get(sym.split(".")[0]) if mk == "kr" else None
+                if pr and pr.get("px"):
+                    rows.append({"sym": sym, "name": nm, "grp": grp, "mk": mk, "cur": pr["px"], "src": "pool",
+                                 "m1": pr.get("r1m") and round(pr["r1m"]*100, 2), "m3": pr.get("r3m") and round(pr["r3m"]*100, 2),
+                                 "m6": pr.get("r6m") and round(pr["r6m"]*100, 2), "y1": pr.get("r1y") and round(pr["r1y"]*100, 2)})
+                else: rows.append({"sym": sym, "name": nm, "grp": grp, "mk": mk})
+                continue
             cur = s[-1][1]
             def ret(n):
                 p = last_n(s, n)
                 if p is None and n >= 365 and len(s) > 200: p = s[0][1]   # range=1y 가 365일에 며칠 못 미쳐 1년 수익률이 비던 결함(SGOV·BIL 실측)
                 return round((cur / p - 1) * 100, 2) if p else None
-            rows.append({"sym": sym, "name": nm, "grp": grp, "mk": mk, "cur": cur, "d": s[-1][0],
-                         "w1": ret(7), "m1": ret(30), "m3": ret(91), "m6": ret(182), "y1": ret(365),
-                         "spark": [v for _, v in s[::max(1, len(s) // 60)]]})
+            row = {"sym": sym, "name": nm, "grp": grp, "mk": mk, "cur": cur, "d": s[-1][0],
+                   "w1": ret(7), "m1": ret(30), "m3": ret(91), "m6": ret(182), "y1": ret(365),
+                   "spark": [v for _, v in s[::max(1, len(s) // 60)]]}
+            pr = pool.get(sym.split(".")[0]) if mk == "kr" else None
+            if pr and pr.get("px"):
+                row.update(cur=pr["px"], src="pool", **{k: (round(pr[k] * 100, 2) if pr.get(k) is not None else None) for k in ("r1m", "r3m", "r6m", "r1y")})
+                row["m1"], row["m3"], row["m6"], row["y1"] = row.pop("r1m"), row.pop("r3m"), row.pop("r6m"), row.pop("r1y")
+            rows.append(row)
         time.sleep(0.5)
     return rows
 

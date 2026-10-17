@@ -111,9 +111,15 @@ META = {
     "ln_corp_s": ("신규 중소기업대출 금리",  "%",  "L", "M", "한국은행 ECOS 121Y006", "1996~"),
     "ln_jeonse": ("신규 전세자금대출 금리",  "%",  "L", "M", "한국은행 ECOS 121Y006",
                   "보증부 전세자금대출 · 2015~"),
+    # (2026-10-17 추가) 유동성 — 고준석 인터뷰(한경머니 2026.10): "금리가 올라도 M2 가 작년 +170조,
+    #   올해 6월까지 +120조, 주담대 상반기 +20조 늘었다 → 돈이 부동산으로 흐른다". 금리(원인)와 나란히 본다.
+    "m2":       ("M2 통화량(평잔·계절조정)", "조원", "R", "M", "한국은행 ECOS 161Y005",
+                 "광의통화 평잔 · 계절조정 · 2003.10~ · 표시방식 '전년비'로 보면 유동성 증가율"),
+    "hloan":    ("주택관련대출 잔액(예금취급기관)", "조원", "R", "M", "한국은행 ECOS 151Y005",
+                 "예금은행+비은행 주택담보·집단·전세대출 잔액 · 2007.12~ · 12개월 변화가 '한 해 늘어난 주담대'"),
 }
 GLOBAL_KEYS = ("rate_kr", "rate_us", "csi",
-               "ln_mtg", "ln_credit", "ln_corp_l", "ln_corp_s", "ln_jeonse")   # 지역 구분 없는 지표
+               "ln_mtg", "ln_credit", "ln_corp_l", "ln_corp_s", "ln_jeonse", "m2", "hloan")   # 지역 구분 없는 지표
 
 
 def _key(*names):
@@ -518,6 +524,12 @@ def main():
                       ("ln_jeonse", "BECBLA03041")]:
         D[key] = {"전국": ecos_monthly("121Y006", item)}
         time.sleep(0.3)
+    # 유동성 (2026-10-17) — 십억원 → 조원
+    for key, stat, item in [("m2", "161Y005", "BBHS00"), ("hloan", "151Y005", "11100A0")]:
+        raw = ecos_monthly(stat, item)
+        D[key] = {"전국": {t: round(v / 1000, 1) for t, v in raw.items() if v is not None}}
+        time.sleep(0.3)
+    print(f"    M2 {len(D['m2']['전국'])}개월 · 주택관련대출 {len(D['hloan']['전국'])}개월")
     print("    차주별 대출금리 " + " · ".join(f"{META[k][0][3:7]} {len(D[k]['전국'])}개월"
                                        for k in ("ln_mtg", "ln_credit", "ln_corp_l", "ln_corp_s", "ln_jeonse")))
 

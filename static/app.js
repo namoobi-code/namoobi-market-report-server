@@ -3089,7 +3089,7 @@ fetch('/api/apk').then(r=>r.json()).then(rs=>{
       {const e=$('rh_asof'); if(e) e.textContent=`${d.src||''} · 수집 ${d.asof||''}`;}
       /* 지역 구분이 없는 거시 지표는 어느 지역을 골라도 '전국' 계열을 쓴다 */
       /* 지역 구분 없는 지표 — 어느 지역을 골라도 전국 값. (2026-09-13) 차주별 대출금리 5종 추가 */
-      const GLOB=['rate_kr','rate_us','csi','ln_mtg','ln_credit','ln_corp_l','ln_corp_s','ln_jeonse'];
+      const GLOB=['rate_kr','rate_us','csi','ln_mtg','ln_credit','ln_corp_l','ln_corp_s','ln_jeonse','m2','hloan'];   // (2026-10-17) M2·주택관련대출
       const pick=(k,r)=>(D[k]||{})[GLOB.includes(k)?'전국':r];
       const axOf=k=>_rhAxis[k]||(M[k]||{}).axis||'R';
       const MODES=[['val','값'],['idx','지수'],['yoy','전년비']];
