@@ -151,16 +151,40 @@ def geocode(addr, typ="parcel"):
 
 
 def clean_jibun(addr):
-    """K-apt kaptAddr '경기도성남분당구분당동92풍림아이원빌라' 처럼 붙어 있고 단지명이 꼬리로 붙는다 →
-    시도/시군구/동/지번 복원. 실패하면 도로명으로."""
-    a = str(addr or "").replace(" ", "")
-    m = re.match(r"(서울특별시|서울|경기도)(.+?(?:구|시))?(?:(.+?(?:구)))?(.+?(?:동|가|읍|면)\d*)(산?\d+(?:-\d+)?)", a)
+    """K-apt kaptAddr → '시도 시군구 (구) 동 지번'. 두 형식이 섞여 있다(실측):
+       '서울특별시 양천구 신정동 311 목동10단지'(띄어쓰기 있음) · '경기도성남분당구분당동92풍림아이원빌라'(없음).
+       (2026-10-17 버그 수정) 띄어쓰기를 지우고 정규식으로 풀던 방식은 '신정동311' 에서 '동\\d*' 가 31 을 먹어 지번이 '1' 이 됐다
+       (실측: 지번 매칭 2,219→2,254 밖에 안 늘던 원인). 띄어쓰기가 있으면 토큰으로, 없을 때만 정규식."""
+    a = str(addr or "").strip()
+    if not a:
+        return None
+    t = a.split()
+    if len(t) >= 3:
+        sido = "서울특별시" if t[0].startswith("서울") else ("경기도" if t[0].startswith("경기") else t[0])
+        parts, dong_i = [sido], None
+        for i, tok in enumerate(t[1:], 1):
+            if re.search(r"(\d+가|동|읍|면|리)$", tok) and not tok.endswith("시"):
+                dong_i = i
+                break
+            parts.append(tok)
+        if dong_i is None:
+            return None
+        parts.append(t[dong_i])
+        jb = next((x for x in t[dong_i + 1:] if re.match(r"^산?\d+(-\d+)?-?$", x)), None)
+        if not jb:
+            return None
+        # '성남분당구' 처럼 시·구가 붙은 토큰 분리
+        fixed = []
+        for x in parts[1:-1]:
+            mm = re.match(r"(.+?)(분당구|수정구|중원구|수지구|기흥구|처인구)$", x)
+            fixed += [mm.group(1) + "시", mm.group(2)] if mm and not x.endswith("시") else [x]
+        return " ".join([parts[0]] + fixed + [parts[-1], jb.rstrip("-")])
+    a = a.replace(" ", "")
+    m = re.match(r"(서울특별시|서울|경기도)(.+?(?:구|시))?(?:(.+?(?:구)))?(.+?(?:\d+가|동|읍|면))(산?\d+(?:-\d+)?)", a)
     if not m:
         return None
     sido = "서울특별시" if m.group(1).startswith("서울") else "경기도"
-    g2 = m.group(2) or ""
-    g3 = m.group(3) or ""
-    # '성남분당구' → '성남시 분당구'
+    g2, g3 = m.group(2) or "", m.group(3) or ""
     if g2 and not g2.endswith("시") and g2.endswith("구") and sido == "경기도" and not g3:
         mm = re.match(r"(.+?)(분당구|수정구|중원구|수지구|기흥구|처인구)$", g2)
         if mm:
@@ -268,11 +292,14 @@ def norm_stations(raw):
     return out
 
 
-BAD_PK = ("입구", "주차", "화장실", "학교", "센터", "현장", "관리소", "회관", "유치원", "어린이집", "교회", "아파트", "빌라")
+BAD_PK = ("입구", "주차", "화장실", "학교", "센터", "현장", "관리소", "회관", "유치원", "어린이집", "교회", "아파트", "빌라",
+          "점", "육교", "지하보도", "포럼", "볼", "매점", "카페", "식당", "약국", "의원", "교습", "학원", "사무소", "정류")
 
 
 def norm_majors(raw):
-    return [m for m in raw if not any(b in m["nm"] for b in BAD_PK)]
+    """대규모 공원 지점 — 이름이 공원/하천/숲/습지/호수/운동장으로 끝나는 것만(상호·시설물 제거)."""
+    return [m for m in raw if not any(b in m["nm"] for b in BAD_PK)
+            and re.search(r"(공원|천|숲|습지|호수|운동장|둔치|생태|수목원|식물원|랜드)$", m["nm"])]
 
 
 def hav(x1, y1, x2, y2):
@@ -292,31 +319,40 @@ def load_prices():
         return {}
     ym = (date.today().replace(day=1).replace(year=date.today().year - 1)).strftime("%Y%m")
     cx = sqlite3.connect(APT_DB)
-    rows = cx.execute("SELECT a.sgg, a.umd, a.name, a.build_year, SUM(s.avg/s.ar*s.n), SUM(s.n), "
+    rows = cx.execute("SELECT a.sgg, a.umd, a.name, a.build_year, a.jibun, SUM(s.avg/s.ar*s.n), SUM(s.n), "
                       "SUM(CASE WHEN s.ar BETWEEN 80 AND 90 THEN s.avg*s.n END), SUM(CASE WHEN s.ar BETWEEN 80 AND 90 THEN s.n END) "
                       "FROM sale s JOIN apt a ON a.id=s.apt_id WHERE s.ym>=? AND s.ar>=20 AND s.avg>0 "
                       "GROUP BY a.id", (ym,)).fetchall()
     cx.close()
     by = defaultdict(list)
-    for sgg, umd, nm, by_, wp, n, p84, n84 in rows:
+    for sgg, umd, nm, by_, jb, wp, n, p84, n84 in rows:
         if sgg in SGG and n:
-            by[(sgg, umd)].append((norm(nm), by_, wp / n, n, (p84 / n84) if n84 else None, n84 or 0))
+            by[(sgg, umd)].append((norm(nm), by_, wp / n, n, (p84 / n84) if n84 else None, n84 or 0, norm_jibun(jb)))
     return by
 
 
-def match_price(PR, sgg, umd, name, use):
+def norm_jibun(j):
+    """'1722' · '1722-0' · '95-' → '1722' · '95' ; '72-3' 그대로"""
+    j = re.sub(r"\s", "", str(j or ""))
+    j = re.sub(r"-0*$", "", j)
+    return j
+
+
+def match_price(PR, sgg, umd, name, use, jibun=None):
+    """① 지번 일치(+준공 ±2년) ② 정규화 단지명 포함관계. (2026-10-17) 지번 매칭 추가 — K-apt '목동10단지' vs
+    실거래 '목동신시가지10단지'처럼 이름이 달라 1,500곳이 빠지던 것을 지번으로 잇는다."""
     cands = PR.get((sgg, umd)) or []
     nn = norm(name)
+    jb = norm_jibun(jibun)
     best = None
-    for anm, by_, ppsm, n, p84, n84 in cands:
-        if not anm or not nn:
+    for anm, by_, ppsm, n, p84, n84, ajb in cands:
+        yr_ok = not (use and by_ and abs(int(use[:4]) - by_) > 2)
+        if jb and ajb and jb == ajb and yr_ok:
+            sc = (2, n)
+        elif anm and nn and (anm == nn or (len(anm) >= 3 and (anm in nn or nn in anm))) and yr_ok:
+            sc = (1 if anm == nn else 0, n)
+        else:
             continue
-        ok = anm == nn or (len(anm) >= 3 and (anm in nn or nn in anm))
-        if not ok:
-            continue
-        if use and by_ and abs(int(use[:4]) - by_) > 2:
-            continue
-        sc = (anm == nn, n)
         if best is None or sc > best[0]:
             best = (sc, ppsm, n, p84, n84)
     return best[1:] if best else (None, 0, None, 0)
@@ -373,7 +409,7 @@ def main():
         pt = geocode(clean_jibun(v.get("addr"))) or geocode(re.sub(r"(로|길)(\d)", r"\1 \2", str(v.get("road") or "")), "road") \
             or geocode(clean_jibun(v.get("addr")) and clean_jibun(v.get("addr")).rsplit(" ", 1)[0])
         C["geo"][c] = pt or []
-        if n % 200 == 0:
+        if n % 100 == 0:
             print(f"    {n}/{len(todo)}", flush=True)
             save_cache(C)
     save_cache(C)
@@ -420,7 +456,8 @@ def main():
         pd_, pn = min(((hav(x, y, m["x"], m["y"]), m["nm"]) for m in P["mj"]), default=(99, None))
         small = any(abs(px - x) < 0.005 and abs(py - y) < 0.004 and hav(x, y, px, py) <= 0.3 for px, py in P["pk"])
         umd = (dongnm or "").strip() or None
-        ppsm, ntr, p84, n84 = match_price(PR, sgg, umd, v.get("nm"), v.get("use"))
+        cj = clean_jibun(v.get("addr"))
+        ppsm, ntr, p84, n84 = match_price(PR, sgg, umd, v.get("nm"), v.get("use"), cj.rsplit(" ", 1)[-1] if cj else None)
         apts.append({
             "k": c, "nm": v.get("nm"), "sgg": SGG[sgg], "umd": umd, "x": x, "y": y,
             "hh": v.get("hh"), "dg": v.get("dong"), "use": v.get("use"), "typ": v.get("typ"),
@@ -428,7 +465,7 @@ def main():
             "edu_n": edu_n, "hosp_d": round(hd, 2), "hosp": hn, "park_d": round(pd_, 2), "park": pn, "park_s": 1 if small else 0,
             "st": [{"nm": s["nm"], "d": round(d, 2), "ln": s["lines"]} for d, s in st_show],
             "s_hosp": score_hosp(hd), "s_park": score_park(pd_, small), "s_tr": tr, "s_size": score_size(v.get("hh")),
-            "ppsm": round(ppsm, 1) if ppsm else None, "ntr": ntr, "p84": round(p84, 2) if p84 else None, "n84": n84,
+            "ppsm": round(ppsm, 4) if ppsm else None, "ntr": ntr, "p84": round(p84, 2) if p84 else None, "n84": n84,   # 억/㎡ (2026-10-17 소수4자리 — 1자리면 0.3억으로 뭉개짐)
             "p84e": round(ppsm * 84, 2) if ppsm else None,
         })
     # 학원 백분위

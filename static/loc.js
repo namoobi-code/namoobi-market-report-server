@@ -51,6 +51,7 @@ function draw(){
   const H=[['tot','총점'],['nm','단지'],['sgg','지역'],['hh','세대'],['use','준공'],['s_edu','교육'],['s_hosp','편의'],['s_park','자연'],['s_tr','교통'],['s_size','규모'],['p84e','84㎡가(억)'],['ppsm','㎡당(만원)'],['vfm','가성비']];
   $('lc_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${H.map(([k,l])=>`<th data-k="${k}" style="padding:5px 7px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap;cursor:pointer">${l}${S.sort===k?(S.dir<0?' ▼':' ▲'):''}</th>`).join('')}</tr></thead><tbody>${
     show.map((a,i)=>{
+      const stT=(a.st||[]).map(s=>`${s.nm}${s.ln>=2?'(환승)':''} ${Math.round(s.d*1000)}m`).join(', ');   // title 용 평문
       const st=(a.st||[]).map(s=>`${E(s.nm)}${s.ln>=2?'<b style="color:#2f6fed">(환승)</b>':''} ${Math.round(s.d*1000)}m`).join(', ');
       const main=`<tr data-k="${E(a.k)}" style="border-bottom:1px solid #f2f4f7;cursor:pointer;${a.k===S.pick?'background:#fff7ed':''}">
         <td style="padding:4px 7px;white-space:nowrap"><b style="font-size:13px">${a.tot.toFixed(0)}</b> <span class="note">#${i+1}</span></td>
@@ -61,10 +62,10 @@ function draw(){
         <td style="padding:4px 7px;white-space:nowrap" title="600m 내 입시·외국어 학원 ${a.edu_n}개">${bar(a.s_edu,FC.edu)} <span class="note">${a.edu_n}</span></td>
         <td style="padding:4px 7px;white-space:nowrap" title="${E(a.hosp||'')}">${bar(a.s_hosp,FC.hosp)} <span class="note">${km(a.hosp_d)}</span></td>
         <td style="padding:4px 7px;white-space:nowrap" title="${E(a.park||'')}${a.park_s?' · 근린공원 300m 내':''}">${bar(a.s_park,FC.park)} <span class="note">${km(a.park_d)}</span></td>
-        <td style="padding:4px 7px;white-space:nowrap" title="${st}">${bar(a.s_tr,FC.tr)} <span class="note">${a.st&&a.st.length?E(a.st[0].nm)+(a.st[0].ln>=2?'⇄':''):'—'}</span></td>
+        <td style="padding:4px 7px;white-space:nowrap" title="${E(stT)}">${bar(a.s_tr,FC.tr)} <span class="note">${a.st&&a.st.length?E(a.st[0].nm)+(a.st[0].ln>=2?'⇄':''):'—'}</span></td>
         <td style="padding:4px 7px;white-space:nowrap">${bar(a.s_size,FC.size)}</td>
         <td style="padding:4px 7px;text-align:right;font-weight:700">${a.p84e!=null?a.p84e.toFixed(1):'—'}${a.p84?`<br><span class="note" title="80~90㎡ 실거래 평균 (${a.n84}건)">실 ${a.p84.toFixed(1)}</span>`:''}</td>
-        <td style="padding:4px 7px;text-align:right">${a.ppsm!=null?Math.round(a.ppsm*10000/10000*10000).toLocaleString():'—'}${a.ntr?`<br><span class="note">${a.ntr}건</span>`:''}</td>
+        <td style="padding:4px 7px;text-align:right">${a.ppsm!=null?Math.round(a.ppsm*10000).toLocaleString():'—'}${a.ntr?`<br><span class="note">${a.ntr}건</span>`:''}</td>
         <td style="padding:4px 7px;text-align:right" title="총점 ÷ 84㎡ 환산가 — 높을수록 점수 대비 싸다">${a.vfm!=null?a.vfm.toFixed(1):'—'}</td></tr>`;
       if(a.k!==S.pick) return main;
       return main+`<tr><td colspan="13" style="background:#f8fafc;padding:8px 14px;font-size:12px;line-height:1.7">
