@@ -297,6 +297,27 @@ def regime():
         R["decomp"] = {"m3": dec(90), "m6": dec(180), "cur": {"us10": us10[-1][1] if us10 else None, "real": real[-1][1] if real else None, "bei": bei[-1][1] if bei else None, "d": us10[-1][0] if us10 else None},
                        "s": {"us10": us10[-260:], "real": real[-260:], "bei": bei[-260:]}}
     except Exception as e: log(f"  ⚠ regime decomp: {repr(e)[:80]}")
+    # ①-b (2026-10-17 한국금융신문 WM '스티프닝 국면') 커브 성격 — 벌어지는 쪽이 10Y(베어 스티프닝=수급 불안·장기채 위험) 인지 2Y(불 스티프닝=인하 사이클) 인지
+    try:
+        us2 = fred_series("DGS2", start=s2)
+        if us2 and us10:
+            d10 = us10[-1][1] - (last_n(us10, 90) or us10[-1][1]); d2 = us2[-1][1] - (last_n(us2, 90) or us2[-1][1]); dc = d10 - d2
+            if dc > 0.1: kind = ("베어 스티프닝" if d10 > 0 else "불 스티프닝"); lab = ("장기금리가 끌어올리며 가팔라짐 — 재정·AI 회사채 수급 불안(기사). 장기채 '역발상' 위험" if d10 > 0 else "단기금리가 내리며 가팔라짐 — 인하 사이클 전형, 장기채 우호")
+            elif dc < -0.1: kind = ("베어 플래트닝" if d2 > 0 else "불 플래트닝"); lab = ("단기금리가 더 빨리 올라 평탄화 — 추가 인상 가격 반영 중, 단기물 이자 챙기기 구간" if d2 > 0 else "장기금리가 더 빨리 내려 평탄화 — 경기 둔화 우려, 장기채 랠리")
+            elif d10 > 0.3 and d2 > 0.3: kind = "병행 상승"; lab = "기울기 변화 없이 전 구간이 같이 오름(기사 '전 구간에서 상승') — 단기는 인상 반영, 장기는 수급·프리미엄. 만기 어디도 피난처가 아님 → 파킹·초단기"
+            elif d10 < -0.3 and d2 < -0.3: kind = "병행 하락"; lab = "전 구간 동반 하락 — 인하 기대 + 장기 수급 완화"
+            else: kind = "보합"; lab = "커브 기울기·수준 변화 미미"
+            R["curve_kind"] = {"kind": kind, "label": lab, "d10": round(d10, 2), "d2": round(d2, 2), "curve": round(us10[-1][1] - us2[-1][1], 2), "curve_m3": round(dc * -1 + (us10[-1][1] - us2[-1][1]), 2),
+                               "risk": kind in ("베어 스티프닝", "병행 상승")}
+    except Exception as e: log(f"  ⚠ curve kind: {repr(e)[:60]}")
+    # ①-c 기간프리미엄 — 기사 '장기금리 상승 = 위험 프리미엄 증가' 를 직접 측정 (NY Fed ACM 10Y, FRED THREEFYTP10)
+    try:
+        tp = fred_series("THREEFYTP10", start=s2)
+        if tp:
+            m3 = last_n(tp, 90); y1 = last_n(tp, 365)
+            R["tp"] = {"cur": round(tp[-1][1], 2), "d": tp[-1][0], "m3": round(tp[-1][1] - m3, 2) if m3 is not None else None, "y1": round(tp[-1][1] - y1, 2) if y1 is not None else None, "s": tp[-260:],
+                       "rising": m3 is not None and tp[-1][1] - m3 > 0.15}
+    except Exception as e: log(f"  ⚠ term premium: {repr(e)[:60]}")
     # ② 명목성장률 − 10Y
     g = {}
     try:
@@ -350,6 +371,14 @@ def regime():
         f = lambda t: f"{t[:4]}-{t[4:]}" if t else None
         cyc["KR"] = {"rate": rows[-1][1] if rows else None, "last_hike": f(lh), "last_cut": f(lc),
                      "days": (date.today() - datetime.strptime(lh, "%Y%m").date()).days if lh else None}
+        # 국고3년 − 기준금리 = 시장이 선반영한 추가 인상폭 (한국금융신문 WM: "3년물 3.9% = 기준금리 3.5% 선반영")
+        s0 = (date.today() - timedelta(days=30)).strftime("%Y%m%d")
+        j3 = json.loads(urllib.request.urlopen(f"https://ecos.bok.or.kr/api/StatisticSearch/{K}/json/kr/1/50/817Y002/D/{s0}/{date.today().strftime('%Y%m%d')}/010200000", timeout=25).read())
+        r3 = [float(r["DATA_VALUE"]) for r in ((j3.get("StatisticSearch") or {}).get("row") or []) if r.get("DATA_VALUE")]
+        if r3 and cyc["KR"]["rate"] is not None:
+            gap = round((r3[-1] - cyc["KR"]["rate"]) * 100); cyc["KR"]["y3"] = r3[-1]; cyc["KR"]["y3_gap"] = gap
+            cyc["KR"]["y3_txt"] = (f"3년물이 기준금리보다 {gap}bp 위 — 시장은 기준금리 {cyc['KR']['rate']+gap/100:.2f}% 부근까지 선반영(기사 식), 실제 인상돼도 충격 제한적" if gap >= 25 else
+                                   f"3년물−기준금리 {gap}bp — 추가 인상 거의 미반영, 인상 시 단기물도 흔들림" if gap >= 0 else f"3년물이 기준금리 아래({gap}bp) — 시장은 인하를 보고 있음")
     except Exception as e: log(f"  ⚠ regime cycle kr: {repr(e)[:60]}")
     # 전문가 컨센 — 매경이코노미 채권 전문가 8인 설문(2026.10.7) 정적 큐레이션
     cyc["consensus"] = {"src": "매경ECONOMY 2026.10.7 채권 전문가 8인", "us_2026": "4.25% (8/8 연내 1회 더)", "us_2027_6": "4.25% 5명 · 4.5% 3명", "kr_2026": "3.25% (8/8 연내 1회 더)",
