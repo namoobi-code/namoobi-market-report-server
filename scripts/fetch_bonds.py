@@ -38,7 +38,7 @@ ETFS_KR = [  # (2026-10-17 사용자 지적 "국고채 1년은 왜 뺐냐") 만�
            ("439870.KS", "KODEX 국고채30년액티브", "국고채 30년"), ("385560.KS", "RISE KIS국고채30년Enhanced", "국고채 30년(강화)"),
            ("273130.KS", "KODEX 종합채권(AA-이상)액티브", "우량 회사채 혼합"), ("305080.KS", "TIGER 미국채10년선물", "미국 10년(KR상장)"),
            ("453850.KS", "ACE 미국30년국채액티브(H)", "미국 30년(KR상장·환헤지)"), ("304660.KS", "KODEX 미국채울트라30년선물(H)", "미국 초장기(KR상장·환헤지)")]
-ETFS_US = [("SGOV", "iShares 0-3M T-Bill", "초단기·파킹(월분배)"), ("BIL", "SPDR 1-3M T-Bill", "초단기·파킹(월분배)"), ("SHY", "iShares 1-3Y Treasury", "미국 단기"), ("IEF", "iShares 7-10Y Treasury", "미국 중기"),
+ETFS_US = [("SGOV", "iShares 0-3M T-Bill", "초단기·파킹(월분배)"), ("BIL", "SPDR 1-3M T-Bill", "초단기·파킹(월분배)"), ("SHV", "iShares 0-1Y Treasury", "단기 1년 이내"), ("SHY", "iShares 1-3Y Treasury", "단기 1-3년"), ("IEF", "iShares 7-10Y Treasury", "미국 중기"),
            ("TLT", "iShares 20+Y Treasury", "미국 장기"), ("EDV", "Vanguard Ext. Duration", "미국 초장기"),
            ("TIP", "iShares TIPS", "물가연동"), ("LQD", "iShares IG Corp", "우량 회사채"),
            ("HYG", "iShares High Yield", "하이일드"), ("BND", "Vanguard Total Bond", "종합")]
