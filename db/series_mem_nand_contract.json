@@ -1,6 +1,6 @@
 {
- "marker": "2026-10-01",
- "as_of": "2026-10-01",
+ "marker": "2026-10-18",
+ "as_of": "2026-10-18",
  "data": [
   [
    "2026-07-11",
@@ -668,6 +668,134 @@
   ],
   [
    "2026-10-02",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-03",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-04",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-05",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-06",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-07",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-08",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-09",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-10",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-11",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-12",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-13",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-14",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-15",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-16",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-17",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-18",
    {
     "NAND 128Gb 16Gx8 MLC": 30.475,
     "NAND 64Gb 8Gx8 MLC": 23.425,

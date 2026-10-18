@@ -1,6 +1,6 @@
 {
  "marker": "2026-10",
- "as_of": "2026-10-02",
+ "as_of": "2026-10-18",
  "data": {
   "rows": [
    {
@@ -28,6 +28,6 @@
     "change": "+0.1%p 상향"
    }
   ],
-  "comment": "컬럼명(mar/jun)은 레거시 표기이며 실제로는 '직전 SEP'(mar) vs '최신 SEP'(jun) 중간값 비교. mar=2026-06-17 SEP(직전, Warsh 신임의장 첫 회의), jun=2026-09-16 SEP(최신, 9월 FOMC 25bp 인상과 동시 발표) — 두 차례 모두 매파적 상향. 출처: federalreserve.gov FOMC statement·SEP 2026-06-17, 2026-09-16"
+  "comment": "mar=직전 SEP(2026-06-17), jun=최신 SEP(2026-09-16) 중간값(컬럼명은 레거시 표기). 9월 FOMC 25bp 인상(3.75~4.00%, 12-0)과 동시 발표, 두 차례 연속 매파적 상향. 출처: federalreserve.gov FOMC statement·SEP 2026-06-17, 2026-09-16"
  }
 }

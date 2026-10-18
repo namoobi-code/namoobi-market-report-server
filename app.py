@@ -271,7 +271,11 @@ BUNDLE_SKIP = {"screener_pool", "tp_history", "us_krname", "etf_holdings", "rele
                #  app.js 직접 fetch→rehub·kimp_series) 또는 JS 미참조(ta_state·growth_accel =
                # 서버 내부용). b.<이름> 번들 소비 0건 확인 — 제외해도 기능 손실 없음. 약 -6.8MB.
                "ta_calls", "rehub", "applyhome_sub", "ta_stage2", "stlead",
-               "kimp_series", "ta_state", "re3", "growth_accel"}
+               "kimp_series", "ta_state", "re3", "growth_accel",
+               # (2026-10-18) 번들 14.2MB 경보 — 10/17 신설분 전수 실측: locscore_cache(3.4MB, locscore.py 내부 캐시·JS 미참조)
+               #  · locscore(1.8MB, loc.js 가 /api/db/locscore 개별 조회) · fin_quality(0.3MB, screener_pool 서버 병합용)
+               #  · cn_export(kcons.js 개별 조회). b.<이름> 번들 소비 0건 — 제외해도 기능 손실 없음. 약 -5.5MB.
+               "locscore_cache", "locscore", "fin_quality", "cn_export"}
 _bundle_cache = {"sig": None, "body": None, "etag": None}
 
 def _db_sig(files):
