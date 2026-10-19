@@ -36,7 +36,7 @@ function spark(sv,color){
   if(!sv||sv.length<2) return '';
   const mn=Math.min(...sv),mx=Math.max(...sv),h=34,w=150;
   const pts=sv.map((v,i)=>`${(i/(sv.length-1)*w).toFixed(1)},${(h-3-(v-mn)/(mx-mn||1)*(h-6)).toFixed(1)}`).join(' ');
-  return `<svg width="${w}" height="${h}" style="display:block"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
+  return `<div style="position:relative"><svg width="${w}" height="${h}" style="display:block"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg><span style="position:absolute;left:0;top:0;font-size:9px;color:#94a3b8">1년</span></div>`;
 }
 
 // (2026-09-04) 해자 '유형' 배지 — 모닝스타 5분류.

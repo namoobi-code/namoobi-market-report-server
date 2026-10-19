@@ -497,8 +497,12 @@ def main():
                 v = "buy_z"                        # 🟢~ 선행지표 중립(±5% 이내) — 방향 판단 보류
         else:
             v = "watch"
-        step = max(1, len(pts)//60)
-        samp = pts[::step][-60:]
+        # (2026-10-19 사용자 지적) 스파크가 2년치(hist 기본 range=2y)라 네이버 '1년' 차트와 모양이 달라 보였다
+        #   (ARM: 6월 고점이 1년 차트에선 가운데, 2년 차트에선 오른쪽 끝 부근). 카드의 다른 수치(1년·52주고점비)와
+        #   기준을 맞춰 **최근 252거래일(1년)** 만 60점으로 샘플링하고, 화면에 '1년' 라벨을 붙인다.
+        yr_pts = pts[-252:] if len(pts) >= 252 else pts
+        step = max(1, len(yr_pts)//60)
+        samp = yr_pts[::step][-60:]
         rows.append({"sym": sym, "name": nm, "sec": sec, "moat": moat, "risk": RISKS.get(sym),
                      "tier": ("B2+" if sym in SEL_B2 else "B1"), "share": SHARES.get(sym),
                      "mtype": MOAT_TYPES.get(sym, []), "reg": REGULATORY.get(sym),
