@@ -708,6 +708,14 @@ META = {   # 화면 표기용 이름·단위·그룹·왜 선행인가 (JS 가 �
  "btc_dom":    ("BTC 도미넌스", "%", "알트", "자금 순환 위치 — BTC 집중(초기) → 알트 확산(후기)"),
 }
 
+def c_coins5():
+    """(2026-10-19 요청) 주요 5코인(시총 상위·스테이블 제외: BTC·ETH·XRP·BNB·SOL) 1년 일봉 종가 — 화면 상단 통합 비교 그래프용"""
+    out = {}
+    for sym in ("BTC", "ETH", "XRP", "BNB", "SOL"):
+        k = jget(f"https://api.binance.com/api/v3/klines?symbol={sym}USDT&interval=1d&limit=366")
+        out[sym] = [[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[4])] for r in k]
+    return out
+
 def main():
     log("[cryptolead] 수집 시작")
     prev = jload(OUT).get("ind") or {}
@@ -733,6 +741,9 @@ def main():
     axes, overall = judge()
     for k, m in META.items():
         if k in IND: IND[k].update(name=m[0], unit=m[1], group=m[2], why=m[3])
+    try: coins5 = c_coins5()
+    except Exception as e:
+        err("coins5", e); coins5 = (jload(OUT).get("coins5") or {})
     policy = jload(DB / "cryptolead_policy.json")
     # (2026-09-20 기사) 이벤트 D-day — 2026 확정 일정. FOMC=연준 공표, CPI=BLS 공표, BOJ=일본은행 공표, 반감기=추정
     EVENTS = [("FOMC", d) for d in ("2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09")] + \
@@ -744,7 +755,7 @@ def main():
     DB.mkdir(parents=True, exist_ok=True)
     now = datetime.now(KST)
     OUT.write_text(json.dumps({"as_of": now.strftime("%Y-%m-%d %H:%M"), "marker": now.strftime("%Y-%m-%d"),
-                               "ind": IND, "axes": axes, "overall": overall, "policy": policy, "events": upcoming,
+                               "ind": IND, "coins5": coins5, "axes": axes, "overall": overall, "policy": policy, "events": upcoming,
                                "groups": ["심리·한국", "지갑·거래소", "온체인 밸류", "기관", "파생", "매크로", "대기자금", "알트", "정책"],   # 알트 = 5번째 축(순환)
                                "errors": ERRORS}, ensure_ascii=False), encoding="utf-8")
     HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")

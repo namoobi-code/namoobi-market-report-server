@@ -362,6 +362,9 @@ def main():
     hist = jload(HIST)
     try:
         d_px = yahoo("GC=F", "5y"); IND["_px"] = {"s": trim(d_px, 1300)}
+        # (2026-10-19) 장기 지표(GPR 20년·CPI·구글트렌드 5년)의 금 오버레이가 일봉 5y 밖에서 끊기던 문제 — 월봉 max 를 함께 실어 화면이 폴백
+        try: IND["_px_m"] = {"s": [[d, round(v, 2)] for d, v in yahoo("GC=F", "max", "1mo") if v][-600:]}
+        except Exception as e2: err("price_m", e2)
     except Exception as e:
         err("price", e); d_px = []
     for name, fn in (("rates", c_rates), ("dxy", c_dxy), ("gpr", c_gpr), ("vix", c_vix), ("cot", lambda: c_cot(hist)),

@@ -20,7 +20,10 @@ function fmtV(k,e){ const v=e.v; if(v==null) return '—'; const u=e.unit||'';
   return nf(v, Math.abs(v)>=100?1:2)+(u&&u!=='x'?' '+u:'');
 }
 let PX=null;
-function pxAt(d){ if(!PX||!PX.length||d<PX[0][0]) return null; let lo=0,hi=PX.length-1; while(lo<hi){const m=(lo+hi+1)>>1; if(PX[m][0]<=d) lo=m; else hi=m-1;} return PX[lo][1]; }
+let PXM=null;
+function _at(S,d){ if(!S||!S.length||d<S[0][0]) return null; let lo=0,hi=S.length-1; while(lo<hi){const m=(lo+hi+1)>>1; if(S[m][0]<=d) lo=m; else hi=m-1;} return S[lo][1]; }
+// (2026-10-19) 일봉(5y) 범위 밖(장기 지표: GPR 20년·CPI·트렌드 5년)은 월봉 max 로 폴백 — 오버레이가 오른쪽 끝에만 그려지던 문제 해결
+function pxAt(d){ const v=_at(PX,d); return v!=null?v:_at(PXM,d); }
 function spark(cv,s,color,k){
   if(!s||s.length<2) return;
   const labels=s.map(x=>x[0]), data=s.map(x=>x[1]);
@@ -105,9 +108,38 @@ function mythTable(M){
     <div class="note" style="margin-top:5px;line-height:1.6">📖 <b>동행 r</b> = 지표의 12개월 변화와 같은 기간 금 수익률의 상관(통설은 "같이 움직인다"는 주장이므로 이것이 검증 정본). |r|≥0.15 를 유의로 본다. <b>선행 r</b> = 지표가 N개월 먼저 움직이고 금이 따라오는지(예측력) — 부호가 동행과 반대로 나오면 "급등 뒤 되돌림(평균회귀)"이지 통설 반증이 아니다.
       실측 요약: <b>달러·실질금리·기준금리</b>는 통설대로(달러가 가장 강함), <b>인플레(CPI)·전쟁(GPR)·공포(VIX)</b>는 20년 평균으로는 유의미한 동행이 없다 — 인플레는 실질금리를 거쳐야 작동하고, 지정학·공포는 급등 며칠만 반영된다. 월간·수준차 기준, 소스 FRED·야후·GPR.</div>`;
 }
+/* ── (2026-10-19 요청) 상단 금 시세 종합 그래프 — 금 선물($/oz) + KRX 금현물(원/g, 우축) · 기간 버튼 ── */
+let GN=365, gtop=null;
+function drawGoldTop(){
+  const box=$('gl_top'); if(!box||!PX||PX.length<2) return;
+  if(gtop){try{gtop.destroy();}catch(e){} gtop=null;}
+  const KR=(((D.ind||{}).krx_gold||{}).s)||[];
+  let src=PX; if(GN>PX.length&&PXM&&PXM.length){ src=PXM; }
+  const a=src.slice(-Math.min(GN,src.length)); const labels=a.map(x=>x[0]); const g=a.map(x=>x[1]);
+  const ret=(n)=>{ const i=PX.length-1-n; return i>=0&&PX[i][1]?(PX[PX.length-1][1]/PX[i][1]-1)*100:null; };
+  const chips=[[1,'1일'],[5,'1주'],[21,'1개월'],[63,'3개월'],[126,'6개월'],[252,'1년']].map(([n,t])=>{const r=ret(n); return r==null?'':`<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">${t} <b style="color:${r>=0?'#16a34a':'#dc2626'}">${r>=0?'+':''}${r.toFixed(1)}%</b></span>`;}).join(' ');
+  const kr=KR.length?KR[KR.length-1]:null;
+  const btns=[[21,'1개월'],[63,'3개월'],[126,'6개월'],[365,'1년'],[1300,'5년'],[600,'전체(월봉)']].map(([n,t])=>`<button data-n="${n}" class="scrrst" style="font-size:11px;margin-left:4px;${n===GN?'background:#1e293b;color:#fff':''}">${t}</button>`).join('');
+  box.innerHTML=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px"><b style="font-size:14px">🥇 금 시세 종합</b>
+      <span style="font-size:20px;font-weight:900;color:#b45309">$${nf(PX[PX.length-1][1],0)}</span><span class="note">/oz 금 선물(GC=F) ${PX[PX.length-1][0]}</span>
+      ${kr?`<span style="font-size:15px;font-weight:700;color:#7c3aed">${nf(kr[1],0)} 원/g</span><span class="note">KRX 금현물 ${kr[0]}</span>`:''}
+      <span style="margin-left:auto">${btns}</span></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>
+    <div style="position:relative;height:280px"><canvas id="gl_topcv" style="height:280px!important;width:100%!important"></canvas></div>`;
+  box.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{GN=+b.dataset.n; drawGoldTop();});
+  const krm=Object.fromEntries(KR); const krd=labels.map(d=>krm[d]!=null?krm[d]:null); const hasKr=src===PX&&krd.some(v=>v!=null);
+  const ds=[{label:'금 선물 $/oz',data:g,borderColor:'#d97706',backgroundColor:'#d9770622',fill:true,pointRadius:0,borderWidth:1.8,tension:0.1,yAxisID:'y'}];
+  if(hasKr) ds.push({label:'KRX 금현물 원/g',data:krd,borderColor:'#7c3aed',backgroundColor:'transparent',fill:false,pointRadius:0,borderWidth:1.4,tension:0.1,yAxisID:'y2',spanGaps:true});
+  gtop=new Chart($('gl_topcv'),{type:'line',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{display:true,labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+nf(c.raw,0)}}},
+    scales:{x:{ticks:{maxTicksLimit:8,font:{size:10},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(src===PXM?0:2,7):''},grid:{display:false}},
+            y:{position:'left',ticks:{font:{size:10},color:'#b45309',callback:v=>'$'+nf(v,0)},grid:{color:'#f1f5f9'}},
+            y2:{display:hasKr,position:'right',ticks:{font:{size:10},color:'#7c3aed',callback:v=>nf(v/1000,0)+'k'},grid:{display:false}}}}});
+}
 function render(){
   if(!D) return; charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
-  PX=((D.ind||{})._px||{}).s||null;
+  PX=((D.ind||{})._px||{}).s||null; PXM=((D.ind||{})._px_m||{}).s||null;
+  drawGoldTop();
   $('gl_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 07:05 자동 수집'+(D.errors&&D.errors.length?` · 수집 실패 ${D.errors.length}건`:'');
   const O=D.overall||{}, A=D.axes||{}; const oc=O.score==null?'#94a3b8':O.score>=0.25?'#16a34a':O.score<=-0.25?'#dc2626':'#ca8a04';
   const px=PX&&PX.length?PX[PX.length-1]:null;
