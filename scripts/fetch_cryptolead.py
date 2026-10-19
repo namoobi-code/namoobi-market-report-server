@@ -709,11 +709,18 @@ META = {   # 화면 표기용 이름·단위·그룹·왜 선행인가 (JS 가 �
 }
 
 def c_coins5():
-    """(2026-10-19 요청) 주요 5코인(시총 상위·스테이블 제외: BTC·ETH·XRP·BNB·SOL) 1년 일봉 종가 — 화면 상단 통합 비교 그래프용"""
+    """(2026-10-19 요청) 주요 5코인(시총 상위·스테이블 제외: BTC·ETH·XRP·BNB·SOL) 상장 이후 전 기간 일봉 종가 — 화면 상단 통합 비교 그래프용.
+       Binance 는 콜당 1000봉 제한 → startTime 페이지네이션(BTC 2017-08~ ≈ 4콜). '기간 전체' 버튼용."""
     out = {}
     for sym in ("BTC", "ETH", "XRP", "BNB", "SOL"):
-        k = jget(f"https://api.binance.com/api/v3/klines?symbol={sym}USDT&interval=1d&limit=366")
-        out[sym] = [[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[4])] for r in k]
+        rows, st = [], 1483228800000      # 2017-01-01 UTC
+        for _ in range(12):
+            k = jget(f"https://api.binance.com/api/v3/klines?symbol={sym}USDT&interval=1d&limit=1000&startTime={st}")
+            if not k: break
+            rows += k
+            if len(k) < 1000: break
+            st = k[-1][0] + 86400000
+        out[sym] = [[utc(r[0] / 1000).strftime("%Y-%m-%d"), float(r[4])] for r in rows]
     return out
 
 def main():

@@ -185,36 +185,41 @@ function axisBox(a,isAlt){
     <div style="position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,#fecaca,#fef9c3,#bbf7d0);margin-top:6px"><div style="position:absolute;left:${pos}%;top:-3px;width:3px;height:12px;background:#0f172a;border-radius:2px;transform:translateX(-50%)"></div></div>
   </div>`;
 }
-/* ── (2026-10-19 요청) 주요 5코인 통합 그래프 — 기간 시작=100 으로 리베이스해 상대 성과 비교 ── */
+/* ── (2026-10-19 요청) 주요 5코인 통합 그래프 — 기간 시작=100 으로 리베이스해 상대 성과 비교
+   (2차 요청) '전체' 버튼(상장 이후 전 기간, 코인별 자기 첫 값=100) · X축 눈금 최대 · 휠 확대/드래그 이동(chartjs-plugin-zoom) · 더블클릭=초기화 ── */
 const C5COL={BTC:'#f59e0b',ETH:'#6366f1',XRP:'#0ea5e9',BNB:'#eab308',SOL:'#14b8a6'};
-let C5N=90, c5chart=null;
+let C5N=365, c5chart=null;
+function zoomOpt(){ return (window.ChartZoom||Chart.registry.plugins.get('zoom'))?{zoom:{wheel:{enabled:true,speed:0.08},pinch:{enabled:true},mode:'x'},pan:{enabled:true,mode:'x'},limits:{x:{minRange:10}}}:undefined; }
 function drawCoins5(){
   const box=$('cl_coins5'); if(!box) return;
   const C=(D&&D.coins5)||{}; const syms=Object.keys(C5COL).filter(k=>C[k]&&C[k].length>2);
   if(c5chart){try{c5chart.destroy();}catch(e){} c5chart=null;}
   if(!syms.length){ box.innerHTML='<div class="note">주요 5코인 그래프 — 다음 06:55 수집 후 표시</div>'; return; }
-  const maxN=Math.min.apply(null,syms.map(k=>C[k].length));
-  const n=Math.min(C5N,maxN);
-  const labels=C[syms[0]].slice(-n).map(x=>x[0]);
+  // 날짜 합집합 축(코인별 상장일이 달라 '전체' 구간에서는 앞부분이 비는 코인이 있음) → 각 코인은 창 안의 자기 첫 값=100
+  const all=new Set(); syms.forEach(k=>C[k].forEach(x=>all.add(x[0]))); let labels=[...all].sort();
+  if(C5N<labels.length) labels=labels.slice(-C5N);
   const ds=syms.map(k=>{
-    const a=C[k].slice(-n), b=a[0][1];
-    const data=a.map(x=>+(x[1]/b*100).toFixed(2));
-    const ret=data[data.length-1]-100;
-    return {label:k,data,ret,price:a[a.length-1][1],raw:a.map(x=>x[1]),borderColor:C5COL[k],backgroundColor:'transparent',borderWidth:k==='BTC'?2.4:1.6,pointRadius:0,tension:0.12};
+    const m=Object.fromEntries(C[k]); let b=null; const raw=labels.map(d=>m[d]!=null?m[d]:null);
+    const data=raw.map(v=>{ if(v==null) return null; if(b==null) b=v; return +(v/b*100).toFixed(2); });
+    const lastRaw=C[k][C[k].length-1][1]; const lastIdx=data.length-1; const ret=data[lastIdx]!=null?data[lastIdx]-100:null;
+    return {label:k,data,ret,price:lastRaw,raw,borderColor:C5COL[k],backgroundColor:'transparent',borderWidth:k==='BTC'?2.4:1.6,pointRadius:0,tension:0.12,spanGaps:true};
   });
-  const btns=[[30,'1개월'],[90,'3개월'],[180,'6개월'],[365,'1년']].map(([d,t])=>`<button data-n="${d}" class="scrrst" style="font-size:11px;margin-left:4px;${d===C5N?'background:#1e293b;color:#fff':''}">${t}</button>`).join('');
-  const chips=ds.map(d=>`<span style="font-size:12px;padding:2px 9px;border-radius:10px;border:1px solid ${d.borderColor};background:#fff;color:#0f172a"><b style="color:${d.borderColor}">${d.label}</b> $${nf(d.price,d.price<10?3:0)} <b style="color:${d.ret>=0?'#16a34a':'#dc2626'}">${d.ret>=0?'+':''}${d.ret.toFixed(1)}%</b></span>`).join(' ');
-  box.innerHTML=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px"><b style="font-size:14px">📈 주요 5코인 통합 (BTC·ETH·XRP·BNB·SOL)</b><span class="note">기간 시작=100 기준 상대 성과 · 점선=100</span><span style="margin-left:auto">${btns}</span></div>
+  const btns=[[30,'1개월'],[90,'3개월'],[180,'6개월'],[365,'1년'],[1095,'3년'],[Infinity,'전체']].map(([d,t])=>`<button data-n="${d}" class="scrrst" style="font-size:11px;margin-left:4px;${d===C5N?'background:#1e293b;color:#fff':''}">${t}</button>`).join('');
+  const chips=ds.map(d=>`<span style="font-size:12px;padding:2px 9px;border-radius:10px;border:1px solid ${d.borderColor};background:#fff;color:#0f172a"><b style="color:${d.borderColor}">${d.label}</b> $${nf(d.price,d.price<10?3:0)} ${d.ret==null?'':`<b style="color:${d.ret>=0?'#16a34a':'#dc2626'}">${d.ret>=0?'+':''}${d.ret.toFixed(1)}%</b>`}</span>`).join(' ');
+  box.innerHTML=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px"><b style="font-size:14px">📈 주요 5코인 통합 (BTC·ETH·XRP·BNB·SOL)</b><span class="note">기간 시작=100 기준 상대 성과 · 점선=100 · 휠=확대/축소 · 드래그=이동 · 더블클릭=초기화</span><span style="margin-left:auto">${btns}</span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>
-    <div style="position:relative;height:300px"><canvas id="cl_c5cv" style="height:300px!important;width:100%!important"></canvas></div>`;
-  box.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{C5N=+b.dataset.n; drawCoins5();});
+    <div style="position:relative;height:320px"><canvas id="cl_c5cv" style="height:320px!important;width:100%!important"></canvas></div>`;
+  box.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{C5N=b.dataset.n==='Infinity'?Infinity:+b.dataset.n; drawCoins5();});
   ds.push({label:'_base',data:labels.map(()=>100),borderColor:'#94a3b8',borderDash:[4,4],borderWidth:0.9,pointRadius:0,fill:false});
+  const long=labels.length>400;
   c5chart=new Chart($('cl_c5cv'),{type:'line',data:{labels,datasets:ds},
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
       plugins:{legend:{display:true,labels:{filter:i=>i.text!=='_base',boxWidth:12,font:{size:11}}},
-        tooltip:{filter:i=>i.dataset.label!=='_base',callbacks:{label:c=>c.dataset.label+' '+(c.raw-100>=0?'+':'')+(c.raw-100).toFixed(1)+'% ($'+nf(c.dataset.raw[c.dataIndex],c.dataset.raw[c.dataIndex]<10?3:0)+')'}}},
-      scales:{x:{ticks:{maxTicksLimit:8,font:{size:10},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(2):''},grid:{display:false}},
+        tooltip:{filter:i=>i.dataset.label!=='_base',callbacks:{label:c=>{const r=c.dataset.raw?c.dataset.raw[c.dataIndex]:null; return c.dataset.label+' '+(c.raw-100>=0?'+':'')+(c.raw-100).toFixed(1)+'%'+(r!=null?' ($'+nf(r,r<10?3:0)+')':'');}}},
+        zoom:zoomOpt()},
+      scales:{x:{ticks:{maxTicksLimit:30,autoSkip:true,font:{size:10},maxRotation:0,callback:(v,i)=>labels[i]?(long?labels[i].slice(0,7):labels[i].slice(2)):''},grid:{display:false}},
               y:{ticks:{font:{size:10},callback:v=>v},grid:{color:'#f1f5f9'}}}}});
+  $('cl_c5cv').ondblclick=()=>{ if(c5chart&&c5chart.resetZoom) c5chart.resetZoom(); };
 }
 function render(){
   if(!D) return;
