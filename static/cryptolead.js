@@ -208,7 +208,7 @@ function drawCoins5(){
   const chips=ds.map(d=>`<span style="font-size:12px;padding:2px 9px;border-radius:10px;border:1px solid ${d.borderColor};background:#fff;color:#0f172a"><b style="color:${d.borderColor}">${d.label}</b> $${nf(d.price,d.price<10?3:0)} ${d.ret==null?'':`<b style="color:${d.ret>=0?'#16a34a':'#dc2626'}">${d.ret>=0?'+':''}${d.ret.toFixed(1)}%</b>`}</span>`).join(' ');
   box.innerHTML=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px"><b style="font-size:14px">📈 주요 5코인 통합 (BTC·ETH·XRP·BNB·SOL)</b><span class="note">기간 시작=100 기준 상대 성과 · 점선=100 · 휠=확대/축소 · 드래그=이동 · 더블클릭=초기화</span><span style="margin-left:auto">${btns}</span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>
-    <div style="position:relative;height:320px"><canvas id="cl_c5cv" style="height:320px!important;width:100%!important"></canvas></div>`;
+    <div style="position:relative;height:320px"><canvas id="cl_c5cv" style="height:320px!important;max-height:320px!important;width:100%!important"></canvas></div>`;
   box.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{C5N=b.dataset.n==='Infinity'?Infinity:+b.dataset.n; drawCoins5();});
   ds.push({label:'_base',data:labels.map(()=>100),borderColor:'#94a3b8',borderDash:[4,4],borderWidth:0.9,pointRadius:0,fill:false});
   const long=labels.length>400;

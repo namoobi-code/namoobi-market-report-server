@@ -16,7 +16,7 @@ global_market.py — 글로벌시황 탭 데이터 (2026-08-01 신설)
       data/db/global_krx_hist.json (KRX 세부지수 일별 누적)
 cron: */10 * * * *  (야후 ~75콜/회·스레드 12 — 1분 내 완료)
 """
-import json, time, urllib.request, urllib.parse
+import json, time, os, sys, urllib.request, urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, date, timedelta
 from pathlib import Path
@@ -329,6 +329,32 @@ def naver_world_hist(code, pages=16):
 
 import re as _re
 _MI_PAT = _re.compile(r'class="date">\s*([\d.]+)\s*</td>\s*<td class="num">\s*([\d,.]+)')
+def krx_gold_hist(have_t, back_days=400):
+    """(2026-10-19) KRX OPEN API 금시장 일별매매정보(gen/gold_bydd_trd) — '금 99.99_1kg' 종가(원/g).
+       네이버 goldDailyQuote 폐지(HTTP 410, 2026-09-17 이후 갱신 중단) 대체. 이미 가진 날짜는 건너뛰고 누락 영업일만 병렬 조회(T+1 공표 — 당일은 자연 빈값).
+       키: 환경변수 KRX_API_KEY 또는 keys/krx.txt (scripts/krx_openapi.py 탐색 규칙)."""
+    try:
+        kf = Path(__file__).resolve().parent.parent / "keys" / "krx.txt"
+        if not os.environ.get("KRX_API_KEY") and kf.is_file():
+            os.environ["KRX_API_KEY"] = kf.read_text(encoding="utf-8").strip().split()[0]
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import krx_openapi as K
+        if not K.API_KEY: return {"t": [], "v": []}
+        have = set(have_t)
+        # 증분 창 = 마지막 보유일 이후 + 여유 5일(최소 20일) — 수집이 오래 멈췄다 재개돼도 공백 없이 메운다
+        gap = (date.today() - datetime.strptime(max(have_t), "%Y%m%d").date()).days + 5 if have_t else back_days
+        days = [d for d in K.business_days(back_days if len(have_t) < 200 else max(20, min(gap, back_days))) if d not in have]
+        rows = K.call_range("gen", "gold_bydd_trd", days, workers=6)
+        out = {}
+        for d, lst in rows.items():
+            for x in lst:
+                if "1kg" in (x.get("ISU_NM") or "").lower() and K.num(x.get("TDD_CLSPRC")):
+                    out[d] = K.num(x["TDD_CLSPRC"])
+        ts = sorted(out)
+        return {"t": ts, "v": [out[k] for k in ts]}
+    except Exception:
+        return {"t": [], "v": []}
+
 def naver_mi_hist(ep, cd, fdtc, pages):
     """네이버 marketindex 일별시세 HTML 파싱(euc-kr) — 첫 실행 pages=40 백필, 이후 2페이지 증분."""
     rows = {}
@@ -504,14 +530,19 @@ def main():
         elif src == "ND":
             ep, cd, fdtc = ND_CODES[s]
             a = acc.get(s) or {"t": [], "v": []}
-            nh = naver_mi_hist(ep, cd, fdtc, pages=120 if len(a["t"]) < 800 else 2)   # 3년 수익률에 ~750거래일 필요(120페이지 ≈ 1200일)
+            if s == "ND.GOLD_KR":
+                # (2026-10-19) 네이버 goldDailyQuote 가 HTTP 410(폐지)으로 9/17 이후 한 달간 멈춤 → KRX OPEN API 금시장 일별매매정보로 교체
+                nh = krx_gold_hist(a["t"])
+                if not nh["t"] and a["t"]: nh = naver_mi_hist(ep, cd, fdtc, pages=2)    # 키 없음·장애 시 구 경로(지금은 410) 시도만
+            else:
+                nh = naver_mi_hist(ep, cd, fdtc, pages=120 if len(a["t"]) < 800 else 2)   # 3년 수익률에 ~750거래일 필요(120페이지 ≈ 1200일)
             m2 = dict(zip(a["t"], a["v"])); m2.update(dict(zip(nh["t"], nh["v"])))
             ts_ = sorted(m2)
             series = {"t": ts_, "v": [m2[k] for k in ts_]}
             acc[s] = {"t": ts_[-2600:], "v": series["v"][-2600:]}
             if ts_:
                 r["px"] = series["v"][-1]
-                r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + (" 고시(네이버)" if ep == "exchangeDailyQuote" else " 종가(네이버)")
+                r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + (" 고시(네이버)" if ep == "exchangeDailyQuote" else " 종가(KRX)" if s == "ND.GOLD_KR" else " 종가(네이버)")
         else:
             y = ydata.get(s)
             if y: series = {"t": y["t"], "v": y["v"]}; r["px"] = y["px"]; r["at"] = y["at"]

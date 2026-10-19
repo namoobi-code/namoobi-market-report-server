@@ -83,6 +83,11 @@ def yahoo(sym, rng="1y", itv="1d"):
     ts, cl = j["timestamp"], j["indicators"]["quote"][0]["close"]
     return [[utc(t).strftime("%Y-%m-%d"), float(c)] for t, c in zip(ts, cl) if c is not None]
 
+def yahoo_period(sym, p1, itv="1d"):
+    j = jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.request.quote(sym)}?period1={p1}&period2={int(time.time())+86400}&interval={itv}")["chart"]["result"][0]
+    ts, cl = j["timestamp"], j["indicators"]["quote"][0]["close"]
+    return [[utc(t).strftime("%Y-%m-%d"), float(c)] for t, c in zip(ts, cl) if c is not None]
+
 # ── ① 실질금리·달러 ────────────────────────────────────────────────────────
 def c_rates():
     if not fred_series: raise RuntimeError("nmr_fred 없음")
@@ -361,7 +366,12 @@ def main():
     prev = jload(OUT).get("ind") or {}
     hist = jload(HIST)
     try:
-        d_px = yahoo("GC=F", "5y"); IND["_px"] = {"s": trim(d_px, 1300)}
+        d_px = yahoo("GC=F", "5y")
+        # (2026-10-19 2차) 상단 종합 그래프 '전체' = 일봉 전 기간(2000~, ~6,500일) — 휠 확대로 세부 확인. 카드 오버레이도 이걸 쓴다
+        # ⚠ range=max&interval=1d 는 야후가 월봉(1mo)으로 강등해 269점만 준다(실측) → period1/period2 명시로 일봉 ~6,600일 수신
+        try: full = [[d, v] for d, v in yahoo_period("GC=F", 946684800) if v]
+        except Exception as e2: err("price_full", e2); full = d_px
+        IND["_px"] = {"s": trim(full, 8000)}
         # (2026-10-19) 장기 지표(GPR 20년·CPI·구글트렌드 5년)의 금 오버레이가 일봉 5y 밖에서 끊기던 문제 — 월봉 max 를 함께 실어 화면이 폴백
         try: IND["_px_m"] = {"s": [[d, round(v, 2)] for d, v in yahoo("GC=F", "max", "1mo") if v][-600:]}
         except Exception as e2: err("price_m", e2)

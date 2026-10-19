@@ -109,31 +109,31 @@ function mythTable(M){
       실측 요약: <b>달러·실질금리·기준금리</b>는 통설대로(달러가 가장 강함), <b>인플레(CPI)·전쟁(GPR)·공포(VIX)</b>는 20년 평균으로는 유의미한 동행이 없다 — 인플레는 실질금리를 거쳐야 작동하고, 지정학·공포는 급등 며칠만 반영된다. 월간·수준차 기준, 소스 FRED·야후·GPR.</div>`;
 }
 /* ── (2026-10-19 요청) 상단 금 시세 종합 그래프 — 금 선물($/oz) + KRX 금현물(원/g, 우축) · 기간 버튼 ── */
-let GN=365, gtop=null;
+let GN=252, gtop=null;
 function drawGoldTop(){
   const box=$('gl_top'); if(!box||!PX||PX.length<2) return;
   if(gtop){try{gtop.destroy();}catch(e){} gtop=null;}
   const KR=(((D.ind||{}).krx_gold||{}).s)||[];
-  let src=PX; if(GN>PX.length&&PXM&&PXM.length){ src=PXM; }
-  const a=src.slice(-Math.min(GN,src.length)); const labels=a.map(x=>x[0]); const g=a.map(x=>x[1]);
+  let src=PX; if(GN===Infinity&&PX.length<1500&&PXM&&PXM.length>PX.length) src=PXM;   // 일봉이 전기간이 아닐 때만 월봉 폴백
+  const a=GN===Infinity?src.slice():src.slice(-Math.min(GN,src.length)); const labels=a.map(x=>x[0]); const g=a.map(x=>x[1]);
   const ret=(n)=>{ const i=PX.length-1-n; return i>=0&&PX[i][1]?(PX[PX.length-1][1]/PX[i][1]-1)*100:null; };
   const chips=[[1,'1일'],[5,'1주'],[21,'1개월'],[63,'3개월'],[126,'6개월'],[252,'1년']].map(([n,t])=>{const r=ret(n); return r==null?'':`<span style="font-size:12px;padding:2px 8px;border-radius:10px;background:#f8fafc;border:1px solid #e2e8f0">${t} <b style="color:${r>=0?'#16a34a':'#dc2626'}">${r>=0?'+':''}${r.toFixed(1)}%</b></span>`;}).join(' ');
   const kr=KR.length?KR[KR.length-1]:null;
-  const btns=[[21,'1개월'],[63,'3개월'],[126,'6개월'],[365,'1년'],[1300,'5년'],[600,'전체(월봉)']].map(([n,t])=>`<button data-n="${n}" class="scrrst" style="font-size:11px;margin-left:4px;${n===GN?'background:#1e293b;color:#fff':''}">${t}</button>`).join('');
+  const btns=[[21,'1개월'],[63,'3개월'],[126,'6개월'],[252,'1년'],[756,'3년'],[1260,'5년'],[2520,'10년'],[Infinity,'전체']].map(([n,t])=>`<button data-n="${n}" class="scrrst" style="font-size:11px;margin-left:4px;${n===GN?'background:#1e293b;color:#fff':''}">${t}</button>`).join('');
   box.innerHTML=`<div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:6px"><b style="font-size:14px">🥇 금 시세 종합</b>
       <span style="font-size:20px;font-weight:900;color:#b45309">$${nf(PX[PX.length-1][1],0)}</span><span class="note">/oz 금 선물(GC=F) ${PX[PX.length-1][0]} · 휠=확대/축소 · 드래그=이동 · 더블클릭=초기화</span>
       ${kr?`<span style="font-size:15px;font-weight:700;color:#7c3aed">${nf(kr[1],0)} 원/g</span><span class="note">KRX 금현물 ${kr[0]}</span>`:''}
       <span style="margin-left:auto">${btns}</span></div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">${chips}</div>
-    <div style="position:relative;height:280px"><canvas id="gl_topcv" style="height:280px!important;width:100%!important"></canvas></div>`;
-  box.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{GN=+b.dataset.n; drawGoldTop();});
+    <div style="position:relative;height:280px"><canvas id="gl_topcv" style="height:280px!important;max-height:280px!important;width:100%!important"></canvas></div>`;
+  box.querySelectorAll('button[data-n]').forEach(b=>b.onclick=()=>{GN=b.dataset.n==='Infinity'?Infinity:+b.dataset.n; drawGoldTop();});
   setTimeout(()=>{const c=$('gl_topcv'); if(c) c.ondblclick=()=>{ if(gtop&&gtop.resetZoom) gtop.resetZoom(); };},0);
   const krm=Object.fromEntries(KR); const krd=labels.map(d=>krm[d]!=null?krm[d]:null); const hasKr=src===PX&&krd.some(v=>v!=null);
   const ds=[{label:'금 선물 $/oz',data:g,borderColor:'#d97706',backgroundColor:'#d9770622',fill:true,pointRadius:0,borderWidth:1.8,tension:0.1,yAxisID:'y'}];
   if(hasKr) ds.push({label:'KRX 금현물 원/g',data:krd,borderColor:'#7c3aed',backgroundColor:'transparent',fill:false,pointRadius:0,borderWidth:1.4,tension:0.1,yAxisID:'y2',spanGaps:true});
   gtop=new Chart($('gl_topcv'),{type:'line',data:{labels,datasets:ds},options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},
     plugins:{legend:{display:true,labels:{boxWidth:12,font:{size:11}}},tooltip:{callbacks:{label:c=>c.dataset.label+' '+nf(c.raw,0)}},zoom:(window.ChartZoom||Chart.registry.plugins.get('zoom'))?{zoom:{wheel:{enabled:true,speed:0.08},pinch:{enabled:true},mode:'x'},pan:{enabled:true,mode:'x'},limits:{x:{minRange:10}}}:undefined},
-    scales:{x:{ticks:{maxTicksLimit:30,autoSkip:true,font:{size:10},maxRotation:0,callback:(v,i)=>labels[i]?labels[i].slice(src===PXM?0:2,7):''},grid:{display:false}},
+    scales:{x:{ticks:{maxTicksLimit:30,autoSkip:true,font:{size:10},maxRotation:0,callback:(v,i)=>labels[i]?(labels.length>400?labels[i].slice(0,7):labels[i].slice(2)):''},grid:{display:false}},
             y:{position:'left',ticks:{font:{size:10},color:'#b45309',callback:v=>'$'+nf(v,0)},grid:{color:'#f1f5f9'}},
             y2:{display:hasKr,position:'right',ticks:{font:{size:10},color:'#7c3aed',callback:v=>nf(v/1000,0)+'k'},grid:{display:false}}}}});
 }
