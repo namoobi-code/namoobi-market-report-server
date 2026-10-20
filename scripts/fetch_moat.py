@@ -6,13 +6,17 @@
 "일시적 빠짐 vs 이유 있는 하락"을 구분하는 3층 신호를 매일 산출한다.
   ① 가격 신호: 52주 고점 대비 낙폭 · 200일선 이격도 · RSI(14) · 기간 수익률
   ② 해자 선행지표: 종목별 연결 지표(우라늄 실물신탁·은 선물·SOX·XBI·MU 등, 야후)의 3개월 방향
-  ③ 판정 신호등:
-     ⚪ top   낙폭 > -10%              — 고점권(빠짐 신호 없음)
-     🟢 buy   낙폭 ≤ -20% & RSI<50 & 선행지표 3개월 ≥ +5% — '일시적 빠짐 후보'
-     🟢~ buy_z 같은 조건, 선행지표 3개월이 ±5% 이내(중립) 또는 악화 3일 미만 — 방향 판단 보류
-     🔴 risk  낙폭 ≤ -20% & 선행지표 3개월 ≤ -5% 가 3거래일 연속 — 선행지표 동반 악화(구조 의심)
-     🟡 watch 그 외                                    — 관찰
-     선행지표 미연결 종목이 낙폭 조건 충족 시 buy_m(🟢※ 수동 확인 필요).
+  ③ 판정 신호등 (2026-10-21 3층 구조로 전면 개정 — 백테스트 근거는 코드 하단 주석):
+     ⚪ top    낙폭 > -10%                                   — 고점권(빠짐 신호 없음)
+     🔴 alert  이익 게이트 경보 — TTM EPS 가 전년 대비 2분기 연속 감소   — 해자 해지 의심(낙폭 무관)
+     🟢 buy    게이트 통과 & 안전마진 & 멈춤 확인                 — 매수 후보
+     🟡 wait   게이트 통과 & 안전마진 & 아직 하락 중(종가 ≤ 20일선)   — 싸졌지만 대기
+     🚫 nogate 안전마진이나 TTM EPS 적자·미확정                   — 매수 규칙 비적용(잴 해자가 없다)
+     🟡 watch  그 외                                         — 관찰
+     · 이익 게이트 = 야후 fundamentals-timeseries 의 trailingDilutedEPS(TTM) 전년동기 대비.
+     · 안전마진 = 자기역사 3년 롤링 '52주고점 대비 낙폭' 하위 10% (또는 PER 밴드 하위 10%, 250일 이상 누적 시).
+     · 멈춤 확인 = 종가 > 20일선.
+     · 선행지표는 매수 판정에서 뺐다. 대신 '혼자 빠짐'(낙폭 하위 10% 인데 섹터 대리지표 3개월 ≥ +5%) 경보로 쓴다.
 ※ 가격·판정은 '검토 후보 알림'이지 매수 신호가 아니다 — 가치함정은 걸러지지 않는다.
 유니버스는 gen_appd/appf/apph 관계도의 B1 카드 기준 수동 동기화(관계도 갱신 시 여기도 갱신).
 
@@ -31,7 +35,12 @@ KST  = timezone(timedelta(hours=9))
 
 # (2026-09-01) 선행지표 판정 안정화 — 0 근처 부호 뒤집힘 방지
 LEAD_DZ      = 5.0   # 데드존: 선행지표 3개월이 ±5% 이내면 방향으로 읽지 않는다(🟢~ 중립)
-LEAD_PERSIST = 3     # 🔴 는 3거래일 연속 악화(≤ -5%)일 때만 확정한다
+LEAD_PERSIST = 3     # (구) 🔴 지속성 — 2026-10-21 이후 판정에는 쓰지 않고 lead.m3_seq 표시용으로만 남긴다
+# (2026-10-21) 3층 판정 파라미터 — 값의 근거는 코드 하단 '빠짐후보 백테스트' 주석
+MARGIN_DDP   = 10    # 안전마진: 자기역사 3년 롤링 낙폭 percentile 하위 10%
+MARGIN_PERP  = 10    # 안전마진(대체): PER 밴드 하위 10% — 밴드 누적 250일 이상일 때만 사용
+GATE_DOWN_Q  = 2     # 🔴 경보: TTM EPS 전년동기 대비 감소가 2분기 연속
+LONE_LEAD    = 5.0   # '혼자 빠짐': 낙폭 하위 10% 인데 섹터 대리지표 3개월 ≥ +5%
 
 # (심볼, 이름, 분야, 해자 한 줄, 선행지표 심볼|None, 선행지표 이름)
 UNIV = [
@@ -405,13 +414,125 @@ def per_band(per_map):
         out[sym] = {"per": v, "src": src, "pct": pct, "n": n}
     return out
 
+# ══════════════════════════════════════════════════════════════════════════════
+# (2026-10-21) 빠짐후보 규칙 백테스트 — 판정을 3층(해자 게이트 → 안전마진 → 멈춤)으로 바꾼 근거.
+#   질문: "해자가 해지되지 않는 한 언젠간 오른다면, 안전마진이 확보된 '좋은 가격'은 무엇인가" (사용자).
+#   방법: UNIV 49종 야후 10년 일봉, 신호 첫날 매수(중복 방지 60거래일), 12개월·24개월 선도수익·승률·
+#         진입 후 최대 추가하락(MAE)·최악 10% 분위. 대조군 = 같은 종목 20거래일마다 조건 없이 매수.
+#         미국 18종은 SEC XBRL 분기 EPS(공시일 이후만 사용) 로 TTM 을 복원해 이익 조건을 검증.
+#   ① 구 규칙 'dd≤-20 & RSI<50' 은 대조군과 차이가 없었다 — 12M 중앙 +24.5% vs +23.4%, 승률 66 vs 68%,
+#      MAE -20.0 vs -17.0%. 고정 -20% 는 고변동주(디웨이브·센트러스)엔 일상이고 저변동주(무라타)엔 사건이라
+#      결국 고변동주만 상시 후보가 됐다(2026-10-20 시점 51종 중 34종 🟢). -30% 로 더 깊게 잡으면 더 나빠진다.
+#   ② 이득은 '낙폭 측정법' 에서 나왔다 — 자기역사 percentile(3년 롤링 하위 10%) 로 바꾸면 승률 75%·MAE -15.2%·
+#      최악10% -24%(구 -35%). '바닥 확인'(ma20/ma50/RSI 회복/반등 5%) 은 어느 것이든 73~78% 로 차이가 잡음 범위 —
+#      설명이 쉬운 종가>20일선을 택했다.
+#   ③ 선행지표 🟢/🔴 분기는 방향이 **거꾸로** 였다 — 선행 우호(구 🟢buy) 12M 중앙 +19.1%·승률 67% vs
+#      선행 악화(구 🔴risk) +32.0%·74%. 섹터가 같이 빠지면 일시적, 섹터는 오르는데 혼자 빠지면 고유 사유.
+#      → 매수 판정에서 제거하고 '혼자 빠짐'(lone) 경보로 역할을 바꿨다.
+#   ④ 미국 18종에서 이익 조건을 붙이면 꼬리가 사라진다 — 낙폭하위10%&>ma20 에 'TTM EPS 전년 대비 증가' 를 더하면
+#      12M 승률 83%·MAE -12.6%·최악10% -2.9%(가격만: 75%·-14.7%·-30.5%). 24M 은 승률 90%·최악10% +32.4%.
+#      반대로 EPS 적자·미확정 종목은 승률 57%·최악10% -44% 로 손실의 진원지 → 🚫 nogate 로 매수 규칙에서 뺀다.
+#   ⑤ 중국 4종(통위·북방희토·JL마그·CATL)은 가격 규칙이 완전히 실패(승률 20%) — 구조적 하락장에선 '자기역사 하위' 가
+#      계속 갱신된다. 가격 신호는 해자 해지를 못 거른다는 증거이고, 그래서 이익 게이트가 1층이다.
+#   한계: 지금 살아남은 해자종목으로 과거를 돌린 생존편향 — 절대 수익률은 부풀려져 있고 규칙 간 비교만 신뢰할 것.
+#        PER 밴드는 이력이 짧아(수십 일) 검증 못 함 → 250일 이상 누적 시 안전마진 대체 조건으로 자동 편입(MARGIN_PERP).
+#        한국·일본은 분기 EPS 10년치가 없어 이익 조건 백테스트는 미국 18종 n=41 에 한정된다.
+#   운영 규약: 🔴 alert 는 '해자 해지 의심 — 사람이 확인' 이지 매도 신호가 아니다(센트러스처럼 계약 인식 시점이
+#        울퉁불퉁한 종목은 오탐 가능). 🟢 buy 도 '검토 후보' 다. 경보는 홈피 해자워치 상단 배너·카드 띠로만 표시(메일 없음 — 사용자 결정).
+
+def fetch_fund(sym):
+    """(2026-10-21) 이익 게이트 — 야후 fundamentals-timeseries (무인증·crumb 불필요, 2026-10-21 실측).
+    trailingDilutedEPS(TTM, 분기점 10~12개) 로 전년동기 대비 증감을 보고, 분기 영업이익·매출로 OPM 변화를 덧붙인다.
+    반환: {"gate": ok|down|alert|na, "eps_ttm", "eps_yoy", "down_q", "opm", "opm_chg", "asof", "n"}
+    · ok    = 최신 TTM EPS ≥ 1년 전 TTM EPS
+    · down  = 1분기 감소
+    · alert = GATE_DOWN_Q 분기 연속 감소 → 🔴 해자 경보
+    · na    = TTM EPS ≤ 0 또는 비교 시점 없음(적자·신규상장) → 매수 규칙 비적용
+    일본 일부(6857.T 등)는 분기 없이 연간만 와서 trailing 점이 6개 — 전년 비교만 가능, 연속성 판정은 1분기로 취급."""
+    p2 = int(time.time()); p1 = p2 - 5 * 365 * 86400
+    u = ("https://query2.finance.yahoo.com/ws/fundamentals-timeseries/v1/finance/timeseries/"
+         f"{urllib.parse.quote(sym)}?type=trailingDilutedEPS,quarterlyOperatingIncome,quarterlyTotalRevenue&period1={p1}&period2={p2}")
+    try:
+        j = json.loads(get(u, 20))
+    except Exception:
+        return {"gate": "na", "err": "fetch"}
+    ser = {}
+    for r in (j.get("timeseries") or {}).get("result") or []:
+        t = (r.get("meta") or {}).get("type", [None])[0]
+        if not t:
+            continue
+        ser[t] = sorted((x["asOfDate"], x["reportedValue"]["raw"]) for x in (r.get(t) or []) if x and x.get("reportedValue"))
+    eps = ser.get("trailingDilutedEPS") or []
+    # ⚠ (2026-10-21 실측) 야후 trailingDilutedEPS 는 **액면분할을 소급 조정하지 않는다** — KLA 34.35→3.53(10:1).
+    #   quarterlyDilutedEPS 는 조정돼 있어 서로 안 맞는다. 차트 API 의 실제 분할 이벤트(SPLITS)로 분할일 이전 점을 나눈다.
+    #   (비율 휴리스틱은 라이너스처럼 이익이 실제로 2.5배 뛴 턴어라운드를 분할로 오인해 폐기 — 2026-10-21)
+    for sd, ratio in SPLITS.get(sym) or []:
+        if ratio and ratio != 1:
+            eps = [(d, v / ratio if int(datetime.fromisoformat(d).timestamp()) < sd else v) for d, v in eps]
+    out = {"gate": "na", "n": len(eps), "asof": eps[-1][0] if eps else None,
+           "eps_ttm": round(eps[-1][1], 2) if eps else None}
+    oi, rv = ser.get("quarterlyOperatingIncome") or [], ser.get("quarterlyTotalRevenue") or []
+    # 영업이익 전년동기 대비 — 주식수·일회성(M&A 상각 등)에 흔들리는 EPS 의 교차검증 축(=1차 잣대 '마진')
+    if len(oi) >= 5 and oi[-5][1]:
+        out["oi_yoy"] = round((oi[-1][1] - oi[-5][1]) / abs(oi[-5][1]) * 100, 1)
+    if oi and rv:
+        rvm = dict(rv)
+        opm = [(d, v / rvm[d] * 100) for d, v in oi if rvm.get(d)]
+        if opm:
+            out["opm"] = round(opm[-1][1], 1)
+            if len(opm) >= 5:
+                out["opm_chg"] = round(opm[-1][1] - opm[-5][1], 1)   # 전년동기 대비 %p
+    if len(eps) < 2 or eps[-1][1] <= 0:
+        return out
+    def yoy(k):
+        """k번째 최신 TTM 점의 전년동기(≥350일 전) 대비 증감률. 비교점 없거나 음수면 None."""
+        d, v = eps[k]
+        base = [(dd, vv) for dd, vv in eps[:k] if (datetime.fromisoformat(d) - datetime.fromisoformat(dd)).days >= 350]
+        if not base or base[-1][1] <= 0 or v <= 0:
+            return None
+        return (v / base[-1][1] - 1) * 100
+    cur = yoy(len(eps) - 1)
+    if cur is None:
+        return out
+    out["eps_yoy"] = round(cur, 1)
+    down = 0
+    for k in range(len(eps) - 1, -1, -1):
+        y = yoy(k)
+        if y is None or y >= 0:
+            break
+        down += 1
+    out["down_q"] = down
+    # 🔴 확정 조건 = EPS 감소 2분기 연속 **그리고** 영업이익도 전년동기 대비 감소.
+    #   (2026-10-21 첫 실행 오탐: 시놉시스 EPS -55% 는 Ansys 인수 주식발행·상각 효과였고 영업이익은 +, KLA -88% 는 분할 미조정.
+    #    이익 '수준'이 아니라 '마진'이 해자의 1차 잣대이므로 영업이익 교차검증 없는 EPS 감소는 ⚠ 까지만.)
+    oy = out.get("oi_yoy")
+    if down >= GATE_DOWN_Q:
+        if oy is not None and oy < 0:
+            out["gate"] = "alert"
+        elif oy is None:
+            out["gate"] = "down"; out["note"] = "EPS 2분기 연속 감소 — 영업이익 데이터 없어 미확정"
+        else:
+            out["gate"] = "ok"; out["note"] = f"EPS 감소({cur:+.0f}%)이나 영업이익 {oy:+.0f}% — 회계효과(주식수·일회성) 추정"
+    elif down == 1:
+        out["gate"] = "down"
+    else:
+        out["gate"] = "ok"
+    return out
+
+SPLITS = {}   # (2026-10-21) sym → [(ts, ratio)] — 차트 응답의 events.splits. 야후 trailing EPS 분할 보정에 쓴다.
+
 def hist(sym, rng="2y"):
-    u = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range={rng}&interval=1d"
+    u = f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(sym)}?range={rng}&interval=1d&events=splits"
     j = json.loads(get(u))
     r = (j.get("chart") or {}).get("result") or []
     if not r:
         return None
     r = r[0]
+    try:
+        SPLITS[sym] = sorted((int(v["date"]), float(v["numerator"]) / float(v["denominator"]))
+                             for v in ((r.get("events") or {}).get("splits") or {}).values())
+    except Exception:
+        SPLITS.setdefault(sym, [])
     ts = r.get("timestamp") or []
     cl = ((r.get("indicators") or {}).get("quote") or [{}])[0].get("close") or []
     pts = [(t, c) for t, c in zip(ts, cl) if c is not None]
@@ -503,7 +624,7 @@ def main():
     rows = []
     for sym, nm, sec, moat, lsym, lnm in UNIV:
         try:
-            pts = hist(sym)
+            pts = hist(sym, "5y")            # (2026-10-21) 3년 롤링 낙폭 percentile 에 4년치(3년 창 + 1년 고점 룩백) 필요
         except Exception as e:
             print(f"  ⚠ {nm}({sym}) 실패: {repr(e)[:50]}", flush=True)
             continue
@@ -511,6 +632,17 @@ def main():
             continue
         cl = [c for _, c in pts]
         cur = cl[-1]
+        try:
+            fund = fetch_fund(sym)
+        except Exception as e:
+            fund = {"gate": "na", "err": repr(e)[:40]}
+        # 자기역사 낙폭 percentile — 과거 매일의 '52주고점 대비 낙폭' 분포(최근 756거래일) 에서 오늘 낙폭의 위치
+        ddp3y = None
+        if len(cl) > 252 + 250:
+            dds = [cl[i] / max(cl[max(0, i - 251):i + 1]) * 100 - 100 for i in range(252, len(cl))]
+            w = dds[-757:-1]
+            ddp3y = round(100 * sum(1 for x in w if x <= dds[-1]) / len(w), 1)
+        ma20 = sum(cl[-20:]) / min(20, len(cl))
         yr = cl[-252:] if len(cl) >= 252 else cl
         hi52 = max(yr)
         dd = pct(hi52, cur)                       # 52주 고점 대비(음수)
@@ -547,32 +679,27 @@ def main():
             sc += 15 if (rsi is not None and rsi >= 55) else (8 if (rsi is not None and rsi >= 45) else 0)  # ⑤ 모멘텀 유지(신고가+낮은 RSI=다이버전스 근사)
             qh = max(0, min(100, sc))
         lead_pending = None
+        # ── (2026-10-21) 3층 판정 — 해자 유지 게이트 → 안전마진 → 멈춤 확인 ──────────────────
+        #   백테스트(코드 하단 주석): 구 'dd≤-20 & RSI<50' 은 아무 날 매수와 차이가 없었고(12M 승률 66 vs 68%),
+        #   선행지표 🟢/🔴 분기는 방향이 거꾸로였다. 꼬리를 없앤 건 '이익이 늘고 있는가'(최악10% -30%→-3%).
+        bpct, bn = ((band.get(sym) or {}).get("pct"), (band.get(sym) or {}).get("n") or 0)
+        margin = (ddp3y is not None and ddp3y <= MARGIN_DDP) or (bpct is not None and bn >= 250 and bpct <= MARGIN_PERP)
+        stop = cur > ma20
+        gate = fund.get("gate", "na")
+        lone = bool(ddp3y is not None and ddp3y <= MARGIN_DDP and lead_m3 is not None and lead_m3 >= LONE_LEAD)
         if dd is None:
             v = "watch"
+        elif gate == "alert":
+            v = "alert"                        # 🔴 이익 2분기 연속 감소 — 낙폭·고점 무관하게 최우선
         elif dd > -10:
             v = "top_hot" if qh >= 70 else ("top_warn" if qh < 40 else "top")
-        elif dd <= -20 and (rsi is None or rsi < 50):
-            # (2026-09-01 개정) 선행지표 3개월의 '부호 하나'로 🟢/🔴 이 뒤집히던 문제를 고친다.
-            #   실측 사고: SK하이닉스 2026-09-01 buy→risk 전환. 마이크론은 전일 +2.8% 상승했는데도
-            #   3개월 기준일이 5/28→5/29 로 하루 밀리며(그날 +5% 급등이 창에 진입) 수익률이
-            #   +3.8% → -1.3% 로 부호만 바뀌어 '선행지표 동반 악화(구조 의심)' 라벨이 붙었다.
-            #   → ① 데드존 ±5%: 0 근처는 방향으로 읽지 않는다  ② 지속성: 3거래일 연속 악화만 🔴
-            if lsym is None or lead_m3 is None:
-                v = "buy_m"                        # 🟢※ 선행지표 미연결 — 수동 확인
-            elif lead_m3 >= LEAD_DZ:
-                v = "buy"                          # 🟢 선행지표 우호
-            elif lead_m3 <= -LEAD_DZ:
-                # 지속성 — 최근 3거래일의 '3개월 수익률'이 모두 ≤ -5% 일 때만 🔴 확정.
-                # 기준일이 하루 밀리며 부호만 바뀌는 잡음은 여기서 걸러진다.
-                _sq = (L or {}).get("m3_seq") or []
-                _bad = sum(1 for x in _sq if x <= -LEAD_DZ)
-                if len(_sq) >= LEAD_PERSIST and _bad >= LEAD_PERSIST:
-                    v = "risk"
-                else:
-                    v = "buy_z"                    # 🟢~ 악화가 아직 하루이틀 — 보류
-                    lead_pending = _bad
+        elif margin:
+            if gate == "na":
+                v = "nogate"                   # 🚫 적자·미확정 — 잴 해자가 없어 매수 규칙 비적용
+            elif stop:
+                v = "buy"                      # 🟢 게이트 통과 + 안전마진 + 멈춤
             else:
-                v = "buy_z"                        # 🟢~ 선행지표 중립(±5% 이내) — 방향 판단 보류
+                v = "wait"                     # 🟡 싸졌지만 아직 하락 중
         else:
             v = "watch"
         # (2026-10-19 사용자 지적) 스파크가 2년치(hist 기본 range=2y)라 네이버 '1년' 차트와 모양이 달라 보였다
@@ -587,6 +714,8 @@ def main():
                      "val": band.get(sym),
                      "cur": round(cur, 1), "dd": dd, "gap200": gap200, "rsi": rsi,
                      "m1": m1, "m3": m3, "y1": y1, "verdict": v, "qh": qh, "lead_pending": lead_pending,
+                     "ddp3y": ddp3y, "gap20": pct(ma20, cur), "margin": margin, "stop": stop, "lone": lone,
+                     "fund": fund,
                      "lead": ({"sym": lsym, "name": lnm, "m1": (L or {}).get("m1"), "m3": lead_m3,
                                "m6": (L or {}).get("m6"), "y1": (L or {}).get("y1"),
                                "m3_seq": (L or {}).get("m3_seq")} if lsym else None),
@@ -629,9 +758,14 @@ def main():
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
         "rows": rows,
         "moat_types": {k: {"name": v[0], "fg": v[1], "bg": v[2], "risk": v[3]} for k, v in MOAT_TYPE.items()},
-        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "buy_z", "buy_m", "risk", "watch", "top", "top_hot", "top_warn")},
+        "counts": {k: sum(1 for r in rows if r["verdict"] == k) for k in ("buy", "wait", "alert", "nogate", "watch", "top", "top_hot", "top_warn")},
+        "alerts": [{"sym": r["sym"], "name": r["name"], "eps_yoy": r["fund"].get("eps_yoy"), "down_q": r["fund"].get("down_q"),
+                    "opm": r["fund"].get("opm"), "opm_chg": r["fund"].get("opm_chg"), "oi_yoy": r["fund"].get("oi_yoy"), "since": r.get("vd_days")}
+                   for r in rows if r["verdict"] == "alert"],
+        "lone": [{"sym": r["sym"], "name": r["name"], "lead": (r["lead"] or {}).get("name"), "lead_m3": (r["lead"] or {}).get("m3"), "ddp3y": r["ddp3y"]}
+                 for r in rows if r.get("lone")],
     }, ensure_ascii=False), encoding="utf-8")
-    vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'buy_z', 'buy_m', 'risk')}
+    vc = {r['name']: r['verdict'] for r in rows if r['verdict'] in ('buy', 'wait', 'alert', 'nogate')}
     print(f"[moat] ✅ {len(rows)}/{len(UNIV)}종 → {OUT} · 신호: {vc}", flush=True)
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-/* moat.js — 🏰 해자 워치 탭 (2026-08-30 신설)
+/* moat.js — 🏰 해자 워치 탭 (2026-08-30 신설 · 2026-10-21 3층 판정으로 개정)
    데이터: /api/db/moat (scripts/fetch_moat.py · 매일 06:30 cron · LLM 토큰 0)
-   목적: 해자지도(부록D·F·H)의 독점·준독점(파란 배지) 상장 종목에서
-        "일시적 빠짐(기회 후보)"과 "이유 있는 하락(구조 의심)"을 구분해 보여준다.
-   판정은 '검토 후보 알림'이지 매수 신호가 아니다 — 가치함정은 가격 신호로 안 걸러진다. */
+   판정 3층 = ① 해자 유지 게이트(TTM EPS 전년比 + 영업이익 교차검증) → ② 안전마진(자기역사 3년 낙폭 하위 10%)
+             → ③ 멈춤 확인(종가>20일선). 근거 백테스트는 fetch_moat.py 하단 주석.
+   🔴 alert 는 '해자 해지 의심 — 사람이 확인'이지 매도 신호가 아니고, 🟢 buy 도 '검토 후보'다. */
 (function(){
 'use strict';
 let D=null, FILT='all', MT='all';
@@ -22,15 +22,17 @@ function mkt(sym){
   if(/\.DE$/.test(sym)) return ['🇩🇪','독일'];
   return ['🇺🇸','미국'];
 }
-const V={buy:  ['🟢','일시적 빠짐 후보','#166534','#dcfce7','해자 유지 신호 속 큰 낙폭 — 검토 후보'],
-        buy_z:['🟢','빠짐 후보 ~선행지표 중립','#15803d','#dcfce7','큰 낙폭 + 선행지표 3개월이 ±5% 이내(방향 불명) 또는 악화가 3일 미만 — 0 근처 부호 뒤집힘을 판정에 쓰지 않는다'],
-        buy_m:['🟢','빠짐 후보 ※수동확인','#166534','#dcfce7','큰 낙폭이나 선행지표 미연결 — 해자 훼손 뉴스 직접 확인 필요'],
-        risk: ['🔴','선행지표 동반 악화','#b91c1c','#fee2e2','낙폭 + 연결 지표가 3거래일 연속 -5% 이하 — 구조적 이유 의심'],
-        watch:['🟡','관찰','#a16207','#fef9c3','중간 지대 — 신호 대기'],
+const V={buy:  ['🟢','매수 후보','#166534','#dcfce7','이익 증가(게이트 통과) + 자기역사 낙폭 하위 10%(안전마진) + 종가>20일선(멈춤) — 세 조건 동시 충족. 백테스트 12M 승률 83%·최악10% -3%'],
+        wait: ['🟡','싸졌지만 하락 중','#a16207','#fef9c3','게이트 통과 + 안전마진이나 종가가 아직 20일선 아래 — 떨어지는 칼날. 20일선 회복 시 🟢 전환'],
+        alert:['🔴','해자 경보','#b91c1c','#fee2e2','TTM EPS 전년 대비 2분기 연속 감소 + 영업이익도 감소 — 해자 해지 의심. 사람이 확인할 것(매도 신호 아님)'],
+        nogate:['🚫','이익 미확정','#6b21a8','#f3e8ff','안전마진은 있으나 TTM EPS 적자·비교 불가 — 잴 해자가 없어 매수 규칙 비적용(백테스트 승률 57%·최악10% -44%)'],
+        watch:['🟡','관찰','#64748b','#f1f5f9','낙폭이 자기 역사상 특별하지 않음 — 신호 대기'],
         top:  ['⚪','고점권','#475569','#f1f5f9','52주 고점 부근 — 빠짐 신호 없음'],
         top_hot: ['⚪🔥','추세 건강','#0f766e','#ccfbf1','고점 질 점수 70+ — 신고가 최근·선행지표 동행·밴드 중하위 = 오를 이유가 살아있는 고점'],
-        top_warn:['⚪⚠','과열·소진 주의','#b45309','#ffedd5','고점 질 점수 40미만 — 경신 끊김·다이버전스·이격 과대 = 멀티플 의존 고점']};
-const ORDER={buy:0,buy_z:1,buy_m:2,risk:3,top_warn:4,watch:5,top_hot:6,top:7};
+        top_warn:['⚪⚠','과열·소진 주의','#b45309','#ffedd5','고점 질 점수 40미만 — 경신 끊김·다이버전스·이격 과대 = 멀티플 의존 고점'],
+        // 구 판정(2026-10-21 이전 이력 표시용)
+        buy_z:['🟢~','(구)빠짐 후보','#15803d','#dcfce7','구 규칙'], buy_m:['🟢※','(구)빠짐 후보','#166534','#dcfce7','구 규칙'], risk:['🔴','(구)선행지표 악화','#b91c1c','#fee2e2','구 규칙']};
+const ORDER={alert:0,buy:1,wait:2,nogate:3,top_warn:4,watch:5,top_hot:6,top:7,buy_z:2,buy_m:2,risk:0};
 
 function spark(sv,color){
   if(!sv||sv.length<2) return '';
@@ -54,7 +56,7 @@ function render(){
   $('mw_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 06:30 자동 갱신';
   const rows=D.rows||[], c=D.counts||{};
   // 필터 칩 + 신호등 요약
-  const FL=[['all','전체 '+rows.length],['buy','🟢 빠짐 후보 '+((c.buy||0)+(c.buy_z||0)+(c.buy_m||0))],['risk','🔴 악화 '+(c.risk||0)],['watch','🟡 관찰 '+(c.watch||0)],['top','⚪ 고점권 '+((c.top||0)+(c.top_hot||0)+(c.top_warn||0))]];
+  const FL=[['all','전체 '+rows.length],['alert','🔴 해자 경보 '+(c.alert||0)],['buy','🟢 매수 후보 '+(c.buy||0)],['wait','🟡 싸졌지만 하락 중 '+(c.wait||0)],['nogate','🚫 이익 미확정 '+(c.nogate||0)],['watch','관찰 '+(c.watch||0)],['top','⚪ 고점권 '+((c.top||0)+(c.top_hot||0)+(c.top_warn||0))]];
   $('mw_filt').innerHTML=FL.map(f=>
     `<button data-f="${f[0]}" style="margin-right:6px;padding:3px 12px;border-radius:14px;border:1px solid ${FILT===f[0]?'#334155':'#d6d9de'};background:${FILT===f[0]?'#334155':'#fff'};color:${FILT===f[0]?'#fff':'#333'};cursor:pointer;font-size:12.5px">${f[1]}</button>`).join('');
   $('mw_filt').querySelectorAll('button').forEach(b=>b.onclick=()=>{FILT=b.dataset.f;render();});
@@ -72,18 +74,28 @@ function render(){
 
   // (Phase3) 오늘의 판정 전환 배너
   const chg=rows.filter(r=>r.vd_prev);
-  const VE={buy:'🟢',buy_z:'🟢~',buy_m:'🟢※',risk:'🔴',watch:'🟡',top:'⚪',top_hot:'⚪🔥',top_warn:'⚪⚠'};
+  const VE={buy:'🟢',wait:'🟡대기',alert:'🔴',nogate:'🚫',buy_z:'🟢~',buy_m:'🟢※',risk:'🔴(구)',watch:'관찰',top:'⚪',top_hot:'⚪🔥',top_warn:'⚪⚠'};
+  // (2026-10-21) 🔴 해자 경보 상단 고정 배너 — 사용자 결정: 메일 없이 홈피 표시만. 사유(EPS·영업이익·OPM)를 함께 적는다.
+  const al=D.alerts||[], lone=D.lone||[], ab=$('mw_alert');
+  if(ab){
+    const alH=al.length?`<b>🔴 해자 경보 ${al.length}종</b> — TTM EPS 전년比 2분기 연속 감소 + 영업이익 감소. <i>해자 해지 의심이지 매도 신호가 아니다 — 계약 인식 시점이 울퉁불퉁한 종목(센트러스류)은 오탐 가능, 사람이 확인할 것.</i><br>`+
+      al.map(a=>`<span style="display:inline-block;margin:3px 10px 0 0;padding:2px 8px;background:#fff;border:1px solid #fecaca;border-radius:8px"><b>${a.name}</b> EPS ${pf(a.eps_yoy)}(${a.down_q}분기 연속) · 영업이익 ${pf(a.oi_yoy)}${a.opm!=null?` · OPM ${a.opm}%(${a.opm_chg!=null?(a.opm_chg>0?'+':'')+a.opm_chg+'%p':'—'})`:''}${a.since>1?` · D+${a.since}`:' · ⚡오늘'}</span>`).join('')
+      :'<b>🔴 해자 경보 없음</b> — 51종 모두 이익 게이트 통과 또는 미확정';
+    const loH=lone.length?`<div style="margin-top:5px"><b>⚠ 혼자 빠짐 ${lone.length}종</b> — 섹터 대리지표는 오르는데(3개월 ≥+5%) 자기역사 낙폭 하위 10%. 백테스트상 '섹터 동반 하락'보다 성적이 나빴던 유형 = 고유 사유 점검: `+
+      lone.map(x=>`<b>${x.name}</b>(지표 ${pf(x.lead_m3)} vs 낙폭 하위 ${x.ddp3y}%)`).join(' · ')+'</div>':'';
+    ab.innerHTML=alH+loH;
+    ab.style.cssText=`margin-bottom:8px;padding:7px 10px;border-radius:8px;background:${al.length?'#fef2f2':'#f0fdf4'};border-left:4px solid ${al.length?'#b91c1c':'#16a34a'};font-size:12px`;
+  }
   const bn=$('mw_chg');
   if(bn) bn.innerHTML=chg.length?`<b>⚡ 오늘의 전환</b> — ${chg.map(r=>`${r.name} ${VE[r.vd_prev]||r.vd_prev}→${VE[r.verdict]}`).join(' · ')}`
                                :'오늘 판정 전환 없음 — 신호등은 매일 06:30 재산출';
   let list=[...rows];
   if(MT==='reg') list=list.filter(r=>r.reg);
   else if(MT!=='all') list=list.filter(r=>(r.mtype||[]).indexOf(MT)>=0);
-  if(FILT==='buy') list=list.filter(r=>r.verdict==='buy'||r.verdict==='buy_z'||r.verdict==='buy_m');
-  else if(FILT==='top') list=list.filter(r=>r.verdict.startsWith('top'));
+  if(FILT==='top') list=list.filter(r=>r.verdict.startsWith('top'));
   else if(FILT!=='all') list=list.filter(r=>r.verdict===FILT);
   // 정렬: 🟢 우선 → 낙폭 큰 순 (기회 후보가 맨 위)
-  list.sort((a,b)=>(ORDER[a.verdict]-ORDER[b.verdict])||((a.dd??0)-(b.dd??0)));
+  list.sort((a,b)=>((ORDER[a.verdict]??5)-(ORDER[b.verdict]??5))||((a.ddp3y??100)-(b.ddp3y??100)));
 
   $('mw_grid').innerHTML=list.map(r=>{
     const v=V[r.verdict]||V.watch;
@@ -107,9 +119,18 @@ function render(){
           <tr><td style="color:#94a3b8;padding:1px 6px 1px 0">PER(${r.val?r.val.src:'-'})</td><td style="text-align:right;font-weight:700">${r.val?r.val.per:'—'}</td>
               <td style="color:#94a3b8;padding:1px 6px 1px 12px">밴드</td><td style="text-align:right;font-size:10.5px">${r.val?(r.val.pct!=null?`<b style="color:${r.val.pct<=25?'#166534':r.val.pct>=75?'#b91c1c':'#334155'}">하위 ${r.val.pct}%</b>(${r.val.n}일)`:`누적 ${r.val.n}일`):'—'}</td></tr>
         </table></div>
+      ${(function(){const f=r.fund||{}, g=f.gate||'na';
+        const gc=g==='alert'?'#b91c1c':g==='down'?'#b45309':g==='ok'?'#166534':'#6b21a8';
+        const gl=g==='alert'?'🔴 2분기 연속 감소+영업이익↓':g==='down'?(f.note?'⚠ '+f.note:'⚠ 1분기 감소'):g==='ok'?(f.note?'✓ 통과 ('+f.note+')':'✓ 이익 증가'):'🚫 적자·미확정';
+        const mg=r.ddp3y!=null?`<b style="color:${r.ddp3y<=10?'#166534':'#334155'}">하위 ${r.ddp3y}%</b>`:'<span style="color:#94a3b8">이력 부족</span>';
+        return `<div style="font-size:11px;margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">
+          <span title="① 해자 유지 게이트 — TTM EPS 전년 대비(영업이익으로 교차검증)" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:1px 6px">① 이익 <b style="color:${gc}">${gl}</b>${f.eps_yoy!=null?` <span style="color:#64748b">EPS ${pf(f.eps_yoy)}${f.oi_yoy!=null?' · 영업이익 '+pf(f.oi_yoy):''}${f.opm!=null?' · OPM '+f.opm+'%':''}</span>`:''}</span>
+          <span title="② 안전마진 — 오늘 낙폭이 이 종목의 최근 3년 낙폭 분포에서 어디인가(하위 10% 이하 = 자기 역사상 이례적)" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:1px 6px">② 자기역사 낙폭 ${mg}</span>
+          <span title="③ 멈춤 확인 — 종가 > 20일선" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:1px 6px">③ 20일선比 <b style="color:${r.stop?'#166534':'#b45309'}">${pf(r.gap20)}</b>${r.stop?' 회복':' 하락중'}</span>
+          ${r.lone?'<span style="background:#fff7ed;border:1px solid #fdba74;color:#9a3412;border-radius:6px;padding:1px 6px">⚠ 혼자 빠짐 — 고유 사유 점검</span>':''}</div>`;})()}
       <div style="font-size:11px;margin-top:6px;padding-top:6px;border-top:1px dashed #e2e8f0">
-        ${r.lead?`🔗 선행지표 <b>${r.lead.name}</b> — 1개월 <span style="color:${pc(r.lead.m1)}">${pf(r.lead.m1)}</span> · 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 6개월 <span style="color:${pc(r.lead.m6)}">${pf(r.lead.m6)}</span> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
-                :'🔗 선행지표 미연결 — 해자 훼손 뉴스 수동 확인 대상'}
+        ${r.lead?`🔗 섹터 대리지표 <b>${r.lead.name}</b> — 1개월 <span style="color:${pc(r.lead.m1)}">${pf(r.lead.m1)}</span> · 3개월 <b style="color:${pc(r.lead.m3)}">${pf(r.lead.m3)}</b> · 6개월 <span style="color:${pc(r.lead.m6)}">${pf(r.lead.m6)}</span> · 1년 <span style="color:${pc(r.lead.y1)}">${pf(r.lead.y1)}</span>`
+                :'🔗 섹터 대리지표 미연결'}
         ${r.share?`<div style="color:#4338ca;margin-top:3px">📊 점유 추이 — ${r.share}</div>`:''}
         ${r.risk?`<div style="color:#b45309;margin-top:3px">⚠ ${r.risk}</div>`:''}
         ${(function(){const a=(window.__moatLLM&&window.__moatLLM.map[r.sym]);if(!a)return '';
