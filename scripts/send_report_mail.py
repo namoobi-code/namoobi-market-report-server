@@ -182,7 +182,7 @@ def main():
             filename=attach_name)
     try:
         with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=ssl.create_default_context(),
-                              timeout=60) as s:
+                              timeout=240) as s:
             s.login(ACCOUNT, pw)
             s.send_message(msg)
     except smtplib.SMTPAuthenticationError as e:
