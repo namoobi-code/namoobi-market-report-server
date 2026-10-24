@@ -1540,21 +1540,23 @@
     <p class="note" style="margin:2px 0 8px;line-height:1.7">
       고준석(연세대 상남경영원) 입지 체크리스트 — <b>걸어서 다닐 학원가 · 종합병원 · 대규모 공원 · 지하철 2개 노선 환승 · 1,500~2,500가구</b> — 를
       K-apt 등록 단지(의무관리, 대체로 150세대+) 하나하나에 공공데이터로 매긴다. 좌표는 VWorld 지오코더, 주변 시설은 VWorld 장소검색(국토부 POI), 세대수·준공은 K-apt,
-      가격은 국토부 실거래(최근 12개월 ㎡당가 → 84㎡ 환산). 가중치는 아래 슬라이더로 바로 바꿀 수 있다. <b>점수는 규칙 기반 참고치</b> — 학군(학교 배정)·조망·브랜드·재건축 가능성은 안 들어 있다.
+      가격은 국토부 실거래(최근 12개월 ㎡당가 → 84㎡ 환산). (2026-10-24) 매경LUXMEN '사람의 지도' 후속으로 <b>소득</b>(국세청 시군구 1인당 근로소득 전국 백분위)을 6번째 요소로 추가. 가중치는 아래 슬라이더로 바로 바꿀 수 있다. <b>점수는 규칙 기반 참고치</b> — 학군(학교 배정)·조망·브랜드·재건축 가능성은 안 들어 있다.
     </p>
     <div class="rs_ctl" style="gap:8px 18px">
       <span>가중치
         <span class="rs_seg" id="lc_wpre">
-          <button data-w='{"edu":20,"hosp":20,"park":20,"tr":20,"size":20}'>균등</button>
-          <button data-w='{"edu":35,"hosp":10,"park":15,"tr":30,"size":10}'>학군·교통</button>
-          <button data-w='{"edu":10,"hosp":30,"park":30,"tr":15,"size":15}'>병원·공원(시니어)</button>
-          <button data-w='{"edu":15,"hosp":10,"park":15,"tr":35,"size":25}'>출퇴근·대단지</button>
+          <button data-w='{"edu":17,"hosp":17,"park":17,"tr":17,"size":17,"inc":15}'>균등</button>
+          <button data-w='{"edu":30,"hosp":10,"park":10,"tr":25,"size":10,"inc":15}'>학군·교통</button>
+          <button data-w='{"edu":10,"hosp":30,"park":25,"tr":15,"size":10,"inc":10}'>병원·공원(시니어)</button>
+          <button data-w='{"edu":15,"hosp":10,"park":10,"tr":30,"size":25,"inc":10}'>출퇴근·대단지</button>
+          <button data-w='{"edu":20,"hosp":10,"park":10,"tr":15,"size":15,"inc":30}'>부촌(소득)</button>
         </span></span>
       <span style="color:#7c3aed">교육 <input type="range" id="lc_w_edu" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_edu"></b></span>
       <span style="color:#0e9aa7">편의 <input type="range" id="lc_w_hosp" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_hosp"></b></span>
       <span style="color:#27ae60">자연 <input type="range" id="lc_w_park" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_park"></b></span>
       <span style="color:#2f6fed">교통 <input type="range" id="lc_w_tr" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_tr"></b></span>
       <span style="color:#e08e3c">규모 <input type="range" id="lc_w_size" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_size"></b></span>
+      <span style="color:#b5476c">소득 <input type="range" id="lc_w_inc" min="0" max="50" style="width:80px;vertical-align:middle"> <b id="lc_wv_inc"></b></span>
     </div>
     <div class="rs_ctl">
       <input type="text" id="lc_q" placeholder="🔎 단지명·동 검색" style="width:200px">
@@ -1663,6 +1665,21 @@
     </div>
     <h4 style="margin:14px 0 2px;font-size:13px">12억+ 거래 5년 증가율 — 신축이 만든 증가인가, 구축 재평가인가 <em id="ht_up_n" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h4>
     <div style="position:relative;height:320px"><canvas id="ht_up"></canvas></div>
+
+    <!-- (2026-10-24) 사람의 지도 — 시군구 근로소득(국세청) + 매경LUXMEN 행정동 소득 표 · scripts/income.py (월 1회) -->
+    <h3 style="margin:22px 0 4px;font-size:14px">사람의 지도 — 시군구 근로소득과 행정동 고소득 생활권 <em id="in_asof" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h3>
+    <p class="note" style="margin:0 0 6px;line-height:1.6;font-size:12px">
+      매경LUXMEN(2026.10) "비싼 집이 생긴 곳에 실제로 어떤 사람들이 들어왔나" 후속. 왼쪽은 공개 자료인 <b>국세청 연말정산(주소지) 1인당 총급여</b>(시군구·근로소득만이라 사업·금융소득 큰 곳은 과소),
+      오른쪽은 기사의 <b>행정동 소득 표</b>(NICE 카드 추정, 2021.06→2026.06)를 그대로 옮긴 것. 둘의 공통 메시지: 상위 1% 36곳 중 31곳이 5년 뒤에도 그 자리(86%) — 부촌은 관성이 크다.
+    </p>
+    <div class="rs_ctl">
+      <span class="rs_seg" id="in_reg"><button data-v="서울">서울 25구</button><button data-v="경기">경기</button><button data-v="all">전국 상위 30</button></span>
+      <span class="rs_seg" id="in_tab"><button data-v="top15">TOP15 생활권</button><button data-v="enter_exit">상위 1% 진입·이탈</button><button data-v="up15">5년 증가율 TOP15</button><button data-v="future10">미래 부촌 TOP10</button><button data-v="pipeline">정비사업 파이프라인</button></span>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(360px,5fr) minmax(420px,6fr);gap:14px;align-items:start">
+      <div id="in_tbl" style="overflow:auto;max-height:620px"></div>
+      <div id="in_lux" style="overflow:auto;max-height:620px"></div>
+    </div>
   </div>
 
   <!-- (2026-08-23) 🔮 RE 예측 페인 — scripts/repred.py (매일 08:10) · re.js
@@ -2507,8 +2524,8 @@
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/resh.js?v=10241100"></script>
-<script src="/loc.js?v=10172300"></script><!-- (2026-10-17) 입지점수 탭 --><!-- (2026-09-20) 부동산시황 탭 -->
+<script src="/resh.js?v=10241200"></script>
+<script src="/loc.js?v=10241200"></script><!-- (2026-10-17) 입지점수 탭 --><!-- (2026-09-20) 부동산시황 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script>
 <script src="/ct.js?v=20260920a"></script><!-- (2026-09-20) 셀트리온 탭 --><!-- (2026-09-01) 이익성장 모니터링 탭 -->

@@ -9,10 +9,10 @@
 const $=id=>document.getElementById(id);
 const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 let D=null, ch=null;
-let S={reg:'전체', q:'', minhh:0, sort:'tot', dir:-1, n:80, w:{edu:20,hosp:20,park:20,tr:20,size:20}, pick:null};
-const F=['edu','hosp','park','tr','size'];
-const FN={edu:'교육',hosp:'편의',park:'자연',tr:'교통',size:'규모'};
-const FC={edu:'#7c3aed',hosp:'#0e9aa7',park:'#27ae60',tr:'#2f6fed',size:'#e08e3c'};
+let S={reg:'전체', q:'', minhh:0, sort:'tot', dir:-1, n:80, w:{edu:17,hosp:17,park:17,tr:17,size:17,inc:15}, pick:null};
+const F=['edu','hosp','park','tr','size','inc'];   // (2026-10-24) inc=시군구 소득 백분위
+const FN={edu:'교육',hosp:'편의',park:'자연',tr:'교통',size:'규모',inc:'소득'};
+const FC={edu:'#7c3aed',hosp:'#0e9aa7',park:'#27ae60',tr:'#2f6fed',size:'#e08e3c',inc:'#b5476c'};
 
 function tot(a){ let s=0,w=0; F.forEach(f=>{const v=a['s_'+f]; if(v!=null&&S.w[f]>0){s+=v*S.w[f]; w+=S.w[f];}}); return w?s/w:null; }
 function rows(){
@@ -48,7 +48,7 @@ function draw(){
         onClick:(e,els)=>{ if(!els.length) return; S.pick=pts[els[0].index].a.k; draw(); const tr=document.querySelector(`#lc_tbl tr[data-k="${S.pick}"]`); tr&&tr.scrollIntoView({block:'center'}); }}});
   }
   // 표
-  const H=[['tot','총점'],['nm','단지'],['sgg','지역'],['hh','세대'],['use','준공'],['s_edu','교육'],['s_hosp','편의'],['s_park','자연'],['s_tr','교통'],['s_size','규모'],['p84e','84㎡가(억)'],['ppsm','㎡당(만원)'],['vfm','가성비']];
+  const H=[['tot','총점'],['nm','단지'],['sgg','지역'],['hh','세대'],['use','준공'],['s_edu','교육'],['s_hosp','편의'],['s_park','자연'],['s_tr','교통'],['s_size','규모'],['s_inc','소득'],['p84e','84㎡가(억)'],['ppsm','㎡당(만원)'],['vfm','가성비']];
   $('lc_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${H.map(([k,l])=>`<th data-k="${k}" style="padding:5px 7px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap;cursor:pointer">${l}${S.sort===k?(S.dir<0?' ▼':' ▲'):''}</th>`).join('')}</tr></thead><tbody>${
     show.map((a,i)=>{
       const stT=(a.st||[]).map(s=>`${s.nm}${s.ln>=2?'(환승)':''} ${Math.round(s.d*1000)}m`).join(', ');   // title 용 평문
@@ -64,17 +64,19 @@ function draw(){
         <td style="padding:4px 7px;white-space:nowrap" title="${E(a.park||'')}${a.park_s?' · 근린공원 300m 내':''}">${bar(a.s_park,FC.park)} <span class="note">${km(a.park_d)}</span></td>
         <td style="padding:4px 7px;white-space:nowrap" title="${E(stT)}">${bar(a.s_tr,FC.tr)} <span class="note">${a.st&&a.st.length?E(a.st[0].nm)+(a.st[0].ln>=2?'⇄':''):'—'}</span></td>
         <td style="padding:4px 7px;white-space:nowrap">${bar(a.s_size,FC.size)}</td>
+        <td style="padding:4px 7px;white-space:nowrap" title="시군구 1인당 근로소득(국세청) 전국 백분위 — ${a.inc?a.inc.toLocaleString()+'만원':''}${a.inc_up5!=null?' · 5년 '+(a.inc_up5>0?'+':'')+a.inc_up5+'%':''}">${bar(a.s_inc,FC.inc)} <span class="note">${a.inc?Math.round(a.inc/100)/10+'천':'—'}</span></td>
         <td style="padding:4px 7px;text-align:right;font-weight:700">${a.p84e!=null?a.p84e.toFixed(1):'—'}${a.p84?`<br><span class="note" title="80~90㎡ 실거래 평균 (${a.n84}건)">실 ${a.p84.toFixed(1)}</span>`:''}</td>
         <td style="padding:4px 7px;text-align:right">${a.ppsm!=null?Math.round(a.ppsm*10000).toLocaleString():'—'}${a.ntr?`<br><span class="note">${a.ntr}건</span>`:''}</td>
         <td style="padding:4px 7px;text-align:right" title="총점 ÷ 84㎡ 환산가 — 높을수록 점수 대비 싸다">${a.vfm!=null?a.vfm.toFixed(1):'—'}</td></tr>`;
       if(a.k!==S.pick) return main;
-      return main+`<tr><td colspan="13" style="background:#f8fafc;padding:8px 14px;font-size:12px;line-height:1.7">
+      return main+`<tr><td colspan="14" style="background:#f8fafc;padding:8px 14px;font-size:12px;line-height:1.7">
         <b>${E(a.nm)}</b> · ${E(a.sgg)} ${E(a.umd||'')} · ${a.hh?a.hh.toLocaleString()+'세대':''} ${a.dg?a.dg+'개동':''} · 준공 ${a.use?a.use.slice(0,4)+'.'+a.use.slice(4):'—'}${a.pkr?` · 주차 ${a.pkr}대/세대`:''}<br>
         🚇 <b>교통 ${a.s_tr}</b> — ${st||'1km 내 역 없음'}<br>
         📚 <b>교육 ${a.s_edu}</b> — 600m 내 입시·교과·외국어 학원 <b>${a.edu_n}</b>개 (전체 단지 백분위)<br>
         🏥 <b>편의 ${a.s_hosp}</b> — 최근접 종합병원 ${E(a.hosp||'—')} ${km(a.hosp_d)}<br>
         🌳 <b>자연 ${a.s_park}</b> — 대규모 공원 ${E(a.park||'—')} ${km(a.park_d)}${a.park_s?' · 근린공원 300m 내 있음(+10)':''}<br>
         🏢 <b>규모 ${a.s_size}</b> — ${a.hh?a.hh.toLocaleString():'—'}세대 (1,500~2,500 만점)<br>
+        💼 <b>소득 ${a.s_inc??'—'}</b> — ${a.sgg.startsWith('서울')?a.sgg:a.sgg.split(' ')[0]+'시'} 1인당 근로소득 ${a.inc?a.inc.toLocaleString()+'만원':'—'}${a.inc_up5!=null?` (5년 ${a.inc_up5>0?'+':''}${a.inc_up5}%)`:''} · 전국 시군구 백분위 (국세청 연말정산·주소지)<br>
         💰 ${a.ppsm?`㎡당 ${Math.round(a.ppsm*10000).toLocaleString()}만원 (최근 12개월 ${a.ntr}건) → 84㎡ 환산 <b>${a.p84e}억</b>${a.p84?` · 80~90㎡ 실거래 평균 ${a.p84}억(${a.n84}건)`:''}`:'최근 12개월 실거래 매칭 없음'}
       </td></tr>`;
     }).join('')}</tbody></table>${R.length>S.n?`<div style="text-align:center;margin:8px 0"><button id="lc_more" style="padding:5px 16px;font-size:12px;border:1px solid #d7dce3;border-radius:6px;cursor:pointer;background:#fff">더 보기 (${S.n}/${R.length})</button></div>`:''}`;

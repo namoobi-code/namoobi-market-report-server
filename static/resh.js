@@ -133,7 +133,7 @@ function controls(){
 function draw(){ controls(); bar(); table(); lines(); }
 
 window.renderResh=async function(){
-  hsLoad(); ipLoad(); htLoad();
+  hsLoad(); ipLoad(); htLoad(); inLoad();
   if(D){ setTimeout(()=>{[chBar,chLine].forEach(c=>c&&c.resize());},60); return; }
   try{
     const r=await fetch('/api/db/rerank'); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -394,5 +394,45 @@ async function htLoad(){
     $('ht_since').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===HTS.since); b.onclick=()=>{HTS.since=b.dataset.v; $('ht_since').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); htDraw();};});
     htDraw();
   }catch(e){ $('ht_sum').textContent='고가 거래 데이터를 불러오지 못했습니다 ('+e.message+')'; }
+}
+
+/* ───────── 사람의 지도 (2026-10-24) — /api/db/income · scripts/income.py ─────────
+   국세청 시군구 1인당 총급여(2016~2023) + 매경LUXMEN 2026.10 행정동 소득 표(수기). */
+let IN=null, INS={reg:'서울', tab:'top15'};
+function inDraw(){
+  if(!IN) return;
+  const last=IN.last, ago=String(+last-5);
+  let L=Object.entries(IN.sgg).map(([c,v])=>({c,nm:v.nm,sido:v.sido,inc:v.avg[last],ago:v.avg[ago],n:(v.n||{})[last],tax:(v.tax||{})[last],pct:IN.pct[c]})).filter(x=>x.inc);
+  if(INS.reg==='서울') L=L.filter(x=>x.sido==='서울'); else if(INS.reg==='경기') L=L.filter(x=>x.sido==='경기');
+  L.sort((a,b)=>b.inc-a.inc); if(INS.reg==='all') L=L.slice(0,30);
+  const F=v=>v==null?'—':v.toLocaleString();
+  $('in_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${['#','시군구',`${last} 1인당 총급여(만원)`,`5년↑(${ago}→)`,'전국 백분위','결정세액/인','신고인원'].map(h=>`<th style="padding:4px 6px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap">${h}</th>`).join('')}</tr></thead><tbody>${
+    L.map((x,i)=>{const up=x.ago?Math.round(1000*(x.inc/x.ago-1))/10:null; return `<tr style="border-bottom:1px solid #f2f4f7"><td style="padding:3px 6px;color:#8a93a0">${i+1}</td><td style="padding:3px 6px;white-space:nowrap"><b>${E(INS.reg==='all'?x.sido+' '+x.nm:x.nm)}</b></td>
+      <td style="padding:3px 6px;text-align:right;font-weight:700">${F(x.inc)}</td><td style="padding:3px 6px;text-align:right;color:${up>=20?'#c2410c':'#333'}">${up!=null?(up>0?'+':'')+up+'%':'—'}</td>
+      <td style="padding:3px 6px;text-align:right">${x.pct??'—'}</td><td style="padding:3px 6px;text-align:right">${F(x.tax)}</td><td style="padding:3px 6px;text-align:right;color:#8a93a0">${F(x.n)}</td></tr>`;}).join('')}</tbody></table>
+    <div class="note" style="font-size:11px;margin-top:4px">${E(IN.src)} · ${E(IN.note)}</div>`;
+  const X=IN.luxmen, t=INS.tab;
+  const tbl=(h,rows,fmt)=>`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#fff7ed">${h.map(x=>`<th style="padding:4px 6px;text-align:left;border-bottom:1px solid #fed7aa;white-space:nowrap">${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr style="border-bottom:1px solid #f2f4f7">${fmt(r).map((c,i)=>`<td style="padding:3px 6px;${i>0&&typeof r[i]==='number'?'text-align:right':''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+  const pc=v=>v==null?'—':(v>0?'+':'')+v+'%'; const nm=v=>v==null?'—':v.toLocaleString();
+  let html='';
+  if(t==='top15') html=`<div class="note" style="margin-bottom:4px">2026년 고소득 생활권 TOP15 — 성남 <b>수내2동 12위</b>(7,591만·7천만+ 33%)가 강남·서초·용산 밖에서 유일</div>`+tbl(['#','행정동','2026 평균소득(만원)','5년↑','7천만+ 비중','고소득층 증감(%p)','3대직군'],X.top15.map((r,i)=>[i+1].concat(r)),r=>[r[0],`<b>${E(r[1])}</b>`,nm(r[2]),pc(r[3]),r[4]+'%',pc(r[5]),r[6]+'%'])
+    +`<div class="note" style="margin-top:8px">소득계층별 5년 변화 — 위로 갈수록 더 올랐다(계단식 격차 확대)</div>`+tbl(['2021 구간','행정동 수','2021 평균','2026 평균','5년↑'],X.tiers,r=>[`<b>${E(r[0])}</b>`,nm(r[1]),nm(r[2]),nm(r[3]),pc(r[4])]);
+  else if(t==='enter_exit') html=`<div class="note" style="margin-bottom:4px">상위 1%(36개 행정동) 5년 교체 — 신규 진입 5곳은 둔촌1동(대규모 신축 입주) 빼고 전부 상위 1~5%에서 한 칸 올라온 곳. 이탈 5곳도 멀리 떨어지지 않았다</div>`+tbl(['구분','행정동','2021','2026','5년↑','7천만+'],X.enter_exit,r=>[`<span style="color:${r[0].startsWith('신규')?'#0f766e':'#b91c1c'};font-weight:700">${E(r[0])}</span>`,`<b>${E(r[1])}</b>`,nm(r[2]),nm(r[3]),pc(r[4]),r[5]+'%']);
+  else if(t==='up15') html=`<div class="note" style="margin-bottom:4px">5년 평균소득 증가율 상위 15 — 대부분 대규모 신축 입주·도시정비로 <b>주민이 바뀐</b> 곳(둔촌1동 표본 34→20,702명). 성남 금광1동 15위</div>`+tbl(['#','행정동','2021','2026','5년↑','7천만+','고소득층 증감(%p)'],X.up15.map((r,i)=>[i+1].concat(r)),r=>[r[0],`<b>${E(r[1])}</b>`,nm(r[2]),nm(r[3]),pc(r[4]),r[5]+'%',pc(r[6])]);
+  else if(t==='future10') html=`<div class="note" style="margin-bottom:4px">LUXMEN 선정 2035 미래 부촌 TOP10 — 집값 순위가 아니라 소득 기반·신규 주거·일자리·생활 인프라가 함께 형성되는지로 고름. 압구정·반포·한남·청담·성수는 이미 형성돼 제외</div>`+tbl(['#','권역','2026 평균소득','5년↑','7천만+','형성 유형','핵심 동력'],X.future10,r=>[r[0],`<b>${E(r[1])}</b>`,nm(r[2]),pc(r[3]),r[4]+'%',E(r[5]),E(r[6])])
+    +`<div class="note" style="margin-top:8px;line-height:1.6">${Object.entries(X.types).map(([k,v])=>`<b>${E(k)}</b> — ${E(v)}`).join('<br>')}</div>`;
+  else html=`<div class="note" style="margin-bottom:4px">서울 미래 부촌 정비사업 파이프라인(서울시 정비사업 정보몽땅 · 2026.09.18) — 잠실5단지 6,411세대 사업시행인가가 가장 앞서 있다. 일정은 변경 가능</div>`+tbl(['자치구','사업명','계획세대','현재 단계','핵심 시점','포인트'],X.pipeline,r=>[E(r[0]),`<b>${E(r[1])}</b>`,nm(r[2]),E(r[3]),E(r[4]),E(r[5])]);
+  $('in_lux').innerHTML=html+`<div class="note" style="font-size:11px;margin-top:4px">출처: ${E(X.src)}</div>`;
+}
+async function inLoad(){
+  if(IN) return;
+  try{
+    const r=await fetch('/api/db/income'); if(!r.ok) throw new Error('HTTP '+r.status);
+    IN=await r.json(); if(!IN.sgg) throw new Error('데이터 없음');
+    $('in_asof').textContent=`국세청 ${IN.years[0]}~${IN.last} · 시군구 ${Object.keys(IN.sgg).length} · 수집 ${IN.asof}`;
+    const seg=(id,cur,set)=>$(id).querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===cur); b.onclick=()=>{set(b.dataset.v); $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); inDraw();};});
+    seg('in_reg',INS.reg,v=>INS.reg=v); seg('in_tab',INS.tab,v=>INS.tab=v);
+    inDraw();
+  }catch(e){ $('in_tbl').innerHTML='<div class="note">소득 데이터를 불러오지 못했습니다 ('+e.message+')</div>'; }
 }
 })();

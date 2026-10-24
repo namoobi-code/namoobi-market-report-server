@@ -28,6 +28,7 @@
   park  최근접 대규모 공원 거리 ≤0.5km 100 · 1km 80 · 1.5km 60 · 2.5km 40 · 그 밖 20 (+근린공원 300m 안 있으면 +10, 상한 100)
   tr    600m 안 역: 환승역(2노선+) 또는 서로 다른 역 2개 100 · 1역 65 · 600~1000m 1역 35 · 없음 0
   size  세대수 1500~2500 100 · 1000~1500/2500~3500 80 · 500~1000 60 · 300~500 40 · <300 20
+  inc   (2026-10-24) 시군구 1인당 근로소득 전국 백분위 — income.py · 매경LUXMEN '사람의 지도' 후속 (성남·용인은 시 단위)
 
 캐시: data/db/locscore_cache.json {kapt:{code:{...}}, geo:{code:[x,y]}, poi:{...}} — 재실행 때 API 재호출 없음(--refresh 로 강제)
 산출: data/db/locscore.json {asof, note, regions, apts:[...], pois_n}
@@ -426,6 +427,22 @@ def main():
     print(f"[poi] 정규화 후 역 {len(P['st'])}(환승 {sum(1 for s in P['st'] if s['lines']>=2)}) · 대규모공원 지점 {len(P['mj'])}")
     # 4) 점수
     PR = load_prices()
+    # (2026-10-24) 소득 레이어 — income.json(국세청 시군구 근로소득). 매경LUXMEN '사람의 지도' 후속: 시군구 1인당 총급여 전국 백분위.
+    INC = {}
+    inc_f = DB / "income.json"
+    if inc_f.exists():
+        ij = json.loads(inc_f.read_text(encoding="utf-8"))
+        last = ij["last"]
+        ago = str(int(last) - 5)
+        for c, v in ij["sgg"].items():
+            if last in v["avg"]:
+                INC[(v["sido"], v["nm"])] = {"inc": v["avg"][last], "pct": ij["pct"].get(c),
+                                             "up5": round(100 * (v["avg"][last] / v["avg"][ago] - 1), 1) if v["avg"].get(ago) else None, "yr": last}
+    def inc_of(sggnm):
+        t = sggnm.split()
+        if t[0] == "서울":
+            return INC.get(("서울", t[1]))
+        return INC.get(("경기", t[0] + "시"))     # 성남 분당구 → 성남시 · 용인 수지구 → 용인시
     apts = []
     for c, v in C["kapt"].items():
         pt = C["geo"].get(c)
@@ -465,6 +482,7 @@ def main():
             "edu_n": edu_n, "hosp_d": round(hd, 2), "hosp": hn, "park_d": round(pd_, 2), "park": pn, "park_s": 1 if small else 0,
             "st": [{"nm": s["nm"], "d": round(d, 2), "ln": s["lines"]} for d, s in st_show],
             "s_hosp": score_hosp(hd), "s_park": score_park(pd_, small), "s_tr": tr, "s_size": score_size(v.get("hh")),
+            "inc": (inc_of(SGG[sgg]) or {}).get("inc"), "inc_up5": (inc_of(SGG[sgg]) or {}).get("up5"), "s_inc": (inc_of(SGG[sgg]) or {}).get("pct"),
             "ppsm": round(ppsm, 4) if ppsm else None, "ntr": ntr, "p84": round(p84, 2) if p84 else None, "n84": n84,   # 억/㎡ (2026-10-17 소수4자리 — 1자리면 0.3억으로 뭉개짐)
             "p84e": round(ppsm * 84, 2) if ppsm else None,
         })
