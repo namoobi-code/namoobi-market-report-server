@@ -115,6 +115,18 @@ def main():
         else: why.append("연속증가 3년 미만")
         if mk == "us" and row.get("fcfy") is not None and row["divy"] is not None and row["fcfy"] < row["divy"]: why.append("FCF<배당")
         row["safe"] = s_safe; row["safe_why"] = " · ".join(why)
+        # (2026-10-24 매경LUXMEN '투자자들 대피할 만한 곳은' 유진투자증권 강송철) 퀄리티 배당: 지난해까지 2년 연속 배당 증액 + 최근 분기 실적 양호 + 현재 배당률 4%↑
+        #   KR: dps_hist 최근 3개년 단조 증가 · 최근 분기 영업익 YoY(qtoby)>0 · divy≥4   US: dgy(연속증가)≥2 · epsg≥0 · divy≥4
+        if mk == "kr":
+            hv = [v for _, v in sorted(row.get("dps_hist", {}).items())]
+            # 최근 분기 영업익 YoY = earnings_join 의 oyoy(%, 발표 종목만) → 없으면 풀 opg(연간 영업익 증가율, 소수) 대체. (1차 실측: qtoby 는 흑자전환 플래그라 전부 0 → 교체)
+            q = r.get("oyoy"); qsrc = "최근 분기 영업익 YoY"
+            if q is None and r.get("opg") is not None: q = r["opg"] * 100; qsrc = "연간 영업익 증가율"
+            row["quality"] = bool(len(hv) >= 3 and hv[-1] > hv[-2] > hv[-3] and (row["divy"] or 0) >= 4 and q is not None and q > 0)
+            row["q_why"] = f"DPS {hv[-3]:.0f}→{hv[-2]:.0f}→{hv[-1]:.0f} · {qsrc} {q:+.0f}% · 배당률 {row['divy']}%" if row["quality"] else ""
+        else:
+            row["quality"] = bool((row.get("inc") or 0) >= 2 and (row.get("grw") or -1) >= 0 and (row["divy"] or 0) >= 4)
+            row["q_why"] = f"연속증가 {row.get('inc')}년 · EPS 성장 {row.get('grw')}% · 배당률 {row['divy']}%" if row["quality"] else ""
         s_tm = 0; tw = []
         if row.get("vs200") is not None and row["vs200"] <= 0: s_tm += 1; tw.append("200일선 아래(눌림)")
         if row.get("rsi") is not None and row["rsi"] < 50: s_tm += 1; tw.append(f"RSI {row['rsi']:.0f}")
@@ -142,12 +154,32 @@ def main():
     HIST.write_text(json.dumps(hist, ensure_ascii=False), encoding="utf-8")
     rows.sort(key=lambda r: -r["score"])
     # 고배당 ETF (국내 풀 — 이름에 배당/고배당/커버드콜, 분배율순)
-    etfs = []
-    for r in (jload(DB / "etf_pool.json").get("kr") or []):
+    # (2026-10-24 매경LUXMEN) AUM 상위 자동선정은 커버드콜이 독식(25종 중 순수 고배당 4종) → 기사 국내 고배당 ETF 11종을 고정 편입하고 '고배당'/'커버드콜' 그룹으로 나눈다
+    FIXED_HD = ["279530", "0139P0", "161510", "322410", "498860", "0222D0", "210780", "0089D0", "0105E0", "466940", "0111J0", "458730", "0046Y0"]
+    #          KODEX고배당주·ACE고배당주·PLUS고배당주·HANARO K고배당·RISE코리아금융고배당·KoAct고배당액티브·TIGER코스피고배당·KODEX금융고배당TOP10·SOL코리아고배당·TIGER은행고배당플러스TOP10·HANARO증권고배당TOP3플러스·TIGER미국배당다우존스·ACE미국배당퀄리티
+    pool_kr = {r["c"]: r for r in (jload(DB / "etf_pool.json").get("kr") or []) if r.get("c")}
+    def mk_etf(r):
         n = r.get("n") or ""
-        if any(k in n for k in ("배당", "커버드콜", "인컴")) and r.get("divy"):
-            etfs.append({"c": r["c"], "n": n, "px": r.get("px"), "divy": r.get("divy"), "r1y": pct((r.get("r1y") or 0) * 100, 1) if r.get("r1y") is not None else None, "fee": r.get("fee"), "cap": r.get("cap")})
-    etfs.sort(key=lambda x: -(x["cap"] or 0)); etfs = etfs[:25]
+        return {"c": r["c"], "n": n, "px": r.get("px"), "divy": r.get("divy"), "r1y": pct((r.get("r1y") or 0) * 100, 1) if r.get("r1y") is not None else None, "fee": r.get("fee"), "cap": r.get("cap"),
+                "cat": "커버드콜" if "커버드콜" in n else "고배당"}
+    etfs = [mk_etf(pool_kr[c]) for c in FIXED_HD if c in pool_kr]
+    seen = {e["c"] for e in etfs}
+    auto = sorted([r for c, r in pool_kr.items() if c not in seen and any(k in (r.get("n") or "") for k in ("배당", "커버드콜", "인컴")) and r.get("divy")], key=lambda x: -(x.get("cap") or 0))
+    etfs += [mk_etf(r) for r in auto[:22]]
+    # 최근 20거래일 투자자별 순매수(KIS 종목별 투자자, 백만원→억) — 기사 "개인이 한 달간 KODEX 200커버드콜액티브 2,020억 순매수"
+    try:
+        import kis_api as K
+        kc = K._creds(); ktok = K._token(kc)
+        for e in etfs:
+            try:
+                j = K._get(kc, ktok, "/uapi/domestic-stock/v1/quotations/inquire-investor", "FHKST01010900", {"FID_COND_MRKT_DIV_CODE": "J", "FID_INPUT_ISCD": e["c"]})
+                o = (j.get("output") or [])[:20]
+                if o:
+                    e["flow"] = {k: round(sum(float(x.get(f"{f}_ntby_tr_pbmn") or 0) for x in o) / 100, 1) for k, f in (("indi", "prsn"), ("frgn", "frgn"), ("inst", "orgn"))}
+                    e["flow"]["days"] = len(o); e["flow"]["to"] = o[0].get("stck_bsop_date")
+                time.sleep(0.12)
+            except Exception as ex: log(f"  ⚠ flow {e['c']}: {repr(ex)[:50]}")
+    except Exception as ex: log(f"  ⚠ kis flows: {repr(ex)[:60]}")
     # (2026-10-17 사용자 요청) 미국 배당 ETF + 전 ETF 1년 추세·지금 유리 신호
     ETF_US = [("SCHD", "Schwab US Dividend Equity", "배당성장·퀄리티"), ("VYM", "Vanguard High Dividend Yield", "고배당 광범위"), ("DGRO", "iShares Core Dividend Growth", "배당성장"),
               ("VIG", "Vanguard Dividend Appreciation", "10년↑ 연속증가"), ("NOBL", "S&P 500 Dividend Aristocrats", "25년↑ 귀족주"), ("HDV", "iShares Core High Dividend", "고배당 퀄리티"),
@@ -228,7 +260,23 @@ def main():
             else: b = None
             if b and b in bench and e.get("tr1y") is not None: e["bench"] = b; e["rel1y"] = round(e["tr1y"] - bench[b], 2)
     cc["bench"] = bench
-    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us, "cc": cc,
+    # (2026-10-24) 배당 − 시중금리 스프레드: 기사 "2022~23 예금금리 4% 때 고배당주 6% → 지금 금리 3%대면 5%대 중반도 매력". 국고3년(ECOS 817Y002) vs 고배당 ETF 분배율 중앙값·KR 고배당주 상위 80 중앙값
+    spread = {}
+    try:
+        import urllib.request
+        K_ = (BASE / "keys" / "ecos.txt").read_text().strip(); s0 = (today - timedelta(days=20)).strftime("%Y%m%d")
+        j3 = json.loads(urllib.request.urlopen(f"https://ecos.bok.or.kr/api/StatisticSearch/{K_}/json/kr/1/30/817Y002/D/{s0}/{today.strftime('%Y%m%d')}/010200000", timeout=20).read())
+        r3 = [float(r["DATA_VALUE"]) for r in ((j3.get("StatisticSearch") or {}).get("row") or []) if r.get("DATA_VALUE")]
+        hd = sorted(e["dy"] if e.get("dy") is not None else e["divy"] for e in etfs if e.get("cat") == "고배당" and (e.get("dy") or e.get("divy")))
+        kr80 = sorted(r["divy"] for r in rows if r["mk"] == "kr" and r.get("divy"))[:80]
+        if r3 and hd:
+            med = hd[len(hd) // 2]; med2 = sorted(r["divy"] for r in rows if r["mk"] == "kr" and r.get("divy"))
+            med2 = med2[len(med2) // 2] if med2 else None
+            spread = {"kr3y": r3[-1], "etf_med": round(med, 2), "stock_med": med2, "gap": round(med - r3[-1], 2),
+                      "verdict": ("배당 매력 구간 — 분배율이 금리를 2%p↑ 웃돈다(기사: 2022~23 금리 4%·배당 6% 수준)" if med - r3[-1] >= 2 else
+                                  "보통 — 금리 대비 1~2%p 우위" if med - r3[-1] >= 1 else "허들 높음 — 분배율이 금리를 거의 못 넘음, 배당 '때문에' 살 이유 약함")}
+    except Exception as ex: log(f"  ⚠ spread: {repr(ex)[:60]}")
+    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us, "cc": cc, "spread": spread,
                                "kr": [r for r in rows if r["mk"] == "kr"][:80], "us": [r for r in rows if r["mk"] == "us"][:80],
                                "n": {"kr": sum(1 for r in rows if r["mk"] == "kr"), "us": sum(1 for r in rows if r["mk"] == "us")},
                                "etfs": etfs, "ref": {"kospi_mfg_ni": {"2025": 169, "2026E": 751, "2027E": 973}, "kospi_mfg_fcf": {"2025": 99, "2026E": 522, "2027E": 778},
