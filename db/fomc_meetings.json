@@ -1,6 +1,6 @@
 {
  "marker": "2026-12-08|19",
- "as_of": "2026-10-18",
+ "as_of": "2026-10-24",
  "data": [
   {
    "date": "2025-10-28~29",
@@ -85,7 +85,7 @@
   {
    "date": "2026-10-27~28",
    "stance": "예정",
-   "note": "SEP 미발표 예정 정례회의. (출처: federalreserve.gov FOMC calendar 2026)"
+   "note": "정례 FOMC(10/27~28), SEP 미실시 예정. 현재 목표범위 3.75~4.00%. (출처: federalreserve.gov FOMC calendar 2026)"
   },
   {
    "date": "2026-10-28",

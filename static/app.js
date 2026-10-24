@@ -4264,6 +4264,47 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         <div id="pg_${k}"></div>
       </div><div class="src">${E(v.comment||'')}</div></div>`;}).join('');
   renderProgram();                                     // 프로그램(차익·비차익)·등락종목 — 서버 실시간 (2026-08-02)
+  renderInvFlow();                                     // (2026-10-24) 투자자별 월별 순매수 막대 — 매경 'KRX 외국인 월별 순매수' 그래프 상시판
+  async function renderInvFlow(){
+    const host=document.getElementById('d_kinv'); if(!host||!window.Chart) return;
+    let F; try{ F=await (await fetch('/api/db/investor_flow',{cache:'no-cache'})).json(); }catch(e){ return; }
+    if(!F||!F.kospi) return;
+    let box=document.getElementById('kr_invflow');
+    if(!box){ box=document.createElement('div'); box.id='kr_invflow'; box.className='card'; box.style.cssText='margin-top:10px'; host.parentElement.insertBefore(box,host.nextSibling); }
+    const ST=window._IVF_ST||(window._IVF_ST={mk:'kospi',who:'frgn',n:18});
+    const WHO={frgn:'외국인',inst:'기관계',indi:'개인',pension:'연기금',fin:'금융투자'};
+    const jo=v=>{const a=Math.abs(v); if(a>=10000){const j=Math.trunc(a/10000), r=Math.round(a%10000); return (v<0?'−':'')+j+'조'+(r?r.toLocaleString():'');} return (v<0?'−':'')+Math.round(a).toLocaleString();};
+    const draw=()=>{
+      const D=F[ST.mk]||{}, M=(D.monthly||[]).slice(-ST.n), dl=D.daily||{}; const n=(dl.t||[]).length;
+      const cur=M.length?M[M.length-1]:null; const k=ST.who;
+      // 요약: 이번 달 누계 · 최근 3개월 · 연속 순매도/순매수 개월
+      let streak=0, sign=0; for(let i=M.length-1;i>=0;i--){const s=Math.sign(M[i][k]||0); if(!sign) sign=s; if(s===sign&&s!==0) streak++; else break;}
+      const d20=n?dl[k].slice(-20).reduce((a,b)=>a+b,0):null, m3=M.slice(-3).reduce((a,b)=>a+(b[k]||0),0);
+      const btn=(on,txt,act)=>`<button data-act="${act}" style="border:1px solid ${on?'#1e40af':'#d0d7de'};background:${on?'#1e40af':'#fff'};color:${on?'#fff':'#333'};border-radius:5px;padding:2px 9px;font-size:11.5px;cursor:pointer">${txt}</button>`;
+      box.innerHTML=`<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <b style="font-size:13px">${ST.mk==='kospi'?'코스피':'코스닥'} ${WHO[k]} 월별 순매수/순매도액</b><span class="note">(단위 억원 · KRX 정규장 · 네이버 집계)</span>
+          <span style="display:flex;gap:4px;margin-left:auto">${btn(ST.mk==='kospi','코스피','mk:kospi')}${btn(ST.mk==='kosdaq','코스닥','mk:kosdaq')}</span>
+          <span style="display:flex;gap:4px">${Object.entries(WHO).map(([kk,v])=>btn(k===kk,v,'who:'+kk)).join('')}</span>
+          <span style="display:flex;gap:4px">${[12,18,30].map(x=>btn(ST.n===x,x+'개월','n:'+x)).join('')}</span></div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin:6px 0 2px;font-size:12px">
+          ${cur?`<span>이번 달(${cur.m.slice(5)}월 ${cur.days}일 누계) <b class="${cur[k]>=0?'up':'dn'}">${jo(cur[k])}억</b></span>`:''}
+          <span>최근 3개월 <b class="${m3>=0?'up':'dn'}">${jo(m3)}억</b></span>
+          ${d20!=null?`<span>최근 20거래일 <b class="${d20>=0?'up':'dn'}">${jo(d20)}억</b></span>`:''}
+          ${streak>=2?`<span><b class="${sign>0?'up':'dn'}">${streak}개월 연속 ${sign>0?'순매수':'순매도'}</b>${cur&&cur.mtd?' (이번 달 포함)':''}</span>`:''}
+          <span class="note" style="margin-left:auto">${E(D.last?D.last.replace(/(\d{4})(\d{2})(\d{2})/,'$1-$2-$3'):'')} 마감 기준 · 기관계=금융투자+보험+투신+은행+기타금융+연기금</span></div>
+        <div style="position:relative;height:250px"><canvas id="ivf_cv" style="display:block;width:100%;height:250px"></canvas></div>
+        <div class="note" style="margin-top:2px">막대 위 숫자는 월 합계(억원, 1조 이상은 조 단위 표기) · 이번 달은 월중 누계 · 가장 오래된 달은 수집 구간에 잘려 부분합일 수 있음 · KRX 공식 집계(ETF·ELW 포함 여부 등)와 수% 차이 가능</div>`;
+      box.querySelectorAll('button[data-act]').forEach(b=>b.onclick=()=>{const [a,v]=b.dataset.act.split(':'); ST[a]=a==='n'?+v:v; draw();});
+      const cv=document.getElementById('ivf_cv'); if(window._IVF_CH){try{window._IVF_CH.destroy();}catch(e){}}
+      const vals=M.map(x=>x[k]||0), labels=M.map(x=>x.m.slice(2).replace('-','.')+(x.mtd?'*':''));
+      const lbl={id:'ivfLbl',afterDatasetsDraw(ch){const {ctx}=ch; const me=ch.getDatasetMeta(0); ctx.save(); ctx.font='bold 10.5px sans-serif'; ctx.textAlign='center';
+        me.data.forEach((bar,i)=>{const v=vals[i]; ctx.fillStyle=v>=0?'#c0392b':'#1f4e9e'; ctx.textBaseline=v>=0?'bottom':'top'; ctx.fillText(jo(v),bar.x,v>=0?bar.y-2:bar.y+2);}); ctx.restore();}};
+      window._IVF_CH=new Chart(cv,{type:'bar',plugins:[lbl],data:{labels,datasets:[{data:vals,backgroundColor:vals.map(v=>v>=0?'#e08a8a':'#4f7fc4'),borderRadius:2,maxBarThickness:46}]},
+        options:{responsive:true,maintainAspectRatio:false,animation:false,layout:{padding:{top:16,bottom:14}},plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>{const m=M[c.dataIndex]; return ` 외국인 ${jo(m.frgn)} · 기관계 ${jo(m.inst)} · 개인 ${jo(m.indi)} · 연기금 ${jo(m.pension)} (억, ${m.days}일)`;}}}},
+          scales:{x:{grid:{display:false},ticks:{font:{size:10.5}}},y:{ticks:{font:{size:10},callback:v=>Math.abs(v)>=10000?(v/10000).toFixed(0)+'조':v.toLocaleString()},grid:{color:'#eef1f4'}}}}});
+    };
+    draw();
+  }
   async function renderProgram(){
     let P; try{ P=await (await fetch('/api/db/program_trading')).json(); }catch(e){ return; }
     const eok=v=>v==null?'—':`<span class="${v>0?'up':v<0?'dn':''}">${v>0?'+':''}${Math.round(v).toLocaleString()}억</span>`;

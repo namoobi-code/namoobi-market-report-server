@@ -59,6 +59,7 @@
   /* (2026-09-05) 코인 선행지표 카드 스파크 — 전역 canvas 200px 캡 해제(90px 컨테이너에 맞춤. 캡 때문에 판정 텍스트를 덮었다 — 실측) */
   #p_cl .clsp canvas{height:100px!important;max-height:100px!important}
   #p_gl .glsp canvas{height:100px!important;max-height:100px!important}  /* (2026-10-19) 금 선행 카드 — 전역 200px 규칙이 100px 박스 안에서 아래 절반을 잘라 보이던 문제 */
+  #kr_invflow canvas{height:250px!important;max-height:250px!important}  /* (2026-10-24) 3.2.1 월별 수급 막대 */
     /* (2026-10-17) 채권 탭 — 전역 canvas{height:200px!important} 를 섹션별로 덮는다(화면 실측: 미니스파크가 200px 로 늘어나 세로 막대처럼 보임) */
     #p_bd .bdsp canvas{height:26px!important;max-height:26px!important;width:90px!important}
     #p_dv canvas{height:26px!important;max-height:26px!important;width:90px!important}
@@ -2485,7 +2486,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=10181900"></script>
+<script src="/app.js?v=10241200"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
