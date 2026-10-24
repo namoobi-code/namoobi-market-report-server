@@ -81,16 +81,20 @@ INSTANT = {"debt_lt", "debt_st", "cash", "sti"}
 # 네오클라우드 전용 태그 — probe 2026-10-24 (APLD 는 LongTermNotesPayable, IREN 은 InterestExpenseNonoperating)
 TAGS_NEO = dict(TAGS)
 TAGS_NEO.update({
-    "debt_lt":  ["LongTermDebtNoncurrent", "LongTermNotesPayable", "LongTermDebt", "LongTermNotesAndLoans"],
-    "debt_st":  ["LongTermDebtCurrent", "NotesPayableCurrent", "DebtCurrent"],
+    # 코어위브는 2026 부터 LongTermDebt* 대신 DebtInstrumentCarryingAmount(총액 35.6B) 하나로 신고,
+    # 테라울프는 ConvertibleDebt(1.1B) — 둘 다 빠지면 '부채 0'이 된다(2026-10-24 probe).
+    "debt_lt":  ["LongTermDebtNoncurrent", "LongTermNotesPayable", "LongTermDebt", "LongTermNotesAndLoans",
+                 "ConvertibleDebtNoncurrent", "ConvertibleNotesPayable", "ConvertibleDebt", "DebtInstrumentCarryingAmount"],
+    "debt_st":  ["LongTermDebtCurrent", "NotesPayableCurrent", "DebtCurrent", "ConvertibleDebtCurrent"],
     "fl_lt":    ["FinanceLeaseLiabilityNoncurrent"],
     "fl_st":    ["FinanceLeaseLiabilityCurrent"],
+    "oplease":  ["OperatingLeaseLiability", "OperatingLeaseLiabilityNoncurrent"],   # 코어위브 16B — 부채엔 안 넣고 별도 표시
     "interest": ["InterestExpenseDebt", "InterestExpenseNonoperating", "InterestExpense"],
     "revenue":  ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues"],
     "issue":    ["ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromIssuanceOfDebt", "ProceedsFromNotesPayable",
                  "ProceedsFromIssuanceOfSecuredDebt"],
 })
-INSTANT_NEO = INSTANT | {"fl_lt", "fl_st"}
+INSTANT_NEO = INSTANT | {"fl_lt", "fl_st", "oplease"}
 # 네오클라우드 딜·사실 시드 (매경ECONOMY 2026.10.21-27 커버스토리 + 홈피 뉴스 2026-10-17)
 DEALS_NEO = [
     {"d": "2026-03", "co": "코어위브", "amt": 8.5,  "note": "GPU 인프라+장기 고객계약 담보 대출 — 무디스 A3(투자적격). GPU 가 담보자산이 된 첫 대형 사례"},
@@ -224,8 +228,17 @@ def series_for(cik, key, since, tags=None, instant=None):
         d = pick_instant(obs, since) if inst else pick_quarter(obs, since)
         if not d:
             continue
-        if inst:                               # 잔액은 의미가 태그마다 달라 첫 히트 고정
-            return d, [tag]
+        if inst:
+            # (2026-10-24 개정) 잔액은 '날짜별 첫 히트' — 회사가 중간에 태그를 바꾸면(코어위브 LongTermDebt→
+            # DebtInstrumentCarryingAmount) 종전 '태그 첫 히트 고정'은 최근 분기를 통째로 0 으로 만들었다.
+            # 앞 순위 태그가 가진 날짜는 유지하고, 없는 날짜만 뒤 순위 태그로 채운다.
+            added = 0
+            for k, v in d.items():
+                if k not in best:
+                    best[k] = v; added += 1
+            if added:
+                btag = (btag or "") + ("+" if btag else "") + tag
+            continue
         if len(d) > len(best):
             best, btag = d, tag
     return best, ([btag] if btag else [])
@@ -257,6 +270,8 @@ def collect_neo(since="2022-01-01"):
             cash = (raw["cash"].get(q) or 0) + (raw["sti"].get(q) or 0)
             e = {"d": q, "debt": round(debt / B, 2), "flease": round(fl / B, 2),
                  "cash": round(cash / B, 2), "net": round((debt - cash) / B, 2)}
+            if raw["oplease"].get(q) is not None:
+                e["oplease"] = round(raw["oplease"][q] / B, 2)
             for k in ("issue", "capex", "revenue", "opinc", "interest"):
                 v = raw[k].get(q)
                 if v is not None:
