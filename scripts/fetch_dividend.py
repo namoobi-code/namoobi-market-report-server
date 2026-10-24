@@ -276,7 +276,44 @@ def main():
                       "verdict": ("배당 매력 구간 — 분배율이 금리를 2%p↑ 웃돈다(기사: 2022~23 금리 4%·배당 6% 수준)" if med - r3[-1] >= 2 else
                                   "보통 — 금리 대비 1~2%p 우위" if med - r3[-1] >= 1 else "허들 높음 — 분배율이 금리를 거의 못 넘음, 배당 '때문에' 살 이유 약함")}
     except Exception as ex: log(f"  ⚠ spread: {repr(ex)[:60]}")
-    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us, "cc": cc, "spread": spread,
+    # (2026-10-24 매경LUXMEN '요즘 뜨는 버퍼 ETF') 🛡 버퍼 ETF — "방어막은 내가 산 날부터 1년이 아니다": 아웃컴 기간 시작일(3월/6월 셋째 금요일) 기준 S&P500 변동으로 잔여 버퍼·잔여 캡 계산
+    #   KODEX 미국S&P500버퍼3월액티브(0026E0)·6월액티브(0068M0): 1년간 S&P500 첫 10% 하락 완충, 캡까지 상승 참여, 총보수 0.39%, 환노출. 최초 캡은 운용사 공시값 — 여기선 CAP_ASSUME(미국 1년 10% 버퍼 상품 통상 12~16%) 가정
+    buf = {}
+    try:
+        gh = jload(DB / "global_hist.json").get("^GSPC") or {}; spx = [(t, v) for t, v in zip(gh.get("t") or [], gh.get("v") or []) if v]
+        def third_fri(y, m):
+            d = date(y, m, 15)
+            while d.weekday() != 4: d += timedelta(days=1)
+            return d
+        CAP_ASSUME = 15.0
+        pool_kr2 = {r["c"]: r for r in (jload(DB / "etf_pool.json").get("kr") or []) if r.get("c")}
+        cur = spx[-1][1]; curd = spx[-1][0]
+        for code, nm, mon in (("0026E0", "KODEX 미국S&P500버퍼3월액티브", 3), ("0068M0", "KODEX 미국S&P500버퍼6월액티브", 6)):
+            st = third_fri(today.year, mon)
+            if st > today: st = third_fri(today.year - 1, mon)
+            nxt = third_fri(st.year + 1, mon)
+            sv = next((v for t, v in spx if t >= st.strftime("%Y%m%d")), None)
+            if not sv: continue
+            move = (cur / sv - 1) * 100
+            floor_lv = sv * 0.9; cap_lv = sv * (1 + CAP_ASSUME / 100)
+            to_floor = (1 - floor_lv / cur) * 100           # 지금 사면 추가 손실 없이 견디는 하락폭(버퍼 바닥까지)
+            to_cap = (cap_lv / cur - 1) * 100               # 지금 사면 남은 상승 여력(캡까지)
+            rem_buf = max(0.0, 10 + min(0.0, move))         # 시작일 기준 남은 버퍼
+            r = pool_kr2.get(code) or {}
+            buf[code] = {"n": nm, "mon": mon, "start": st.isoformat(), "next": nxt.isoformat(), "days_left": (nxt - today).days, "spx_start": round(sv, 2), "spx_cur": round(cur, 2), "spx_d": curd,
+                         "move": round(move, 2), "rem_buf": round(rem_buf, 2), "to_floor": round(to_floor, 2), "to_cap": round(to_cap, 2), "cap_assume": CAP_ASSUME,
+                         "px": r.get("px"), "cap": r.get("cap"), "r1m": pct((r.get("r1m") or 0) * 100, 1) if r.get("r1m") is not None else None, "r3m": pct((r.get("r3m") or 0) * 100, 1) if r.get("r3m") is not None else None,
+                         "state": ("캡 도달 — 지금 사면 상승 여력 사실상 0, 하락 쿠션만" if to_cap <= 0.5 else "캡 근접 — 상승 여력 작음, 쿠션은 두꺼움" if to_cap <= 4 else
+                                   "버퍼 일부 소진 — 시작일보다 낮아 잔여 버퍼 10% 미만" if move < 0 else "버퍼 온전 · 캡 여유 — 설계 그대로 작동")}
+        g12 = ((cc.get("regime") or {}).get("spx") or {}).get("g12")
+        if g12 is not None:
+            buf["verdict"] = ("강한 상승 예상 — 캡(≈15%)에 막혀 지수 직접투자보다 불리" if g12 >= 15 else "완만 상승 예상 — 캡 안쪽이면 지수와 비슷하게 따라가며 10% 쿠션 보유, 버퍼 유리" if g12 >= 0 else
+                              "하락 예상 — 첫 10%는 완충되나 초과 하락은 그대로(1등급 고위험), 폭락 대비면 채권·현금 병행") + f" (S&P500 12M 예측 {g12:+.1f}%)"
+        buf["ref"] = {"growth": [["미국 디파인드 아웃컴 ETF", "약 880억 달러(2026.6)", "방어형 ETF 독립 카테고리"], ["2026 상반기 순유입", "약 70억 달러", "변동성 국면에도 자금 유입"], ["국내 커버드콜 ETF", "24조5,490억원(2026.5)", "2022말 1,223억 → 상품 6→50개"], ["국내 버퍼 ETF", "약 320억원(2종)", "출발선 — 상품 2개"]],
+                      "cmp": [["주 목적", "시장수익 추종", "현금흐름", "하방 손실 완충"], ["옵션", "없음", "콜 매도", "풋 매수·풋 매도·콜 매도"], ["상승장", "대부분 참여", "일부 제한", "캡까지 참여"], ["하락장", "하락 그대로", "프리미엄 일부 완충", "정해진 버퍼 구간 완충"], ["핵심 확인", "추적 오차·보수", "분배 재원·옵션 매도율", "캡·버퍼·아웃컴 기간 **잔여치**"]],
+                      "src": "매경LUXMEN 2026.10 · 모닝스타·자본시장연구원·Fun ETF"}
+    except Exception as ex: log(f"  ⚠ buffer: {repr(ex)[:80]}")
+    OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "y10": y10, "etfs_us": etfs_us, "cc": cc, "spread": spread, "buffer": buf,
                                "kr": [r for r in rows if r["mk"] == "kr"][:80], "us": [r for r in rows if r["mk"] == "us"][:80],
                                "n": {"kr": sum(1 for r in rows if r["mk"] == "kr"), "us": sum(1 for r in rows if r["mk"] == "us")},
                                "etfs": etfs, "ref": {"kospi_mfg_ni": {"2025": 169, "2026E": 751, "2027E": 973}, "kospi_mfg_fcf": {"2025": 99, "2026E": 522, "2027E": 778},

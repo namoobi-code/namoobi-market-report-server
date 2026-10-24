@@ -972,6 +972,9 @@
 
     <!-- (2026-09-05) K푸드 전용 — 라면 글로벌 위상 카드 (이코노미스트 커버스토리 'K라면 열풍, 진짜일까' 반영 · kcons.js 정적 렌더) -->
     <!-- (2026-10-17) 대중국 수출 선행 — 이코노미스트 'K브랜드, 다시 중국으로' -->
+    <!-- (2026-10-24) K뷰티 밸류체인 모니터 — 매경LUXMEN 'K-뷰티 실적, 주가도 우상향' -->
+    <h3 id="kc_kb_h3">💄 K뷰티 밸류체인 모니터 <span class="note">K뷰티 전용 · 브랜드→유통→ODM→용기 동조/괴리 · ODM 밸류 갭(2015 전성기 PER 25~30배 대비) · ETF 3종 · 매일 07:10</span></h3>
+    <div class="box" id="kc_kb_box" style="padding:12px 14px"><div id="kc_kb"></div></div>
     <h3 id="kc_cn_h3">🇨🇳 대중국 수출 선행 <span class="note">통관 → 현지판매 → 분기공시 순이라 통관이 실적을 2~4개월 선행 · 테마 품목별 대중국 월 수출 · YoY 전환 플래그 · 중국 비중</span></h3>
     <div class="box" id="kc_cn_box" style="padding:12px 14px">
       <div style="height:240px"><canvas id="kc_cn_cv"></canvas></div>
@@ -1679,6 +1682,24 @@
     <div style="display:grid;grid-template-columns:minmax(360px,5fr) minmax(420px,6fr);gap:14px;align-items:start">
       <div id="in_tbl" style="overflow:auto;max-height:620px"></div>
       <div id="in_lux" style="overflow:auto;max-height:620px"></div>
+    </div>
+
+    <!-- (2026-10-24) 학원가 형성 신호 — scripts/hakwon.py (NEIS 학원·교습소, 월 1회) -->
+    <h3 style="margin:22px 0 4px;font-size:14px">학원가 형성 신호 — 동별 입시·외국어 학원, 최근 3년 신설 <em id="hk_asof" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h3>
+    <p class="note" style="margin:0 0 6px;line-height:1.6;font-size:12px">
+      기사의 "주민 구성이 바뀐 뒤 학원·병원이 따라온다"(둔촌1동 학문·교육 점포 3→55곳)를 공개 자료로 추적. NEIS 학원·교습소 개설현황에서 <b>입시·검정·보습 + 외국어</b>만 세어
+      동별 총수와 <b>최근 3년 신설 수·비중</b>을 본다. 신설 비중이 높으면 신도시·대규모 입주로 생활권이 새로 생기는 곳, 총수가 크고 비중이 낮으면 축적형 학군. 현재 개원 중인 학원만 잡히므로(폐원 제외) 매달 쌓아 순증을 본다.
+    </p>
+    <div class="rs_ctl">
+      <span class="rs_seg" id="hk_reg"><button data-v="all">서울+경기</button><button data-v="서울">서울</button><button data-v="경기">경기</button><button data-v="성남">성남</button><button data-v="용인">용인</button></span>
+      <span class="rs_seg" id="hk_sort"><button data-v="l3">3년 신설 수</button><button data-v="l3p">3년 신설 비중</button><button data-v="hw">학원가 총수</button></span>
+      <span>최소 학원 수 <select id="hk_min"><option value="10">10+</option><option value="30" selected>30+</option><option value="100">100+</option></select></span>
+    </div>
+    <div id="hk_sum" class="note" style="margin:0 0 6px;font-size:12.5px"></div>
+    <div style="display:grid;grid-template-columns:minmax(420px,6fr) minmax(320px,4fr);gap:14px;align-items:start">
+      <div id="hk_tbl" style="overflow:auto;max-height:560px"></div>
+      <div><div class="note" id="hk_pick_n" style="font-size:11.5px;margin-bottom:3px">행을 누르면 그 동의 학원 설립연도 분포</div>
+        <div style="position:relative;height:260px"><canvas id="hk_bar"></canvas></div></div>
     </div>
   </div>
 
@@ -2532,8 +2553,8 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=10192350"></script><script src="/goldlead.js?v=10192350"></script><script src="/bonds.js?v=10173000"></script><script src="/div.js?v=10241300"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
-<script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
+<script src="/cryptolead.js?v=10192350"></script><script src="/goldlead.js?v=10192350"></script><script src="/bonds.js?v=10173000"></script><script src="/div.js?v=10241500"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/kcons.js?v=10241210"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=10212030"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->
 <style>/* ETF 표 뱃지 */ .etflev{font-size:9.5px;background:#fde8e8;color:#c0392b;border-radius:4px;padding:0 4px;font-weight:700}

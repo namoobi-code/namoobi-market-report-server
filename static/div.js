@@ -71,6 +71,29 @@ function render(){
     <div style="flex:1;min-width:220px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">S&P500 대비 커버드콜(BXM) 상대성과 — 1990년 이후 실측</div>
       <table style="border-collapse:collapse;font-size:12px;margin-top:4px;width:100%">${(CC.table||[]).map(([k,v])=>`<tr><td style="padding:2px 6px;border-bottom:1px solid #f1f5f9">${E(k)}</td><td style="padding:2px 6px;border-bottom:1px solid #f1f5f9;text-align:right;font-weight:800;color:${v>0?'#16a34a':'#dc2626'}">${v>0?'+':''}${v}%p</td><td style="padding:2px 6px;border-bottom:1px solid #f1f5f9;width:40%"><div style="height:8px;border-radius:4px;background:${v>0?'#bbf7d0':'#fecaca'};width:${Math.abs(v)*10}%"></div></td></tr>`).join('')}</table>
       <div class="note" style="font-size:10.5px;margin-top:4px">블룸버그·SC제일은행. 지수가 10% 넘게 오르면 커버드콜이 뒤처진다 — 아래 ETF 표의 '지수比 1년' 열이 올해 실제 결과</div></div></div>`;
+  // (2026-10-24 매경LUXMEN '요즘 뜨는 버퍼 ETF') 🛡 버퍼 ETF — 잔여 버퍼·잔여 캡은 아웃컴 기간 시작일 기준
+  const BF=D.buffer||{}; const bfk=['0026E0','0068M0'].filter(k=>BF[k]);
+  if($('dv_cc')&&bfk.length){
+    const card=b=>{const col=b.to_cap<=0.5?'#dc2626':b.to_cap<=4?'#ca8a04':b.move<0?'#b45309':'#16a34a';
+      return `<div style="flex:1;min-width:280px;border:1px solid #e2e8f0;border-left:4px solid ${col};border-radius:8px;padding:8px 12px;background:#fff">
+        <div style="font-weight:700;font-size:12.5px">${E(b.n)} <span class="note" style="font-weight:400">${b.px?nf(b.px,0)+'원':''}${b.cap?' · 순자산 '+(b.cap/1e8).toFixed(0)+'억':''}</span></div>
+        <div class="note" style="font-size:11px">아웃컴 기간 ${E(b.start)} ~ ${E(b.next)} (리셋까지 ${b.days_left}일) · 시작일 S&P500 ${nf(b.spx_start,0)} → 현재 ${nf(b.spx_cur,0)} (<b class="${b.move>=0?'up':'dn'}">${b.move>0?'+':''}${b.move}%</b>)</div>
+        <div style="display:flex;gap:10px;margin:6px 0 4px;flex-wrap:wrap">
+          <div><div class="note" style="font-size:10.5px">지금 사면 남은 상승 여력(캡까지)</div><div style="font-size:17px;font-weight:800;color:${b.to_cap<=0.5?'#dc2626':b.to_cap<=4?'#ca8a04':'#16a34a'}">${b.to_cap>0?'+':''}${b.to_cap}%</div></div>
+          <div><div class="note" style="font-size:10.5px">추가 손실 없이 견디는 하락폭(버퍼 바닥까지)</div><div style="font-size:17px;font-weight:800;color:#1d4ed8">−${b.to_floor}%</div></div>
+          <div><div class="note" style="font-size:10.5px">시작일 기준 잔여 버퍼</div><div style="font-size:17px;font-weight:800">${b.rem_buf}% <span class="note" style="font-size:10px">/10%</span></div></div></div>
+        <div style="font-size:12px;font-weight:700;color:${col}">${E(b.state)}</div>
+        <div class="note" style="font-size:10.5px">1M ${pf(b.r1m)} · 3M ${pf(b.r3m)} · 총보수 0.39% · 환노출 · 위험등급 1등급(매우 높음). 최초 캡은 운용사 공시값 — 여기선 ${b.cap_assume}% 가정(미국 1년 10% 버퍼 상품 통상 12~16%), 공시 캡이 다르면 상승 여력도 달라짐</div></div>`;};
+    const ref=BF.ref||{};
+    $('dv_cc').insertAdjacentHTML('beforeend',`<div style="margin-top:12px;border-top:1px dashed #e2e8f0;padding-top:10px">
+      <div style="font-weight:700;font-size:12.5px;margin-bottom:4px">🛡 버퍼 ETF — "방어막은 내가 산 날부터 1년이 아니다" <span class="note" style="font-weight:400">매경LUXMEN 2026.10 · 옵션 3장(풋 매수·풋 매도·콜 매도)으로 첫 10% 하락 완충, 캡까지 상승 참여. 버퍼·캡은 아웃컴 기간 <b>시작일</b> 기준이라 중간 진입자는 잔여치를 봐야 한다</span></div>
+      ${BF.verdict?`<div style="font-size:12px;margin-bottom:6px"><b>지금 국면:</b> ${E(BF.verdict)}</div>`:''}
+      <div style="display:flex;gap:10px;flex-wrap:wrap">${bfk.map(k=>card(BF[k])).join('')}</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
+        <div style="flex:1;min-width:300px"><table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%"><thead><tr>${['구분','일반 지수 ETF','커버드콜 ETF','버퍼 ETF'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${(ref.cmp||[]).map(r=>`<tr>${r.map((c,i)=>`<td style="${TD}${i===0?'font-weight:700':''}${i===3?'background:#f0fdf4':''}">${E(c).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>')}</td>`).join('')}</tr>`).join('')}</tbody></table></div>
+        <div style="flex:1;min-width:260px"><table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%"><thead><tr>${['방어형 ETF 성장','현재','의미'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${(ref.growth||[]).map(r=>`<tr>${r.map((c,i)=>`<td style="${TD}${i===1?'font-weight:700;text-align:right':''}">${E(c)}</td>`).join('')}</tr>`).join('')}</tbody></table><div class="note" style="font-size:10.5px;margin-top:3px">${E(ref.src||'')}</div></div></div>
+      <div class="note" style="margin-top:6px;line-height:1.5">읽는 법: S&P500이 시작일보다 올라 있으면 <b>캡까지의 여력은 줄고 쿠션은 두꺼워진다</b>(원래 버퍼 10% + 그간 상승분). 시작일보다 내려 있으면 버퍼 일부가 이미 소진돼 남은 방어가 10% 미만. 버퍼를 넘는 하락(예 −22%면 −12%)은 그대로 손실 — '보장'이 아니다. 매년 3월/6월 셋째 금요일 리셋 직후가 설계값 그대로 사는 시점.</div></div>`);
+  }
   $('dv_kr').innerHTML=tbl('kr'); $('dv_us').innerHTML=tbl('us'); bindSort();
   $('dv_cal').innerHTML=calendar();
   const etfLamp=t=>t==null?['⚪','—']:t>=3?['🟢','유리']:t>=2?['🟡','보통']:['🔴','대기'];

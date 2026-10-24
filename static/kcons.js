@@ -6,7 +6,7 @@
              국내 관심도는 기존 Trends 탭(구글·유튜브·네이버쇼핑)을 보조지표로 쓴다. */
 (function(){
 'use strict';
-let D=null, CN=null, TH='K뷰티', MODE='idx', ch1=null, ch2=null, chCn=null;   // MODE: idx(지수)|abs(절대값) — 화장품이 축을 지배해 소품목 급등이 안 보이는 문제(2026-08-29 피드백)
+let D=null, CN=null, KB=null, TH='K뷰티', MODE='idx', ch1=null, ch2=null, chCn=null;   // MODE: idx(지수)|abs(절대값) — 화장품이 축을 지배해 소품목 급등이 안 보이는 문제(2026-08-29 피드백)
 
 // 품목 → 관련 종목 매핑 (연동 논리 — 직결 상장사가 없으면 정직하게 표기)
 const ITEM_MAP={
@@ -25,6 +25,7 @@ const ITEM_MAP={
  '선글라스·안경':'직결 상장사 희소 — 젠틀몬스터 등 주요 브랜드 비상장',
  '의류(편물+직물)':'영원무역(OEM 생산)·F&F·휠라홀딩스(브랜드)'};
 const $=id=>document.getElementById(id);
+const E=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));   // (2026-10-24) HTML 이스케이프
 const nf=n=>(n==null?'—':Number(n).toLocaleString());
 const pf=v=>v==null?'—':(v>0?'+':'')+v.toFixed(1)+'%';
 const pc=v=>v==null?'#64748b':(v>0?'#dc2626':v<0?'#2563eb':'#64748b');
@@ -107,7 +108,7 @@ function render(){
   //     아마존·세포라는 K뷰티 전용 데이터 — K푸드·K패션 선택 시 섹션 숨김(사용자 피드백)
   const showRet=(TH==='K뷰티');
   ['kc_ret_h3','kc_ret_box'].forEach(id=>{const el=$(id); if(el) el.style.display=showRet?'':'none';});
-  renderCn();
+  renderCn(); renderKb();
   /* (2026-09-05) K푸드 전용 — 라면 글로벌 위상 카드. 이코노미스트 커버스토리 실측 전재:
      '수출 사상 최대(+28%)인데 글로벌 점유는 한 자릿수'라는 갭이 투자 논점. 분기 갱신. */
   const showRm=(TH==='K푸드');
@@ -242,13 +243,50 @@ function renderCn(){
       ⚠ 품목 합계라 회사별이 아님 — 해당 품목 매출 비중이 큰 종목일수록 신호가 선명. 전환 품목은 관련 종목의 다음 분기 중국 매출(DART 지역별·종속법인 요약재무)로 확인.</div>`;
 }
 
+/* ── (2026-10-24) 💄 K뷰티 밸류체인 모니터 — 매경LUXMEN 2026-10 'K-뷰티 실적, 주가도 우상향' 프레임
+   "브랜드→유통→ODM→용기 동조화"를 매일 검증: 계층별 fwd PER·상승여력·1M/3M·리비전·영업익 전망성장 + 동조/괴리 판정 + ODM 밸류 갭 + ETF 3종. */
+function renderKb(){
+  const show=(TH==='K뷰티'); ['kc_kb_h3','kc_kb_box'].forEach(id=>{const el=$(id); if(el) el.style.display=show?'':'none';});
+  const box=$('kc_kb'); if(!box||!show) return;
+  if(!KB||!KB.layers){ box.innerHTML='<div class="note">밸류체인 데이터 수집 전(매일 07:10)</div>'; return; }
+  const P=v=>v==null?'—':(v>0?'+':'')+(v*100).toFixed(1)+'%';
+  const ps=v=>v==null?'—':(v*100).toFixed(1)+'%';
+  const sync=KB.sync||{}, val=KB.val||{};
+  const head=`<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+    <div style="flex:1;min-width:300px;border:1px solid ${sync.state==='동조'?'#bbf7d0':'#fecaca'};background:${sync.state==='동조'?'#f0fdf4':'#fef2f2'};border-radius:8px;padding:8px 12px;font-size:12.5px"><b>${sync.state==='동조'?'🟢 동조화':'🔴 괴리'}</b> — ${E(sync.txt||'')}</div>
+    <div style="flex:1;min-width:300px;border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:8px 12px;font-size:12.5px"><b>💰 ODM 밸류 갭</b> — ${E(val.txt||'—')}</div></div>`;
+  const tbl=`<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%"><thead><tr style="background:#f8fafc">${['계층','종목','가격','fwd PER','상승여력','1M','3M','영업익 리비전','영업익 전망성장','목표가 추세'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px">${h}</th>`).join('')}</tr></thead><tbody>
+    ${KB.layers.map(l=>l.rows.map((x,i)=>`<tr>${i===0?`<td rowspan="${l.rows.length+1}" style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:700;vertical-align:top;background:#fafafa"><div>${E(l.name)}</div><div class="note" style="font-weight:400;max-width:170px">${E(l.why)}</div></td>`:''}
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;white-space:nowrap"><a href="https://finance.naver.com/item/main.naver?code=${x.c}" target="_blank">${E(x.n)}</a></td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${x.px!=null?Math.round(x.px).toLocaleString():'—'}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${x.fper!=null?x.fper.toFixed(1)+'배':'—'}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${ps(x.upside)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(x.r1m)}">${P(x.r1m)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(x.r3m)};font-weight:700">${P(x.r3m)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(x.rev)}">${P(x.rev)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(x.opg_f)}">${P(x.opg_f)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;color:#64748b;font-size:11px">${E(x.tp_trend||'—')}</td></tr>`).join('')
+      +`<tr style="background:#f8fafc;font-size:11.5px"><td colspan="2" style="border:1px solid #e2e8f0;padding:2px 7px;color:#475569">계층 평균</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 7px;text-align:right">${l.avg.fper!=null?l.avg.fper.toFixed(1)+'배':'—'}</td><td style="border:1px solid #e2e8f0;padding:2px 7px;text-align:right">${ps(l.avg.upside)}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 7px;text-align:right;color:${pc(l.avg.r1m)}">${P(l.avg.r1m)}</td><td style="border:1px solid #e2e8f0;padding:2px 7px;text-align:right;color:${pc(l.avg.r3m)};font-weight:700">${P(l.avg.r3m)}</td>
+        <td style="border:1px solid #e2e8f0;padding:2px 7px;text-align:right;color:${pc(l.avg.rev)}">${P(l.avg.rev)}</td><td colspan="2" style="border:1px solid #e2e8f0"></td></tr>`).join('')}</tbody></table>`;
+  const etf=`<div style="margin-top:10px;font-size:12.5px;font-weight:700">K-뷰티 ETF 3종 <span class="note" style="font-weight:400">기사(9/17) 연초 수익률 vs 지금 — 현실 체크</span></div>
+    <table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%;margin-top:4px"><thead><tr style="background:#f8fafc">${['ETF','현재가','1M','3M','6M','1Y','기사 YTD(9/17)'].map(h=>`<th style="border:1px solid #e2e8f0;padding:4px 7px">${h}</th>`).join('')}</tr></thead><tbody>
+    ${(KB.etfs||[]).map(e=>`<tr><td style="border:1px solid #e2e8f0;padding:3px 7px;font-weight:700">${E(e.n)}</td><td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right">${e.px!=null?e.px.toLocaleString():'—'}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(e.r1m)}">${P(e.r1m)}</td><td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(e.r3m)}">${P(e.r3m)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(e.r6m)}">${P(e.r6m)}</td><td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:${pc(e.r1y)};font-weight:700">${P(e.r1y)}</td>
+      <td style="border:1px solid #e2e8f0;padding:3px 7px;text-align:right;color:#64748b">+${e.article_ytd}%</td></tr>`).join('')}</tbody></table>`;
+  box.innerHTML=head+tbl+etf+`<div class="note" style="margin-top:6px">기준 ${E(KB.as_of)} · 출처 ${E(KB.src||'')} · 동조/괴리 = 계층 평균 3M 수익률 최대 격차 15p 기준 · 영업익 리비전·전망성장 = 네이버 컨센(스크리너 풀) · 리서치용</div>`;
+}
+
 function load(force){
   if(D&&!force){ render(); return; }
   $('kc_asof').textContent='불러오는 중…';
   Promise.all([
     fetch('/api/db/kcons',{cache:'no-cache'}).then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); }),
-    fetch('/api/db/cn_export',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null)   // (2026-10-17) 대중국 수출 선행
-  ]).then(([j,c])=>{ D=j; CN=c; render(); })
+    fetch('/api/db/cn_export',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null),   // (2026-10-17) 대중국 수출 선행
+    fetch('/api/db/kbeauty_chain',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null) // (2026-10-24) K뷰티 밸류체인
+  ]).then(([j,c,k])=>{ D=j; CN=c; KB=k; render(); })
   .catch(e=>{ $('kc_asof').textContent='로드 실패: '+e.message+' (서버 수집 전이면 다음 06:25 이후 표시)'; });
 }
 
