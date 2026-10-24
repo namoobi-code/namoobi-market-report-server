@@ -124,6 +124,37 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   if(g.length<2&&ann?.length) g=ann.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
   const o=[];for(const x of g){if(!o.length||x[1]!==o[o.length-1][1])o.push(x);} return o.slice(-8);}
 
+/* (2026-10-24) 3.1.2 '앞으로의 물가 경로' 표 — 나우캐스트(당월·익월)·SPF 5분기·SEP 연말·기대인플레. 전부 공식 소스, 전망은 (E) */
+function renderInflFcst(F){
+  const box=$('infl_fcst'); if(!box) return; if(!F){ box.style.display='none'; return; }
+  const V4=[['CPI','CPI'],['CORECPI','Core CPI'],['PCE','PCE'],['COREPCE','Core PCE']];
+  const f1=v=>v==null?'—':(+v).toFixed(2)+'%', fm=v=>v==null?'—':((+v>=0?'+':'')+(+v).toFixed(2)+'%');
+  const nc=(F.nowcast&&F.nowcast.months)||[]; const la=F.last_actual||{};
+  const spf=(F.spf&&F.spf.vars)||{}; const sep=F.sep||{};
+  const qs=[...new Set(Object.values(spf).flatMap(v=>(v.yoy||[]).map(p=>p[0])))].sort().slice(0,6);
+  let h=`<table class="mini" style="width:100%;font-size:12px;text-align:center"><tr><th style="text-align:left">지표</th><th>최신 실제</th>`;
+  const ncm=nc.filter(m=>m.m>(la.CPI||'')||m.m>(la.PCE||'')); const ncShow=nc.slice(-2);
+  ncShow.forEach(m=>h+=`<th>나우캐스트 ${esc(m.m)}<br><span class="note" style="font-weight:400">MoM · YoY</span></th>`);
+  qs.forEach(q=>h+=`<th>SPF ${esc(q.slice(0,4))}Q${Math.ceil(+q.slice(5,7)/3)}<br><span class="note" style="font-weight:400">YoY</span></th>`);
+  const yrs=(sep.PCE||[]).map(p=>p[0]).slice(0,3); yrs.forEach(y=>h+=`<th>SEP ${y}<br><span class="note" style="font-weight:400">Q4/Q4</span></th>`);
+  h+='</tr>';
+  V4.forEach(([k,n])=>{ h+=`<tr><td style="text-align:left"><b>${n}</b></td><td>${la[k]?esc(la[k]):'—'}</td>`;
+    ncShow.forEach(m=>{ const x=m[k]||{}; const pub=x.act_mom!=null;
+      h+=`<td>${pub?`<span class="note">예측 ${fm(x.mom)} → 실제 <b>${fm(x.act_mom)}</b></span>`:`${fm(x.mom)} · <b>${f1(x.yoy)}</b>`}</td>`; });
+    const ym=Object.fromEntries(((spf[k]||{}).yoy||[]).map(p=>[p[0],p[1]]));
+    qs.forEach(q=>h+=`<td>${ym[q]!=null?f1(ym[q]):'—'}</td>`);
+    const sm=Object.fromEntries((sep[k]||[])); yrs.forEach(y=>h+=`<td>${sm[y]!=null?f1(sm[y]):'<span class="note">CPI 없음</span>'}</td>`);
+    h+='</tr>'; });
+  h+='</table>';
+  const ei=F.expinf||{}; const ann=(spf.CPI||{}).annual||{};
+  h+=`<div class="note" style="margin-top:6px">기대인플레(클리블랜드 연준 모델 ${esc(ei.as_of||'')}): 1년 <b>${f1(ei.y1)}</b> · 2년 ${f1(ei.y2)} · 5년 ${f1(ei.y5)} · 10년 ${f1(ei.y10)}
+    · SPF 연평균 CPI ${Object.entries(ann).map(([y,v])=>y+' '+f1(v)).join(' · ')}</div>
+  <div class="note">읽는 법 — 나우캐스트는 발표 전 1~2개월의 일별 추정(예측→실제 괄호는 직전 달의 오차). SPF 는 분기 1회(2·5·8·11월) 40여 기관 중앙값 — 전분기비 연율을 실제 지수에 이어붙여 YoY 로 환산했으므로
+    <b>내년 2분기 급락은 올해 2분기 급등의 기저효과</b>가 큰 몫. SEP 는 연준 위원 중앙값(연말 Q4/Q4)이라 CPI 는 없다. 차트 점선=같은 경로. 전부 전망(E) — 블룸버그 50여 기관 집계(유료) 대체.
+    ${F.spf?`SPF ${esc(F.spf.survey)} 서베이`:''} · SEP 갱신 ${esc(sep.updated||'')} · 나우캐스트 ${esc((F.nowcast||{}).as_of||'')} · 수집 ${esc(F.as_of||'')}</div>`;
+  box.innerHTML=h; box.style.display='';
+}
+
 (async()=>{
   const [b,rd,pr,rs,h] = await Promise.all([
     /* (2026-08-14) cache:'no-cache' — 브라우저가 디스크 캐시본을 조용히 재사용해
@@ -256,8 +287,24 @@ function fixGdp(r,ann){let g=r.filter(x=>x[1]!=null&&Math.abs(x[1])<50);
     <td class="note">${esc(r.interp)}</td></tr>`;}).join('');
   const ic=S(b,'series_infl_CPI'),icc=S(b,'series_infl_Core_CPI'),ip=S(b,'series_infl_PCE'),
         ipc=S(b,'series_infl_Core_PCE'),ippi=S(b,'series_infl_PPI');
-  mk($('c_infl'),L(ic),[{n:'CPI',d:V(ic),c:C.r},{n:'Core CPI',d:V(icc),c:C.o},{n:'PCE',d:V(ip),c:C.b},
-    {n:'Core PCE',d:V(ipc),c:C.g},{n:'PPI',d:V(ippi),c:C.gy}],{legend:true});
+  /* (2026-10-24 한경MONEY 이은택 'CPI와 장기금리의 암울한 예언') 실제 뒤에 '앞으로의 경로'를 점선으로 잇는다 —
+     /api/db/infl_fcst(fetch_infl_fcst.py 06:20): 나우캐스트 월(클리블랜드 연준) → SPF 분기말(필라델피아 연준 중앙값, 전분기비 연율을
+     FRED 지수에 이어붙여 YoY 환산) + SEP 연말점(FOMC 중앙값, PCE·코어PCE 만). 전부 (E) — 블룸버그 집계(유료) 대체. 리포트 3.1.2 와 동일 소스. */
+  let IF=null; try{ const r=await fetch('/api/db/infl_fcst',{cache:'no-cache'}); if(r.ok) IF=await r.json(); }catch(e){}
+  {const base=[{n:'CPI',s:ic,c:C.r,k:'CPI'},{n:'Core CPI',s:icc,c:C.o,k:'CORECPI'},{n:'PCE',s:ip,c:C.b,k:'PCE'},{n:'Core PCE',s:ipc,c:C.g,k:'COREPCE'},{n:'PPI',s:ippi,c:C.gy}];
+   const lab=[...L(ic)]; const sets=[]; const ext=IF&&IF.ext||{};
+   base.forEach(b=>{ (b.k&&ext[b.k]||[]).forEach(p=>{ if(!lab.includes(p[0])) lab.push(p[0]); }); });
+   const spfEnd=Math.max(...Object.values(ext).flat().map(p=>+String(p[0]).slice(0,4)),0);   // 차트 x축은 SPF 끝 해까지만(SEP 2029 로 축이 늘어지지 않게)
+   ((IF&&IF.sep)||{}).PCE?.forEach(p=>{ const m=p[0]+'-12'; if(p[0]<=spfEnd&&!lab.includes(m)) lab.push(m); });
+   lab.sort();
+   base.forEach(b=>{ const m=Object.fromEntries(b.s); sets.push({n:b.n,d:lab.map(l=>m[l]??null),c:b.c});
+     const e=b.k&&ext[b.k]; if(e&&e.length){ const em=Object.fromEntries(e.map(p=>[p[0],p[1]]));
+       const last=b.s.length?b.s[b.s.length-1]:null; if(last) em[last[0]]=last[1];   // 실제 마지막 점에서 점선 시작
+       sets.push({n:b.n+' 전망(E)',d:lab.map(l=>em[l]??null),c:b.c,dash:[4,3],w:1.3,pt:2}); } });
+   const sep=IF&&IF.sep||{}; [['PCE','SEP PCE',C.b],['COREPCE','SEP Core PCE',C.g]].forEach(([k,n,c])=>{ if(!sep[k]||!sep[k].length) return;
+     const em=Object.fromEntries(sep[k].map(p=>[p[0]+'-12',p[1]])); sets.push({n:n+'(E)',d:lab.map(l=>em[l]??null),c:c,dash:[1,3],w:0,pt:4}); });
+   mk($('c_infl'),lab,sets,{legend:true,xt:9});
+   renderInflFcst(IF);}
   const bei=S(b,'series_infl_exp');
   mk($('c_bei'),L(bei),[{n:'BEI',d:V(bei),c:C.p}]);
   /* (req7 2026-07-19) BEI 현재값 텍스트 표시 — 차트 컨테이너 바로 위에 최신값·기준일 캡션 */
