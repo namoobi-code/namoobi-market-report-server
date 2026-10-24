@@ -1647,6 +1647,22 @@
       <span class="rs_seg" id="ih_type"><button data-v="multi">공동주택(아파트+연립·다세대)</button><button data-v="apt">아파트만</button></span>
     </div>
     <div style="position:relative;height:300px"><canvas id="ih_bar"></canvas></div>
+
+    <!-- (2026-10-24) 고가 거래 집중도 · 신축 분해 — scripts/hitier.py (매일 08:08) · 매경LUXMEN 2026.10 '한국의 부촌' Part2 실거래 재현 -->
+    <h3 style="margin:22px 0 4px;font-size:14px">고가 거래 집중도 — "20억 문턱은 넓어지고 50억은 좁아지나" <em id="ht_asof" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h3>
+    <p class="note" style="margin:0 0 6px;line-height:1.6;font-size:12px">
+      매경LUXMEN(2026.10)의 "20억+ 주택 중 강남3구 57%, 50억+ 는 83%"를 <b>실거래</b>로 매달 다시 센다(기사는 공시가·AI시세).
+      왼쪽: 서울 아파트 거래 중 가격대별 강남3구(실선)·한강벨트 8구(점선) 비중의 분기 추이 — 선이 내려오면 문턱이 넓어지는 것.
+      오른쪽: 구별 최근 12개월, 20억+ 거래를 <b>신축(준공 5년 이내)·준신축·구축</b>으로 쪼개 "새 집이 들어온 동네"와 "옛 집값이 오른 동네"를 구분.
+    </p>
+    <div id="ht_sum" class="note" style="margin:0 0 6px;font-size:12.5px"></div>
+    <div style="display:grid;grid-template-columns:minmax(360px,5fr) minmax(420px,6fr);gap:14px;align-items:start">
+      <div><div style="position:relative;height:300px"><canvas id="ht_line"></canvas></div>
+        <div class="rs_seg" id="ht_since" style="margin-top:4px;font-size:11.5px">시작 <button data-v="2015">2015</button><button data-v="2019">2019</button><button data-v="2022">2022</button></div></div>
+      <div id="ht_tbl" style="overflow:auto;max-height:560px"></div>
+    </div>
+    <h4 style="margin:14px 0 2px;font-size:13px">12억+ 거래 5년 증가율 — 신축이 만든 증가인가, 구축 재평가인가 <em id="ht_up_n" style="font-weight:400;font-size:11.5px;color:#8a93a0"></em></h4>
+    <div style="position:relative;height:320px"><canvas id="ht_up"></canvas></div>
   </div>
 
   <!-- (2026-08-23) 🔮 RE 예측 페인 — scripts/repred.py (매일 08:10) · re.js
@@ -2491,7 +2507,7 @@
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
 <script src="/re.js?v=20260826hz"></script><!-- (2026-08-23) RE 예측 탭 -->
-<script src="/resh.js?v=10172100"></script>
+<script src="/resh.js?v=10241100"></script>
 <script src="/loc.js?v=10172300"></script><!-- (2026-10-17) 입지점수 탭 --><!-- (2026-09-20) 부동산시황 탭 -->
 <script src="/re3.js?v=08280100"></script><!-- (2026-08-27) RE3 국면 신호등 탭 -->
 <script src="/eg.js?v=20260902c"></script>
@@ -2499,7 +2515,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=09052004"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=10192350"></script><script src="/goldlead.js?v=10192350"></script><script src="/bonds.js?v=10173000"></script><script src="/div.js?v=10172500"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=10192350"></script><script src="/goldlead.js?v=10192350"></script><script src="/bonds.js?v=10173000"></script><script src="/div.js?v=10241300"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10171700"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=10212030"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=08312130"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

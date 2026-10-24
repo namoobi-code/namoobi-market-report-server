@@ -133,7 +133,7 @@ function controls(){
 function draw(){ controls(); bar(); table(); lines(); }
 
 window.renderResh=async function(){
-  hsLoad(); ipLoad();
+  hsLoad(); ipLoad(); htLoad();
   if(D){ setTimeout(()=>{[chBar,chLine].forEach(c=>c&&c.resize());},60); return; }
   try{
     const r=await fetch('/api/db/rerank'); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -334,5 +334,65 @@ function ihDraw(){
     +recent.map(k=>`${k.replace('H1','상').replace('H2','하')} ${Math.round(past[k]).toLocaleString()} (${pct(past[k])})`).join(' · ')
     +(favg?` · 향후 예정 반기평균 <b>${Math.round(favg).toLocaleString()}</b> (${pct(favg)})`:'')
     +(fb?` · <span style="color:#b45309">예정은 ${E(IP.reg)}, 준공·평균은 ${hreg} 전체 — 비율이 아니라 추세로 읽을 것</span>`:'');
+}
+
+/* ───────── 고가 거래 집중도 · 신축 분해 (2026-10-24) — /api/db/hitier · scripts/hitier.py ─────────
+   매경LUXMEN 2026.10 '한국의 부촌' Part2 를 실거래로 재현. 실측(2026-10-24): 20억+ 중 강남3구 56.6%(기사 57.2%),
+   동대문 20억+ 거래의 신축 69% vs 강서 0% — 기사의 "같은 증가율, 다른 원인"이 실거래에서도 그대로. */
+let HT=null, htL=null, htU=null, HTS={since:'2015', sort:'p20', dir:-1};
+const GUC={'강남구':1,'서초구':1,'송파구':1};
+function htDraw(){
+  if(!HT) return;
+  const qs=HT.q.filter(q=>q>=HTS.since+'Q1'&&q!==HT.cur_q);   // 진행 중 분기는 표본이 적어 제외
+  const ds=[];
+  [['20','#2f6fed'],['30','#e08e3c'],['50','#d9534f']].forEach(([t,c])=>{
+    ds.push({label:`${t}억+ 중 강남3구`,data:qs.map(q=>(HT.conc[t][q]||{}).gn3_pct??null),borderColor:c,borderWidth:2,pointRadius:0,tension:.2,spanGaps:true});
+  });
+  ds.push({label:'20억+ 중 한강벨트 8구',data:qs.map(q=>(HT.conc['20'][q]||{}).hr_pct??null),borderColor:'#2f6fed',borderDash:[4,3],borderWidth:1.5,pointRadius:0,tension:.2,spanGaps:true});
+  ds.push({label:'20억+ 거래 비중(전체 중)',data:qs.map(q=>(HT.conc['20'][q]||{}).share??null),borderColor:'#9aa5b1',borderWidth:1.2,pointRadius:0,tension:.2,yAxisID:'y2',spanGaps:true});
+  if(htL) htL.destroy();
+  htL=new Chart($('ht_line'),{type:'line',data:{labels:qs,datasets:ds},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+    plugins:{legend:{labels:{boxWidth:12,font:{size:10.5}}},tooltip:{callbacks:{label:c=>c.raw==null?null:` ${c.dataset.label} ${c.raw}%`+(c.dataset.yAxisID!=='y2'?` (${(HT.conc[c.dataset.label.slice(0,2)][qs[c.dataIndex]]||{}).all||'—'}건 중)`:'')}}},
+    scales:{x:{ticks:{font:{size:10},maxTicksLimit:12}},y:{min:0,max:100,ticks:{font:{size:10},callback:v=>v+'%'},title:{display:true,text:'강남3구·한강벨트 비중',font:{size:10}}},
+            y2:{position:'right',min:0,ticks:{font:{size:10},callback:v=>v+'%'},grid:{display:false},title:{display:true,text:'20억+ 거래 비중',font:{size:10}}}}}});
+  const last=qs[qs.length-1], c20=HT.conc['20'][last]||{}, c50=HT.conc['50'][last]||{}, c30=HT.conc['30'][last]||{};
+  const first=qs[0], f20=HT.conc['20'][first]||{}, f50=HT.conc['50'][first]||{};
+  $('ht_sum').innerHTML=`<b>${last}</b> 서울 아파트 거래 중 20억+ <b>${c20.all||0}</b>건(전체의 ${c20.share||0}%) → 강남3구 <b>${c20.gn3_pct}%</b>·한강벨트 ${c20.hr_pct}% · 30억+ ${c30.all||0}건 → 강남3구 <b>${c30.gn3_pct}%</b> · 50억+ ${c50.all||0}건 → 강남3구 <b>${c50.gn3_pct}%</b>`
+    +` · <span class="note">${first} 에는 20억+ 강남3구 ${f20.gn3_pct??'—'}% · 50억+ ${f50.gn3_pct??'—'}%</span>`;
+  // 표
+  const G=Object.entries(HT.gu).map(([g,v])=>Object.assign({g},v));
+  const k=HTS.sort; G.sort((a,b)=>{const x=a[k],y=b[k]; if(x==null) return 1; if(y==null) return -1; return typeof x==='string'?HTS.dir*x.localeCompare(y,'ko'):HTS.dir*(x-y);});
+  const H=[['g','구'],['n12','12M 거래'],['p20','20억+'],['p30','30억+'],['p50','50억+'],['new5','신축'],['new10','준신축'],['old','구축'],['p84','84㎡ 평균(억)'],['up5','12억+ 5년↑'],['new5_now','↑중 신축']];
+  const F=(v,s='')=>v==null?'—':(typeof v==='number'?v.toLocaleString():v)+s;
+  $('ht_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${H.map(([kk,l])=>`<th data-k="${kk}" style="padding:4px 6px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap;cursor:pointer"${kk==='new5'?' title="최근 12개월 20억+ 거래 중 준공 5년 이내 비중"':kk==='up5'?' title="5년 전 1~M월 대비 올해 1~M월 12억+ 거래건수 증가율 (5년 전 20건 미만이면 —)"':kk==='new5_now'?' title="올해 12억+ 거래 중 준공 5년 이내 비중 — 높으면 신축 입주가 만든 증가"':''}>${l}${HTS.sort===kk?(HTS.dir<0?' ▼':' ▲'):''}</th>`).join('')}</tr></thead><tbody>${
+    G.map(v=>`<tr style="border-bottom:1px solid #f2f4f7;${GUC[v.g]?'background:#fff7ed':v.hr?'background:#eff6ff':''}">
+      <td style="padding:3px 6px;white-space:nowrap"><b>${E(v.g)}</b></td><td style="padding:3px 6px;text-align:right">${F(v.n12)}</td>
+      <td style="padding:3px 6px;text-align:right;font-weight:700">${F(v.p20,'%')}</td><td style="padding:3px 6px;text-align:right">${F(v.p30,'%')}</td><td style="padding:3px 6px;text-align:right">${F(v.p50,'%')}</td>
+      <td style="padding:3px 6px;text-align:right;color:#7c2d12">${F(v.new5,'%')}</td><td style="padding:3px 6px;text-align:right;color:#b5476c">${F(v.new10,'%')}</td><td style="padding:3px 6px;text-align:right;color:#8a93a0">${F(v.old,'%')}</td>
+      <td style="padding:3px 6px;text-align:right">${v.p84!=null?v.p84.toFixed(1):'—'}</td>
+      <td style="padding:3px 6px;text-align:right;font-weight:700;color:${v.up5>0?'#c2410c':'#1d4ed8'}">${v.up5!=null?(v.up5>0?'+':'')+v.up5+'%':'—'}</td>
+      <td style="padding:3px 6px;text-align:right">${F(v.new5_now,'%')}</td></tr>`).join('')}</tbody></table>
+    <div class="note" style="margin-top:4px;font-size:11px">주황=강남3구 · 파랑=한강벨트. 신축/준신축/구축은 20억+ 거래 기준(거래 시점 준공연차). ${E(HT.note)}</div>`;
+  $('ht_tbl').querySelectorAll('th[data-k]').forEach(th=>th.onclick=()=>{const kk=th.dataset.k; if(HTS.sort===kk) HTS.dir=-HTS.dir; else {HTS.sort=kk; HTS.dir=kk==='g'?1:-1;} htDraw();});
+  // 5년 증가율 막대 — 신축비중으로 색 농도
+  const U=G.filter(v=>v.up5!=null).sort((a,b)=>b.up5-a.up5);
+  if(htU) htU.destroy();
+  htU=new Chart($('ht_up'),{type:'bar',data:{labels:U.map(v=>v.g),datasets:[
+      {label:'12억+ 거래 5년 증가율(%)',data:U.map(v=>v.up5),backgroundColor:U.map(v=>v.new5_now>=30?'#7c2d12':v.new5_now>=10?'#b5476c':'#c9cfd6'),borderWidth:0,maxBarThickness:28},
+      {label:'올해 12억+ 중 신축 비중(%)',data:U.map(v=>v.new5_now),type:'line',borderColor:'#2f6fed',borderWidth:1.5,pointRadius:3,yAxisID:'y2'}]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{boxWidth:12,font:{size:10.5}}},tooltip:{callbacks:{label:c=>{const v=U[c.dataIndex]; return c.datasetIndex===0?` 12억+ ${v.t12_ago}→${v.t12_now}건 (${v.up5>0?'+':''}${v.up5}%)`:` 신축 비중 ${v.new5_now}%`;}}}},
+      scales:{x:{ticks:{font:{size:10},maxRotation:60}},y:{ticks:{font:{size:10},callback:v=>v+'%'},grid:{color:'#eef1f4'}},y2:{position:'right',min:0,max:100,ticks:{font:{size:10},callback:v=>v+'%'},grid:{display:false}}}}});
+  $('ht_up_n').textContent=`${HT.ago.replace('~','~')} vs ${HT.now} · 막대 색: 진할수록 신축이 만든 증가(신축비중 30%+ 진갈색·10%+ 분홍·그 외 회색)`;
+}
+async function htLoad(){
+  if(HT){ setTimeout(()=>{[htL,htU].forEach(c=>c&&c.resize());},60); return; }
+  try{
+    const r=await fetch('/api/db/hitier'); if(!r.ok) throw new Error('HTTP '+r.status);
+    HT=await r.json(); if(!HT.conc) throw new Error('데이터 없음');
+    $('ht_asof').textContent=`${HT.src} · 수집 ${HT.asof} · 최근 12개월 ${HT.win12}`;
+    $('ht_since').querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===HTS.since); b.onclick=()=>{HTS.since=b.dataset.v; $('ht_since').querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); htDraw();};});
+    htDraw();
+  }catch(e){ $('ht_sum').textContent='고가 거래 데이터를 불러오지 못했습니다 ('+e.message+')'; }
 }
 })();
