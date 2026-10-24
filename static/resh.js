@@ -133,7 +133,7 @@ function controls(){
 function draw(){ controls(); bar(); table(); lines(); }
 
 window.renderResh=async function(){
-  hsLoad(); ipLoad(); htLoad(); inLoad();
+  hsLoad(); ipLoad(); htLoad(); inLoad(); hkLoad();
   if(D){ setTimeout(()=>{[chBar,chLine].forEach(c=>c&&c.resize());},60); return; }
   try{
     const r=await fetch('/api/db/rerank'); if(!r.ok) throw new Error('HTTP '+r.status);
@@ -434,5 +434,47 @@ async function inLoad(){
     seg('in_reg',INS.reg,v=>INS.reg=v); seg('in_tab',INS.tab,v=>INS.tab=v);
     inDraw();
   }catch(e){ $('in_tbl').innerHTML='<div class="note">소득 데이터를 불러오지 못했습니다 ('+e.message+')</div>'; }
+}
+
+/* ───────── 학원가 형성 신호 (2026-10-24) — /api/db/hakwon · scripts/hakwon.py ─────────
+   실측: 3년 신설 1위 대치동 270/1,291 · 남양주 다산동 191/464 · 목동 165/772 · 평택 고덕동 104/133(78%) */
+let HK=null, hkB=null, HKS={reg:'all', sort:'l3', min:30, pick:null};
+function hkDraw(){
+  if(!HK) return;
+  let L=HK.dong.filter(x=>x.hw>=HKS.min);
+  if(HKS.reg==='서울'||HKS.reg==='경기') L=L.filter(x=>x.sido===HKS.reg);
+  else if(HKS.reg!=='all') L=L.filter(x=>x.sgg.startsWith(HKS.reg));
+  L.sort((a,b)=>b[HKS.sort]-a[HKS.sort]||b.hw-a.hw);
+  const show=L.slice(0,60);
+  const tot=L.reduce((a,x)=>a+x.hw,0), l3=L.reduce((a,x)=>a+x.l3,0);
+  $('hk_sum').innerHTML=`${E(HKS.reg==='all'?'서울+경기':HKS.reg)} 동 <b>${L.length}</b>곳 · 학원가 <b>${tot.toLocaleString()}</b>곳 · 최근 3년(${HK.l3y[0]}~${HK.l3y[2]}) 신설 <b>${l3.toLocaleString()}</b> (${tot?Math.round(100*l3/tot):0}%) · 상위 60 표시`;
+  $('hk_tbl').innerHTML=`<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="background:#f7f8fa">${['#','동','시군구','학원가','3년 신설','신설 비중','정원','설립 중앙년'].map(h=>`<th style="padding:4px 6px;text-align:left;border-bottom:1px solid #e5e8ec;white-space:nowrap">${h}</th>`).join('')}</tr></thead><tbody>${
+    show.map((x,i)=>{const key=x.sido+'|'+x.sgg+'|'+x.dong; return `<tr data-k="${E(key)}" style="border-bottom:1px solid #f2f4f7;cursor:pointer;${HKS.pick===key?'background:#fff7ed':''}">
+      <td style="padding:3px 6px;color:#8a93a0">${i+1}</td><td style="padding:3px 6px;white-space:nowrap"><b>${E(x.dong)}</b></td><td style="padding:3px 6px;white-space:nowrap;color:#5b6672">${E(x.sido)} ${E(x.sgg)}</td>
+      <td style="padding:3px 6px;text-align:right;font-weight:700">${x.hw.toLocaleString()}</td><td style="padding:3px 6px;text-align:right;color:#c2410c;font-weight:700">${x.l3}</td>
+      <td style="padding:3px 6px;text-align:right">${x.l3p}%${x.l3p>=50?' <span title="절반 이상이 3년 내 신설 — 생활권이 새로 생기는 중">🆕</span>':''}</td>
+      <td style="padding:3px 6px;text-align:right;color:#8a93a0">${x.cap?x.cap.toLocaleString():'—'}</td><td style="padding:3px 6px;text-align:right">${x.med_y||'—'}</td></tr>`;}).join('')}</tbody></table>
+    <div class="note" style="font-size:11px;margin-top:4px">${E(HK.src)} · 수집 ${E(HK.asof)}. ${E(HK.note)}</div>`;
+  $('hk_tbl').querySelectorAll('tr[data-k]').forEach(tr=>tr.onclick=()=>{HKS.pick=tr.dataset.k; hkDraw();});
+  const pk=HKS.pick?L.find(x=>x.sido+'|'+x.sgg+'|'+x.dong===HKS.pick)||HK.dong.find(x=>x.sido+'|'+x.sgg+'|'+x.dong===HKS.pick):show[0];
+  if(!pk) return;
+  const ys=HK.years, vals=ys.map(y=>pk.by[y]||0);
+  if(hkB) hkB.destroy();
+  hkB=new Chart($('hk_bar'),{type:'bar',data:{labels:ys,datasets:[{data:vals,backgroundColor:ys.map(y=>HK.l3y.includes(y)?'#c2410c':'#9aa5b1'),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw}곳 설립`}}},
+      scales:{x:{ticks:{font:{size:10}}},y:{beginAtZero:true,ticks:{font:{size:10}},grid:{color:'#eef1f4'}}}}});
+  $('hk_pick_n').innerHTML=`<b>${E(pk.sgg)} ${E(pk.dong)}</b> — 현재 개원 중인 입시·외국어 학원 ${pk.hw}곳의 설립연도 (주황 = 최근 3년, ${pk.l3}곳 ${pk.l3p}%) · 2010년 이전 설립분은 표시 생략`;
+}
+async function hkLoad(){
+  if(HK) return;
+  try{
+    const r=await fetch('/api/db/hakwon'); if(!r.ok) throw new Error('HTTP '+r.status);
+    HK=await r.json(); if(!HK.dong) throw new Error('데이터 없음');
+    $('hk_asof').textContent=`NEIS · 서울 ${HK.sgg.filter(x=>x.sido==='서울').reduce((a,x)=>a+x.hw,0).toLocaleString()} · 경기 ${HK.sgg.filter(x=>x.sido==='경기').reduce((a,x)=>a+x.hw,0).toLocaleString()}곳 · 수집 ${HK.asof}`;
+    const seg=(id,cur,set)=>$(id).querySelectorAll('button').forEach(b=>{b.classList.toggle('on',b.dataset.v===cur); b.onclick=()=>{set(b.dataset.v); $(id).querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b)); hkDraw();};});
+    seg('hk_reg',HKS.reg,v=>HKS.reg=v); seg('hk_sort',HKS.sort,v=>HKS.sort=v);
+    $('hk_min').onchange=e=>{HKS.min=+e.target.value; hkDraw();};
+    hkDraw();
+  }catch(e){ $('hk_sum').textContent='학원 데이터를 불러오지 못했습니다 ('+e.message+')'; }
 }
 })();
