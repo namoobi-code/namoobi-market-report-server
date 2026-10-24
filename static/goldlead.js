@@ -137,10 +137,32 @@ function drawGoldTop(){
             y:{position:'left',ticks:{font:{size:10},color:'#b45309',callback:v=>'$'+nf(v,0)},grid:{color:'#f1f5f9'}},
             y2:{display:hasKr,position:'right',ticks:{font:{size:10},color:'#7c3aed',callback:v=>nf(v/1000,0)+'k'},grid:{display:false}}}}});
 }
+function moneySec(){
+  /* (2026-10-24 이코노미스트 '금 믿고 샀다가 반쪽 됐다') 내 금 수익률 분해 · 가격대 · 투자수단 · 긴축 선반영 */
+  const M=((D.ind||{})._money)||null; const box=$('gl_money'); if(!box) return; if(!M){box.innerHTML='';return;}
+  const pf=(v,d=1)=>v==null?'—':`<span class="${v>0?'up':(v<0?'dn':'')}">${v>0?'+':''}${v.toFixed(d)}%</span>`;
+  const TD='border:1px solid #e2e8f0;padding:4px 8px;', TH='border:1px solid #e2e8f0;padding:5px 8px;font-size:11.5px;background:#f8fafc;';
+  const L=M.levels||{}, pk=L.peak||{}, sp=L.support||{}, tg=L.target||{}, T=M.tight||{};
+  const rows=`<table style="border-collapse:collapse;font-size:12px;background:#fff;width:100%"><thead><tr>${['기간','달러 금 (GC=F)','원·달러 환율','원화 환산 (곱)','KRX 금현물 실측'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
+    (M.rows||[]).map(r=>`<tr><td style="${TD}"><b>${E(r.w)}</b><span class="note" style="font-size:10px"> ${E(r.from)}~</span></td><td style="${TD}text-align:right">${pf(r.gold)}</td><td style="${TD}text-align:right">${pf(r.fx)}</td><td style="${TD}text-align:right;font-weight:700">${pf(r.krw_calc)}</td><td style="${TD}text-align:right;font-weight:700;color:#7c3aed">${pf(r.krx)}</td></tr>`).join('')}</tbody></table>`;
+  const lv=`<div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="flex:1;min-width:150px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">5년 고점 <span style="font-size:10px">${E(pk.d||'')}</span></div><div style="font-size:16px;font-weight:800">$${nf(pk.v,0)}</div><div style="font-size:11.5px">고점比 <b class="dn">${pk.pct}%</b> · 조정 ${pk.months}개월째</div></div>
+    <div style="flex:1;min-width:150px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff;border-top:3px solid ${sp.pct!=null&&sp.pct>=-2?'#dc2626':'#94a3b8'}"><div class="note">지지선 $4,000</div><div style="font-size:16px;font-weight:800">${sp.pct>0?'+':''}${sp.pct}%</div><div style="font-size:11.5px">${sp.pct>=0?'<b class="dn">이미 하회 — 지지 이탈 여부가 다음 가격 흐름을 가름(기사)</b>':sp.pct>=-2?'<b style="color:#dc2626">지지선 코앞</b> — 이탈 시 추가 조정':'지지까지 여유'}</div></div>
+    <div style="flex:1;min-width:150px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff"><div class="note">목표 $5,000 (NH)</div><div style="font-size:16px;font-weight:800;color:#16a34a">+${tg.pct}%</div><div class="note" style="font-size:11px">${E(tg.src||'')}</div></div>
+    ${T.near?`<div style="flex:1.4;min-width:220px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff;border-top:3px solid ${T.verdict&&T.verdict.ok?'#16a34a':'#ca8a04'}"><div class="note">긴축 선반영? <span style="font-size:10px">(📜 채권 ⓪ 패널 재사용)</span></div><div style="font-size:12.5px;font-weight:700">FF선물 ${E(T.near.m)}월 ${T.near.implied}% (${T.near.vs_dff>0?'+':''}${T.near.vs_dff}bp) · ${E(T.far.m)}월 ${T.far.implied}% vs 점도표 2027말 ${T.sep?T.sep['2027E']:'—'}%</div><div style="font-size:11.5px;line-height:1.4">${E(T.read||'')}</div></div>`:''}</div>`;
+  const pr=`<table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%"><thead><tr>${['상품','유형','AUM','보수','1개월','3개월','6개월','1년','메모'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
+    (M.prods||[]).map(e=>`<tr style="${/레버리지|인버스/.test(e.type)?'background:#fffbeb':''}"><td style="${TD}white-space:nowrap"><b>${E(e.n)}</b><span class="note" style="font-size:10px"> ${E(e.c)}</span></td><td style="${TD}font-size:11px;color:${/환헤지/.test(e.type)?'#1d4ed8':'#b45309'}">${E(e.type)}</td><td style="${TD}text-align:right">${e.cap?(e.cap/1e12).toFixed(2)+'조':'—'}</td><td style="${TD}text-align:right">${e.fee==null?'—':e.fee+'%'}</td>${['r1m','r3m','r6m','r1y'].map(k=>`<td style="${TD}text-align:right">${pf(e[k])}</td>`).join('')}<td style="${TD}font-size:11px;color:#475569">${E(e.note||'')}</td></tr>`).join('')}</tbody></table>`;
+  box.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1.2;min-width:320px"><b style="font-size:13px">💱 내 금 수익률 — 달러 금 × 환율 = 원화</b> <span class="note">GC=F $${nf(M.cur,0)} (${E(M.cur_d)}) · 환율 ${nf(M.fx,0)}원 · KRX 금현물 ${nf(M.krx,0)}원/g (${E(M.krx_d||'')})</span>${rows}
+        <div class="note" style="margin-top:4px;line-height:1.5">기사 계산: 국제 금 −26% + 환율 −10% → 원화 −33.4%(합산 −36%가 아니라 <b>곱</b>). 원화 강세 국면에선 국제 금이 반등해도 원화 수익은 깎인다 — 환헤지(H) 상품은 환율 열이 0에 가깝고 롤오버·헤지 비용만 남는다. KRX 실측 열이 곱 열과 다른 만큼이 한국 프리미엄 변동(아래 지표 카드).</div></div>
+      <div style="flex:1;min-width:300px"><b style="font-size:13px">📍 가격대</b> <span class="note">트로이온스당, 기사 기준선</span><div style="margin-top:6px">${lv}</div></div></div>
+    <div style="margin-top:10px"><b style="font-size:13px">🧾 투자수단 비교</b> <span class="note">같은 금값 변동에도 환헤지·현물/선물·분배 여부로 성과가 갈린다(기사) · ETF 풀 다음금융 수정주가 수익률</span><div style="margin-top:4px">${pr}</div>
+      <div class="note" style="margin-top:4px;line-height:1.5">읽는 법: 환노출 현물(ACE·TIGER KRX금현물)은 KRX 금현물과 같이 움직여 원화 강세에 더 깎이고, 환헤지 선물(H)은 달러 금 수익에 가깝지만 콘탱고 롤오버·헤지 비용(연 1~3%p)이 빠진다. KRX 금시장 직접 거래는 매매차익 비과세, ETF 는 배당소득세 15.4%(연금계좌 제외). 레버리지·인버스는 단기 방향 베팅용.</div></div>`;
+}
 function render(){
   if(!D) return; charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
   PX=((D.ind||{})._px||{}).s||null; PXM=((D.ind||{})._px_m||{}).s||null;
-  drawGoldTop();
+  drawGoldTop(); moneySec();
   $('gl_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 07:05 자동 수집'+(D.errors&&D.errors.length?` · 수집 실패 ${D.errors.length}건`:'');
   const O=D.overall||{}, A=D.axes||{}; const oc=O.score==null?'#94a3b8':O.score>=0.25?'#16a34a':O.score<=-0.25?'#dc2626':'#ca8a04';
   const px=PX&&PX.length?PX[PX.length-1]:null;

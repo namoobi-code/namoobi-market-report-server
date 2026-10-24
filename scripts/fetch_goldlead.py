@@ -196,6 +196,58 @@ def c_trends():
         if len(s) > 50: put(key, s=s)
         time.sleep(4)
 
+# ── (2026-10-24 이코노미스트 '금 믿고 샀다가 반쪽 됐다') 내 금 수익률 분해·가격대·투자수단 ─────────────
+def c_money(d_px):
+    """원화 투자자의 체감 수익 = 달러 금 × 환율. 기간별(1M·3M·YTD·고점比)로 달러금/환율/원화금(KRX 금현물) 3분해 +
+       가격대(고점·$4,000 지지·$5,000 NH 목표) + 투자수단 비교(ETF 풀: 현물 환노출 / 선물 환헤지 / 레버리지·인버스) + 📜 채권 탭 긴축 선반영 판정 재사용"""
+    gd = [(d, v) for d, v in d_px if v]; fx = yahoo("KRW=X", "5y"); fx = [(d, v) for d, v in fx if v]
+    gh = jload(DB / "global_hist.json").get("ND.GOLD_KR") or {}
+    kr = [(f"{t[:4]}-{t[4:6]}-{t[6:]}", v) for t, v in zip(gh.get("t") or [], gh.get("v") or []) if v]
+    if not gd or not fx: return
+    def at(S, d):
+        prev = None
+        for dd, v in S:
+            if dd <= d: prev = v
+            else: break
+        return prev
+    cur_d = gd[-1][0]; cur = gd[-1][1]; fxc = at(fx, cur_d); krc = kr[-1][1] if kr else None
+    y5 = gd[-1260:]; pk = max(y5, key=lambda x: x[1]); pk_d, pk_v = pk
+    from datetime import date as _date
+    cd = _date.fromisoformat(cur_d)
+    wins = {"1M": (cd - timedelta(days=30)).isoformat(), "3M": (cd - timedelta(days=91)).isoformat(), "YTD": f"{cd.year - 1}-12-31", "고점比": pk_d}
+    rows = []
+    for lab, d0 in wins.items():
+        g0 = at(gd, d0); f0 = at(fx, d0); k0 = at(kr, d0) if kr else None
+        if not g0 or not f0: continue
+        rg = (cur / g0 - 1) * 100; rf = (fxc / f0 - 1) * 100 if fxc else None
+        rk = (krc / k0 - 1) * 100 if (krc and k0) else None
+        rows.append({"w": lab, "from": d0, "gold": round(rg, 1), "fx": round(rf, 1) if rf is not None else None, "krw_calc": round(((1 + rg / 100) * (1 + (rf or 0) / 100) - 1) * 100, 1), "krx": round(rk, 1) if rk is not None else None})
+    levels = {"peak": {"d": pk_d, "v": pk_v, "pct": round((cur / pk_v - 1) * 100, 1), "months": round((cd - _date.fromisoformat(pk_d)).days / 30.4, 1)},
+              "support": {"v": 4000, "pct": round((4000 / cur - 1) * 100, 1)}, "target": {"v": 5000, "pct": round((5000 / cur - 1) * 100, 1), "src": "NH투자증권 연내 5,000달러 회복 가능성(이코노미스트 2026.10)"}}
+    # 투자수단 비교 — ETF 풀(다음금융 수정주가 수익률) + KRX 금현물 자체
+    pool = {r["c"]: r for r in (jload(DB / "etf_pool.json").get("kr") or []) if r.get("c")}
+    PROD = [("411060", "현물 · 환노출", "KRX 금현물 추종, 분배 없음, 연금계좌 가능"), ("0072R0", "현물 · 환노출", "KRX 금현물 추종"), ("0064K0", "현물·액티브 · 환노출", ""),
+            ("132030", "선물 · 환헤지(H)", "롤오버 비용·헤지 비용 발생, 환율 영향 제거"), ("319640", "선물 · 환헤지(H)", "롤오버 비용·헤지 비용"), ("139320", "금+은 선물 · 환헤지(H)", "은 비중 → 변동 더 큼"),
+            ("225130", "선물 2× 레버리지 · 환헤지(H)", "⚠ 단기용, 음의 복리"), ("280940", "선물 인버스 · 환헤지(H)", "⚠ 하락 베팅용")]
+    prods = []
+    for c, typ, note in PROD:
+        r = pool.get(c)
+        if not r: continue
+        prods.append({"c": c, "n": r.get("n"), "type": typ, "note": note, "cap": r.get("cap"), "fee": r.get("fee"), "px": r.get("px"),
+                      **{k: (round(r[k] * 100, 1) if r.get(k) is not None else None) for k in ("r1m", "r3m", "r6m", "r1y")}})
+    krx_ret = next((x for x in rows if x["w"] == "고점比"), None)
+    # 긴축 선반영 — 📜 채권 ⓪ 패널 regime.cycle 재사용
+    tight = {}
+    try:
+        cy = (jload(DB / "bonds.json").get("regime") or {}).get("cycle") or {}
+        us = cy.get("US") or {}; fut = us.get("futures") or []; v = cy.get("verdict") or {}
+        if fut: tight = {"near": fut[0], "far": fut[-1], "sep": us.get("sep"), "verdict": v, "dff": us.get("dff"),
+                         "read": ("시장이 점도표보다 더 많은 인상을 반영 — 기사 '긴축 선반영' 상태. 물가 둔화 확인 시 반영분이 풀리며 금 반등 여력" if fut[-1].get("implied") and us.get("sep") and fut[-1]["implied"] > us["sep"].get("2027E", 99)
+                                  else "시장 반영이 점도표 이하 — 선반영 과도 아님, 추가 인상 뉴스에 금이 더 흔들릴 수 있음")}
+    except Exception as e: err("tight", e)
+    IND["_money"] = {"cur": cur, "cur_d": cur_d, "fx": fxc, "fx_d": fx[-1][0], "krx": krc, "krx_d": kr[-1][0] if kr else None, "rows": rows, "levels": levels, "prods": prods, "tight": tight,
+                     "src": "이코노미스트 2026.10 '금 믿고 샀다가 반쪽 됐다' — 국제 금 −26%·환율 −10% 가정 시 원화 −33.4%(곱셈)"}
+
 # ── ⑥ 상대가격 ───────────────────────────────────────────────────────────
 def c_ratios(d_px):
     gd = dict(d_px)
@@ -379,7 +431,7 @@ def main():
         err("price", e); d_px = []
     for name, fn in (("rates", c_rates), ("dxy", c_dxy), ("gpr", c_gpr), ("vix", c_vix), ("cot", lambda: c_cot(hist)),
                      ("etf", lambda: c_etf(hist)), ("korea", lambda: c_korea(d_px)), ("trends", c_trends),
-                     ("ratios", lambda: c_ratios(d_px)), ("myth", c_myth)):
+                     ("ratios", lambda: c_ratios(d_px)), ("money", lambda: c_money(d_px)), ("myth", c_myth)):
         try:
             t = time.time(); fn(); log(f"  ✓ {name} {time.time() - t:.1f}s")
         except Exception as e: err(name, e)

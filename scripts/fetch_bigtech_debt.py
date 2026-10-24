@@ -14,6 +14,7 @@
   ② FRED — IG 회사채 OAS(BAMLC0A0CM)·HY OAS(BAMLH0A0HYM2) = 조달비용 환경
   ③ 딜 타임라인·신용등급 = 시드 + debt_llm.json(보고서 Phase 3.8 웹서치 갱신) upsert
 
+  ④ (2026-10-24) 네오클라우드 6사(CRWV·NBIS·IREN·CIFR·WULF·APLD) 별도 블록 `neo` — 금융리스 합산·이자보상·CAPEX÷매출
 산출: data/db/bigtech_debt.json
 cron: 45 6 * * *
 """
@@ -42,6 +43,22 @@ CO = [
     ("ORCL",  "오라클",         "0001341439", 5),
 ]
 
+# ── (2026-10-24) 네오클라우드 그룹 — 매경ECONOMY 2026.10.21 커버 'AIDC NO WAY OUT' 반영.
+#   기사의 핵심 경고: 투자 회수 부담은 데이터센터를 '운영하는' 쪽이 진다(코어위브 총부채 510억$·GPU 담보대출 85억$,
+#   코어사이언티픽 계약 590MW 중 과금 395MW). 신용 리스크가 빅테크(순현금)에서 네오클라우드(순부채)로 옮겨갔는데
+#   이 탭은 빅테크 5사만 보고 있었다. 같은 XBRL 파이프라인으로 6사를 붙인다.
+#   빅테크와 다른 점: ① GPU 금융리스가 부채의 큰 몫이라 **금융리스 부채를 총부채에 합산** ② 이자비용·매출을 받아
+#   이자보상배율(LTM EBITDA÷이자)·CAPEX÷매출을 추가로 본다 ③ 적자 기업이 많아 순부채/EBITDA 는 EBITDA>0 일 때만.
+#   갤럭시디지털(GLXY)은 금융사 혼합이라 제외, 코어사이언티픽(CORZ)은 코어위브 피인수 절차로 제외.
+CO_NEO = [
+    ("CRWV", "코어위브",       "0001769628", 12),
+    ("NBIS", "네비우스",       "0001513845", 12),
+    ("IREN", "아이렌",         "0001878848", 6),
+    ("CIFR", "사이퍼마이닝",   "0001819989", 12),
+    ("WULF", "테라울프",       "0001083301", 12),
+    ("APLD", "어플라이드디지털","0001144879", 5),
+]
+
 # 항목별 태그 후보 — 회사별 XBRL 태그 차이를 흡수(실측 probe 2026-08-31 기준)
 TAGS = {
     # instant(잔액) — 합산
@@ -61,6 +78,31 @@ TAGS = {
                  "Depreciation", "DepreciationAndAmortization"],
 }
 INSTANT = {"debt_lt", "debt_st", "cash", "sti"}
+# 네오클라우드 전용 태그 — probe 2026-10-24 (APLD 는 LongTermNotesPayable, IREN 은 InterestExpenseNonoperating)
+TAGS_NEO = dict(TAGS)
+TAGS_NEO.update({
+    "debt_lt":  ["LongTermDebtNoncurrent", "LongTermNotesPayable", "LongTermDebt", "LongTermNotesAndLoans"],
+    "debt_st":  ["LongTermDebtCurrent", "NotesPayableCurrent", "DebtCurrent"],
+    "fl_lt":    ["FinanceLeaseLiabilityNoncurrent"],
+    "fl_st":    ["FinanceLeaseLiabilityCurrent"],
+    "interest": ["InterestExpenseDebt", "InterestExpenseNonoperating", "InterestExpense"],
+    "revenue":  ["RevenueFromContractWithCustomerExcludingAssessedTax", "Revenues"],
+    "issue":    ["ProceedsFromIssuanceOfLongTermDebt", "ProceedsFromIssuanceOfDebt", "ProceedsFromNotesPayable",
+                 "ProceedsFromIssuanceOfSecuredDebt"],
+})
+INSTANT_NEO = INSTANT | {"fl_lt", "fl_st"}
+# 네오클라우드 딜·사실 시드 (매경ECONOMY 2026.10.21-27 커버스토리 + 홈피 뉴스 2026-10-17)
+DEALS_NEO = [
+    {"d": "2026-03", "co": "코어위브", "amt": 8.5,  "note": "GPU 인프라+장기 고객계약 담보 대출 — 무디스 A3(투자적격). GPU 가 담보자산이 된 첫 대형 사례"},
+    {"d": "2026-06", "co": "코어사이언티픽", "amt": None, "note": "코어위브와 590MW 장기임대 계약 중 과금 개시 395MW(67%) — 나머지는 구축·시운전. '계약≠매출' 격차의 실측"},
+    {"d": "2026-10", "co": "코어위브", "amt": 51.0, "note": "총부채 510억$ 초과(블록미디어 10/17) — 주간 -23%, AI 인프라 부채 우려의 진원"},
+    {"d": "2026-10", "co": "엔비디아", "amt": None, "note": "보험사들과 네오클라우드 채무불이행 보험 상품 개발 협의 — 대출금 미상환 시 담보 GPU 처분 손실을 보험이 보전"},
+]
+NOTES_NEO = [
+    "읽는 법: 빅테크는 순현금이라 '증분부채÷CAPEX 44%'가 경고였지만, 네오클라우드는 이 값이 100%를 넘는 게 정상이다 — 자기 현금이 없어 전액을 빚·리스로 짓는다. 여기서 봐야 할 건 ① 이자보상배율(LTM EBITDA÷이자)이 1 아래로 가는가 ② CAPEX÷매출이 줄기 시작하는가(투자 둔화) ③ 금융리스 비중.",
+    "GPU 감가상각 5년·건물 20년(IREN 기준)이라 GPU 보유 사업자는 짧은 회수기간을 떠안는다. 임대료 하락·기술 진부화·전력 지연이 겹치면 이자비용 → 차환 리스크로 간다(매경ECONOMY 2026.10.21).",
+    "데이터센터 보험 시장 106억$(2026) → 242억$(2030e, 스위스리) · AM베스트: 보험 업계가 감당해본 적 없는 보장 규모. 액침냉각 사고가 FM 15년 손해액의 24%.",
+]
 
 # ── ② 발행 딜 타임라인 시드 (Phase 3.8 이 최신 딜을 upsert)
 DEALS_SEED = [
@@ -168,12 +210,13 @@ def pick_quarter(obs, since):
     return out
 
 
-def series_for(cik, key, since):
+def series_for(cik, key, since, tags=None, instant=None):
     """태그 후보 중 '분기 관측이 가장 많은' 것을 채택.
     (첫 히트 방식은 오라클처럼 옛 태그가 먼저 잡히면 2점짜리를 쓰게 된다)"""
-    inst = key in INSTANT
+    tags = tags or TAGS; instant = instant or INSTANT
+    inst = key in instant
     best, btag = {}, None
-    for tag in TAGS[key]:
+    for tag in tags[key]:
         obs = concept(cik, tag)
         time.sleep(0.12)                      # EDGAR 예의 (권고 10 req/s 이하)
         if not obs:
@@ -192,6 +235,85 @@ def ltm(d, end):
     """end 포함 직전 4개 분기 합. 4개 미만이면 None"""
     ks = sorted([k for k in d if k <= end])[-4:]
     return round(sum(d[k] for k in ks), 2) if len(ks) == 4 else None
+
+
+def collect_neo(since="2022-01-01"):
+    """네오클라우드 6사 — 총부채(+금융리스)·현금·CAPEX·매출·영업이익·D&A·이자 분기 시계열과 LTM 비율."""
+    B = 1e9
+    rows, allq = [], set()
+    for sym, name, cik, fye in CO_NEO:
+        raw = {}
+        for key in TAGS_NEO:
+            raw[key], tg = series_for(cik, key, since, TAGS_NEO, INSTANT_NEO)
+            print(f"   [neo] {sym} {key}: {len(raw[key])}점 {tg}", flush=True)
+        qs = sorted(set(raw["debt_lt"]) | set(raw["debt_st"]) | set(raw["fl_lt"]) | set(raw["cash"]))
+        ser = []
+        for q in qs:
+            parts = [raw[k].get(q) for k in ("debt_lt", "debt_st", "fl_lt", "fl_st")]
+            if all(v is None for v in parts) and raw["cash"].get(q) is None:
+                continue
+            debt = sum(v or 0 for v in parts)
+            fl = (raw["fl_lt"].get(q) or 0) + (raw["fl_st"].get(q) or 0)
+            cash = (raw["cash"].get(q) or 0) + (raw["sti"].get(q) or 0)
+            e = {"d": q, "debt": round(debt / B, 2), "flease": round(fl / B, 2),
+                 "cash": round(cash / B, 2), "net": round((debt - cash) / B, 2)}
+            for k in ("issue", "capex", "revenue", "opinc", "interest"):
+                v = raw[k].get(q)
+                if v is not None:
+                    e[k] = round(v / B, 3)
+            lc, lr = ltm(raw["capex"], q), ltm(raw["revenue"], q)
+            lo, ld, li = ltm(raw["opinc"], q), ltm(raw["da"], q), ltm(raw["interest"], q)
+            if lc is not None:
+                e["capex_ltm"] = round(lc / B, 2)
+                prev = [k for k in qs if k <= q][-5:]
+                if len(prev) == 5:
+                    p0 = prev[0]
+                    d0 = sum((raw[k].get(p0) or 0) for k in ("debt_lt", "debt_st", "fl_lt", "fl_st"))
+                    if d0 and lc:
+                        e["dd_capex"] = round((debt - d0) / lc * 100, 1)
+            if lr:
+                e["rev_ltm"] = round(lr / B, 2)
+                if lc is not None:
+                    e["capex_rev"] = round(lc / lr * 100, 0)
+            if lo is not None and ld is not None:
+                ebitda = lo + ld
+                e["ebitda_ltm"] = round(ebitda / B, 2)
+                if ebitda > 0:
+                    e["nd_ebitda"] = round((debt - cash) / ebitda, 2)
+                if li:
+                    e["int_ltm"] = round(li / B, 3)
+                    e["int_cov"] = round(ebitda / li, 2)        # 음수면 EBITDA 적자
+            ser.append(e); allq.add(q)
+        rows.append({"sym": sym, "name": name, "fye": fye, "series": ser})
+        print(f"  ✅ [neo] {sym} {len(ser)}분기 (최신 {ser[-1]['d'] if ser else '-'})", flush=True)
+    # 합산 — 달력 분기말 축, 각 사 직전 관측 이월, 관측 수 n 표기(6사 미만 분기는 근사)
+    agg = []
+    for q in sorted(allq):
+        if q[5:7] not in ("03", "06", "09", "12"):
+            continue
+        pts = []
+        for r in rows:
+            c = [x for x in r["series"] if x["d"] <= q and x["d"] >= f"{int(q[:4])-1}-{q[5:7]}-01"]
+            if c:
+                pts.append(c[-1])
+        if len(pts) < 4:
+            continue
+        a = {"d": q, "n": len(pts), "debt": round(sum(p["debt"] for p in pts), 1),
+             "flease": round(sum(p["flease"] for p in pts), 1), "net": round(sum(p["net"] for p in pts), 1)}
+        for k in ("capex_ltm", "rev_ltm", "ebitda_ltm", "int_ltm"):
+            v = [p.get(k) for p in pts if p.get(k) is not None]
+            if v:
+                a[k] = round(sum(v), 2)
+        if a.get("ebitda_ltm") is not None and a.get("int_ltm"):
+            a["int_cov"] = round(a["ebitda_ltm"] / a["int_ltm"], 2)
+        if a.get("capex_ltm") and a.get("rev_ltm"):
+            a["capex_rev"] = round(a["capex_ltm"] / a["rev_ltm"] * 100, 0)
+        agg.append(a)
+    for i, a in enumerate(agg):
+        if i >= 4 and a.get("capex_ltm"):
+            a["dd_capex"] = round((a["debt"] - agg[i - 4]["debt"]) / a["capex_ltm"] * 100, 1)
+    return {"rows": rows, "agg": agg, "deals": DEALS_NEO, "notes": NOTES_NEO,
+            "src": "매경ECONOMY 2026.10.21-27 커버스토리 'AIDC NO WAY OUT' · SEC EDGAR XBRL"}
 
 
 def main():
@@ -303,6 +425,12 @@ def main():
             r["llm"] = True
             ratings[r["co"]] = r
 
+    # ── (2026-10-24) 네오클라우드 그룹 — 실패해도 빅테크 블록은 그대로 저장(비차단)
+    try:
+        neo = collect_neo()
+    except Exception as e:
+        print(f"   [neo] 실패: {e}", flush=True); neo = None
+
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps({
         "as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"),
@@ -310,6 +438,7 @@ def main():
         "rows": rows, "agg": agg, "oas": oas,
         "deals": deals, "ratings": [ratings[k["co"]] for k in RATINGS_SEED],
         "bench": BENCH, "llm_asof": llm.get("as_of"),
+        "neo": neo,
     }, ensure_ascii=False), encoding="utf-8")
     last = agg[-1] if agg else {}
     print(f"[debt] ✅ 5사 · 합산 {len(agg)}분기 · 최신 {last.get('d')} "
