@@ -1,6 +1,6 @@
 {
- "marker": "2026-10-24",
- "as_of": "2026-10-24",
+ "marker": "2026-10-29",
+ "as_of": "2026-10-29",
  "data": [
   [
    "2026-07-04",
@@ -668,6 +668,24 @@
     "inventory": 1,
     "price_qoq": 1,
     "capex_yoy": 2
+   }
+  ],
+  [
+   "2026-10-27",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-10-29",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
    }
   ]
  ]
