@@ -200,6 +200,10 @@ def main():
             row["rsi"] = round(100 - 100 / (1 + up / dn), 0) if dn else 100.0
             row["hi52"] = round((px / max(cl) - 1) * 100, 1)
             row["spark"] = [round(v, 2) for v in cl[::max(1, len(cl) // 60)]]
+            # (2026-10-31 매경LUXMEN '국내 대표 커버드콜 ETF 차이점') 1억 투자 1년 시뮬레이션: 받은 현금(TTM 분배금 ÷ 1년 전 가격) · 평가액 · 합계 — "분배율 차트보다 NAV·총수익"
+            row["n_days"] = len(cl); row["since_list"] = len(cl) < 240       # 1년 미만 상장(KODEX 200커버드콜액티브 2026-07 상장 등) → 기사 '12개월 이력 없음'
+            row["sim_cash"] = round(1e8 * row["dy"] / 100 * (1 + row["y1p"] / 100) / 1e4); row["sim_val"] = round(1e8 * (1 + row["y1p"] / 100) / 1e4); row["sim_tot"] = row["sim_cash"] + row["sim_val"]
+            row["r1m_px"] = round((px / cl[-22] - 1) * 100, 2) if len(cl) >= 22 else None
             t = 0; w = []
             if row["vs200"] <= 0: t += 1; w.append("200일선 아래")
             if row["rsi"] < 50: t += 1; w.append(f"RSI {row['rsi']:.0f}")
@@ -234,18 +238,22 @@ def main():
     except Exception as e: log(f"  ⚠ cc regime: {e}")
     # 커버드콜 ETF 전략 유형 태그 + 기초지수 대비 1년 상대성과
     def strat(n):
+        # (2026-10-31 매경LUXMEN) 엔진 3유형: 규칙형(타겟·위클리·데일리 부분매도) / 탄력 액티브(옵션 비중·행사가 조절) / 종목선정 액티브+특별분배. 1차엔 '커버드콜액티브'가 ATM 100% 로 오분류됐었다
         n = n.upper()
         if "OTM" in n: return "OTM(외가격) — 상승 참여↑"
-        if "타겟" in n or "TARGET" in n: return "부분매도(타겟 분배) — 상승 참여 일부"
+        if "타겟" in n or "TARGET" in n or "위클리" in n or "데일리" in n: return "규칙형 부분매도(타겟 분배) — 상승 참여 일부"
         if n.startswith("JEPI") or n.startswith("JEPQ") or "PREMIUM" in n: return "ELN 부분매도 — 상승 참여 일부"
+        if "커버드콜액티브" in n and ("배당" in n or "고배당" in n): return "종목선정 액티브 + 특별분배 — 주식 베타 큼"
+        if "커버드콜액티브" in n: return "탄력 액티브(옵션 비중·행사가 조절) — 상승장 매도 축소"
         if "커버드콜" in n or "COVERED" in n or n.startswith("QYLD") or n.startswith("XYLD"): return "ATM 100% — 상승 포기·프리미엄 최대"
         return None
     bench = {}
-    for sym in ("SPY", "QQQ", "069500.KS", "133690.KS"):     # S&P500 · 나스닥100 · KODEX200 · TIGER 미국나스닥100
+    for sym in ("SPY", "QQQ", "069500.KS", "133690.KS", "SCHD"):     # S&P500 · 나스닥100 · KODEX200 · TIGER 미국나스닥100 · 미국배당다우존스(SCHD) — (2026-10-31) 배당다우존스 커버드콜이 SPY 에 비교되던 오매핑 수정
         try:
             j = T.jget(f"https://query1.finance.yahoo.com/v8/finance/chart/{_up.quote(sym)}?range=1y&interval=1d&events=div", opener=op, timeout=20)
             res = j["chart"]["result"][0]; cl = [c for c in res["indicators"]["quote"][0]["close"] if c]; dv = (res.get("events") or {}).get("dividends") or {}
             bench[sym] = round((cl[-1] / cl[0] - 1) * 100 + sum(x["amount"] for x in dv.values()) / cl[-1] * 100, 2)
+            bench[sym + ":1m"] = round((cl[-1] / cl[-22] - 1) * 100, 2) if len(cl) >= 22 else None
         except Exception: pass
     for e in etfs + etfs_us:
         tg = strat(e.get("n") or ""); e["strat"] = tg
@@ -255,10 +263,16 @@ def main():
             if c in ("JEPQ", "QYLD"): b = "QQQ"
             elif c in ("JEPI", "XYLD"): b = "SPY"
             elif "미국" in n and ("나스닥" in n or "테크100" in n): b = "QQQ"
-            elif "미국" in n and ("S&P" in n or "배당" in n or "AI" in n): b = "SPY"
+            elif "배당다우존스" in n or "DIVIDEND" in n: b = "SCHD"
+            elif "미국" in n and "S&P" in n: b = "SPY"
+            elif "미국" in n and ("AI" in n or "밸류체인" in n or "반도체" in n): b = None      # 테마 기초지수 — SPY 비교는 오해 유발(1차 실측 RISE AI밸류체인 −12.8%p 가짜 방어 실패)
             elif "200" in n and "미국" not in n: b = "069500.KS"
             else: b = None
             if b and b in bench and e.get("tr1y") is not None: e["bench"] = b; e["rel1y"] = round(e["tr1y"] - bench[b], 2)
+            # 최근 1개월 기초지수 대비 — 하락 구간이면 '방어 %p', 상승 구간이면 '참여율'(기사: 10월 급락 때 셋 다 지수 그대로 −22%, 급등일 참여율 85%)
+            if b and bench.get(b + ":1m") is not None and e.get("r1m_px") is not None:
+                bm = bench[b + ":1m"]; e["bench1m"] = bm; e["rel1m"] = round(e["r1m_px"] - bm, 2)
+                e["part1m"] = round(e["r1m_px"] / bm * 100) if abs(bm) >= 1 else None     # 참여율(%) — 지수 변동 1% 이상일 때만
     cc["bench"] = bench
     # (2026-10-24) 배당 − 시중금리 스프레드: 기사 "2022~23 예금금리 4% 때 고배당주 6% → 지금 금리 3%대면 5%대 중반도 매력". 국고3년(ECOS 817Y002) vs 고배당 ETF 분배율 중앙값·KR 고배당주 상위 80 중앙값
     spread = {}
