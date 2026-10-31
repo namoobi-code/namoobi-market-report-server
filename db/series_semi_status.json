@@ -1,6 +1,11 @@
 {
+<<<<<<< Updated upstream
  "marker": "2026-10-29",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-31",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
  "data": [
   [
    "2026-07-04",
@@ -687,6 +692,27 @@
     "capex_yoy": 2,
     "leadtime": 0
    }
+<<<<<<< Updated upstream
+=======
+  ],
+  [
+   "2026-10-30",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-10-31",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+>>>>>>> Stashed changes
   ]
  ]
 }

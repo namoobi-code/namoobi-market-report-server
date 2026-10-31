@@ -1,6 +1,11 @@
 {
+<<<<<<< Updated upstream
  "marker": "2026-10-29",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-31",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
  "data": [
   [
    "2026-07-11",
@@ -889,6 +894,25 @@
     "NAND 64Gb 8Gx8 MLC": 23.425,
     "NAND 32Gb 4Gx8 MLC": 18.128
    }
+<<<<<<< Updated upstream
+=======
+  ],
+  [
+   "2026-10-30",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.475,
+    "NAND 64Gb 8Gx8 MLC": 23.425,
+    "NAND 32Gb 4Gx8 MLC": 18.128
+   }
+  ],
+  [
+   "2026-10-31",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+>>>>>>> Stashed changes
   ]
  ]
 }

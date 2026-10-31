@@ -1,6 +1,10 @@
 {
  "marker": "2026-12-08|19",
+<<<<<<< Updated upstream
  "as_of": "2026-10-29",
+=======
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
  "data": [
   {
    "date": "2025-10-28~29",
@@ -89,8 +93,8 @@
   },
   {
    "date": "2026-10-28",
-   "stance": "예정",
-   "note": "정례 FOMC(10/27~28), SEP 미실시. (출처: federalreserve.gov FOMC calendar)"
+   "stance": "동결",
+   "note": "3.75~4.00% 동결(9월 인상 후 첫 회의). 10-2 가결 — Cook 이사·Hammack 클리블랜드 연은 총재가 25bp 즉시 인상을 주장하며 반대. 성명: 물가 '여전히 높은 수준', 경기 평가 'solid→strong' 상향. SEP 미실시. (출처: CNBC 2026-10-28 https://www.cnbc.com/2026/10/28/fed-interest-rate-decision-october-2026.html · 404K Research 2026-10-28 https://404kresearch.substack.com/p/fed-holds-rates-steady-as-two-dissent)"
   },
   {
    "date": "2026-12-08~09",

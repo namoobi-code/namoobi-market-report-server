@@ -1,4 +1,5 @@
 {
+<<<<<<< Updated upstream
  "marker": "krx:2026102811|short:202610283S",
  "as_of": "2026-10-29",
  "data": {
@@ -16,6 +17,25 @@
    "att_seq": "202610283S",
    "pages": 2,
    "file_nm": "261028..........��일리브리프.pdf",
+=======
+ "marker": "krx:2026103041|short:202610303S",
+ "as_of": "2026-10-30",
+ "data": {
+  "krx": {
+   "title": "KRX 증시 Brief(2026.10.30)",
+   "date": "2026/10/30 16:22",
+   "att_seq": "2026103041",
+   "pages": 1,
+   "file_nm": "261030KRXBrief.pdf",
+   "reused": false
+  },
+  "short": {
+   "title": "공매도 데일리 브리프('26.10.30)",
+   "date": "2026/10/30 16:11",
+   "att_seq": "202610303S",
+   "pages": 2,
+   "file_nm": "261030..........��일리브리프.pdf",
+>>>>>>> Stashed changes
    "reused": false
   }
  }

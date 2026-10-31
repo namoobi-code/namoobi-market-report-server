@@ -1,59 +1,59 @@
 {
- "asof": "2026-10-24",
- "week": "2026년 10월 4주",
- "note": "인스타 KR은 위픽 밈 위키(2026-09-02 표기, 2026.8 기준) 공개 요약 기반 10건, 글로벌은 SocialPilot 10/15 업데이트 릴스 오디오 TOP10. 구글·유튜브는 서버 주간 등장일수 랭킹 기반이며 검색으로 배경이 확인되지 않은 키워드는 지어내지 않고 '미확인'으로 표기. 네이버쇼핑은 서버 5년 추이에서 직접 계산.",
+ "asof": "2026-10-30",
+ "week": "2026년 10월 5주",
+ "note": "인스타 KR은 인스타공백닷컴 밈 사전(최신 유행 순)과 위픽 아카이브(2026.09.04 갱신본, 8월분까지) 기반 10건 — 9~10월 신규 밈 문서는 확인되지 않음(HSAD 밈집 페이지는 목록 미수신). 글로벌은 Later(10/23)·Newengen(10/1) 포맷 리포트 조합 10건. 구글·유튜브는 서버 주간 등장일수 랭킹 기반이며 검색으로 배경이 확인되지 않은 키워드는 '미확인'으로 표기. 네이버쇼핑은 서버 5년 추이(최신월 2026.09)에서 직접 계산, 지난주와 동일 데이터월.",
  "kr": {
   "title": "🇰🇷 인스타 주간 트렌드 (한국)",
   "items": [
    [
-    "누가 돌아왔게",
-    "의미보다 성량·호흡·억양으로 각인되는 청각형 밈 — 2026 3분기 대중화 단계 진입(위픽 위키).",
-    "https://www.instagram.com/explore/tags/%EB%88%84%EA%B0%80%EB%8F%8C%EC%95%84%EC%99%94%EA%B2%8C/"
+    "아무것도 모르는 OO vs 모든 걸 찍어 올리는 나",
+    "평온한 일상 vs 쉴 새 없이 촬영하는 나를 대비하는 숏폼 — 자기풍자형 공감 포맷(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EC%95%84%EB%AC%B4%EA%B2%83%EB%8F%84%EB%AA%A8%EB%A5%B4%EB%8A%94/"
    ],
    [
-    "관악산 등산 트렌드",
-    "등산이 기운 받기 같은 운세 문화 + 막걸리·뒤풀이 코스로 소비되는 O2O 현상 — 아웃도어·F&B 연결 가능(위픽).",
-    "https://www.instagram.com/explore/tags/%EA%B4%80%EC%95%85%EC%82%B0/"
+    "영원할 건가 보다 밈",
+    "끝이 안 보이는 고단한 상황을 역설적으로 표현하는 릴스 밈(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EC%98%81%EC%9B%90%ED%95%A0%EA%B1%B4%EA%B0%80%EB%B3%B4%EB%8B%A4/"
    ],
    [
-    "젓가락워킹·간바레·냐냐냥·거제야호·고맙투우사",
-    "진입장벽 없는 참여형 챌린지 체인이 상시 바이럴 인프라로 정착(위픽).",
-    "https://www.instagram.com/explore/tags/%EC%A0%93%EA%B0%80%EB%9D%BD%EC%9B%8C%ED%82%B9/"
+    "이혼앤비혼 밈",
+    "신인 그룹 데뷔곡 후렴이 '이혼앤비혼'으로 들린다는 청각 착각에서 시작 — 음원 화제성이 밈으로 번진 사례(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EC%9D%B4%ED%98%BC%EC%95%A4%EB%B9%84%ED%98%BC/"
    ],
    [
-    "'ㅇㅇㅍ 바꿀까' 언어유희 광고",
-    "직접 말하지 않고 소비자가 토론하게 만드는 방식 — 규제 환경에서 바이럴 엔진 역할(위픽).",
-    "https://www.instagram.com/explore/tags/%EB%B0%94%EA%BF%80%EA%B9%8C/"
+    "다비치 거북이 챌린지",
+    "이불을 쓰고 거북이처럼 기어가며 다비치 노래를 배경으로 쓰는 놀이 — 노래 재소비·역주행 신호(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EB%8B%A4%EB%B9%84%EC%B9%98%EA%B1%B0%EB%B6%81%EC%9D%B4/"
    ],
    [
-    "K-헤리티지",
-    "전통이 설명 대상에서 소유하고 싶은 오브제로 전환 — SNS 확산과 실물 품절 동시 발생(위픽).",
-    "https://www.instagram.com/explore/tags/K%ED%97%A4%EB%A6%AC%ED%8B%B0%EC%A7%80/"
+    "친한 친구 이름 대기 챌린지",
+    "구호에 맞춰 엉뚱한 이름을 말해 혼나는 상황극 — 친구 태그를 부르는 참여형 구조(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EC%B9%9C%ED%95%9C%EC%B9%9C%EA%B5%AC%EC%9D%B4%EB%A6%84%EB%8C%80%EA%B8%B0/"
    ],
    [
-    "키캡 키링",
-    "스트레스 해소 + 커스텀 DIY 욕구를 채우는 촉각·청각 굿즈, MZ 독립 트렌드(위픽).",
-    "https://www.instagram.com/explore/tags/%ED%82%A4%EC%BA%A1%ED%82%A4%EB%A7%81/"
+    "김민 따라하기 밈",
+    "예능에서 화제가 된 배우 김민의 동두천 생활 흉내 패러디 — 예능 클립이 UGC로 확산(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EA%B9%80%EB%AF%BC%EB%94%B0%EB%9D%BC%ED%95%98%EA%B8%B0/"
    ],
    [
-    "장례 마케팅",
-    "금기 영역을 브랜드 정체성으로 해석한 실험 캠페인 — 해외 반응 강했고 국내 적용 논의(위픽).",
-    "https://www.instagram.com/explore/tags/%EC%9E%A5%EB%A1%80%EB%A7%88%EC%BC%80%ED%8C%85/"
+    "'가난하게 컸어?' 밈",
+    "2022년 드라마 대사가 짤·숏폼으로 재유행 — 과거 콘텐츠 재확산 사례(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EA%B0%80%EB%82%9C%ED%95%98%EA%B2%8C%EC%BB%B8%EC%96%B4/"
    ],
    [
-    "셀러브리티의 밈 자발적 탑승",
-    "역주행과 재확산을 동시에 일으키는 촉매(위픽).",
-    "https://www.instagram.com/explore/tags/%EB%B0%88%EC%B1%8C%EB%A6%B0%EC%A7%80/"
+    "젠모지(Genmoji) 밈",
+    "아이폰 생성형 AI 이모지를 조합해 최애를 소개하는 놀이 — AI 기능이 밈 도구가 되는 사례(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EC%A0%A0%EB%AA%A8%EC%A7%80/"
    ],
    [
-    "원영적 사고·정민적 사고",
-    "밈 어휘가 광고 서사에 흡수되는 상업화 신호(위픽).",
-    "https://www.instagram.com/explore/tags/%EC%9B%90%EC%98%81%EC%A0%81%EC%82%AC%EA%B3%A0/"
+    "몽땅거침없이순풍감자별",
+    "2000년대 시트콤 분위기를 AI로 재현한 숏드라마 계정 — 레트로 향수 + AI 콘텐츠 결합(인스타공백닷컴).",
+    "https://www.instagram.com/explore/tags/%EC%88%9C%ED%92%8D%EA%B0%90%EC%9E%90%EB%B3%84/"
    ],
    [
-    "디저트·식품 유행 주기 압축",
-    "유행이 수주 단위로 짧아져 트렌드 추종보다 CRM 기반 고객관계가 중요해짐(위픽) — 식음료 소비 관점 시사.",
-    "https://www.instagram.com/explore/tags/%EB%94%94%EC%A0%80%ED%8A%B8%ED%8A%B8%EB%A0%8C%EB%93%9C/"
+    "하겠습니다 안 하겠습니다",
+    "면접 문자 캡처에서 출발한 '포기↔진행' 번복 텍스트 밈, 단어만 바꿔 변주(위픽 아카이브, 2026.08 유행).",
+    "https://www.instagram.com/explore/tags/%ED%95%98%EA%B2%A0%EC%8A%B5%EB%8B%88%EB%8B%A4/"
    ]
   ]
  },
@@ -61,146 +61,146 @@
   "title": "🌎 인스타 주간 트렌드 (글로벌)",
   "items": [
    [
-    "Hello October (Sugar Lime Blue)",
-    "한 번의 시즌 장면으로 월을 여는 몽타주 오디오.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Refuse to be limited by a single niche",
+    "대담한 선언 후 여러 관심사를 사진 컷으로 연속 제시하는 포맷(Later, 10/23).",
+    "https://later.com/blog/instagram-reels-trends/"
    ],
    [
-    "My October (The Folks)",
-    "집에서 만든 코지 키친 프로젝트를 과정부터 결과까지 보여주는 포맷.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Vlog timestamps",
+    "하루를 시각 라벨이 붙은 클립으로, 보이스오버 없이 스와이프 전환(Later, 10/23).",
+    "https://later.com/blog/instagram-reels-trends/"
    ],
    [
-    "October (Adrián Berenguer)",
-    "선선한 공기·낙엽·아침 햇살의 차분한 가을 클립.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Fan transition",
+    "천장 선풍기 날개가 카메라를 지날 때 의상이 바뀌는 변신 영상(Later, 10/23).",
+    "https://later.com/blog/instagram-reels-trends/"
    ],
    [
-    "we fell in love in october (girl in red)",
-    "카페 첫 가을 음료 등 '월 시작' 소프트 포스트.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Fall outfits",
+    "일주일 룩을 같은 동작 반복 컷으로 잇는 가을 코디(Later, 10/23).",
+    "https://later.com/blog/instagram-reels-trends/"
    ],
    [
-    "Goo Goo Muck (The Cramps)",
-    "'내 장식이 살아있다' 핼러윈 비트 맞춤 개그.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Money can't buy happiness but...",
+    "짧은 클립+문구로 제품이 기분을 개선하는 모습을 보여주는 브랜드용 포맷(Later, 10/23).",
+    "https://later.com/blog/instagram-reels-trends/"
    ],
    [
-    "STORM II (GENER8ION, Yung Lean)",
-    "드론샷·빠른 컷의 시네마틱 모험 편집.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Take that chance",
+    "빠른 컷·단어별 자막으로 위험·좌절·성취 스토리를 전하는 포맷(Later, 10/23).",
+    "https://later.com/blog/instagram-reels-trends/"
    ],
    [
-    "Last Train to London (Rikas)",
-    "아웃핏+음료 페어링의 레트로 팝 무드.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Message From A",
+    "습관을 촬영하고 '-A' 서명의 수상한 메모를 덧붙이는 포맷(Newengen, 10/1 업데이트).",
+    "https://newengen.com/insights/instagram-trends/"
    ],
    [
-    "Autumn Journey (Andrea Vanzo)",
-    "낙엽 페인팅 등 느린 수작업 과정 콘텐츠.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Things You Should Definitely Ghost",
+    "시트 유령 의상이 틈새 속설·레드플래그를 팻말로 짚는 핼러윈 포맷(Newengen).",
+    "https://newengen.com/insights/instagram-trends/"
    ],
    [
-    "My Own Universe (PattiJ North)",
-    "'본 적 없는' 제품·음식 리빌용 오디오.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Ramalama Costume Walk",
+    "로우앵글 다리부터 걷다 전체 코스튬을 공개하는 핼러윈 워크(Newengen).",
+    "https://newengen.com/insights/instagram-trends/"
    ],
    [
-    "Girls on Film 2010 Remaster (Duran Duran)",
-    "천장 선풍기 아래 옷 갈아입기 변신 영상.",
-    "https://www.socialpilot.co/blog/instagram-reels-trends"
+    "Stop the Wedding",
+    "웨딩 후회를 솔직히 공유하는 사진 캐러셀(Newengen).",
+    "https://newengen.com/insights/instagram-trends/"
    ]
   ]
  },
  "google_wk": {
   "title": "🔍 구글 주간 해설",
   "kr": {
-   "head": "특정 이슈 쏠림 없이 나스닥·삼성·김정은이 각 2일로 최다 — 미국 증시·반도체(삼성 파운드리) 관심과 연예·스포츠 인물 검색이 흩어진 주.",
+   "head": "2026 월즈(롤드컵)에서 T1·페이커가 'tes'·'페이커'·'2026 월즈' 3개를 2일씩 최다 등장시킨 e스포츠 주간 — 나머지는 환율·피싱·젠슨 황 등 1일 단발 검색.",
    "items": [
     [
-     "나스닥 (2일 등장)",
-     "7일 중 2일 등장한 복수일 키워드. 미국 증시 관심이 국내 검색에 반영 — 구체 사건은 확인하지 못함."
+     "tes (2일 등장)",
+     "월즈 관련 연관 검색으로 추정 — 7일 중 2일 등장. 구체 경기 맥락은 미확인(월즈 기간과 일치)."
     ],
     [
-     "삼성 (2일 등장)",
-     "복수일 등장. 삼성전자 파운드리 기대 관련 증시 보도가 있으나 이번 주 직접 원인은 단정하지 않음."
+     "페이커 (2일)",
+     "T1이 10/28(현지) 스위스 스테이지 5일차에서 MKOI를 2-0으로 꺾고 8강 진출 확정(이투데이). 사상 첫 월즈 4연패 도전 중(아주뉴스)."
     ],
     [
-     "김정은 (2일 등장)",
-     "복수일 등장. 정확한 배경 뉴스는 확인하지 못해 원인 불명으로 표기."
+     "2026 월즈 (2일)",
+     "월즈 스위스 스테이지 진행 중 — T1 8강 진출, 한화생명은 스위스 탈락 위기로 보도(뉴스투온, 직전 주). e스포츠·게임주 관심 신호."
     ],
     [
-     "파운드리 (1일)",
-     "삼성 키워드와 동시에 잡힘 — 반도체 위탁생산 관심(투자 관점에서 삼성전자·반도체 업황 신호), 배경은 미확인."
+     "환율 (1일)",
+     "배경 뉴스 미확인 — 환율 관심은 투자 관점에서 상시 모니터링 대상."
     ],
     [
-     "l g 에너지 솔루션 (1일)",
-     "2차전지 대표주 검색 — 배경 미확인."
+     "피싱 (1일)",
+     "배경 미확인."
     ],
     [
-     "카카오뱅크 점검 (1일)",
-     "서비스 점검 공지에 따른 이용자 검색으로 보임 — 세부 일정 미확인."
+     "암 (1일)",
+     "배경 미확인."
     ],
     [
-     "이효리 (1일)",
-     "연예 인물 키워드, 배경 미확인."
+     "제16전투비행단 (1일)",
+     "배경 미확인."
     ],
     [
-     "박준금 (1일)",
-     "연예 인물 키워드, 배경 미확인."
+     "젠슨 황 (1일)",
+     "엔비디아 CEO 키워드 — 이번 주 직접 원인은 검색으로 확인하지 못함(올해 6월 방한 보도만 확인)."
     ],
     [
-     "김민재·손아섭 (각 1일)",
-     "스포츠 선수 키워드 — 경기·이적 등 배경 미확인."
+     "유로파리그 (1일)",
+     "유럽 축구 대회 검색 — 시즌 패턴, 베식타시 대 크리스털 팰리스 경기 검색과 동반."
     ],
     [
-     "유실물 (1일)",
-     "생활 키워드, 배경 미확인."
+     "솔리다임 (1일)",
+     "SK하이닉스 계열 낸드 기업 키워드 — 배경 미확인(반도체 업황 신호로만 참고)."
     ]
    ]
   },
   "us": {
-   "head": "미국 중간선거(투표 방법·Cook Political Report·H-1B 쟁점)와 NFL·NBA·WNBA 스포츠 검색이 주류 — 복수일 등장 키워드는 없이 1일 단발 검색 위주.",
+   "head": "미국 중간선거 열기(플로리다 상원 후보 Angie Nixon 2일 최다)와 'Heated Rivalry' 극장 상영 소식, 리콜·주식 단발 검색이 섞인 주간.",
    "items": [
     [
-     "deportivo la coruna (1일)",
-     "스페인 축구 클럽 검색 — 배경 미확인."
+     "angie nixon (2일)",
+     "플로리다 상원 후보 — 라틴계 유권자 대상 인스타 계정이 get-out-the-vote 집회 중 정지(TheGrio 10/28), Hope Florida·쿠바 발언 보도 다수. 선거 임박 정치 이벤트."
     ],
     [
-     "melissa mccarthy (1일)",
-     "배우 키워드, 배경 미확인."
+     "heated rivalry theaters (1일)",
+     "드라마 'Heated Rivalry'가 Regal 등에서 한정 극장 상영 예정(Deadline 10월 보도) — OTT 인기작의 극장 확장 사례."
     ],
     [
-     "cook political report (1일)",
-     "미국 중간선거 전망 매체 — 선거 시즌 검색 패턴."
+     "walmart fruit cocktail lead recall (1일)",
+     "월마트 판매 과일 칵테일 납 리콜 관련 검색 — 상세 내용 미확인, 소매·식품 안전 이슈."
     ],
     [
-     "how to vote in the us midterms (1일)",
-     "중간선거 투표 방법 — 선거 임박 정보 수요."
+     "rashee rice (1일)",
+     "NFL 선수 키워드 — 시즌 패턴, 배경 미확인."
     ],
     [
-     "h-1b visa (1일)",
-     "H-1B 폐지·제한 논의와 중간선거 쟁점이 맞물린 보도 다수(Vance 발언·소송 보도)."
+     "britt mchenry (1일)",
+     "방송인 키워드, 배경 미확인."
     ],
     [
-     "ps6 (1일)",
-     "차세대 콘솔 관련 검색 — 구체 소식은 미확인."
+     "olympiacos (1일)",
+     "그리스 축구 클럽 — 유럽대회 시즌 검색."
     ],
     [
-     "james harden (1일)",
-     "NBA 시즌 개막기 선수 검색으로 추정."
+     "southern california healthcare fraud raids (1일)",
+     "남부 캘리포니아 의료사기 단속 관련 검색 — 세부 미확인."
     ],
     [
-     "jalen hurts (1일)",
-     "NFL 시즌 선수 검색 — 시즌 패턴."
+     "butcher and blackbird (1일)",
+     "배경 미확인."
     ],
     [
-     "angel reese · veronica burton · natalie nakase (각 1일)",
-     "여자농구(WNBA) 인물 검색 3건 동시 등장 — 배경 미확인."
+     "be stock (1일)",
+     "종목 티커 검색 — 배경 미확인."
     ],
     [
-     "doritos lemon pepper (1일)",
-     "신제품 맛 관련 검색으로 추정 — 미확인."
+     "wdc stock (1일)",
+     "웨스턴디지털 티커 검색 — 스토리지/반도체 업황 관심 신호로 추정, 단정하지 않음."
     ]
    ]
   }
@@ -208,99 +208,99 @@
  "youtube_wk": {
   "title": "▶️ 유튜브 주간 해설",
   "kr": {
-   "head": "팡이요·김재원의 즐거운 세상이 7일 연속 — 개인 크리에이터 채널 강세에 음원 Topic·K팝 기획사·넷플릭스 채널이 가세한 구도.",
+   "head": "LCK 월드챔피언십 중계와 개인 크리에이터(정글선생·PAKA·김재원)가 5~6일씩 상위, 여기에 K팝 기획사·음원 Topic과 넷플릭스·《듄: 파트 3》 예고편이 가세.",
    "items": [
     [
-     "팡이요 (7일 등장)",
-     "7일 연속 급상승 — 일주일 내내 노출 유지."
+     "LCK (6일 등장)",
+     "월즈 스위스 스테이지 중계(예: Day 5 영상 조회 약 175만, 서버 일간 데이터) — e스포츠 주간 흐름과 일치."
     ],
     [
-     "김재원의 즐거운 세상 (7일)",
-     "7일 연속 급상승."
+     "정글선생 진 영준 (6일)",
+     "7일 중 6일 등장한 크리에이터 채널 — 배경 미확인."
     ],
     [
-     "동수칸TV (6일)",
-     "7일 중 6일 등장."
+     "PAKA (5일)",
+     "크리에이터 채널 5일 등장."
     ],
     [
-     "혜안 (5일)",
-     "7일 중 5일 등장."
+     "김재원의 즐거운 세상 (5일)",
+     "크리에이터 채널 5일 등장(지난주 7일→5일)."
     ],
     [
-     "Kim Gyeol - Topic (5일)",
-     "음원 Topic 채널 5일 등장 — 신곡 효과 추정이나 단정하지 않음."
+     "Netflix Korea 넷플릭스 코리아 (5일)",
+     "OTT 공식 채널 5일 등장 — 신작 예고·클립 노출."
     ],
     [
-     "A2O - Topic (4일)",
-     "음원 Topic 채널 4일 등장."
+     "Crush - Topic (4일)",
+     "음원 Topic 채널 4일 등장 — 신곡 효과 추정이나 단정하지 않음."
     ],
     [
-     "Netflix Korea 넷플릭스 코리아 (4일)",
-     "OTT 공식 채널 4일 등장."
+     "RESCENE (4일)",
+     "K팝 그룹 채널 4일 등장."
     ],
     [
-     "근가놈 (4일)",
-     "7일 중 4일 등장."
+     "KQ ENTERTAINMENT (4일)",
+     "ATEEZ 소속 기획사 공식 채널 — ATEEZ - Topic(4일)과 동반 등장, 팬덤 콘텐츠 투트랙."
     ],
     [
-     "괴물쥐 유튜브 (4일)",
-     "7일 중 4일 등장."
+     "SMTOWN (4일)",
+     "K팝 기획사 채널 4일 등장."
     ],
     [
-     "PAKA·튜브김민교·JYP·STARSHIP (각 4일)",
-     "크리에이터와 K팝 기획사 채널이 4일씩 등장 — 팬덤 콘텐츠 투트랙."
+     "무비띵크·Marvel Entertainment (각 4일)",
+     "영화 콘텐츠 채널 동반 등장 — 오늘 일간에도 《듄: 파트 3》 3차 예고편(Warner Bros. Korea 약 127만) 노출."
     ]
    ]
   },
   "us": {
-   "head": "CaseOh·TheBurntPeanut 7일 연속 등 게임 크리에이터가 상위 독점, Rockstar·Netflix·Prime Video 등 공식 채널이 뒤를 이음.",
+   "head": "TheBurntPeanut·CaseOh가 이번 주도 7일 연속, Jarahn 6일 등 게임 크리에이터가 상위 독점하고 LISA·Marvel·LoL Esports 공식 채널이 뒤를 이음.",
    "items": [
+    [
+     "TheBurntPeanut (7일)",
+     "7일 연속 급상승 — 게임/스트리머 크리에이터."
+    ],
     [
      "CaseOh (7일)",
      "7일 연속 급상승 — 게임 크리에이터."
     ],
     [
-     "TheBurntPeanut (7일)",
-     "7일 연속 급상승 — 게임 크리에이터."
+     "Jarahn (6일)",
+     "7일 중 6일 등장한 크리에이터 채널."
     ],
     [
-     "Jeruu JBK's - Topic (6일)",
-     "음원 Topic 채널 6일 등장."
+     "LISAOfficialVEVO (4일)",
+     "블랙핑크 리사 공식 채널 4일 등장 — 신곡·MV 효과 추정, 미확인."
     ],
     [
-     "Joe Bart Games (5일)",
-     "게임 채널 5일 등장."
+     "ZAMination (4일)",
+     "애니메이션 채널 4일 등장."
     ],
     [
-     "Rockstar Games (4일)",
-     "퍼블리셔 공식 채널 4일 등장 — 신작 소식 가능성이나 배경 미확인."
+     "LoL Esports (4일)",
+     "월즈 중계 공식 채널 — 한국 LCK 강세와 같은 흐름."
     ],
     [
-     "Netflix (4일)",
-     "OTT 공식 채널 4일 등장."
+     "Marvel Entertainment (4일)",
+     "마블 공식 채널 4일 등장 — 예고편 효과 추정, 배경 미확인."
     ],
     [
-     "OliviaRodrigoVEVO (3일)",
-     "올리비아 로드리고 신곡·뮤직비디오 관련 보도가 있으나 이번 주 작품은 미확인."
+     "KQ ENTERTAINMENT (3일)",
+     "K팝 기획사 채널이 미국 랭킹에도 3일 등장 — K팝 글로벌 팬덤 신호."
     ],
     [
-     "SMii7Y (3일)",
+     "Joe Bart Games (3일)",
      "게임 채널 3일 등장."
     ],
     [
-     "Emergency Awesome (3일)",
-     "3일 등장."
-    ],
-    [
-     "Prime Video·Screen Junkies (각 3일)",
-     "영상 스트리밍/영화 콘텐츠 채널 동반 등장."
+     "KinoCheck.com (3일)",
+     "영화 예고편 채널 3일 등장."
     ]
    ]
   }
  },
  "naver_long": {
   "title": "🛒 네이버 쇼핑 장기 해석 (5년 클릭 추이)",
-  "head": "전 분야가 2023.02(도서 2023.03, 패션의류는 2021.11) 피크 이후 하락 — 플랫폼 트래픽 축소 구조라 절대값보다 분야 간 상대 비교가 정보. 도서(-64.7%)·패션이 방어적, 디지털/가전(-91.8%)이 가장 급격.",
+  "head": "전 분야가 2023.02(도서 2023.03, 패션의류는 2021.11) 피크 이후 하락 — 플랫폼 트래픽 축소 구조라 절대값보다 분야 간 상대 비교가 정보. 도서(-64.7%)·패션이 방어적, 디지털/가전(-91.8%)이 가장 급격. (데이터 최신월 2026.09 — 지난주와 동일, 재계산 결과 수치 일치)",
   "items": [
    [
     "도서 (-64.7%)",
@@ -349,8 +349,8 @@
   ]
  },
  "season_check": {
-  "checked": "2026-10-24",
-  "found": "신규 없음 — Google Year in Search 2026·YouTube Culture & Trends 2026 연간판 미발표 확인(검색 결과에 2025판(2025-12-05)만 존재, 2026판은 통상 12월 초). 신규 YouTube 시즌 리포트도 검색에서 발견되지 않음. trends_annual.json 갱신 없음."
+  "checked": "2026-10-30",
+  "found": "신규 1건 — YouTube Culture & Trends 'Human Creativity and AI'(생성형 AI 영상·개인 창작, NRG 공동조사 694명, 2026-10-20 블로그 게시) 발견, trends_annual.json 카드 추가. Google Year in Search 2026·YouTube 연간판은 아직 미발표(검색에는 2025판만 확인, 통상 12월 초)."
  },
  "sources": [
   [
@@ -358,20 +358,36 @@
    "https://161.33.190.254/api/db/trends"
   ],
   [
-   "위픽레터 밈·유행 위키",
-   "https://letter.wepick.kr/wiki/meme-viral-content-tracking"
+   "인스타공백닷컴 밈 사전",
+   "https://www.instablank.com/meme"
   ],
   [
-   "SocialPilot Instagram Reels Trends (2026-10-15)",
-   "https://www.socialpilot.co/blog/instagram-reels-trends"
+   "위픽레터 2026 밈 아카이브",
+   "https://letter.wepick.kr/post/23942"
   ],
   [
-   "Google Year in Search 2025 (BetaNews)",
-   "https://betanews.com/2025/12/05/google-reveals-year-in-search-2025/"
+   "Later Instagram Reels Trends (2026-10-23)",
+   "https://later.com/blog/instagram-reels-trends/"
   ],
   [
-   "US Midterm Elections: H-1B (Dynamite News)",
-   "https://www.dynamitenews.com/international/us-midterm-elections-how-h-1b-visa-curbs-and-green-card-reforms-could-affect-indians/amp"
+   "Newengen Instagram Trends (2026-10-01)",
+   "https://newengen.com/insights/instagram-trends/"
+  ],
+  [
+   "이투데이 T1 월즈 8강",
+   "https://www.etoday.co.kr/news/view/2641412"
+  ],
+  [
+   "TheGrio Angie Nixon",
+   "https://thegrio.com/2026/10/28/angie-nixon-instagram-page-suspended-florida-rally/"
+  ],
+  [
+   "Deadline Heated Rivalry 극장 상영",
+   "https://deadline.com/2026/10/heated-rivalry-regal-cinema-limited-theatrical-run-1237167318/"
+  ],
+  [
+   "YouTube Blog: Human Creativity and AI (2026-10-20)",
+   "https://blog.youtube/culture-and-trends/youtube-generative-ai-video-creativity-report/"
   ]
  ]
 }

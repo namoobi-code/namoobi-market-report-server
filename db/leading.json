@@ -1,6 +1,10 @@
 {
  "marker": "2026.08",
+<<<<<<< Updated upstream
  "as_of": "2026-10-29",
+=======
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
  "data": [
   {
    "period": "2026.08",

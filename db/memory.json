@@ -1,13 +1,22 @@
 {
+<<<<<<< Updated upstream
  "marker": "2026-10-29",
  "as_of": "2026-10-29",
  "data": {
   "asof": "2026-10-29",
   "fetched_at": "2026-10-29T09:56:30+09:00",
+=======
+ "marker": "2026-10-31",
+ "as_of": "2026-10-31",
+ "data": {
+  "asof": "2026-10-31",
+  "fetched_at": "2026-10-31T06:08:50+09:00",
+>>>>>>> Stashed changes
   "tables": {
    "dram_spot": {
     "label": "DRAM 현물(스팟)",
     "unit": "USD",
+<<<<<<< Updated upstream
     "last_update": "2026-10-28 18:10",
     "rows": [
      {
@@ -29,10 +38,34 @@
       "item": "DDR4 16Gb (2Gx8) eTT",
       "avg": 13.8,
       "chg_pct": -0.18
+=======
+    "last_update": "2026-10-30 18:10",
+    "rows": [
+     {
+      "item": "DDR5 16Gb (2Gx8) 4800/5600",
+      "avg": 61.5,
+      "chg_pct": 0.27
+     },
+     {
+      "item": "DDR5 16Gb (2Gx8) eTT",
+      "avg": 29.8,
+      "chg_pct": 0.34
+     },
+     {
+      "item": "DDR4 16Gb (2Gx8) 3200",
+      "avg": 82.796,
+      "chg_pct": -0.15
+     },
+     {
+      "item": "DDR4 16Gb (2Gx8) eTT",
+      "avg": 13.7,
+      "chg_pct": -0.36
+>>>>>>> Stashed changes
      },
      {
       "item": "DDR4 8Gb (1Gx8) 3200",
       "avg": 46.864,
+<<<<<<< Updated upstream
       "chg_pct": -0.38
      },
      {
@@ -44,48 +77,61 @@
       "item": "DDR3 4Gb 512Mx8 1600/1866",
       "avg": 13.936,
       "chg_pct": 0.34
+=======
+      "chg_pct": 0.0
+     },
+     {
+      "item": "DDR4 8Gb (1Gx8) eTT",
+      "avg": 5.96,
+      "chg_pct": -0.17
+     },
+     {
+      "item": "DDR3 4Gb 512Mx8 1600/1866",
+      "avg": 14.078,
+      "chg_pct": 0.51
+>>>>>>> Stashed changes
      }
     ]
    },
    "dram_contract": {
     "label": "DRAM 고정거래(계약)",
     "unit": "USD",
-    "last_update": "2026-08-31 14:00",
+    "last_update": "2026-09-30 17:00",
     "rows": [
      {
       "item": "DDR5 8GB SO-DIMM",
       "avg": 133.0,
-      "chg_pct": 2.31
+      "chg_pct": 0.0
      },
      {
       "item": "DDR4 16GB SO-DIMM",
-      "avg": 270.0,
-      "chg_pct": 1.89
+      "avg": 275.0,
+      "chg_pct": 1.85
      },
      {
       "item": "DDR4 8GB SO-DIMM",
-      "avg": 142.0,
-      "chg_pct": 2.16
+      "avg": 148.0,
+      "chg_pct": 4.23
      },
      {
       "item": "DDR4 16Gb 2Gx8",
-      "avg": 50.0,
-      "chg_pct": 4.17
+      "avg": 52.0,
+      "chg_pct": 4.0
      },
      {
       "item": "DDR4 8Gb 1Gx8",
-      "avg": 25.0,
-      "chg_pct": 4.17
+      "avg": 26.0,
+      "chg_pct": 4.0
      },
      {
       "item": "DDR4 4Gb 256Mx16",
-      "avg": 15.2,
-      "chg_pct": 4.83
+      "avg": 15.5,
+      "chg_pct": 1.97
      },
      {
       "item": "DDR3 4Gb 256Mx16",
       "avg": 15.2,
-      "chg_pct": 4.83
+      "chg_pct": 0.0
      }
     ]
    },
@@ -119,22 +165,22 @@
    "nand_contract": {
     "label": "NAND 고정거래(계약)",
     "unit": "USD",
-    "last_update": "2026-08-31 18:00",
+    "last_update": "2026-09-30 10:00",
     "rows": [
      {
       "item": "NAND 128Gb 16Gx8 MLC",
-      "avg": 30.475,
-      "chg_pct": 1.42
+      "avg": 30.608,
+      "chg_pct": 0.44
      },
      {
       "item": "NAND 64Gb 8Gx8 MLC",
-      "avg": 23.425,
-      "chg_pct": 1.36
+      "avg": 23.528,
+      "chg_pct": 0.44
      },
      {
       "item": "NAND 32Gb 4Gx8 MLC",
-      "avg": 18.128,
-      "chg_pct": 1.47
+      "avg": 18.208,
+      "chg_pct": 0.44
      }
     ]
    }
@@ -302,7 +348,11 @@
     "hbm_per_gb": 50.0,
     "ddr5_per_gb": 16.62,
     "ratio": 3.0,
+<<<<<<< Updated upstream
     "ddr5_spot_per_gb": 30.67,
+=======
+    "ddr5_spot_per_gb": 30.75,
+>>>>>>> Stashed changes
     "ratio_spot": 1.6,
     "basis": "HBM3E 36GB 스택 ASP $1,800 ÷ 36GB vs DDR5 8GB SO-DIMM 모듈가 환산 $133.00 ÷ 8GB (환산 추정)",
     "source": "Silicon Analysts 공개 API + TrendForce 공개 가격표"
@@ -313,6 +363,7 @@
     "ticker": "^SOX",
     "label": "필라델피아 반도체지수",
     "why": "반도체 업황 종합 체온계",
+<<<<<<< Updated upstream
     "price": 11684.0,
     "chg_1y_pct": 59.4,
     "chg_1m_pct": -7.5,
@@ -326,6 +377,13 @@
       7216.0
      ],
      [
+=======
+    "price": 10688.8,
+    "chg_1y_pct": 47.9,
+    "chg_1m_pct": -16.7,
+    "series_1y": [
+     [
+>>>>>>> Stashed changes
       "2025-10-31",
       7228.66
      ],
@@ -1320,6 +1378,7 @@
      [
       "2026-10-28",
       11684.0
+<<<<<<< Updated upstream
      ]
     ]
    },
@@ -1334,11 +1393,27 @@
      [
       "2025-10-29",
       207.04
+=======
+>>>>>>> Stashed changes
      ],
      [
-      "2025-10-30",
-      202.89
+      "2026-10-29",
+      11518.2
      ],
+     [
+      "2026-10-30",
+      10688.8
+     ]
+    ]
+   },
+   "NVDA": {
+    "ticker": "NVDA",
+    "label": "엔비디아",
+    "why": "HBM 최대 수요처",
+    "price": 204.64,
+    "chg_1y_pct": 1.1,
+    "chg_1m_pct": -11.4,
+    "series_1y": [
      [
       "2025-10-31",
       202.49
@@ -2330,6 +2405,7 @@
      [
       "2026-10-27",
       217.94
+<<<<<<< Updated upstream
      ]
     ]
    },
@@ -2344,11 +2420,31 @@
      [
       "2025-10-29",
       264.33
+=======
      ],
      [
-      "2025-10-30",
-      254.84
+      "2026-10-28",
+      215.38
+>>>>>>> Stashed changes
      ],
+     [
+      "2026-10-29",
+      213.66
+     ],
+     [
+      "2026-10-30",
+      204.64
+     ]
+    ]
+   },
+   "AMD": {
+    "ticker": "AMD",
+    "label": "AMD",
+    "why": "HBM 2번째 수요처",
+    "price": 504.8,
+    "chg_1y_pct": 97.1,
+    "chg_1m_pct": -18.0,
+    "series_1y": [
      [
       "2025-10-31",
       256.12
@@ -3340,6 +3436,7 @@
      [
       "2026-10-27",
       560.26
+<<<<<<< Updated upstream
      ]
     ]
    },
@@ -3354,11 +3451,31 @@
      [
       "2025-10-29",
       305.09
+=======
      ],
      [
-      "2025-10-30",
-      303.22
+      "2026-10-28",
+      578.44
+>>>>>>> Stashed changes
      ],
+     [
+      "2026-10-29",
+      566.42
+     ],
+     [
+      "2026-10-30",
+      504.8
+     ]
+    ]
+   },
+   "TSM": {
+    "ticker": "TSM",
+    "label": "TSMC",
+    "why": "CoWoS 패키징 = HBM 출하의 물리적 상한",
+    "price": 406.13,
+    "chg_1y_pct": 35.2,
+    "chg_1m_pct": -11.6,
+    "series_1y": [
      [
       "2025-10-31",
       300.43
@@ -4350,6 +4467,7 @@
      [
       "2026-10-27",
       436.87
+<<<<<<< Updated upstream
      ]
     ]
    },
@@ -4364,7 +4482,31 @@
      [
       "2025-10-29",
       4081.15
+=======
      ],
+     [
+      "2026-10-28",
+      439.51
+     ],
+     [
+      "2026-10-29",
+      431.81
+>>>>>>> Stashed changes
+     ],
+     [
+      "2026-10-30",
+      406.13
+     ]
+    ]
+   },
+   "KOSPI": {
+    "ticker": "^KS11",
+    "label": "코스피",
+    "why": "삼성+SK 시총 55~60% — 메모리 사이클이 곧 지수",
+    "price": 5730.74,
+    "chg_1y_pct": 45.3,
+    "chg_1m_pct": -13.8,
+    "series_1y": [
      [
       "2025-10-30",
       4086.89
@@ -5334,6 +5476,7 @@
       5638.34
      ],
      [
+<<<<<<< Updated upstream
       "2026-10-29",
       6066.43
      ]
@@ -5350,11 +5493,25 @@
      [
       "2025-10-29",
       226.63
+=======
+      "2026-10-28",
+      6012.44
+>>>>>>> Stashed changes
      ],
      [
-      "2025-10-30",
-      224.01
-     ],
+      "2026-10-29",
+      5937.66
+     ]
+    ]
+   },
+   "MU": {
+    "ticker": "MU",
+    "label": "마이크론",
+    "why": "메모리 공급자 대표",
+    "price": 884.74,
+    "chg_1y_pct": 295.4,
+    "chg_1m_pct": -19.4,
+    "series_1y": [
      [
       "2025-10-31",
       223.77
@@ -6346,13 +6503,32 @@
      [
       "2026-10-27",
       928.76
+<<<<<<< Updated upstream
+=======
+     ],
+     [
+      "2026-10-28",
+      983.23
+     ],
+     [
+      "2026-10-29",
+      934.27
+     ],
+     [
+      "2026-10-30",
+      884.74
+>>>>>>> Stashed changes
      ]
     ]
    },
    "MEM_VS_GPU": {
     "label": "메모리/GPU 상대강도 (MU ÷ NVDA, 1년)",
     "why": "1 초과 = 가치가 수요처(GPU)에서 공급자(메모리)로 이동 = 공급부족 심화",
+<<<<<<< Updated upstream
     "value": 3.89,
+=======
+    "value": 3.91,
+>>>>>>> Stashed changes
     "signal": "공급자 우위"
    }
   },
@@ -6361,6 +6537,7 @@
     "name": "SK하이닉스",
     "ticker": "000660.KS",
     "currency": "KRW",
+<<<<<<< Updated upstream
     "price": 1559000.0,
     "eps_ttm": 224313.0,
     "eps_2026E": 349566,
@@ -6368,6 +6545,15 @@
     "per_ttm": 6.95,
     "per_2026E": 4.46,
     "per_2027E": 3.34,
+=======
+    "price": 1418000.0,
+    "eps_ttm": 224313.0,
+    "eps_2026E": 356342.0,
+    "eps_2027E": 470710.0,
+    "per_ttm": 6.32,
+    "per_2026E": 3.98,
+    "per_2027E": 3.01,
+>>>>>>> Stashed changes
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다",
     "annual_naver": {
      "2021": {
@@ -6431,6 +6617,7 @@
      },
      "2026": {
       "is_consensus": true,
+<<<<<<< Updated upstream
       "revenue": 3417284.0,
       "net": 2564094.0,
       "opm": 76.9,
@@ -6475,11 +6662,58 @@
     },
     "eps_fwd": 356342.0,
     "per_fwd": 4.38
+=======
+      "revenue": 3614159.0,
+      "net": 2558593.0,
+      "opm": 77.79,
+      "roe": 100.04,
+      "eps": 355563.0,
+      "per": 3.99,
+      "bps": 573367.0,
+      "pbr": 2.47
+     },
+     "2027": {
+      "is_consensus": true,
+      "revenue": 5656231.0,
+      "net": 3743871.0,
+      "opm": 79.72,
+      "roe": 66.79,
+      "eps": 529311.0,
+      "per": 2.68,
+      "bps": 1071269.0,
+      "pbr": 1.32
+     },
+     "2028": {
+      "is_consensus": true,
+      "revenue": 6388274.0,
+      "net": 4188300.0,
+      "opm": 76.49,
+      "roe": 44.45,
+      "eps": 586787.0,
+      "per": 2.42,
+      "bps": 1668213.0,
+      "pbr": 0.85
+     }
+    },
+    "consensus_live": {
+     "fwd_eps": 357343.0,
+     "fwd_per": 3.89,
+     "eps_ttm": 224313.0,
+     "per_ttm": 6.2,
+     "asof": "2026-10-31",
+     "target": 3220000.0,
+     "recomm": "4.00",
+     "target_asof": "2026-10-29"
+    },
+    "eps_fwd": 357343.0,
+    "per_fwd": 3.97
+>>>>>>> Stashed changes
    },
    {
     "name": "삼성전자",
     "ticker": "005930.KS",
     "currency": "KRW",
+<<<<<<< Updated upstream
     "price": 245000.0,
     "eps_ttm": 22292.0,
     "eps_2026E": 47816,
@@ -6487,6 +6721,15 @@
     "per_ttm": 10.99,
     "per_2026E": 5.12,
     "per_2027E": 3.53,
+=======
+    "price": 225000.0,
+    "eps_ttm": 22292.0,
+    "eps_2026E": 45531.0,
+    "eps_2027E": 68238.0,
+    "per_ttm": 10.09,
+    "per_2026E": 4.94,
+    "per_2027E": 3.3,
+>>>>>>> Stashed changes
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다",
     "annual_naver": {
      "2021": {
@@ -6551,6 +6794,7 @@
      },
      "2026": {
       "is_consensus": true,
+<<<<<<< Updated upstream
       "revenue": 7118157.0,
       "net": 3070811.0,
       "opm": 52.22,
@@ -6581,10 +6825,43 @@
       "per": 3.2,
       "bps": 235268.0,
       "pbr": 1.03
+=======
+      "revenue": 7222251.0,
+      "net": 3099403.0,
+      "opm": 53.01,
+      "roe": 54.08,
+      "eps": 45983.0,
+      "per": 4.89,
+      "bps": 109026.0,
+      "pbr": 2.06
+     },
+     "2027": {
+      "is_consensus": true,
+      "revenue": 10016880.0,
+      "net": 4876842.0,
+      "opm": 59.81,
+      "roe": 52.49,
+      "eps": 72460.0,
+      "per": 3.11,
+      "bps": 172864.0,
+      "pbr": 1.3
+     },
+     "2028": {
+      "is_consensus": true,
+      "revenue": 11310989.0,
+      "net": 5380162.0,
+      "opm": 57.01,
+      "roe": 38.83,
+      "eps": 79146.0,
+      "per": 2.84,
+      "bps": 243392.0,
+      "pbr": 0.92
+>>>>>>> Stashed changes
      }
     },
     "consensus_live": {
      "fwd_eps": 45531.0,
+<<<<<<< Updated upstream
      "fwd_per": 5.29,
      "eps_ttm": 22292.0,
      "per_ttm": 10.81,
@@ -6595,18 +6872,39 @@
     },
     "eps_fwd": 45531.0,
     "per_fwd": 5.38
+=======
+     "fwd_per": 4.84,
+     "eps_ttm": 22292.0,
+     "per_ttm": 9.89,
+     "asof": "2026-10-31",
+     "target": 495227.0,
+     "recomm": "4.00",
+     "target_asof": "2026-10-29"
+    },
+    "eps_fwd": 45531.0,
+    "per_fwd": 4.94
+>>>>>>> Stashed changes
    },
    {
     "name": "Micron",
     "ticker": "MU",
     "currency": "USD",
+<<<<<<< Updated upstream
     "price": 983.23,
+=======
+    "price": 884.74,
+>>>>>>> Stashed changes
     "eps_ttm": null,
     "eps_2026E": 44.27,
     "eps_2027E": 155.03,
     "per_ttm": null,
+<<<<<<< Updated upstream
     "per_2026E": 22.21,
     "per_2027E": 6.34,
+=======
+    "per_2026E": 19.99,
+    "per_2027E": 5.71,
+>>>>>>> Stashed changes
     "_eps_note": "EPS 컨센서스는 MCP(UsStockInfo) 또는 DB carry-forward 로 채운다"
    }
   ],

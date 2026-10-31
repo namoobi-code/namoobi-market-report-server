@@ -1,6 +1,11 @@
 {
+<<<<<<< Updated upstream
  "marker": "2026-10-29",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-31",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
  "data": [
   [
    "2026-07-11",
@@ -1333,6 +1338,33 @@
     "DDR4 4Gb 256Mx16": 15.2,
     "DDR3 4Gb 256Mx16": 15.2
    }
+<<<<<<< Updated upstream
+=======
+  ],
+  [
+   "2026-10-30",
+   {
+    "DDR5 8GB SO-DIMM": 133.0,
+    "DDR4 16GB SO-DIMM": 270.0,
+    "DDR4 8GB SO-DIMM": 142.0,
+    "DDR4 16Gb 2Gx8": 50.0,
+    "DDR4 8Gb 1Gx8": 25.0,
+    "DDR4 4Gb 256Mx16": 15.2,
+    "DDR3 4Gb 256Mx16": 15.2
+   }
+  ],
+  [
+   "2026-10-31",
+   {
+    "DDR5 8GB SO-DIMM": 133.0,
+    "DDR4 16GB SO-DIMM": 275.0,
+    "DDR4 8GB SO-DIMM": 148.0,
+    "DDR4 16Gb 2Gx8": 52.0,
+    "DDR4 8Gb 1Gx8": 26.0,
+    "DDR4 4Gb 256Mx16": 15.5,
+    "DDR3 4Gb 256Mx16": 15.2
+   }
+>>>>>>> Stashed changes
   ]
  ]
 }
