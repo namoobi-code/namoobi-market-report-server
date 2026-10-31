@@ -143,6 +143,23 @@ function regimeChart(){
     options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{font:{size:10},boxWidth:10}}},
       scales:{x:{ticks:{maxTicksLimit:6,font:{size:9},maxRotation:0,callback:(v,i)=>dates[i]?dates[i].slice(2,7):''}},y:{ticks:{callback:v=>v+'%',font:{size:9.5},maxTicksLimit:5}}}}}));
 }
+function maturitySec(){
+  /* (2026-10-31 한경BUSINESS 하나증권 박승진) 만기매칭형 ETF — 잔존 개월 자동 · 만기 사다리 · 3유형 선택 가이드 */
+  const M=D.maturity||{}; const R=M.rows||[]; if(!R.length) return '<div class="note">만기매칭형 데이터 없음</div>';
+  const pk=M.pick||{}; const n=(D.alloc||{}).n_ok||0;
+  const types=[['파킹형','현재의 높은 단기금리로 대기자금 운용. 듀레이션≈0, 금리 방향 무관, 시장금리 내리면 수익률도 같이 내림','④ 파킹형 표'],['일반형','특정 잔존만기 구간 유지(국고채 3년·10년 등). 금리 하락 시 가격 상승, 상승 시 손실. 만기 돌려받는 구조 아님','⑤ 채권 ETF 표'],['만기매칭형','정해진 만기까지 보유해 현재 금리를 고정. 시간이 갈수록 듀레이션↓, 만기 때 상장폐지·해지상환금 지급(원금 보장 아님)','아래 표']];
+  let h=`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">${types.map(([t,d,w])=>`<div style="flex:1;min-width:200px;border:1px solid #e2e8f0;border-radius:8px;padding:8px 12px;background:#fff;${pk.best&&pk.best.includes(t)?'border-top:3px solid #16a34a;box-shadow:0 0 0 3px #dcfce7':''}"><div style="font-weight:700;font-size:12.5px">${E(t)}${pk.best&&pk.best.includes(t)?' <span style="font-size:10.5px;color:#16a34a">◀ 지금</span>':''}</div><div style="font-size:11.5px;line-height:1.4">${E(d)}</div><div class="note" style="font-size:10.5px">→ ${E(w)}</div></div>`).join('')}</div>
+    <div style="font-size:12px;margin-bottom:8px;padding:6px 10px;background:#f0fdf4;border-radius:6px"><b>지금 고르면:</b> <b style="color:#16a34a">${E(pk.best||'')}</b> — ${E(pk.txt||'')} <span class="note">(①체크리스트 ${n}/4 · ⓪사이클 판정 연동, 매일 갱신)</span></div>`;
+  // 사다리
+  const L=M.ladder||[]; const mx=Math.max(...L.map(x=>x.cap||0),1);
+  h+=`<div style="display:flex;gap:6px;align-items:flex-end;margin:4px 0 10px;height:70px">${L.map(x=>`<div title="${E(x.names.join(' · '))}" style="flex:1;text-align:center;font-size:10.5px"><div style="font-weight:700">${(x.cap/1e12).toFixed(2)}조</div><div style="background:${x.y<='2026'?'#f59e0b':x.y<='2028'?'#0ea5e9':'#7c3aed'};height:${Math.max(4,(x.cap||0)/mx*40)}px;border-radius:3px 3px 0 0;margin:2px 6px"></div><div>${E(x.y)}년 <span class="note">${x.n}종</span></div></div>`).join('')}</div>
+    <div class="note" style="font-size:11px;margin-bottom:6px">만기 사다리(기사): 서로 다른 연도의 ETF를 나눠 보유하면 매년 투자금이 돌아온다 — 막대=만기 연도별 AUM. 2026년 말 만기 6종(AUM 합 ${((L.find(x=>x.y==='2026')||{}).cap/1e12||0).toFixed(1)}조)이 두 달 안에 상장폐지·상환 → 그 돈의 재투자처가 다음 수급 변수</div>`;
+  const cats=['국고채','특수·은행·금융채','회사채'];
+  h+=`<table style="border-collapse:collapse;font-size:11.5px;background:#fff;width:100%"><thead><tr>${['대분류','ETF','신용등급','만기','잔존(개월)','현재가','AUM','보수','분배율','1개월','3개월','6개월','1년','비고'].map(x=>`<th style="${TH}">${x}</th>`).join('')}</tr></thead><tbody>${
+    cats.map(c=>R.filter(r=>r.cat===c).map((r,i)=>`<tr style="${r.tag==='만기 임박'?'background:#fff7ed':''}"><td style="${TD}white-space:nowrap">${i===0?'<b>'+E(c)+'</b>':''}</td><td style="${TD}white-space:nowrap"><b>${E(r.n)}</b><span class="note" style="font-size:10px"> ${E(r.c)}</span></td><td style="${TD}font-size:11px">${E(r.grade||'')}</td><td style="${TD}">${E(r.mat)}</td><td style="${TD}text-align:right;font-weight:700;color:${r.months<=3?'#dc2626':r.months<=12?'#b45309':'#334155'}">${r.months}</td><td style="${TD}text-align:right">${nf(r.px,0)}</td><td style="${TD}text-align:right">${r.cap?(r.cap/1e8).toFixed(0)+'억':'—'}</td><td style="${TD}text-align:right">${r.fee==null?'—':r.fee+'%'}</td><td style="${TD}text-align:right">${r.divy==null?'—':r.divy+'%'}</td>${['r1m','r3m','r6m','r1y'].map(k=>`<td style="${TD}text-align:right">${pf(r[k],2)}</td>`).join('')}<td style="${TD}font-size:11px;color:#b45309;white-space:nowrap">${E(r.tag||'')}</td></tr>`).join('')).join('')}</tbody></table>
+    <div class="note" style="margin-top:5px;line-height:1.6">${E(M.src||'')}. 읽는 법: 잔존 개월이 짧을수록 듀레이션이 작아 금리 변동 영향이 줄고, 만기 시점엔 공지 일정에 따라 거래정지→상장폐지→청산 뒤 해지상환금이 계좌로 입금된다(별도 매도 불필요). <b>중도 매도하면 개별 채권처럼 당시 시장가</b>로 손익 확정. 회사채형은 편입 기업 부실 영향을 분산하지만 신용등급 변화에 따라 종목 교체 가능. 수익률=ETF 풀 수정주가(분배 포함).</div>`;
+  return h;
+}
 function render(){
   charts.forEach(c=>{try{c.destroy();}catch(e){}}); charts.length=0;
   $('bd_asof').textContent='기준 '+(D.as_of||'')+' · 서버 매일 07:40 자동';
@@ -153,6 +170,7 @@ function render(){
   $('bd_rates').innerHTML=rates(); ratesChart();
   if($('bd_park')) $('bd_park').innerHTML=parkingSec();
   $('bd_etf_kr').innerHTML=etfTbl('kr'); $('bd_etf_us').innerHTML=etfTbl('us');
+  if($('bd_mat')) $('bd_mat').innerHTML=maturitySec();
   (D.etfs||[]).forEach(r=>{const cv=$('bd_sp_'+r.sym.replace('.','_')); if(cv&&r.spark) miniSpark(cv,r.spark,(r.y1||0)>=0?'#dc2626':'#2563eb');});
 }
 function init(){ if(_init) return; _init=true;

@@ -397,6 +397,36 @@ def regime():
                 "alt": "과거 美 인상기 글로벌 인프라 +8.2%·원자재 +9.2% (2004~, 연환산) / 韓 리츠·인프라 −12% (현대차증권)"}
     return R
 
+def maturity_etfs(n_ok, cyc_verdict):
+    """(2026-10-31 한경BUSINESS 하나증권 박승진 '파킹형·일반형·만기형 어떻게 고를까') 만기매칭형 ETF — 종목명 'YY-MM' 에서 만기 파싱 → 잔존 개월 매일 자동.
+       ETF 풀(다음금융) 에서 이름에 YY-MM + 액티브 + (국고채|회사채|금융채|은행채|특수채) 인 것을 전부 잡는다(기사 17종 + 신규 상장 자동 편입).
+       대분류: 국고채 / 특수·은행·금융채 / 회사채. 태그: 만기 임박(≤3M) · 6개월 이내 · 1년 이내. YTM 은 운용사 공시라 풀에 없음 → 분배율·수익률로 대체."""
+    import re
+    out = []
+    for r in (jload(DB / "etf_pool.json").get("kr") or []):
+        n = r.get("n") or ""
+        m = re.search(r"(?<!\d)(\d{2})-(\d{2})(?!\d)", n)   # "27-04회사채" 처럼 한글이 바로 붙으면 \b 가 안 잡힌다(한글=\w)
+        if not m or "액티브" not in n or not any(k in n for k in ("국고채", "회사채", "금융채", "은행채", "특수채")): continue
+        yy, mm = int(m.group(1)), int(m.group(2)); mat = date(2000 + yy, mm, 1)
+        # 만기월 말일 기준 잔존 개월
+        months = (mat.year - date.today().year) * 12 + (mat.month - date.today().month)
+        cat = "국고채" if "국고채" in n else "회사채" if "회사채" in n else "특수·은행·금융채"
+        grade = (re.search(r"\(([^)]*)\)", n) or [None, "국채" if cat == "국고채" else ""])[1]
+        tag = "만기 임박" if months <= 3 else "6개월 이내" if months <= 6 else "1년 이내" if months <= 12 else ""
+        out.append({"c": r["c"], "n": n, "cat": cat, "grade": grade, "mat": f"{2000+yy}-{mm:02d}", "months": months, "tag": tag, "px": r.get("px"), "cap": r.get("cap"), "fee": r.get("fee"), "divy": r.get("divy"),
+                    **{k: (round(r[k] * 100, 2) if r.get(k) is not None else None) for k in ("r1m", "r3m", "r6m", "r1y")}})
+    out.sort(key=lambda x: (x["months"], -(x["cap"] or 0)))
+    # 사다리: 만기 연도별 AUM·종목 수
+    ladder = {}
+    for e in out:
+        y = e["mat"][:4]; L = ladder.setdefault(y, {"y": y, "n": 0, "cap": 0.0, "names": []}); L["n"] += 1; L["cap"] += e["cap"] or 0; L["names"].append(e["n"])
+    # 3유형 선택 가이드 — ①체크리스트·⓪사이클 판정 연결
+    if n_ok >= 3: pick = {"best": "일반형(장기채)", "txt": f"고점 통과 신호 {n_ok}/4 — 금리 하락 시 가격 상승을 노리는 일반형 장기채 ETF 비중 확대 구간. 만기형은 이미 보유분 유지, 파킹은 축소"}
+    elif cyc_verdict and not cyc_verdict.get("ok"): pick = {"best": "파킹형 + 만기매칭형", "txt": f"고점 미확인({n_ok}/4)·인상 사이클 {cyc_verdict.get('st','')} — 단기 대기자금은 파킹형, 자금 사용 시점이 정해진 돈은 만기매칭형으로 '현재 금리를 만기까지 고정'. 일반형 장기채는 소량"}
+    else: pick = {"best": "만기매칭형", "txt": f"고점 미확인({n_ok}/4)이지만 추가 인상 반영 약함 — 현재 금리를 고정하는 만기매칭형이 유리, 일반형은 분할 시작 검토"}
+    return {"rows": out, "ladder": [ladder[k] for k in sorted(ladder)], "pick": pick, "n": len(out),
+            "src": "한경BUSINESS 2026.10.28 하나증권 박승진 · KRX. YTM(만기수익률)은 운용사 공시값으로 풀에 없음 — 확정 수익률 아님(보수·세금·부도·조기상환·재투자 조건에 따라 달라짐)"}
+
 def main():
     log("[bonds] 시작")
     chk, aux, n_ok, phase = checklist()
@@ -417,8 +447,11 @@ def main():
              "note": "메리츠 윤여삼(한경MONEY 2026.10): 고점 확신 전 단기채 50%로 유동성 확보, 최종금리 3.25~3.5% 확신 시 장기채 50%로 점진 전환. 회사채는 신용등급만 믿지 말고 신용스프레드·부채비율(200%)·이자보상배율(2배)을 함께. 초장기채·레버리지 ETF 몰빵 금지, 분할 매수·만기 분산."}
     sr = short_rates(); pk = parking()
     rows = judge_etfs(rows, chk, aux, n_ok, sr)
+    mt = {}
+    try: mt = maturity_etfs(n_ok, ((reg.get("cycle") or {}).get("verdict")))
+    except Exception as e: log(f"  ⚠ maturity: {repr(e)[:80]}")
     OUT.write_text(json.dumps({"as_of": datetime.now(KST).strftime("%Y-%m-%d %H:%M"), "checklist": chk, "aux": aux, "short": sr, "parking": pk,
-                               "policy": pr, "countries": countries, "series": series, "etfs": rows, "alloc": alloc, "regime": reg},
+                               "policy": pr, "countries": countries, "series": series, "etfs": rows, "alloc": alloc, "regime": reg, "maturity": mt},
                               ensure_ascii=False), encoding="utf-8")
     log(f"[bonds] ✅ 체크리스트 {n_ok}/4 · {phase} · ETF {sum(1 for r in rows if r.get('cur'))}/{len(rows)} → {OUT}")
 
