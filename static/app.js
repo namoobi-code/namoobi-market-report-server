@@ -1,4 +1,34 @@
 const $=id=>document.getElementById(id);
+/* (2026-10-31) KOSPI/KOSDAQ 1년 일봉 기술차트 + 투자자·프로그램·등락 카드 — AI Daily 3.2.1 과 🌐 Market 상세(지수 클릭)가 같은 함수를 쓴다.
+   데이터: /api/db/kr_tech(gen_kr_tech.py 16:20·18:45 — 네이버 OHLC·다음 수급·KIS 프로그램, 캔들 PNG 서버 생성)
+         + /api/db/program_trading(KIS 일별). 리포트 gen_kr_candle.py 와 같은 소스·패널 → 보고서=홈피 동일. */
+window.__krTech=null;
+async function krTechData(){
+  if(window.__krTech) return window.__krTech;
+  const [KT,P]=await Promise.all([fetch('/api/db/kr_tech',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null),
+                                 fetch('/api/db/program_trading',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null)]);
+  return (window.__krTech={KT,P});
+}
+function krTechCard(k,KT,P,opt){
+  opt=opt||{}; const E_=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+  const v=(KT||{})[k]||{}; const ver=encodeURIComponent((KT&&KT.asof)||'');
+  const eok=x=>x==null?'—':`<span class="${x>0?'up':x<0?'dn':''}">${x>0?'+':''}${Math.round(x).toLocaleString()}억</span>`;
+  const row=(l,val)=>`<div class="fo"><span class="fl">${l}</span><span class="fv">${val}</span></div>`;
+  let prg='';
+  if(P&&P[k]&&(P[k].t||[]).length){ const a=P[k], i=a.t.length-1, ud=(P.updown||{})[k];
+    prg=row('프로그램 차익',eok(a.arb[i]))+row('프로그램 비차익',eok(a.nonarb[i]))+row('프로그램 전체',eok(a.whole[i]))+
+      (ud?row('등락종목',`<span class="up">상승 ${ud.up}</span> · 보합 ${ud.flat} · <span class="dn">하락 ${ud.down}</span>${ud.uplm?` · 상한 ${ud.uplm}`:''}${ud.lslm?` · 하한 ${ud.lslm}`:''}`):'')+
+      `<div class="note" style="margin-top:2px">프로그램 ${a.t[i].slice(4,6)}/${a.t[i].slice(6)} 종가(KIS 일별·억원)${ud?` · 등락종목 ${E_(P.updown_asof||'')} 기준(KIS)`:''} · <span style="color:#e08e3c;font-weight:700">차익</span>/<span style="color:#1f6feb;font-weight:700">비차익</span> 1년 추이는 차트 맨 아래 패널</div>`; }
+  const img=`<a href="/charts/${k}_tech.png?v=${ver}" target="_blank"><img src="/charts/${k}_tech.png?v=${ver}" style="width:100%;border:1px solid var(--line,#ddd);border-radius:6px;margin:4px 0" loading="lazy" alt="${k} 일봉"></a>`;
+  const tbl=v.date?`<div class="card"><div class="k" style="font-size:13px;color:var(--tx);font-weight:650">${k.toUpperCase()} <span class="note">${E_(v.date)} 마감</span></div>
+      <div style="margin-top:8px;font-size:12.5px">
+        ${row('지수',`${(+v.close).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}${v.chg_pct!=null?` <span class="${v.chg_pct>0?'up':v.chg_pct<0?'dn':''}" style="font-size:11.5px">${v.chg_pct>0?'+':''}${v.chg_pct}%</span>`:''}`)}
+        ${row('외국인',eok(v.frgn))}${row('기관',eok(v.inst))}${row('개인',eok(v.indi))}
+        ${v.rsi!=null?row('RSI(14)',`<span class="${v.rsi>=70?'up':v.rsi<=30?'dn':''}">${v.rsi}</span>`):''}
+        ${prg}</div>
+      <div class="src">투자자 순매수 = 다음금융 정규장 집계(억원) · 캔들 = 네이버 OHLC · 서버 ${E_((KT&&KT.asof)||'')} 생성</div></div>`:'';
+  return opt.imgOnly?img:(opt.tblOnly?tbl:img+tbl);
+}
 const esc=s=>String(s??'').replace(/[<>&]/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]));
 /* (2026-08-10) 가이던스 비교 기간 라벨 — 우선순위 ①진행분기 ②다음분기 ③올해(FY) ④내년(FY).
    상세표·캘린더 팝업·차트 팝업이 **같은 라벨**을 쓰도록 전역 공용으로 둔다. */
@@ -4298,7 +4328,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   { const _kc=document.getElementById('d_kinv');
     if(_kc && !document.getElementById('kr_candles')){
       const _div=document.createElement('div'); _div.id='kr_candles'; _div.style.cssText='grid-column:1/-1';
-      _div.innerHTML=['kospi','kosdaq'].map(k=>`<a href="/charts/${k}_tech.png" target="_blank"><img src="/charts/${k}_tech.png" style="width:100%;max-width:860px;border:1px solid var(--line,#ddd);border-radius:6px;margin:6px 0" loading="lazy" alt="${k} 일봉 캔들·수급" onerror="this.parentElement.style.display='none'"></a>`).join('');
+      // (2026-10-31) 캔들 PNG 는 서버 gen_kr_tech.py 가 매일 생성 — 날짜 캐시버스트(브라우저가 8/14 그림을 재사용하던 사고 방지)
+      const _cb=new Date().toISOString().slice(0,10);
+      _div.innerHTML=['kospi','kosdaq'].map(k=>`<a href="/charts/${k}_tech.png?v=${_cb}" target="_blank"><img src="/charts/${k}_tech.png?v=${_cb}" style="width:100%;max-width:860px;border:1px solid var(--line,#ddd);border-radius:6px;margin:6px 0" loading="lazy" alt="${k} 일봉 캔들·수급" onerror="this.parentElement.style.display='none'"></a>`).join('');
       _kc.parentElement.insertBefore(_div,_kc); } }
   const KI=M.korea_investors||{};
   $$('d_kinv').innerHTML=['kospi','kosdaq'].filter(k=>KI[k]).map(k=>{
@@ -4312,6 +4344,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         <div id="pg_${k}"></div>
       </div><div class="src">${E(v.comment||'')}</div></div>`;}).join('');
   renderProgram();                                     // 프로그램(차익·비차익)·등락종목 — 서버 실시간 (2026-08-02)
+  // (2026-10-31) 리포트 회차(report_data)보다 서버 kr_tech 가 더 새 마감이면 카드 전체를 서버본으로 교체 — 🌐 Market 상세와 같은 카드
+  krTechData().then(({KT,P})=>{ if(!KT||!KT.kospi||!KT.kospi.date) return;
+    if(KT.kospi.date<=String(KI.asof||'')) return;
+    $$('d_kinv').innerHTML=['kospi','kosdaq'].map(k=>krTechCard(k,KT,P,{tblOnly:true})).join(''); }).catch(()=>{});
   renderInvFlow();                                     // (2026-10-24) 투자자별 월별 순매수 막대 — 매경 'KRX 외국인 월별 순매수' 그래프 상시판
   async function renderInvFlow(){
     const host=document.getElementById('d_kinv'); if(!host||!window.Chart) return;
@@ -9548,7 +9584,12 @@ await _canvasFlow(c);
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1Y','3Y','10Y','MAX'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'3Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'3Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
+      <div id="gm_kr"></div>
       <canvas id="gm_cv" style="width:100%;height:600px"></canvas>`;
+    // (2026-10-31 사용자 요청) KOSPI·KOSDAQ 은 AI Daily 3.2.1 과 같은 1년 일봉 기술차트 + 투자자·프로그램·등락 카드를 라인차트 위에
+    if(sym==='^KS11'||sym==='^KQ11'){ const k=sym==='^KS11'?'kospi':'kosdaq';
+      krTechData().then(({KT,P})=>{ const h=$('gm_kr'); if(h&&openSym===sym) h.innerHTML=
+        `<div class="note" style="margin:4px 0 2px">📈 1년 일봉 기술차트 · 투자자별 수급 <span style="color:#94a3b8">— AI Daily 3.2.1 동일 · 서버 ${(KT&&KT.asof)||''} 생성 · 아래는 10년 추세(야후·네이버 종가)</span></div>`+krTechCard(k,KT,P); }).catch(()=>{}); }
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; delete box._vn; delete box._vo; openDetail(sym,true);}));
     if(!keep){ delete box._vn; delete box._vo; }
     box.querySelectorAll('.gme').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation(); window.open(b.dataset.u,'gm_pop','width=1280,height=860');}));
