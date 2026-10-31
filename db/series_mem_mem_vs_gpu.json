@@ -1,7 +1,12 @@
 {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
  "marker": "2026-10-29",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-31",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
 =======
  "marker": "2026-10-31",
  "as_of": "2026-10-31",
@@ -667,7 +672,10 @@
     "메모리/GPU 상대강도": 4.17
    }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
   ],
   [
    "2026-10-30",
@@ -680,6 +688,9 @@
    {
     "메모리/GPU 상대강도": 3.91
    }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   ]
  ]

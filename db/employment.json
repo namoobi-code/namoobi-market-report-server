@@ -1,7 +1,12 @@
 {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
  "marker": "2026-10-22",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-29",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
 =======
  "marker": "2026-10-29",
  "as_of": "2026-10-31",
@@ -72,9 +77,15 @@
    "meaning": "실질 성장률(연율) — 후행지표",
    "impact": "발표가 늦어 단기 트레이딩보다 중기 경기판단용",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "value": "2.2",
    "asof": "2026-Q2",
    "release": "2026-09-30",
+=======
+   "value": 3.4,
+   "asof": "2026 Q3",
+   "release": "2026-10-29",
+>>>>>>> Stashed changes
 =======
    "value": 3.4,
    "asof": "2026 Q3",

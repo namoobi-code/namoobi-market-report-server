@@ -1,7 +1,12 @@
 {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
  "marker": "2026-10-29",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-31",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
 =======
  "marker": "2026-10-31",
  "as_of": "2026-10-31",
@@ -1339,7 +1344,10 @@
     "DDR3 4Gb 512Mx8 1600/1866": 13.936
    }
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 =======
+=======
+>>>>>>> Stashed changes
   ],
   [
    "2026-10-30",
@@ -1364,6 +1372,9 @@
     "DDR4 8Gb (1Gx8) eTT": 5.96,
     "DDR3 4Gb 512Mx8 1600/1866": 14.078
    }
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
   ]
  ]

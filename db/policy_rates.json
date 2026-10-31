@@ -1,7 +1,11 @@
 {
  "marker": "2026-10",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
  "as_of": "2026-10-29",
+=======
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
 =======
  "as_of": "2026-10-31",
 >>>>>>> Stashed changes
@@ -10,7 +14,11 @@
    "country": "미국",
    "rate": "3.75~4.00",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-28",
+=======
+   "asof": "2026-10-30",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-30",
 >>>>>>> Stashed changes
@@ -20,7 +28,11 @@
    "country": "유로존",
    "rate": "2.50",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-28",
+=======
+   "asof": "2026-10-30",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-30",
 >>>>>>> Stashed changes
@@ -30,7 +42,11 @@
    "country": "한국",
    "rate": "3.00",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-26",
+=======
+   "asof": "2026-10-28",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-28",
 >>>>>>> Stashed changes
@@ -40,7 +56,11 @@
    "country": "일본",
    "rate": "1.25",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-29",
+=======
+   "asof": "2026-10-31",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-31",
 >>>>>>> Stashed changes
@@ -50,7 +70,11 @@
    "country": "중국",
    "rate": "3.00",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-29",
+=======
+   "asof": "2026-10-31",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-31",
 >>>>>>> Stashed changes
@@ -60,7 +84,11 @@
    "country": "영국",
    "rate": "3.75",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-29",
+=======
+   "asof": "2026-10-31",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-31",
 >>>>>>> Stashed changes

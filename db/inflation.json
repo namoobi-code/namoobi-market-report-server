@@ -1,7 +1,12 @@
 {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
  "marker": "2026-10-28",
  "as_of": "2026-10-29",
+=======
+ "marker": "2026-10-30",
+ "as_of": "2026-10-31",
+>>>>>>> Stashed changes
 =======
  "marker": "2026-10-30",
  "as_of": "2026-10-31",
@@ -64,7 +69,11 @@
    "yoy": 2.38,
    "mom": "수준지표(MoM 미해당)",
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
    "asof": "2026-10-28",
+=======
+   "asof": "2026-10-30",
+>>>>>>> Stashed changes
 =======
    "asof": "2026-10-30",
 >>>>>>> Stashed changes

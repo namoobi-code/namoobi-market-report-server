@@ -1,5 +1,6 @@
 {
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
  "as_of": "2026-10-29",
  "source": "field-level carry-forward",
  "price_note": "기준가(2026-10-29 종가): SK하이닉스 1,559,000 · 삼성전자 245,000 · Micron $983.23",
@@ -28,10 +29,26 @@
    "y2028_eps": 450129,
    "y2028_per": 3.15,
 >>>>>>> Stashed changes
+=======
+ "as_of": "2026-10-31",
+ "source": "field-level carry-forward",
+ "price_note": "기준가(2026-10-31 종가): SK하이닉스 1,418,000 · 삼성전자 225,000 · Micron $884.74",
+ "data": {
+  "SK하이닉스": {
+   "y2025_eps": 58955,
+   "y2025_per": 24.05,
+   "y2026_eps": 357343.0,
+   "y2026_per": 3.97,
+   "y2027_eps": 470710.0,
+   "y2027_per": 3.01,
+   "y2028_eps": 450129,
+   "y2028_per": 3.15,
+>>>>>>> Stashed changes
    "currency": "KRW"
   },
   "삼성전자": {
    "y2025_eps": 6564,
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
    "y2025_per": 37.32,
    "y2026_eps": 45531.0,
@@ -49,10 +66,20 @@
    "y2028_eps": 67197,
    "y2028_per": 3.35,
 >>>>>>> Stashed changes
+=======
+   "y2025_per": 34.28,
+   "y2026_eps": 45531.0,
+   "y2026_per": 4.94,
+   "y2027_eps": 68238.0,
+   "y2027_per": 3.3,
+   "y2028_eps": 67197,
+   "y2028_per": 3.35,
+>>>>>>> Stashed changes
    "currency": "KRW"
   },
   "Micron": {
    "y2025_eps": 8.29,
+<<<<<<< Updated upstream
 <<<<<<< Updated upstream
    "y2025_per": 118.6,
    "y2026_eps": 44.27,
@@ -62,6 +89,8 @@
    "y2028_eps": 82.27,
    "y2028_per": 11.95,
 =======
+=======
+>>>>>>> Stashed changes
    "y2025_per": 106.72,
    "y2026_eps": 44.27,
    "y2026_per": 19.99,
@@ -69,6 +98,9 @@
    "y2027_per": 5.71,
    "y2028_eps": 82.27,
    "y2028_per": 10.75,
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
    "currency": "USD"
   }
