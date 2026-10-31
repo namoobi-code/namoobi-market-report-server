@@ -9584,12 +9584,12 @@ await _canvasFlow(c);
       <span class="note">${r.at||''}</span>
       <span style="margin-left:auto">${extLinks(r).map(([lb,u])=>`<button class="gme" data-u="${u}" style="margin-left:4px;padding:2px 9px;font-size:11px;border:1px solid #d7dce3;background:#fff;color:#333;border-radius:5px;cursor:pointer">${lb} ↗</button>`).join('')}<span style="display:inline-block;width:10px"></span>${['1Y','3Y','10Y','MAX'].map(k=>`<button class="gmp" data-p="${k}" style="margin-left:4px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:${k===(box.dataset.p||'3Y')?'#1f2937':'#fff'};color:${k===(box.dataset.p||'3Y')?'#fff':'#333'};border-radius:5px;cursor:pointer">${k}</button>`).join('')}
       <button id="gm_x" style="margin-left:8px;padding:2px 8px;font-size:11px;border:1px solid #d7dce3;background:#fff;border-radius:5px;cursor:pointer">✕</button></span></div>
-      <div id="gm_kr"></div>
-      <canvas id="gm_cv" style="width:100%;height:600px"></canvas>`;
-    // (2026-10-31 사용자 요청) KOSPI·KOSDAQ 은 AI Daily 3.2.1 과 같은 1년 일봉 기술차트 + 투자자·프로그램·등락 카드를 라인차트 위에
+      <canvas id="gm_cv" style="width:100%;height:600px"></canvas>
+      <div id="gm_kr"></div>`;
+    // (2026-10-31 사용자 요청) KOSPI·KOSDAQ 은 기존 10년 추세 차트를 유지하고 그 아래에 AI Daily 3.2.1 과 같은 1년 일봉 기술차트 + 투자자·프로그램·등락 카드
     if(sym==='^KS11'||sym==='^KQ11'){ const k=sym==='^KS11'?'kospi':'kosdaq';
       krTechData().then(({KT,P})=>{ const h=$('gm_kr'); if(h&&openSym===sym) h.innerHTML=
-        `<div class="note" style="margin:4px 0 2px">📈 1년 일봉 기술차트 · 투자자별 수급 <span style="color:#94a3b8">— AI Daily 3.2.1 동일 · 서버 ${(KT&&KT.asof)||''} 생성 · 아래는 10년 추세(야후·네이버 종가)</span></div>`+krTechCard(k,KT,P); }).catch(()=>{}); }
+        `<div class="note" style="margin:10px 0 2px;font-weight:600;color:var(--tx)">📈 투자자별 수급 동향 — 1년 일봉 기술차트 <span class="note" style="font-weight:400">AI Daily 3.2.1 동일 · 서버 ${(KT&&KT.asof)||''} 생성</span></div>`+krTechCard(k,KT,P); }).catch(()=>{}); }
     box.querySelectorAll('.gmp').forEach(b=>b.addEventListener('click',()=>{box.dataset.p=b.dataset.p; delete box._vn; delete box._vo; openDetail(sym,true);}));
     if(!keep){ delete box._vn; delete box._vo; }
     box.querySelectorAll('.gme').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation(); window.open(b.dataset.u,'gm_pop','width=1280,height=860');}));
