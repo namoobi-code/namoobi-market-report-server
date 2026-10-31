@@ -666,17 +666,20 @@
 
   <!-- (2026-07-26) 캘린더 페인 — calendar.html 전체 페이지 대신 대시보드 안에서 표시 -->
   <!-- (2026-08-02) 글로벌시황 페인 — 미래에셋 국내외 주요지수 재현 (global_market.py 10분 수집) -->
-  <div class="pane" id="p_global" style="overflow:auto">
+  <!-- (2026-10-31 사용자 요청) 좌(표)·우(상세) 스크롤 분리 — 페인은 고정, 두 열이 각자 overflow:auto. 우측 상세가 10년 차트+일봉 기술차트+표로 길어져 sticky 로는 못 따라갔다 -->
+  <div class="pane" id="p_global" style="overflow:hidden">
     <h2>🌐 글로벌시황 <em id="gm_asof">지수·선물·상품·환율·암호화폐 — 10분 자동 갱신 · 국내대표/크립토=실시간 · 해외지수=야후(~15분 지연) · KRX 세부=T+1 종가</em></h2>
-    <div style="display:flex;gap:14px;align-items:flex-start">
-      <div id="gm_body" style="flex:0 0 1150px;width:1150px"><div class="note">불러오는 중…</div></div>
-      <div style="flex:1;min-width:420px;position:sticky;top:8px">
+    <div style="display:flex;gap:14px;align-items:stretch;flex:1;min-height:0">
+      <div id="gm_left" style="flex:0 0 1150px;width:1150px;overflow:auto;min-height:0;overscroll-behavior:contain">
+        <div id="gm_body"><div class="note">불러오는 중…</div></div>
+    <div class="note" style="margin:8px 0 14px;line-height:1.7">📖 기간수익률은 각 소스의 1년 일봉 기준(현재가 대비 과거 최근접 종가) · KRX 세부지수는 이력 누적 개시(2026-08-02)부터 기간수익률·추세가 차오른다 · 미래에셋 리스트 중 러시아 RTS(거래정지)·항셍종합·항셍 레드칩(R)·K-뉴딜 TOP10 시리즈는 무료 소스 미제공. 선물 시세는 최근월 연속(롤오버 자동)이며, 만기 교체 시 월물 간 가격차가 시계열에 섞여 매월물 상품(원유·천연가스 등)의 장기 수익률은 실제 현물 등락과 다소 다를 수 있음. 리서치용·투자권유 아님.</div>
+      </div>
+      <div id="gm_right" style="flex:1;min-width:420px;overflow:auto;min-height:0;overscroll-behavior:contain;padding-bottom:40px">
       <div id="gm_detail" class="box" style="padding:10px 14px">
         <div class="note" style="padding:40px 0;text-align:center">👈 왼쪽 표에서 지수/종목을 클릭하면<br>여기에 차트가 표시됩니다</div>
       </div>
       </div>
     </div>
-    <div class="note" style="margin:8px 0 14px;line-height:1.7">📖 기간수익률은 각 소스의 1년 일봉 기준(현재가 대비 과거 최근접 종가) · KRX 세부지수는 이력 누적 개시(2026-08-02)부터 기간수익률·추세가 차오른다 · 미래에셋 리스트 중 러시아 RTS(거래정지)·항셍종합·항셍 레드칩(R)·K-뉴딜 TOP10 시리즈는 무료 소스 미제공. 선물 시세는 최근월 연속(롤오버 자동)이며, 만기 교체 시 월물 간 가격차가 시계열에 섞여 매월물 상품(원유·천연가스 등)의 장기 수익률은 실제 현물 등락과 다소 다를 수 있음. 리서치용·투자권유 아님.</div>
   </div>
 
   <!-- (2026-08-31) 점유율 추이 탭 — share.js · 데이터 scripts/fetch_share.py (매일 06:35) -->
@@ -2555,7 +2558,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=10311935"></script>
+<script src="/app.js?v=10311950"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
