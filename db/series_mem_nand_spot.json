@@ -1,16 +1,6 @@
 {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
- "marker": "2026-10-29",
- "as_of": "2026-10-29",
-=======
- "marker": "2026-10-31",
- "as_of": "2026-10-31",
->>>>>>> Stashed changes
-=======
- "marker": "2026-10-31",
- "as_of": "2026-10-31",
->>>>>>> Stashed changes
+ "marker": "2026-11-07",
+ "as_of": "2026-11-07",
  "data": [
   [
    "2026-07-11",
@@ -1010,11 +1000,6 @@
     "MLC 64Gb 8GBx8": 42.726,
     "MLC 32Gb 4GBx8": 19.933
    }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
   ],
   [
    "2026-10-30",
@@ -1033,10 +1018,69 @@
     "MLC 64Gb 8GBx8": 42.726,
     "MLC 32Gb 4GBx8": 19.933
    }
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+  ],
+  [
+   "2026-11-01",
+   {
+    "SLC 2Gb 256MBx8": 4.383,
+    "SLC 1Gb 128MBx8": 3.32,
+    "MLC 64Gb 8GBx8": 42.726,
+    "MLC 32Gb 4GBx8": 19.933
+   }
+  ],
+  [
+   "2026-11-02",
+   {
+    "SLC 2Gb 256MBx8": 4.408,
+    "SLC 1Gb 128MBx8": 3.303,
+    "MLC 64Gb 8GBx8": 43.413,
+    "MLC 32Gb 4GBx8": 20.267
+   }
+  ],
+  [
+   "2026-11-03",
+   {
+    "SLC 2Gb 256MBx8": 4.408,
+    "SLC 1Gb 128MBx8": 3.303,
+    "MLC 64Gb 8GBx8": 43.413,
+    "MLC 32Gb 4GBx8": 20.267
+   }
+  ],
+  [
+   "2026-11-04",
+   {
+    "SLC 2Gb 256MBx8": 4.408,
+    "SLC 1Gb 128MBx8": 3.303,
+    "MLC 64Gb 8GBx8": 43.413,
+    "MLC 32Gb 4GBx8": 20.267
+   }
+  ],
+  [
+   "2026-11-05",
+   {
+    "SLC 2Gb 256MBx8": 4.408,
+    "SLC 1Gb 128MBx8": 3.303,
+    "MLC 64Gb 8GBx8": 43.413,
+    "MLC 32Gb 4GBx8": 20.267
+   }
+  ],
+  [
+   "2026-11-06",
+   {
+    "SLC 2Gb 256MBx8": 4.408,
+    "SLC 1Gb 128MBx8": 3.303,
+    "MLC 64Gb 8GBx8": 43.413,
+    "MLC 32Gb 4GBx8": 20.267
+   }
+  ],
+  [
+   "2026-11-07",
+   {
+    "SLC 2Gb 256MBx8": 4.408,
+    "SLC 1Gb 128MBx8": 3.303,
+    "MLC 64Gb 8GBx8": 43.413,
+    "MLC 32Gb 4GBx8": 20.267
+   }
   ]
  ]
 }

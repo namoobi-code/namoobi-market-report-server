@@ -1,19 +1,11 @@
 {
- "marker": "2026-10-29|2026.09",
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
- "as_of": "2026-10-29",
-=======
- "as_of": "2026-10-31",
->>>>>>> Stashed changes
-=======
- "as_of": "2026-10-31",
->>>>>>> Stashed changes
+ "marker": "2026-11-03|2026.09",
+ "as_of": "2026-11-07",
  "data": {
   "unit": "지수(진폭조정, 기준 100)",
   "source": "OECD SDMX API (DSD_STES@DF_CLI, 진폭조정 AA)",
   "source_url": "https://sdmx.oecd.org/public/rest/data/OECD.SDD.STES,DSD_STES@DF_CLI",
-  "data_updated": "2026-10-29|2026.09",
+  "data_updated": "2026-11-03|2026.09",
   "months": [
    "2022.01",
    "2022.02",

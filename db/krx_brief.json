@@ -1,61 +1,21 @@
 {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
- "marker": "krx:2026102811|short:202610283S",
- "as_of": "2026-10-29",
+ "marker": "krx:2026110611|short:202611064S",
+ "as_of": "2026-11-07",
  "data": {
   "krx": {
-   "title": "KRX 증시 Brief(2026.10.28)",
-   "date": "2026/10/28 16:00",
-   "att_seq": "2026102811",
+   "title": "KRX 증시 Brief(2026.11.06)",
+   "date": "2026/11/06 16:08",
+   "att_seq": "2026110611",
    "pages": 1,
-   "file_nm": "261028KRXBrief.pdf",
+   "file_nm": "261106KRXBrief.pdf",
    "reused": false
   },
   "short": {
-   "title": "공매도 데일리 브리프('26.10.28)",
-   "date": "2026/10/28 16:53",
-   "att_seq": "202610283S",
+   "title": "공매도 데일리 브리프('26.11.06)",
+   "date": "2026/11/06 16:39",
+   "att_seq": "202611064S",
    "pages": 2,
-   "file_nm": "261028..........��일리브리프.pdf",
-=======
- "marker": "krx:2026103041|short:202610303S",
- "as_of": "2026-10-30",
- "data": {
-  "krx": {
-   "title": "KRX 증시 Brief(2026.10.30)",
-   "date": "2026/10/30 16:22",
-   "att_seq": "2026103041",
-   "pages": 1,
-   "file_nm": "261030KRXBrief.pdf",
-   "reused": false
-  },
-  "short": {
-   "title": "공매도 데일리 브리프('26.10.30)",
-   "date": "2026/10/30 16:11",
-   "att_seq": "202610303S",
-   "pages": 2,
-   "file_nm": "261030..........��일리브리프.pdf",
->>>>>>> Stashed changes
-=======
- "marker": "krx:2026103041|short:202610303S",
- "as_of": "2026-10-30",
- "data": {
-  "krx": {
-   "title": "KRX 증시 Brief(2026.10.30)",
-   "date": "2026/10/30 16:22",
-   "att_seq": "2026103041",
-   "pages": 1,
-   "file_nm": "261030KRXBrief.pdf",
-   "reused": false
-  },
-  "short": {
-   "title": "공매도 데일리 브리프('26.10.30)",
-   "date": "2026/10/30 16:11",
-   "att_seq": "202610303S",
-   "pages": 2,
-   "file_nm": "261030..........��일리브리프.pdf",
->>>>>>> Stashed changes
+   "file_nm": "261106..........��일리브리프.pdf",
    "reused": false
   }
  }

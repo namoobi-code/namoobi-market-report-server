@@ -1,22 +1,8 @@
 {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
- "marker": "2026-10-29",
- "as_of": "2026-10-29",
+ "marker": "2026-11-07",
+ "as_of": "2026-11-07",
  "data": {
-  "asof": "2026-10-29",
-=======
- "marker": "2026-10-31",
- "as_of": "2026-10-31",
- "data": {
-  "asof": "2026-10-31",
->>>>>>> Stashed changes
-=======
- "marker": "2026-10-31",
- "as_of": "2026-10-31",
- "data": {
-  "asof": "2026-10-31",
->>>>>>> Stashed changes
+  "asof": "2026-11-07",
   "unit": "USD billion",
   "years": [
    2022,

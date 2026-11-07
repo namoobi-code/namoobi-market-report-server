@@ -1,16 +1,6 @@
 {
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
- "marker": "2026-10-29",
- "as_of": "2026-10-29",
-=======
- "marker": "2026-10-31",
- "as_of": "2026-10-31",
->>>>>>> Stashed changes
-=======
- "marker": "2026-10-31",
- "as_of": "2026-10-31",
->>>>>>> Stashed changes
+ "marker": "2026-11-07",
+ "as_of": "2026-11-07",
  "data": [
   [
    "2026-07-11",
@@ -899,18 +889,13 @@
     "NAND 64Gb 8Gx8 MLC": 23.425,
     "NAND 32Gb 4Gx8 MLC": 18.128
    }
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-=======
-=======
->>>>>>> Stashed changes
   ],
   [
    "2026-10-30",
    {
-    "NAND 128Gb 16Gx8 MLC": 30.475,
-    "NAND 64Gb 8Gx8 MLC": 23.425,
-    "NAND 32Gb 4Gx8 MLC": 18.128
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
    }
   ],
   [
@@ -920,10 +905,62 @@
     "NAND 64Gb 8Gx8 MLC": 23.528,
     "NAND 32Gb 4Gx8 MLC": 18.208
    }
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+  ],
+  [
+   "2026-11-01",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+  ],
+  [
+   "2026-11-02",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+  ],
+  [
+   "2026-11-03",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+  ],
+  [
+   "2026-11-04",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+  ],
+  [
+   "2026-11-05",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+  ],
+  [
+   "2026-11-06",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
+  ],
+  [
+   "2026-11-07",
+   {
+    "NAND 128Gb 16Gx8 MLC": 30.608,
+    "NAND 64Gb 8Gx8 MLC": 23.528,
+    "NAND 32Gb 4Gx8 MLC": 18.208
+   }
   ]
  ]
 }
