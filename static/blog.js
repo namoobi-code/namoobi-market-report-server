@@ -116,14 +116,24 @@ function editor(p){
 
 async function reload(){ const d=await api('/api/blog/posts'); POSTS=d.posts||[]; }
 
+/* (2026-11-17 수정) 로그인 여부는 탭을 열 때마다 다시 확인한다 — 처음 한 번만 확인하던 탓에, 블로그를 먼저 열고 나서 로그인하면
+   '새 글'·수정·삭제 버튼이 끝내 안 나왔다(사용자 실측). 로그인 상태가 바뀌었으면 보고 있던 화면도 다시 그린다. */
+async function checkAuth(){
+  let a=false; try{ const me=await fetch('/api/auth/me',{cache:'no-store',credentials:'same-origin'}).then(r=>r.json()); a=!!(me&&me.ok); }catch(e){}
+  const changed=a!==ADMIN; ADMIN=a;
+  $('bl_new').style.display=ADMIN?'':'none'; $('bl_auth').textContent=ADMIN?'로그인됨 — 글쓰기·수정·삭제 가능':'읽기·검색은 누구나 · 글쓰기는 로그인 후';
+  return changed;
+}
 window.renderBlog=async function(){
-  if(LOADED){ return; } LOADED=true;
-  try{ const me=await fetch('/api/auth/me').then(r=>r.json()); ADMIN=!!(me&&me.ok); }catch(e){}
-  $('bl_new').style.display=ADMIN?'':'none'; $('bl_new').onclick=()=>editor();
+  if(LOADED){ if(await checkAuth()){ if(CUR) openPost(CUR.id); } return; }
+  LOADED=true;
+  await checkAuth();
+  $('bl_new').onclick=()=>editor();
   $('bl_home').onclick=e=>{e.preventDefault(); $('bl_q').value=''; showHome();};
   $('bl_q').addEventListener('input',()=>{ clearTimeout(stimer); stimer=setTimeout(search,220); });
   try{ await reload(); }catch(e){ $('bl_main').innerHTML='<div class="note">목록을 불러오지 못했습니다: '+E(e.message)+'</div>'; return; }
   showHome();
 };
+window.addEventListener('focus',()=>{ const p=$('p_blog'); if(LOADED&&p&&p.classList.contains('on')) window.renderBlog(); });
 document.addEventListener('keydown',e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){ const p=$('p_blog'); if(p&&p.classList.contains('on')){ e.preventDefault(); $('bl_q').focus(); $('bl_q').select(); } } });
 })();
