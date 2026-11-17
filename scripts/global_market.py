@@ -355,6 +355,28 @@ def krx_gold_hist(have_t, back_days=400):
     except Exception:
         return {"t": [], "v": []}
 
+# (2026-11-17) 새 네이버 시세 API 매핑 — 심볼: (분류, 새 코드, 전 구간 교체 여부). 교체=True 는 새 피드 값이 구 피드와 달라 이어붙이면 안 되는 종목.
+NV2 = {"ND.CMDT_PDY": ("metals", "CMPB0", True), "ND.CMDT_ZDY": ("metals", "CMZN0", True), "ND.CMDT_NDY": ("metals", "CMNI0", True),
+       "ND.CMDT_AAY": ("metals", "CMAA0", True), "ND.CMDT_SDY": ("metals", "CMSN0", True),
+       "ND.CMDT_GO": ("energy", "LGOcv1", False), "ND.OIL_DU": ("energy", "DCBc1", False),
+       "ND.OIL_GSL": ("energy", "OIL_GSL", False), "ND.OIL_LO": ("energy", "OIL_LO", False),
+       "CNYKRW=X": ("exchange", "FX_CNYKRW", False), "BRLKRW=X": ("exchange", "FX_BRLKRW", False), "SEKKRW=X": ("exchange", "FX_SEKKRW", False),
+       "CZKKRW=X": ("exchange", "FX_CZKKRW", False), "CLPKRW=X": ("exchange", "FX_CLPKRW", False), "TRYKRW=X": ("exchange", "FX_TRYKRW", False),
+       "ND.FX_USDGEL": ("exchange", "FX_USDGEL", False)}
+
+def naver_new_hist(cat, code, pages=2):
+    """api.stock.naver.com/marketindex/{cat}/{code}/prices — 일별 종가. pageSize 60 고정, 빈 페이지에서 멈춤."""
+    out = {}
+    for pg in range(1, pages + 1):
+        j = jget(f"https://api.stock.naver.com/marketindex/{cat}/{code}/prices?page={pg}&pageSize=60")
+        if not isinstance(j, list) or not j: break
+        for x in j:
+            try: out[str(x["localTradedAt"])[:10].replace("-", "")] = float(str(x["closePrice"]).replace(",", ""))
+            except Exception: pass
+        if len(j) < 60: break
+    ts = sorted(out)
+    return {"t": ts, "v": [out[k] for k in ts]}
+
 def naver_metal_hist(code, pages=2):
     """(2026-11-17) 네이버 새 시세 API api.stock.naver.com/marketindex/metals/{code}/prices — 국내 금(M04020000) 일별 종가(원/g).
        KRX OPEN API gold_bydd_trd 가 10/16 이후 빈 응답([])만 돌려줘 국내 금이 한 달 멈춘 데 대한 2차 경로(사용자 요청 '금 수집 복구').
@@ -551,12 +573,24 @@ def main():
                 if not nh["t"] or (a["t"] and max(nh["t"]) <= max(a["t"])):
                     nv = naver_metal_hist("M04020000", pages=3 if a["t"] else 20)
                     if nv["t"]: nh = {"t": nh["t"] + nv["t"], "v": nh["v"] + nv["v"]}
+            elif s in NV2:
+                # (2026-11-17) 네이버 marketindex 구 HTML 일별시세가 전부 폐지('이 페이지는 더 이상 제공되지 않습니다')돼 LME 금속·가스오일·두바이유·
+                #   국내 유가·고시환율 16종이 9/16~17 에서 두 달 멈췄다 → 새 API api.stock.naver.com/marketindex/{분류}/{코드}/prices 로 교체.
+                #   실측 겹침(9/14~17): 가스오일·두바이유·국내유가·환율은 구 값과 동일 → 이어붙임. LME 금속 5종은 새 피드 값이 구 값과 최대 2% 다름
+                #   (니켈 9/15 16,135 vs 15,817) → 서로 다른 시세를 한 시계열에 섞지 않도록 전 구간을 새 피드로 한 번 갈아끼운다(src='nv2' 표식).
+                cat, code, replace = NV2[s]
+                fresh = replace and a.get("src") != "nv2"
+                nh = naver_new_hist(cat, code, pages=45 if (fresh or len(a["t"]) < 800) else 2)
+                nv2_done = (a.get("src") == "nv2")
+                if fresh and len(nh["t"]) >= 200: a = {"t": [], "v": []}; nv2_done = True
+                elif fresh: nh = {"t": [], "v": []}          # 백필이 충분치 않으면 섞지 않고 다음 회차에 재시도
             else:
                 nh = naver_mi_hist(ep, cd, fdtc, pages=120 if len(a["t"]) < 800 else 2)   # 3년 수익률에 ~750거래일 필요(120페이지 ≈ 1200일)
             m2 = dict(zip(a["t"], a["v"])); m2.update(dict(zip(nh["t"], nh["v"])))
             ts_ = sorted(m2)
             series = {"t": ts_, "v": [m2[k] for k in ts_]}
             acc[s] = {"t": ts_[-2600:], "v": series["v"][-2600:]}
+            if s in NV2 and NV2[s][2] and nv2_done: acc[s]["src"] = "nv2"
             if ts_:
                 r["px"] = series["v"][-1]
                 r["at"] = ts_[-1][4:6] + "/" + ts_[-1][6:] + (" 고시(네이버)" if ep == "exchangeDailyQuote" else " 종가(KRX)" if s == "ND.GOLD_KR" else " 종가(네이버)")
