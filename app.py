@@ -3024,6 +3024,113 @@ _LLM_SYS = ("당신은 namoobi AI 터미널의 실험용 로컬 어시스턴트�
             "모르는 사실은 모른다고 말하고 수치를 지어내지 않는다.")
 
 
+# ───────── (2026-11-17) 📝 블로그 — 글 목록·본문·검색은 공개, 작성·수정·삭제는 로그인 필수 ─────────
+#   저장: data/blog/posts.json (글 수가 적어 단일 파일 · 쓰기는 락+원자적 교체). 본문은 마크다운, 렌더는 blog.js.
+#   검색: 제목(가중 5)·태그(4)·설명(3)·본문(1) 부분일치 점수 + 본문 발췌. 공백으로 나눈 모든 단어가 들어 있어야 한다(AND).
+_BLOG_F = BASE / "data" / "blog" / "posts.json"
+import threading as _blog_th
+_BLOG_LOCK = _blog_th.Lock()
+
+
+def _blog_load():
+    try:
+        return json.loads(_BLOG_F.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+
+
+def _blog_save(posts):
+    _BLOG_F.parent.mkdir(parents=True, exist_ok=True)
+    tmp = _BLOG_F.with_suffix(".tmp")
+    tmp.write_text(json.dumps(posts, ensure_ascii=False), encoding="utf-8")
+    os.replace(tmp, _BLOG_F)
+
+
+def _blog_meta(p):
+    return {k: p.get(k) for k in ("id", "title", "desc", "tags", "cat", "created", "updated")}
+
+
+@app.get("/api/blog/posts")
+def blog_posts():
+    ps = sorted(_blog_load(), key=lambda p: p.get("created", ""), reverse=True)
+    return {"posts": [_blog_meta(p) for p in ps]}
+
+
+@app.get("/api/blog/post/{pid}")
+def blog_post(pid: str):
+    for p in _blog_load():
+        if p.get("id") == pid:
+            return p
+    raise HTTPException(404, "글 없음")
+
+
+@app.get("/api/blog/search")
+def blog_search(q: str = ""):
+    words = [w for w in q.lower().split() if w][:8]
+    if not words:
+        return {"q": q, "hits": []}
+    hits = []
+    for p in _blog_load():
+        f = {"title": (p.get("title") or "").lower(), "tags": " ".join(p.get("tags") or []).lower(),
+             "desc": (p.get("desc") or "").lower(), "md": (p.get("md") or "").lower()}
+        score, ok = 0, True
+        for w in words:
+            c = {k: v.count(w) for k, v in f.items()}
+            if not any(c.values()):
+                ok = False; break
+            score += 5 * c["title"] + 4 * c["tags"] + 3 * c["desc"] + min(c["md"], 20)
+        if not ok:
+            continue
+        md = p.get("md") or ""
+        i = md.lower().find(words[0])
+        snip = (p.get("desc") or "")[:160]
+        if i >= 0:
+            a = max(0, i - 60)
+            snip = ("…" if a else "") + " ".join(md[a:i + 120].split()) + "…"
+        hits.append({**_blog_meta(p), "score": score, "snip": snip})
+    hits.sort(key=lambda h: -h["score"])
+    return {"q": q, "hits": hits[:30]}
+
+
+@app.post("/api/blog/post")
+async def blog_write(request: Request):
+    if not _logged_in(request):
+        raise HTTPException(401, "로그인 필요")
+    b = await request.json()
+    title = str(b.get("title") or "").strip()[:200]
+    md = str(b.get("md") or "")[:400000]
+    if not title or not md.strip():
+        raise HTTPException(400, "제목과 본문은 필수")
+    tags = [str(t).strip()[:30] for t in (b.get("tags") or []) if str(t).strip()][:12]
+    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    with _BLOG_LOCK:
+        posts = _blog_load()
+        pid = str(b.get("id") or "")
+        cur = next((p for p in posts if p.get("id") == pid), None) if pid else None
+        if cur is None:
+            import secrets as _sec
+            pid = _sec.token_urlsafe(5)[:6]
+            cur = {"id": pid, "created": now}
+            posts.append(cur)
+        cur.update({"title": title, "desc": str(b.get("desc") or "").strip()[:400], "tags": tags,
+                    "cat": str(b.get("cat") or "").strip()[:30] or "기타", "md": md, "updated": now})
+        _blog_save(posts)
+    return {"ok": True, "id": pid}
+
+
+@app.delete("/api/blog/post/{pid}")
+def blog_delete(pid: str, request: Request):
+    if not _logged_in(request):
+        raise HTTPException(401, "로그인 필요")
+    with _BLOG_LOCK:
+        posts = _blog_load()
+        left = [p for p in posts if p.get("id") != pid]
+        if len(left) == len(posts):
+            raise HTTPException(404, "글 없음")
+        _blog_save(left)
+    return {"ok": True}
+
+
 @app.get("/api/llm/status")
 def llm_status():
     try:

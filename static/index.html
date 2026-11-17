@@ -584,6 +584,7 @@
       <button class="tab"    data-pane="p_debt" style="background:#134e4a;border-color:#134e4a;color:#fff">💵 조달구조<small style="color:#99f6e4">빅테크 회사채·부채 추이</small></button>
       <button class="tab"    data-pane="p_revd" style="background:#7c2d12;border-color:#7c2d12;color:#fff">📋 리비전 데일리<small style="color:#fed7aa">목표가·컨센 변동 일별</small></button>
       <button class="tab"    data-pane="p_exp" style="background:#0c4a6e;border-color:#0c4a6e;color:#fff">📦 K-수출<small style="color:#bae6fd">잠정치 10일·품목별 HS</small></button>
+      <button class="tab"    data-pane="p_blog" style="background:#e96900;border-color:#e96900;color:#fff">📝 블로그<small style="color:#ffedd5">글·검색(Ctrl+K)</small></button>
       <button class="tab"    data-pane="p_llm" style="background:#312e81;border-color:#312e81;color:#fff">🤖 AI 챗봇<small style="color:#c7d2fe">서버 로컬 LLM 실험</small></button>
       <!-- (2026-09-05) 코인 선행지표 탭 — cryptolead.js · scripts/fetch_cryptolead.py (매일 06:55) -->
       <button class="tab"    data-pane="p_cl" style="background:#a16207;border-color:#a16207;color:#fff">🪙 코인 선행<small style="color:#fef08a">지갑·기관·파생·유동성 신호등</small></button>
@@ -831,6 +832,46 @@
 
   <!-- (2026-08-29) K-소비재 선행지표 탭 — kcons.js · 데이터 scripts/fetch_kcons.py (매일 06:25) -->
   <!-- (2026-09-05) 📦 K-수출 페인 — customs+hs_invest 재사용 · exports.js (3.1.10 은 그대로 유지) -->
+  <!-- (2026-11-17) 📝 블로그 탭 — blog.js · /api/blog/* (읽기·검색 공개, 쓰기 로그인) · 좌 메뉴/본문/우 목차 3열, 각자 스크롤 -->
+  <style>
+    #p_blog .bl_cat{font-size:11px;font-weight:700;color:#94a3b8;margin:14px 0 4px;letter-spacing:.04em}
+    #p_blog .bl_item,#bl_toc a{display:block;font-size:12.5px;color:#334155;text-decoration:none;padding:3px 6px;border-radius:5px;line-height:1.45}
+    #p_blog .bl_item:hover,#bl_toc a:hover{background:#fff3e8;color:#e96900}
+    #p_blog .bl_item.on{background:#e96900;color:#fff}
+    #p_blog .bl_h1{font-size:28px;font-weight:800;margin:6px 0 10px;line-height:1.3}
+    #p_blog .bl_card{display:block;text-decoration:none;color:inherit;border:1px solid #e2e8f0;border-radius:10px;padding:12px 16px;margin-bottom:10px;background:#fff}
+    #p_blog .bl_card:hover{border-color:#e96900}
+    #p_blog .bl_ct{font-size:16px;font-weight:700} #p_blog .bl_cd{font-size:13px;color:#475569;margin:4px 0;line-height:1.6}
+    #p_blog .bl_cm{font-size:11.5px;color:#94a3b8} #p_blog .bl_tag{color:#e96900;text-decoration:none;margin-left:4px}
+    #p_blog mark{background:#ffe8cc;color:inherit;padding:0 1px}
+    #p_blog .bl_in{width:100%;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;padding:8px 10px;font-size:13px}
+    .bl_body{font-size:15px;line-height:1.85;color:#1e293b}
+    .bl_body h2{font-size:22px;margin:38px 0 12px;padding-top:6px;border-top:1px solid #e2e8f0} .bl_body h3{font-size:17.5px;margin:26px 0 8px}
+    .bl_body .bl_anchor{color:#e96900;text-decoration:none;margin-right:8px;font-weight:400}
+    .bl_body p{margin:10px 0} .bl_body ul,.bl_body ol{padding-left:22px;margin:8px 0} .bl_body li{margin:3px 0}
+    .bl_body a{color:#e96900} .bl_body img{max-width:100%;border-radius:8px;border:1px solid #e2e8f0}
+    .bl_body blockquote{border-left:4px solid #e96900;background:#fff7ed;margin:12px 0;padding:6px 14px;color:#475569}
+    .bl_body code{background:#f1f5f9;border-radius:4px;padding:1px 5px;font-size:.88em;font-family:ui-monospace,Consolas,monospace;color:#c2410c}
+    .bl_body .bl_code{margin:14px 0;border-radius:10px;overflow:hidden;background:#1e293b}
+    .bl_body .bl_codebar{display:flex;justify-content:space-between;align-items:center;padding:5px 12px;background:#0f172a;color:#94a3b8;font-size:11px;font-weight:700}
+    .bl_body .bl_codebar button{background:none;border:1px solid #475569;color:#cbd5e1;border-radius:5px;font-size:11px;padding:1px 8px;cursor:pointer}
+    .bl_body pre{margin:0;padding:12px 14px;overflow:auto} .bl_body pre code{background:none;color:#e2e8f0;padding:0;font-size:12.5px;line-height:1.6}
+    .bl_body table{border-collapse:collapse;font-size:13.5px;width:auto} .bl_body th,.bl_body td{border:1px solid #e2e8f0;padding:6px 10px;text-align:left}
+    .bl_body th{background:#f8fafc}
+  </style>
+  <div class="pane" id="p_blog" style="overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;margin:2px 0 8px;flex-wrap:wrap">
+      <a href="#" id="bl_home" style="font-size:18px;font-weight:800;color:#e96900;text-decoration:none">📝 NAMOOBI.BLOG</a>
+      <input id="bl_q" placeholder="🔍 검색 — 제목·태그·본문 (Ctrl+K)" style="flex:1;max-width:520px;border:1px solid #cbd5e1;border-radius:20px;padding:7px 14px;font-size:13px">
+      <button id="bl_new" class="scrrst" style="display:none;background:#e96900;color:#fff;border-color:#e96900;font-size:12.5px;padding:5px 14px">✏ 새 글</button>
+      <span class="note">읽기·검색은 누구나 · 글쓰기는 로그인 후</span>
+    </div>
+    <div style="display:flex;gap:18px;align-items:stretch;flex:1;min-height:0">
+      <div id="bl_menu" style="flex:0 0 230px;overflow:auto;min-height:0;border-right:1px solid #e2e8f0;padding-right:8px"></div>
+      <div id="bl_main" style="flex:1;min-width:0;overflow:auto;min-height:0;padding:0 6px 80px;max-width:920px"></div>
+      <div id="bl_toc" style="flex:0 0 210px;overflow:auto;min-height:0"></div>
+    </div>
+  </div>
   <!-- (2026-09-10) AI 챗봇 탭 — llm.js · 서버 Ollama(qwen3.5:4b) 프록시 /api/llm/chat (로그인 필요) -->
   <div class="pane" id="p_llm" style="overflow:auto">
     <h2>🤖 AI 챗봇 <em id="llm_stat"></em> <button id="llm_clear" class="scrrst" style="font-size:11px">🗑 대화 초기화</button></h2>
@@ -2560,7 +2601,7 @@
   <div id="lg_err"></div>
 </div></div>
 <!-- (2026-08-05) ?v= 캐시버스터 — 배포 시 날짜를 올려야 브라우저가 새 JS를 받는다 -->
-<script src="/app.js?v=10311950"></script>
+<script src="/app.js?v=11171000"></script>
 <script src="/etf.js?v=20260811s"></script><!-- (2026-07-26) ETF 스크리너 -->
 <script src="/sub.js?v=09221100"></script><!-- (2026-08-16) 청약 탭 (namoobi 로그인 시) -->
 <script src="/pf.js?v=20260826g"></script><!-- (2026-08-22) Portfolio 탭 -->
@@ -2573,7 +2614,7 @@
 <script src="/revd.js?v=09022140"></script><!-- (2026-09-02) 리비전 데일리 탭 -->
 <script src="/exports.js?v=10241330"></script><!-- (2026-09-05) K-수출 탭 -->
 <script src="/kpop.js?v=08290600"></script><!-- (2026-08-29) K-POP 선행지표 탭 -->
-<script src="/cryptolead.js?v=10192350"></script><script src="/goldlead.js?v=10241800"></script><script src="/bonds.js?v=10311500"></script><script src="/div.js?v=10311300"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
+<script src="/cryptolead.js?v=10192350"></script><script src="/goldlead.js?v=10241800"></script><script src="/bonds.js?v=10311500"></script><script src="/div.js?v=10311300"></script><!-- (2026-10-17) 배당 탭 --><!-- (2026-10-17) 채권 탭 --><!-- (2026-09-22) 금 선행 탭 --><script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.1.6/purify.min.js"></script><script src="/blog.js?v=11171000"></script><!-- (2026-11-17) 블로그 탭 --><script src="/llm.js?v=09102350"></script><!-- (2026-09-10) AI 챗봇 탭 --><!-- (2026-09-05) 코인 선행지표 탭 -->
 <script src="/kcons.js?v=10241210"></script><!-- (2026-08-29) K-소비재 선행지표 탭 -->
 <script src="/moat.js?v=10212030"></script>
 <script src="/share.js?v=10172310"></script><script src="/debt.js?v=10241200"></script><!-- (2026-08-31) 빅테크 조달구조 탭 --><!-- (2026-08-31) 점유율 추이 탭 --><!-- (2026-08-30) 해자 워치 탭 -->

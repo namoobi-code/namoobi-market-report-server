@@ -1,6 +1,6 @@
 {
- "marker": "2026-11-07",
- "as_of": "2026-11-07",
+ "marker": "2026-11-15",
+ "as_of": "2026-11-15",
  "data": [
   [
    "2026-11-03",
@@ -39,6 +39,78 @@
   ],
   [
    "2026-11-07",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-08",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-09",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-10",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-11",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-12",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-13",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-14",
+   {
+    "inventory": 1,
+    "price_qoq": 1,
+    "capex_yoy": 2,
+    "leadtime": 0
+   }
+  ],
+  [
+   "2026-11-15",
    {
     "inventory": 1,
     "price_qoq": 1,
