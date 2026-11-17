@@ -455,13 +455,30 @@ def main():
             continue                                   # 전 종목 6-K 는 수시보고 소음 — 핵심만
         its = items_of(cik, ac.group(1)) if ft == "8-K" else ""
         is_ern = "2.02" in its
+        # (2026-10-17 실측 사고 TSLA) Item 2.02 가 곧 '실적 발표'는 아니다 — 테슬라는 분기 **인도·생산 실적**
+        #   (10/02, 수치는 대수·GWh 뿐)도 2.02 로 접수한다. 이를 실적으로 믿어 ern=1 이 되자 earnings_watch 의
+        #   '장거리 gap 은 8-K(실적) 교차확인 시 허용' 규칙이 열려 **직전 분기(Q2) EPS 0.33 이 10/02 에 붙었고**,
+        #   달력은 10/21 진짜 발표 예정 칸에서 TSLA 를 '완료'로 지웠다(healthcheck 경보). 첨부(EX-99.1) 본문에
+        #   손익 키워드(EPS·net income·revenue·operating income)가 하나도 없으면 운영지표 공시로 강등한다.
+        if is_ern and ft == "8-K":
+            try:
+                _tx = (exhibit_text(cik, ac.group(1)) or "")[:60000].lower()
+                #   키워드만으론 부족 — 테슬라 인도 보고서에도 "net income ... will be announced when we announce Q3 earnings"
+                #   보일러플레이트가 있다. 손익 키워드 **+ 금액 표기($·million/billion)** 둘 다 있어야 실적으로 본다.
+                _fin = (re.search(r"earnings per share|\beps\b|net income|net loss|total revenue|revenues?\b|operating income|gross margin", _tx)
+                        and re.search(r"\$\s?\d|\d\s?(million|billion)\b", _tx))
+                if _tx and not _fin:
+                    is_ern = False
+                    print(f"  ↓ {sym} 2.02 이지만 첨부에 손익 수치 없음 → 운영지표(비실적)로 분류 acc={ac.group(1)}")
+            except Exception:
+                pass
         # (2026-08-15) Item 7.01(Reg FD) 도 본다 — **분기 중 가이던스 상향/하향·인베스터데이
         # 자료는 실적일이 아니라 7.01 로 나온다**(사용자 지적: 놓치는 채널). 소음 방지:
         # 비핵심 종목의 7.01 은 첨부에서 가이던스가 실제로 파싱될 때만 기록한다.
         is_fd = (not is_ern) and ("7.01" in its)
         if ft == "8-K" and not is_core and not is_ern and not is_fd:
             continue                                   # 비핵심은 실적(2.02)·RegFD(7.01) 만 후보
-        tag = f"📄 {ft}{'(실적)' if is_ern else ('(RegFD)' if is_fd else '')} 접수 {et.strftime('%H:%M')}ET"
+        tag = f"📄 {ft}{'(실적)' if is_ern else ('(RegFD)' if is_fd else ('(운영지표)' if '2.02' in its else ''))} 접수 {et.strftime('%H:%M')}ET"
         gd = {}
         if is_ern or is_fd:                          # 실적·RegFD 8-K 는 보도자료를 열어 가이던스 확인
             try:

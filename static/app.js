@@ -4905,6 +4905,15 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cov:{label:'목표주가(구)',fixed:'— 목표주가 리비전 30·90일로 통일'},
       per:{label:'PER',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['10배 ↓',null,10],['15배 ↓',null,15],['20배 ↓',null,20]],def:[null,null]},
       pbr:{label:'PBR',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['1배 ↓',null,1],['2배 ↓',null,2],['3배 ↓',null,3]],def:[null,null]},
+      /* (2026-11-17 메리츠 '퀄리티' 선별 — 매경ECONOMY 11.11) KR FCF = DART 영업현금흐름 − 유형자산 취득(fin_quality v2, 최근 사업연도) */
+      fcfy:{label:'FCF 수익률 (잉여현금흐름÷시총)',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['0% ↑(현금 남음)',0,null],['3% ↑',3,null],['5% ↑',5,null],['마이너스',null,0]],def:[null,null]},
+      nig1:{label:'내년 순이익 증가율(컨센)',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['증가(0% ↑)',0.01,null],['10% ↑',10,null],['20% ↑',20,null],['감소',null,0]],def:[null,null]},
+      nig0:{label:'올해 순이익 증가율(컨센)',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['증가(0% ↑)',0.01,null],['20% ↑',20,null],['감소',null,0]],def:[null,null]},
+      nirev90:{label:'내년 순이익 전망 리비전 90일',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['상향(0% ↑)',0.01,null],['+3% ↑',3,null],['+10% ↑',10,null],['하향',null,0]],def:[null,null]},
+      niacc:{label:'순이익 증가율 가속(내년−올해)',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%p',reqData:1,presets:[['전체',null,null],['가속(0%p ↑)',0.01,null],['+10%p ↑',10,null],['둔화',null,0]],def:[null,null]},
+      dpsg:{label:'내년 DPS 증가율(컨센)',fmt:v=>(v>=0?'+':'')+v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['증가(0% ↑)',0.01,null],['5% ↑',5,null],['10% ↑',10,null],['감소',null,0]],def:[null,null]},
+      divfcf:{label:'배당÷FCF (금융=배당성향)',fmt:v=>v.toFixed(0)+'%',reqData:1,presets:[['전체',null,null],['50% ↓(여력)',null,50],['100% ↓',null,100],['100% ↑(FCF 초과)',100,null]],def:[null,null]},
+      mexp:{label:'내년 영업이익률 개선 전망',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',reqData:1,presets:[['전체',null,null],['개선(0%p ↑)',0,null],['+1%p ↑',1,null],['+3%p ↑',3,null],['악화(0%p ↓)',null,0]],def:[null,null]},
       divy:{label:'배당',fmt:v=>v.toFixed(1)+'%',min:1,presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]],def:[null,null]},
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       mom:{label:'수익률 12M',fmt:v=>v.toFixed(0)+'%',presets:[['전체',null,null],['0% ↑',0,null],['50% ↑',50,null],['100% ↑',100,null],['0% ↓(하락)',null,0],['-30% ↓',null,-30]],def:[null,null]},
@@ -5016,6 +5025,10 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       cov:{label:'목표주가',tgl:1,def:false,tglLabel:'컨센서스 있는 종목만'},
       per:{label:'PER',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['10배 ↓',null,10],['15배 ↓',null,15],['20배 ↓',null,20]],def:[null,null]},
       pbr:{label:'PBR',fmt:v=>v.toFixed(1)+'배',presets:[['전체',null,null],['1배 ↓',null,1],['2배 ↓',null,2],['3배 ↓',null,3]],def:[null,null]},
+      fcfy:{label:'FCF 수익률 (잉여현금흐름÷시총)',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%',reqData:1,presets:[['전체',null,null],['0% ↑(현금 남음)',0,null],['3% ↑',3,null],['5% ↑',5,null],['8% ↑',8,null],['마이너스(현금 소진)',null,0]],def:[null,null]},
+      nig1:{label:'내년 순이익 증가율(컨센)',fixed:'— (KR 전용 · WISEreport 연간 순이익 컨센)'}, nig0:{label:'올해 순이익 증가율(컨센)',fixed:'— (KR 전용)'},
+      nirev90:{label:'내년 순이익 전망 리비전 90일',fixed:'— (KR 전용 — US 는 추정 90일(cr90) 사용)'}, niacc:{label:'순이익 증가율 가속',fixed:'— (KR 전용)'}, divfcf:{label:'배당÷FCF',fixed:'— (KR 전용 — US 는 FCF 수익률·배당성향 사용)'}, dpsg:{label:'내년 DPS 증가율(컨센)',fixed:'— (KR 전용)'},
+      mexp:{label:'내년 마진 개선 전망 (EPS성장−매출성장)',fmt:v=>(v>=0?'+':'')+v.toFixed(1)+'%p',reqData:1,presets:[['전체',null,null],['개선(0%p ↑)',0,null],['+3%p ↑',3,null],['+10%p ↑',10,null],['악화(0%p ↓)',null,0]],def:[null,null]},
       divy:{label:'배당',fmt:v=>v.toFixed(1)+'%',min:1,presets:[['전체',null],['1% ↑',1],['2% ↑',2],['3% ↑',3]],def:[null,null]},
       grw:{label:'성장',fmt:v=>v.toFixed(0)+'%',min:1,presets:[['전체',null],['0% ↑',0],['10% ↑',10],['20% ↑',20],['50% ↑',50]],def:[null,null]},
       mom:{label:'수익률 12-1M',fmt:v=>v.toFixed(0)+'%',presets:[['전체',null,null],['0% ↑',0,null],['50% ↑',50,null],['100% ↑',100,null],['0% ↓(하락)',null,0],['-30% ↓',null,-30]],def:[null,null]},
@@ -5138,7 +5151,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
               /* (2026-08-09) 실적발표 이벤트 — 실적(서프)·전망(리비전·가이던스)·주가(반응) 순
                  (2026-08-10) cr7 · gapE 추가 — 리비전 7일 / 가이던스 갭 매출·EPS 분리 */
               'edld','spr','sspr','sprb','cr7','cr30','cr90','qup','yup','pr7','pr30','pr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20',
-              'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
+              'grw','mgrw','ogrw','gacc','tob','qtoby','qtobq','opm','opmch','per','peg','pbr','fcfy','mexp','nig0','nig1','niacc','nirev90','dpsg','divfcf','psr','roe','payout','divy','dinc','dgy','dcyc','mdd5','sec'];
   /* ── (2026-07-24) 파생·수급판정 점수 (등급형 v2) ──────────────────────
      파생 z 3종(베이시스·풋콜(OI)·IV스큐 — 방향지표만, GEX·OI 제외):
        |z|≥1 → ±0.5점 · |z|≥2 → ±1점  (절벽 제거 — 1.49/1.51 이 갈리지 않게)
@@ -5251,7 +5264,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       if(f.tgl){o[k]={on:f.def};}
       else if(f.cat){o[k]={v:null};}
       else {o[k]={min:f.def[0],max:f.def[1]};} } return o; }
-  function resetF(){ F_ST[mkt]=buildF(); F=F_ST[mkt]; }          // 초기화 → 현재 마켓만 기본값
+  let SECCAP=null;   // (2026-11-17) 업종별 상위 N 제한 — 메리츠 프리셋 전용 {n,k}. resetF/필터 초기화 때 해제
+  function resetF(){ F_ST[mkt]=buildF(); F=F_ST[mkt]; SECCAP=null; }          // 초기화 → 현재 마켓만 기본값
   /* 전부전체 = 모든 필터를 '전체'로 (buildF 와 같은 구조에 기본값 대신 빈 값) */
   function clearF(){ const o={}; const d=DEF[mkt];
     for(const k of KEYS){ const f=d[k]; if(!f || f.fixed!==undefined) continue;
@@ -5535,7 +5549,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     tprv:{l:'목표가30일',n:1,m:'both'}, tprv90:{l:'목표가90일',n:1,m:'both'}, gap:{l:'매출 가이던스 갭',n:1,m:'us'}, gapP:{l:'매출 가이던스 갭(포털)',n:1,m:'us'},
     gapE:{l:'EPS 가이던스 갭',n:1,m:'us'}, gapEP:{l:'EPS 가이던스 갭(포털)',n:1,m:'us'},
     r1:{l:'발표D+1',n:1,m:'both'}, r20:{l:'발표D+20',n:1,m:'both'},
-    grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
+    fcfy:{l:'FCF수익률',n:1,m:'both'}, mexp:{l:'내년마진Δ',n:1,m:'both'}, nig0:{l:'올해순익↑',n:1,m:'kr'}, nig1:{l:'내년순익↑',n:1,m:'kr'}, niacc:{l:'순익가속',n:1,m:'kr'}, nirev90:{l:'순익전망90일',n:1,m:'kr'}, divfcf:{l:'배당÷FCF',n:1,m:'kr'}, dpsg:{l:'내년DPS↑',n:1,m:'kr'}, grw:{l:'성장',n:1,m:'both'}, revg:{l:'매출성장',n:1,m:'both'}, opg:{l:'이익성장',n:1,m:'both'}, gacc:{l:'성장가속',n:1,m:'both'},
     per:{l:'PER',n:1,m:'both'}, pbr:{l:'PBR',n:1,m:'both'}, roe:{l:'ROE',n:1,m:'both'},
     payout:{l:'배당성향',n:1,m:'both'}, divy:{l:'배당',n:1,m:'both'}
   };
@@ -5640,6 +5654,9 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'r6m': return r.r6m!=null?r.r6m*100:null;
       case 'vol20': return r.vol20;                       // 이미 % 값
       case 'opm': return r.opm!=null?r.opm*100:null;
+      case 'fcfy': { const f=r.fcfy!=null?r.fcfy:r.fcfy_kr; return f!=null?f*100:null; }   // US=야후 fcf÷cap · KR=DART(OCF−유형자산 취득)÷시총
+      case 'nig0': case 'nig1': case 'niacc': case 'nirev90': case 'divfcf': case 'dpsg': return r[k]!=null?r[k]:null;   // (2026-11-17) 메리츠 퀄리티 선별용
+      case 'mexp': return r.mexp;   // (2026-10-17) KR=FY내년 영업이익률−올해(%p, 네이버 연간 컨센) · US=EPS성장−매출성장 프록시(%p)   // (2026-10-17) FCF÷시총 % — US 야후 재무(screener_pool fcf/cap)
       case 'turn': return r.turn!=null?r.turn*100:null;
       case 'peg': return r.peg; case 'psr': return r.psr;
       case 'tob': return r.tob?1:0;
@@ -5756,7 +5773,12 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
       case 'oploss': return v>0?`<span class="dn">${v.toFixed(0)}년</span>`:'<span class="note">—</span>';
       case 'hi': return `<span class="note">고점 ${v.toFixed(0)}%</span>`;
       case 'grw': case 'revg': case 'opg': case 'mom': case 'v200': case 'v20': case 'v50': return sgn(0);
-      case 'r1m': case 'r3m': case 'r6m': case 'opm': return sgn(1);
+      case 'r1m': case 'r3m': case 'r6m': case 'opm': case 'fcfy': case 'mexp': return sgn(1);
+      case 'nig0': case 'nig1': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="WISEreport 연간 순이익 컨센 증가율 ${E(r.ni_lbl||'')} (${key==='nig0'?'올해(E) vs 직전 실적':'내년(E) vs 올해(E)'})">${v>0?'+':''}${Math.abs(v)>=1000?(v/100).toFixed(0)+'배':v.toFixed(0)+'%'}</span>`;
+      case 'niacc': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="내년 순이익 증가율 − 올해 증가율 (하나증권: 증가율의 폭이 커지는가)">${v>0?'+':''}${v.toFixed(0)}%p</span>`;
+      case 'nirev90': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="내년 순이익 컨센서스의 최근 90일 변화 (30일 ${r.nirev30==null?'—':(r.nirev30>0?'+':'')+r.nirev30+'%'})">${v>0?'+':''}${v.toFixed(1)}%</span>`;
+      case 'dpsg': return `<span class="${v>0?'up':(v<0?'dn':'note')}" title="현금DPS 컨센(원) 직전→올해(E)→내년(E): ${E(r.dps_e||'')}">${v>0?'+':''}${v.toFixed(0)}%</span>`;
+      case 'divfcf': return `<span class="${v<=50?'up':(v>100?'dn':'note')}" title="${/^ni/.test(r.divfcf_src||'')?'금융사 — 배당성향(순이익 기준'+(r.divfcf_src==='niE'?', 내년 컨센)':')'):r.divfcf_src==='fcfE'?'내년(E) 컨센: 순이익×배당성향 ÷ FCF':'DART 배당금의 지급 ÷ (영업현금흐름 − 유형자산 취득), 최근 사업연도 실적'}">${v>=999?'FCF≤0':v.toFixed(0)+'%'}${/^ni/.test(r.divfcf_src||'')?'<span class="note" style="font-size:10px"> 성향</span>':''}</span>`;
       case 'vol20': return v.toFixed(1)+'%';
       case 'turn': return v.toFixed(2)+'%';
       case 'peg': case 'psr': return v.toFixed(2);
@@ -5870,12 +5892,16 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
   let popCloser=false;
   function applyTable(){
     if(!loaded){ waitScreen(); return; }      // START 전: 대기 화면 유지(빈 표로 덮어쓰지 않음)
-    const base=POOL[mkt].filter(pass);            // 하드컷 통과 (2·3단계는 이 집합을 그대로 쓴다)
+    let base=POOL[mkt].filter(pass);            // 하드컷 통과 (2·3단계는 이 집합을 그대로 쓴다)
+    let _capNote='';
+    if(SECCAP&&mkt==='kr'){ const n0=base.length, cnt={};      // 업종(WICS 섹터)별 상위 N — 정렬키 내림차순
+      base=base.slice().sort((a,b)=>(sortVal(b,SECCAP.k)||-1e9)-(sortVal(a,SECCAP.k)||-1e9)).filter(r=>{const s=r.wics2||r.wics||r.krx||'기타';   /* 업종 = WICS 세부(없으면 섹터) — 기사 15종목에 반도체 3·산업재 6이라 대분류가 아닌 세부 업종 기준 */ cnt[s]=(cnt[s]||0)+1; return cnt[s]<=SECCAP.n;});
+      _capNote=` <span class="findtag" title="메리츠 ③ 최종 선별: 이익 전망 상향률 순, 업종(WICS 세부)별 최대 ${SECCAP.n}곳. 초기화하거나 다른 프리셋을 누르면 해제">🏛 조건 통과 ${n0}종 → 업종별 최대 ${SECCAP.n}곳 = ${base.length}종${SECCAP.hana?' · 하나 조건(증가율 가속) 포함':''}</span>`; }
     const rows=findQ? base.filter(findHit) : base; // 종목 찾기는 1단계 표에만 적용
     rows.sort((a,b)=>{const x=sortVal(a,sort.k),y=sortVal(b,sort.k);
       if(typeof x==='string')return sort.d*x.localeCompare(y); return sort.d*(x-y);});
     $('scr_cnt').innerHTML=`<b>${base.length.toLocaleString()}</b>종 통과 <span style="opacity:.6">/ ${POOL[mkt].length.toLocaleString()} 전체</span>`
-      +(findQ?` <span class="findtag">🔎 “${E(findQ)}” ${rows.length.toLocaleString()}종</span>`:'');
+      +(findQ?` <span class="findtag">🔎 “${E(findQ)}” ${rows.length.toLocaleString()}종</span>`:'')+_capNote;
     const cols=COLST[mkt].filter(cAvail); const cap=rows.slice(0,400);
     $('scr_tbl').innerHTML='<tr><th id="scr_hashtop" title="클릭: 결과 표를 화면 맨 위로 · 다시 클릭: 필터로 복귀" style="cursor:pointer">#</th>'+cols.map(k=>`<th data-sort="${k}" class="${sort.k===k?(sort.d<0?'dn':'up'):''}">${E(cl(k))}</th>`).join('')
       +'<th class="colbtn" id="scr_colplus" title="표시 컬럼 추가·순서 변경">＋</th></tr>'+
@@ -6025,6 +6051,8 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
         ['연속 비트(4Q중)','KR 미제공 — 분기별 서프라이즈 이력을 주는 무료 소스가 없다'],
 
         ['전망분기·전망연간 전구간↑','한국 전용. WISEreport 컨센 표에서 <b>모든 미래(E) 구간의 영업이익 증가율이 양수</b>인가 — 분기(E)는 전년동기(YoY) 대비, 연간(E)은 전년 대비(예: 2026/09E·2026/12E·2027/03E 전부 + / FY2026E·2027E·2028E 전부 +). 기저가 결측·0 근처인 구간은 판정에서 제외 · 적자 기저의 흑자전환은 +로 본다. 두 필터를 함께 켜면 \'분기로도 연간으로도 꺾이는 구간이 없는\' 전망 종목만 남는다'],
+        ['내년 영업이익률 개선 전망','한국=<b>내년(E) 영업이익률 − 올해(E) 영업이익률</b>(네이버 연간 컨센 영업이익÷매출, %p). 미국=야후가 영업이익 전망을 안 줘 <b>내년 EPS 컨센 성장 − 매출 컨센 성장</b>으로 근사(이익이 매출보다 빨리 늘면 마진 확대). 한경BUSINESS 26.10.14 하나증권: \'국내 증시 이익 증가율이 둔화하는 초기 국면에선 영업이익률 상승 여부가 주가 차별화를 결정\'. 실측: 효성중공업 15.7→18.3%, HD현대일렉 26.3→28.0%(기사 수치)'],
+        ['FCF 수익률','<b>잉여현금흐름(FCF) ÷ 시가총액</b>. FCF=영업으로 번 현금 − 설비투자. \'투자를 다 치르고도 남는 현금이 주가 대비 몇 %냐\' — 예금금리와 바로 비교되는 숫자라 고금리 시대의 핵심 체크(한경BUSINESS 26.10.14 \'투자 이후 현금흐름\'). 미국만(야후 재무), 한국은 소스 미제공. 마이너스=투자가 번 돈보다 커서 외부 조달 필요'],
         ['가이던스 갭','한국은 기업이 다음 분기 실적 전망을 공시하는 관행이 없다. 대신 <b>실적 서프라이즈</b>(잠정 vs 컨센)가 같은 역할을 한다'],
         ['발표 후 1일','발표 <b>직전</b> 종가 대비 다음 거래일 등락률. <b>서프 + 인데 여기가 − 면</b> 시장이 향후 전망을 나쁘게 봤다는 뜻'],
         ['발표 후 20일(PEAD)','발표 후 20거래일 수익률. PEAD(발표후 표류) = 서프라이즈 방향으로 주가가 수 주간 계속 흐르는 현상'],
@@ -6054,7 +6082,7 @@ fetch('/api/report').then(r=>r.json()).then(R=>{
     ['기술적 지표',['hi','v200','v50','v20','align','rsi','macd','bb','volx','vol20']],
     ['컨센서스',['ern','tp','upside','recn','rev','nan']],
       ['실적발표',['edld','spr','sspr','sprb','cr7','cr30','cr90','qup','yup','pr7','pr30','pr90','tprv','tprv90','gap','gapP','gapE','gapEP','r1','r20']],
-    ['밸류·수익성',['per','peg','pbr','psr','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
+    ['밸류·수익성',['per','peg','pbr','psr','fcfy','mexp','nig0','nig1','niacc','nirev90','dpsg','divfcf','divy','payout','dinc','dgy','dcyc','mdd5','roe','opm']],
     ['성장',['grw','revg','opg','tob']],['수급',['fnb20','onb20','fst','ost','sr','lbr','frgn','frgn4w','drvj']],
     ['건전성',['de','cr','oploss']],['기타',['age']]];
   const _catByLabel=(()=>{ const m={};
@@ -9120,6 +9148,57 @@ await _canvasFlow(c);
     sort={k:'spr',d:-1}; apply(); };}
   /* (2026-08-09) ⚠️ 가이던스쇼크 — 샌디스크형. 실적은 좋은데 전망이 나빠 빠진 경우.
      반등 후보일 수도, 전망 악화가 진짜일 수도 있어 컨센 리비전을 반드시 함께 본다. */
+  /* (2026-10-17 한경BUSINESS 26.10.14 황수욱 '고금리 시대, 주식시장은 무엇을 봐야 하나' 반영)
+     💵 고금리 감당 — "금리가 올라도 이익이 그 부담을 감당할 만큼 성장하는, 현금흐름이 뒷받침되는 기업".
+     기사 체크리스트 → 필터: ① 이익이 금리 부담을 넘어 성장(실적 이익성장 20%↑·영업이익률 10%↑·마진 개선)
+     ② 재무가 금리를 견딤(부채비율 100%↓·유동비율 1.0↑ — 이자부담·차입조달 리스크) ③ 전망이 올라가는 중(컨센 리비전 0%↑,
+     KR 은 전망 전구간↑) ④ 추정치 상향 vs 주가 — 주가가 추정만큼 안 올랐다(3M 수익률 20% 이하 = 밸류 재평가 여지)
+     ⑤ 대형(3,000억/$2B↑ — 고금리에서 소형주 조달비용 불리). 수주잔고·현금흐름 절대치는 풀에 없어 상세(실적·전망 패널)에서 확인. */
+  {const b=$('scr_hirate'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    resetF(); F=F_ST[mkt];
+    const d=DEF[mkt];
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('ogrw',{min:20,max:null});       // 이익 성장이 금리 부담을 상회
+    set('opm',{min:10,max:null});        // 이익률 — 비용(금리) 흡수 여력
+    set('opmch',{min:0,max:null});       // 마진 개선 중(원가·금리 부담을 가격에 전가 가능)
+    set('de',{min:null,max:100});        // 부채비율 100% 이하 — 차입 조달 리스크
+    set('cr',{min:1.0,max:null});        // 유동비율
+    if(mkt==='us'){ set('cr30',{min:0,max:null}); set('fcfy',{min:3,max:null}); }   // (2026-10-17 승인) 투자 후 현금흐름 — FCF 수익률 3%↑(예금금리급)
+    else { set(_KRREV(),{min:0,max:null}); set('qup',{min:1,max:null}); }
+    set('r3m',{min:null,max:20});        // 추정 상향 vs 주가: 아직 덜 오른 쪽
+    set('cap',{min:mkt==='kr'?3e11:2e9,max:null});   // ⚠ cap 은 원/달러 원단위(3e11=3,000억) — 'cap:3000' 은 무필터와 같다
+    sort={k:'ogrw',d:-1}; apply(); };}
+  /* (2026-10-17 한경BUSINESS 26.10.14 전예진 '국채금리 5% 시대… 이익률·현금흐름 좋은 종목 골라라' — 하나증권 이재만) 📐 이익률·현금흐름
+     기사 선별 기준: ① ROE 와 영업이익률이 **개선**되면서 ② 잉여현금흐름이 늘어나는 기업. "이익 증가율 둔화 초기 국면에선 영업이익률 상승 여부가 차별화".
+     → ROE 10%↑(현재) · 내년 영업이익률 개선 전망(mexp>0 — KR 연간 컨센, US EPS−매출 성장 프록시) · 영업이익률 5%↑(흑자) · US 는 FCF 수익률 0%↑(현금 남는 회사) · 대형.
+     기사 예시 검증: 효성중공업·HD현대일렉트릭·한화에어로스페이스 통과(아래 커밋 실측). 한국전력·대한항공은 컨센 소스(네이버 FY) 기준으로 재확인. */
+  {const b=$('scr_mgn'); if(b) b.onclick=()=>{ if(stage!==1) return;
+    resetF(); F=F_ST[mkt];
+    const d=DEF[mkt];
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    set('roe',{min:10,max:null});
+    /* US 프록시(EPS성장−매출성장)는 저기저 EPS 에서 +100%p 로 폭주(바이오 다수) — 상한 30%p·FCF 2%↑·영업이익률 10%↑로 조인다 */
+    set('mexp',mkt==='us'?{min:0,max:30}:{min:0,max:null});
+    set('opm',{min:mkt==='us'?10:5,max:null});
+    if(mkt==='us') set('fcfy',{min:2,max:null});
+    set('cap',{min:mkt==='kr'?3e11:2e9,max:null});
+    sort={k:'mexp',d:-1}; apply(); };}
+  /* (2026-11-17 매경ECONOMY 11.11 '모멘텀보다 퀄리티' — 메리츠 황수욱 선별 3단계 + 하나증권 추가 조건) 🏛 메리츠 퀄리티 (KR 전용)
+     대상 코스피 시총 3,000억↑ → ① 이익 증가: 내년 순이익 증가(nig1>0) · 최근 3개월 전망 상향(nirev90>0)
+     → ② 현금·배당: 배당 증가(내년 DPS 컨센 증가 dpsg>0) · 배당액이 FCF 의 50% 이하(divfcf≤50 — 내년 컨센 순이익×배당성향÷FCF, 금융사는 배당성향)
+     → ③ 최종: 이익 전망 상향률(nirev90) 순, **업종(WICS 세부)별 최대 3곳**(SECCAP). 하나 조건(niacc>0=내년 증가율>올해)은 버튼을 한 번 더 누르면 토글.
+     기사는 에프앤가이드 컨센(11/3) · 우리는 WISEreport 컨센 + DART 현금흐름(최근 사업연도) — 종목이 완전히 같지는 않다. */
+  {const b=$('scr_meritz'); if(b) b.onclick=()=>{ if(stage!==1||mkt!=='kr') return;
+    const hana=(SECCAP&&SECCAP.tag==='meritz'&&!SECCAP.hana);     // 이미 메리츠 상태에서 다시 누르면 하나 조건 추가
+    allF(); SECCAP=null; const d=DEF[mkt];      // 기사 방식 그대로 — 기본 하드컷(거래대금·부채비율·120일선 등) 없이 '전부 전체'에서 시작(하드컷을 얹으면 41→25종으로 줄어 기사와 달라진다)
+    const set=(k,st)=>{ if(d[k]&&d[k].fixed===undefined) F[k]=st; };
+    if(d.mk) F.mk={v:'KOSPI'};
+    set('cap',{min:3e11,max:null});
+    set('nig1',{min:0.01,max:null}); set('nirev90',{min:0.01,max:null});
+    set('dpsg',{min:0.01,max:null}); set('divfcf',{min:null,max:50});   // 배당 증가=내년 DPS 컨센 > 올해(기사는 전망치 기준 — 과거 연속증가 dinc 로는 15종 중 5종만 통과)
+    if(hana) set('niacc',{min:0.01,max:null});
+    SECCAP={n:3,k:'nirev90',tag:'meritz',hana}; sort={k:'nirev90',d:-1}; apply();
+    b.textContent=hana?'🏛 메리츠+하나':'🏛 메리츠퀄리티'; };}
   {const b=$('scr_gshock'); if(b) b.onclick=()=>{ if(stage!==1) return;
     resetF(); F=F_ST[mkt];                 // 기본 하드컷 위에 조건을 얹는다(위 어닝드리프트와 동일)
     const d=DEF[mkt];

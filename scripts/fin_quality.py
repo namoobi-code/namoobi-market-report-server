@@ -30,7 +30,11 @@ IDS = {
     "ie_is": ("IS", ["ifrs-full_InterestExpense", "dart_InterestExpenseFinanceCosts"]),
     "ie_cf": ("CF", ["ifrs-full_InterestPaidClassifiedAsOperatingActivities", "ifrs-full_InterestPaidClassifiedAsFinancingActivities"]),
     "fc": ("IS", ["ifrs-full_FinanceCosts"]),
+    # (2026-11-17 메리츠 '퀄리티' 선별 — 배당액 ≤ FCF 50%) 설비투자·배당금 지급 → FCF = OCF − 유형자산 취득, 배당/FCF
+    "capex": ("CF", ["ifrs-full_PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities"]),
+    "div": ("CF", ["ifrs-full_DividendsPaidClassifiedAsFinancingActivities"]),
 }
+VER = 2   # 캐시 레코드 버전 — v2 = capex·div·fcf 포함. 구버전 레코드는 우선순위(코스피 시총 3,000억↑ 먼저) 순으로 다시 받는다
 
 
 def num(s):
@@ -63,6 +67,11 @@ def pull(corp, year, fs):
             got["ie_cf"] = v
         if "ie_is" not in got and sjn == "IS" and nm.replace(" ", "") in ("이자비용",):
             got["ie_is"] = v
+        _n = nm.replace(" ", "")
+        if "capex" not in got and sj == "CF" and _n in ("유형자산의취득", "유형자산취득", "유형자산의증가"):
+            got["capex"] = v
+        if "div" not in got and sj == "CF" and _n in ("배당금의지급", "배당금지급", "배당의지급", "현금배당금의지급"):
+            got["div"] = v
     return got or None
 
 
@@ -75,12 +84,18 @@ def main():
     # 최신 사업보고서 연도: 4월 이후면 전년, 그 전엔 전전년(3월 말 제출)
     year = now.year - 1 if now.month >= 4 else now.year - 2
     rows, n_call, n_new = {}, 0, 0
+    # v2 재수집 예산 — DART 가 2,800콜 넘으면 지연시키므로 한 번에 MAXNEW 종목만. 코스피 시총 큰 순으로 먼저(메리츠 대상 = 코스피 3,000억↑)
+    import sys as _sys
+    MAXNEW = int(_sys.argv[1]) if len(_sys.argv) > 1 else 700
+    prio = {r["c"]: (0 if r.get("mk") == "KOSPI" else 1, -(r.get("cap") or 0)) for r in pool.get("kr") or []}
+    codes.sort(key=lambda c: prio.get(c, (2, 0)))
+    n_up = 0
     for i, c in enumerate(codes):
         corp = mp.get(c)
         if not corp:
             continue
         ck = f"{c}:{year}"
-        if ck in cache:
+        if ck in cache and (cache[ck].get("v") == VER or cache[ck].get("none") or n_up >= MAXNEW):
             rows[c] = cache[ck]
             continue
         rec = None; failed = False
@@ -97,7 +112,10 @@ def main():
                     if got.get(k) is not None and got[k] > 0:
                         ie, src = abs(got[k]), k; break
                 op, ocf = got.get("op"), got.get("ocf")
-                rec = {"yr": year, "fs": fs, "op": op, "ie": ie, "ocf": ocf, "src": src,
+                cpx = abs(got["capex"]) if got.get("capex") is not None else None; dv = abs(got["div"]) if got.get("div") is not None else None
+                n_up += 1
+                rec = {"yr": year, "fs": fs, "op": op, "ie": ie, "ocf": ocf, "src": src, "v": VER, "capex": cpx, "div": dv,
+                       "fcf": (ocf - cpx) if (ocf is not None and cpx is not None) else None,
                        "icr": (round(op / ie, 1) if (ie and op is not None) else None),
                        "ocfop": (round(ocf / op, 2) if (ocf is not None and op and op > 0) else None)}
                 break

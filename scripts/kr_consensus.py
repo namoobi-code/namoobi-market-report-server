@@ -83,6 +83,9 @@ def encparam():
     return m.group(1)
 
 
+EXTRA = {}   # code → {FYxxxx: {fcf(억), dps(원), po(%)}} — quarters(freq='Y') 가 채운다
+
+
 def quarters(code, enc, freq="Q"):
     """→ [(period, is_est, sales, op, ni)]  기간 오름차순. 억원 단위(DART 파서와 동일).
     freq='Y' 면 연간 표 — 같은 구조라 파서를 공유한다(실측: 2028/12(E)까지 제공)."""
@@ -101,6 +104,17 @@ def quarters(code, enc, freq="Q"):
         key = {"매출액": "sales", "영업이익(발표기준)": "op", "당기순이익": "ni"}.get(c[0])
         if key and (key != "op" or "op" not in rows):
             rows[key] = c[1:1 + len(pers)]
+        # (2026-11-17) 같은 표에 FCF·현금DPS·현금배당성향 컨센(E)도 있다(실측 LX인터·코스맥스) — 메리츠 ② '배당 증가·배당액≤FCF 50%' 를 **전망치**로 판정하기 위해 연간 표에서 함께 읽는다
+        k2 = {"FCF": "fcf", "현금DPS(원)": "dps", "현금배당성향(%)": "po"}.get(c[0])
+        if k2 and freq == "Y":
+            rows[k2] = c[1:1 + len(pers)]
+    if freq == "Y":
+        ex = {}
+        for i, p in enumerate(pers):
+            m = re.match(r"(\d{4})/\d{2}", p)
+            if m:
+                ex["FY" + m.group(1)] = {k: (num(rows[k][i]) if rows.get(k) and i < len(rows[k]) else None) for k in ("fcf", "dps", "po")}
+        EXTRA[code] = ex
     out = []
     for i, p in enumerate(pers):
         m = re.match(r"(\d{4}/\d{2})(\(E\))?", p)
@@ -281,6 +295,32 @@ def main():
         yr = [(p2, e2, o2) for p2, e2, _s2, o2, _n2 in qs if p2.startswith("FY")]
         rec["qup"] = _futup(qr, lambda pp: str(int(pp[:4]) - 1) + pp[4:])   # 분기(E) 전부 YoY+
         rec["yup"] = _futup(yr, lambda pp: "FY" + str(int(pp[2:]) - 1))     # 연간(E) 전부 전년+
+        # (2026-10-17 한경BUSINESS 26.10.14 하나증권 '이익률·현금흐름' 반영) 연간 컨센 영업이익률 — 올해(E)·내년(E).
+        #   기사 선별 기준 = "내년 영업이익률이 올해보다 높아지는가". 분기 컨센만 쓰던 rec 에 연간(FY) 매출·영업익을 붙여
+        #   earnings_join 이 opm_fy0/opm_fy1/mexp(%p) 를 풀에 패치한다. 흑자·매출>0 인 경우만.
+        fy = {}
+        for p2, e2, s2, o2, _n2 in qs:
+            if p2.startswith("FY") and e2 and s2 and o2 is not None and s2 > 0:
+                fy[p2] = {"s": s2, "op": o2}
+        if fy:
+            rec["fy"] = fy
+        # (2026-11-17 매경ECONOMY 11.11 '모멘텀보다 퀄리티' 메리츠 황수욱 선별 기준 반영) 연간 **순이익** 컨센 — 올해(E)·내년(E)·직전 실적 + 내년 순이익 90/30일 리비전.
+        #   메리츠 ① "2027년 순이익 증가 · 최근 3개월 전망 상향", 하나증권 "내년 증가율 > 올해 증가율" 을 풀에서 판정하기 위한 원자료.
+        #   earnings_join 이 nig0/nig1/nirev90/niacc 로 가공한다. 스냅샷(snap.ni)은 2026-08-09 부터 쌓여 90일 창이 이미 찼다.
+        fyr = {p2: (e2, n2) for p2, e2, _s2, _o2, n2 in qs if p2.startswith("FY") and n2 is not None}
+        ey = sorted(k for k, (e2, _n) in fyr.items() if e2)
+        if len(ey) >= 2:
+            y0, y1 = ey[0], ey[1]; yp = "FY" + str(int(y0[2:]) - 1)
+            def _nprev(period, days):
+                d0 = (datetime.now() - timedelta(days=days)).strftime("%Y-%m-%d")
+                rr = cx.execute("SELECT ni FROM snap WHERE code=? AND period=? AND ni IS NOT NULL AND d<=? ORDER BY d DESC LIMIT 1", (code, period, d0)).fetchone()
+                return rr[0] if rr else None
+            rec["nfy"] = {"y0": y0, "y1": y1, "nip": (fyr.get(yp) or (None, None))[1], "ni0": fyr[y0][1], "ni1": fyr[y1][1],
+                          "ni1_90": _nprev(y1, 90), "ni1_30": _nprev(y1, 30), "ni0_90": _nprev(y0, 90)}
+            _ex = EXTRA.get(code) or {}
+            for lab, yy in (("p", yp), ("0", y0), ("1", y1)):
+                e3 = _ex.get(yy) or {}
+                rec["nfy"]["dps" + lab] = e3.get("dps"); rec["nfy"]["fcf" + lab] = e3.get("fcf"); rec["nfy"]["po" + lab] = e3.get("po")
         out[code] = rec
 
     # ── 리포트 발간 흐름·목표주가 (상위 종목만 — 호출 절약)
