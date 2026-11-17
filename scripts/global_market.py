@@ -355,6 +355,20 @@ def krx_gold_hist(have_t, back_days=400):
     except Exception:
         return {"t": [], "v": []}
 
+def naver_metal_hist(code, pages=2):
+    """(2026-11-17) 네이버 새 시세 API api.stock.naver.com/marketindex/metals/{code}/prices — 국내 금(M04020000) 일별 종가(원/g).
+       KRX OPEN API gold_bydd_trd 가 10/16 이후 빈 응답([])만 돌려줘 국내 금이 한 달 멈춘 데 대한 2차 경로(사용자 요청 '금 수집 복구').
+       값은 KRX 종가와 동일 — 실측 10/14 179,180 · 10/15 179,050 · 10/16 179,200 일치. pageSize 60 고정(10 미만은 400)."""
+    out = {}
+    for pg in range(1, pages + 1):
+        j = jget(f"https://api.stock.naver.com/marketindex/metals/{code}/prices?page={pg}&pageSize=60")
+        if not isinstance(j, list) or not j: break
+        for x in j:
+            try: out[str(x["localTradedAt"])[:10].replace("-", "")] = float(str(x["closePrice"]).replace(",", ""))
+            except Exception: pass
+    ts = sorted(out)
+    return {"t": ts, "v": [out[k] for k in ts]}
+
 def naver_mi_hist(ep, cd, fdtc, pages):
     """네이버 marketindex 일별시세 HTML 파싱(euc-kr) — 첫 실행 pages=40 백필, 이후 2페이지 증분."""
     rows = {}
@@ -533,7 +547,10 @@ def main():
             if s == "ND.GOLD_KR":
                 # (2026-10-19) 네이버 goldDailyQuote 가 HTTP 410(폐지)으로 9/17 이후 한 달간 멈춤 → KRX OPEN API 금시장 일별매매정보로 교체
                 nh = krx_gold_hist(a["t"])
-                if not nh["t"] and a["t"]: nh = naver_mi_hist(ep, cd, fdtc, pages=2)    # 키 없음·장애 시 구 경로(지금은 410) 시도만
+                # (2026-11-17) KRX 가 새 날짜를 못 주면(빈 응답) 네이버 새 API 로 메운다 — 구 goldDailyQuote 는 폐지돼 제거
+                if not nh["t"] or (a["t"] and max(nh["t"]) <= max(a["t"])):
+                    nv = naver_metal_hist("M04020000", pages=3 if a["t"] else 20)
+                    if nv["t"]: nh = {"t": nh["t"] + nv["t"], "v": nh["v"] + nv["v"]}
             else:
                 nh = naver_mi_hist(ep, cd, fdtc, pages=120 if len(a["t"]) < 800 else 2)   # 3년 수익률에 ~750거래일 필요(120페이지 ≈ 1200일)
             m2 = dict(zip(a["t"], a["v"])); m2.update(dict(zip(nh["t"], nh["v"])))

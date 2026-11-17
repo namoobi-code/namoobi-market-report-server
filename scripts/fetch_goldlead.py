@@ -223,7 +223,13 @@ def c_money(d_px):
         rk = (krc / k0 - 1) * 100 if (krc and k0) else None
         rows.append({"w": lab, "from": d0, "gold": round(rg, 1), "fx": round(rf, 1) if rf is not None else None, "krw_calc": round(((1 + rg / 100) * (1 + (rf or 0) / 100) - 1) * 100, 1), "krx": round(rk, 1) if rk is not None else None})
     levels = {"peak": {"d": pk_d, "v": pk_v, "pct": round((cur / pk_v - 1) * 100, 1), "months": round((cd - _date.fromisoformat(pk_d)).days / 30.4, 1)},
-              "support": {"v": 4000, "pct": round((4000 / cur - 1) * 100, 1)}, "target": {"v": 5000, "pct": round((5000 / cur - 1) * 100, 1), "src": "NH투자증권 연내 5,000달러 회복 가능성(이코노미스트 2026.10)"}}
+              "support": {"v": 4000, "pct": round((4000 / cur - 1) * 100, 1)},
+              # (2026-11-17 어피티 '금값, 바닥이라고 확신할 수 없어요') $4,000 이 깨졌으므로 지지선을 사다리로 — 깨진 선·다음 선·1년 저점을 매일 계산.
+              #   $3,800 = Kitco 2026-11-13 애널리스트 다음 지지 언급. 고정 문구('지지선 코앞')가 깨진 뒤에도 남던 문제 해소.
+              "supports": [{"v": lv, "pct": round((lv / cur - 1) * 100, 1), "broken": cur < lv} for lv in (4000, 3800, 3500)],
+              "low1y": (lambda y1: {"d": min(y1, key=lambda x: x[1])[0], "v": round(min(y1, key=lambda x: x[1])[1], 1),
+                                    "pct": round((cur / min(y1, key=lambda x: x[1])[1] - 1) * 100, 1)})(gd[-252:]),
+              "target": {"v": 5000, "pct": round((5000 / cur - 1) * 100, 1), "src": "NH투자증권 연내 5,000달러 회복 가능성(이코노미스트 2026.10)"}}
     # 투자수단 비교 — ETF 풀(다음금융 수정주가 수익률) + KRX 금현물 자체
     pool = {r["c"]: r for r in (jload(DB / "etf_pool.json").get("kr") or []) if r.get("c")}
     PROD = [("411060", "현물 · 환노출", "KRX 금현물 추종, 분배 없음, 연금계좌 가능"), ("0072R0", "현물 · 환노출", "KRX 금현물 추종"), ("0064K0", "현물·액티브 · 환노출", ""),
@@ -372,6 +378,25 @@ def judge():
     x = chg(s("gdx_rs"), 60)
     if x is not None: S("gdx_rs", "bull" if x >= 5 else "bear" if x <= -5 else "neu", f"60일 {x:+.1f}% — " + ("광산주가 금을 앞서 오름=금 강세 확신(광산주는 금의 레버리지)" if x >= 5 else "광산주가 금보다 약함=금 랠리 의심 신호" if x <= -5 else "동행"), jv=x, jl="60D %")
 
+    # (2026-11-17 어피티) 🔎 반등 단서 — "중앙은행·장기자금 매수만으론 가격을 못 지킨다. 미국 ETF 와 선물시장으로 단기 자금이 돌아오는지가 단서".
+    #   기존 수집 2종 재조합: CFTC 운용사 순롱의 4주 변화(수준이 아니라 방향) + IAU 20거래일 순유입 합. 둘 다 +면 복귀, 둘 다 −면 이탈, 엇갈리면 혼조.
+    try:
+        cs = s("cot_mm"); fl = (IND.get("iau_flow") or {}).get("s") or []
+        if len(cs) >= 5 and fl:
+            c_now, c_4w = cs[-1][1], cs[-5][1]; dc = c_now - c_4w; dcp = dc / abs(c_4w) * 100 if c_4w else 0
+            c_1w = c_now - cs[-2][1]
+            f20 = sum(vv for _, vv in fl[-20:]); f5 = sum(vv for _, vv in fl[-5:])
+            cu = dcp >= 3; cd_ = dcp <= -3; fu = f20 >= 100; fd = f20 <= -100
+            st = "복귀" if (cu and fu) else "이탈" if (cd_ and fd) else "멈춤" if (not cd_ and not fd and not cu and not fu) else "혼조"
+            txt = {"복귀": "선물 투기 포지션과 미국 ETF 가 함께 늘고 있음 — 단기 자금 복귀(반등 확인 신호)",
+                   "이탈": "선물 투기 포지션과 미국 ETF 가 함께 줄고 있음 — 단기 자금 이탈 진행 중(바닥 확인 전)",
+                   "멈춤": "선물·ETF 모두 변화가 작음 — 이탈은 멈췄지만 복귀도 아직",
+                   "혼조": ("선물 투기 포지션은 늘었는데 미국 ETF 는 유출 — 선물만 먼저 돌아온 상태, ETF 확인 필요" if (cu and not fu) else
+                            "미국 ETF 는 유입인데 선물 투기 포지션은 감소 — ETF 만 먼저 돌아온 상태" if (fu and not cu) else "선물·ETF 방향이 엇갈림")}[st]
+            IND["_rebound"] = {"state": st, "txt": txt, "cot": {"now": c_now, "w4": c_4w, "d4": dc, "d4p": round(dcp, 1), "d1": c_1w, "d": cs[-1][0]},
+                               "etf": {"f20": round(f20), "f5": round(f5), "d": fl[-1][0], "n": min(20, len(fl))},
+                               "src": "CFTC Disaggregated COMEX 금 운용사 순롱(주간) · IAU 발행주식×NAV 순유입 프록시(일간) — 기준: 4주 ±3%·20일 ±$100M"}
+    except Exception as e: err("rebound", e)
     AX = {"rate": ["real10", "bei", "dxy", "dff"], "risk": ["gpr", "vix"], "pos": ["cot_mm", "iau_flow", "gdx_rs"], "kr": ["kr_prem", "gt_world", "gt_kr"]}
     NM = {"rate": "실질금리·달러 (핵심)", "risk": "지정학·공포", "pos": "포지셔닝·ETF·광산주", "kr": "한국·대중 심리 (과열 감지)"}
     axes = {}
